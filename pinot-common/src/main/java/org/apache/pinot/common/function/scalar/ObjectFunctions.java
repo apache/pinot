@@ -94,28 +94,28 @@ public class ObjectFunctions {
     return null;
   }
 
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
   public static Object caseWhen(boolean c1, Object o1, Object oe) {
     return caseWhenVar(c1, o1, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, boolean c4,
       Object o4, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, boolean c4,
       Object o4, boolean c5, Object o5, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, oe);
