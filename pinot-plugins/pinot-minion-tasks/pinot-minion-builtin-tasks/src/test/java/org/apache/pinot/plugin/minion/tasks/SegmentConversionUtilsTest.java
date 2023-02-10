@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -53,7 +53,8 @@ public class SegmentConversionUtilsTest {
     _testServer = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
     _testServer.createContext("/segments/myTable", exchange -> {
       String response = JsonUtils.objectToString(
-          List.of(Map.of(TEST_TABLE_TYPE, List.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2))));
+          ImmutableList.of(
+              ImmutableMap.of(TEST_TABLE_TYPE, ImmutableList.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2))));
       exchange.sendResponseHeaders(HttpStatus.SC_OK, response.length());
       OutputStream os = exchange.getResponseBody();
       os.write(response.getBytes());
@@ -67,32 +68,32 @@ public class SegmentConversionUtilsTest {
   public void testNonExistentSegments()
       throws Exception {
     Assert.assertEquals(
-        SegmentConversionUtils.nonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
+        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
         FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-        List.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_3), null),
-        Set.of(TEST_TABLE_SEGMENT_3));
+            ImmutableList.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_3), null),
+        ImmutableSet.of(TEST_TABLE_SEGMENT_3));
     Assert.assertEquals(
-        SegmentConversionUtils.nonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
+        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
             FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            List.of(TEST_TABLE_SEGMENT_3), null),
-        Set.of(TEST_TABLE_SEGMENT_3));
+            ImmutableList.of(TEST_TABLE_SEGMENT_3), null),
+        ImmutableSet.of(TEST_TABLE_SEGMENT_3));
     Assert.assertTrue(
-        SegmentConversionUtils.nonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
+        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
             FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            List.of(TEST_TABLE_SEGMENT_1), null).isEmpty());
+            ImmutableList.of(TEST_TABLE_SEGMENT_1), null).isEmpty());
     Assert.assertTrue(
-        SegmentConversionUtils.nonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
+        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
             FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            List.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2), null).isEmpty());
+            ImmutableList.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2), null).isEmpty());
   }
 
   @Test
   public void testNonExistentSegmentsThrowsWhenTheSegmentNameListIsEmpty()
       throws Exception {
     Assert.assertThrows(IllegalArgumentException.class, () ->
-        SegmentConversionUtils.nonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
+        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
         FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-        List.of(), null));
+            ImmutableList.of(), null));
   }
 
   @AfterClass

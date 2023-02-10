@@ -163,7 +163,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
-    Set<String> nonExistentSegmentNames = SegmentConversionUtils.nonExistentSegments(tableNameWithType,
+    Set<String> nonExistentSegmentNames = SegmentConversionUtils.extractNonExistentSegments(tableNameWithType,
         FileUploadDownloadClient.extractBaseURI(new URI(uploadURL)),
         Arrays.asList(inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR)), authProvider);
     if (!CollectionUtils.isEmpty(nonExistentSegmentNames)) {

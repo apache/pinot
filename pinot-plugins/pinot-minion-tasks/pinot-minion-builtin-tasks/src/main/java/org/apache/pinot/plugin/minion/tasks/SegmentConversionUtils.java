@@ -66,15 +66,15 @@ public class SegmentConversionUtils {
   }
 
   /**
-   * Checks whether the given list of segments all exist or not
+   * Extract non-existent segments from the given list of segments
    * @param tableNameWithType a table name with type
    * @param controllerBaseURI the controller base URI
    * @param segmentNames a list of segments to check
    * @param authProvider a {@link AuthProvider}
-   * @return
+   * @return a set of non-existent segment names
    * @throws Exception when there are exceptions checking whether the given list of segments all exist or not
    */
-  public static Set<String> nonExistentSegments(String tableNameWithType, URI controllerBaseURI,
+  public static Set<String> extractNonExistentSegments(String tableNameWithType, URI controllerBaseURI,
       List<String> segmentNames, @Nullable AuthProvider authProvider)
       throws Exception {
     Preconditions.checkArgument(!CollectionUtils.isEmpty(segmentNames),
