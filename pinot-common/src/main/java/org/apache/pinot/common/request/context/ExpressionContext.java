@@ -68,7 +68,7 @@ public class ExpressionContext {
   // TODO: Refactor all of the usage for getLiteralString.
   @Deprecated
   public String getLiteralString() {
-    return _literal.getValue().toString();
+    return String.valueOf(_literal.getValue());
   }
 
   public Type getType() {
