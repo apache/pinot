@@ -19,14 +19,12 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.request.context.LiteralContext;
-import org.apache.pinot.common.request.context.NullSentinel;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class LiteralTransformFunctionTest {
-
   @Test
   public void testLiteralTransformFunction() {
     LiteralTransformFunction trueBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
@@ -35,7 +33,7 @@ public class LiteralTransformFunctionTest {
     LiteralTransformFunction falseBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, false));
     Assert.assertEquals(falseBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
     Assert.assertEquals(falseBoolean.getLiteral(), false);
-    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.NULL, true));
-    Assert.assertEquals(nullLiteral.getLiteral(), NullSentinel.INSTANCE);
+    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
+    Assert.assertEquals(nullLiteral.getLiteral(), null);
   }
 }

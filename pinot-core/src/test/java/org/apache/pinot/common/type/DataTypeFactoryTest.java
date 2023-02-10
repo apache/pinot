@@ -30,6 +30,6 @@ public class DataTypeFactoryTest {
     Literal literal = new Literal();
     literal.setNullValue(true);
     FieldSpec.DataType type = DataTypeFactory.createDataType(literal.getSetField());
-    Assert.assertEquals(type, FieldSpec.DataType.NULL);
+    Assert.assertEquals(type, FieldSpec.DataType.UNKNOWN);
   }
 }

@@ -40,7 +40,7 @@ public class DataTypeFactory {
       case STRING_VALUE:
         return FieldSpec.DataType.STRING;
       case NULL_VALUE:
-        return FieldSpec.DataType.NULL;
+        return FieldSpec.DataType.UNKNOWN;
       default:
         throw new UnsupportedOperationException("Unsupported literal type:" + fields);
     }

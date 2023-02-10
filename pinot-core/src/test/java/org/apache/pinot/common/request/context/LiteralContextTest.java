@@ -32,27 +32,16 @@ public class LiteralContextTest {
     Literal literal = new Literal();
     literal.setNullValue(true);
     LiteralContext nullContext1 = new LiteralContext(literal);
-    Assert.assertEquals(nullContext1.getValue(), NullSentinel.INSTANCE);
+    Assert.assertEquals(nullContext1.getValue(), null);
     Assert.assertEquals(nullContext1.toString(), "'null'");
-    Assert.assertEquals(nullContext1.getBigDecimalValue(FieldSpec.DataType.NULL), BigDecimal.ZERO);
+    Assert.assertEquals(nullContext1.getBigDecimalValue(FieldSpec.DataType.UNKNOWN), BigDecimal.ZERO);
     // Create literal context from object and type
-    LiteralContext nullContext2 = new LiteralContext(FieldSpec.DataType.NULL, null);
-    Assert.assertEquals(nullContext2.getValue(), NullSentinel.INSTANCE);
+    LiteralContext nullContext2 = new LiteralContext(FieldSpec.DataType.UNKNOWN, null);
+    Assert.assertEquals(nullContext2.getValue(), null);
     Assert.assertEquals(nullContext2.toString(), "'null'");
-    Assert.assertEquals(nullContext2.getBigDecimalValue(FieldSpec.DataType.NULL), BigDecimal.ZERO);
+    Assert.assertEquals(nullContext2.getBigDecimalValue(FieldSpec.DataType.UNKNOWN), BigDecimal.ZERO);
     // Check different literal objects are equal and have same hash code.
     Assert.assertTrue(nullContext1.equals(nullContext2));
     Assert.assertTrue(nullContext1.hashCode() == nullContext2.hashCode());
-  }
-
-  @Test
-  public void testLiteralInferDataType() {
-    Assert.assertEquals(LiteralContext.inferLiteralDataType("abc"), FieldSpec.DataType.STRING);
-    Assert.assertEquals(LiteralContext.inferLiteralDataType("123"), FieldSpec.DataType.INT);
-    Assert.assertEquals(LiteralContext.inferLiteralDataType("2147483649"), FieldSpec.DataType.LONG);
-    Assert.assertEquals(LiteralContext.inferLiteralDataType("1.2"), FieldSpec.DataType.FLOAT);
-    Assert.assertEquals(LiteralContext.inferLiteralDataType("41241241.2412"), FieldSpec.DataType.DOUBLE);
-    Assert.assertEquals(LiteralContext.inferLiteralDataType("1.7976931348623159e+308"), FieldSpec.DataType.BIG_DECIMAL);
-    Assert.assertEquals(LiteralContext.inferLiteralDataType("2020-02-02 20:20:20.20"), FieldSpec.DataType.TIMESTAMP);
   }
 }

@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.common.request.context;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.type.DataTypeFactory;
 import org.apache.pinot.common.utils.PinotDataType;
@@ -44,56 +41,19 @@ public class LiteralContext {
   private FieldSpec.DataType _type;
   private Object _value;
 
-  // TODO: Deprecate the usage case for this function.
-  @VisibleForTesting
-  public static FieldSpec.DataType inferLiteralDataType(String literal) {
-    // Try to interpret the literal as number
-    try {
-      Number number = NumberUtils.createNumber(literal);
-      if (number instanceof Integer) {
-        return FieldSpec.DataType.INT;
-      } else if (number instanceof Long) {
-        return FieldSpec.DataType.LONG;
-      } else if (number instanceof Float) {
-        return FieldSpec.DataType.FLOAT;
-      } else if (number instanceof Double) {
-        return FieldSpec.DataType.DOUBLE;
-      } else if (number instanceof BigDecimal | number instanceof BigInteger) {
-        return FieldSpec.DataType.BIG_DECIMAL;
-      } else {
-        return FieldSpec.DataType.STRING;
-      }
-    } catch (Exception e) {
-      // Ignored
-    }
-
-    // Try to interpret the literal as TIMESTAMP
-    try {
-      Timestamp.valueOf(literal);
-      return FieldSpec.DataType.TIMESTAMP;
-    } catch (Exception e) {
-      // Ignored
-    }
-
-    return FieldSpec.DataType.STRING;
-  }
-
   public LiteralContext(Literal literal) {
     Preconditions.checkState(literal.getFieldValue() != null,
         "Field value cannot be null for field:" + literal.getSetField());
     _type = DataTypeFactory.createDataType(literal.getSetField());
-    if(_type == FieldSpec.DataType.NULL){
-      _value = NullSentinel.INSTANCE;
+    if(_type == FieldSpec.DataType.UNKNOWN){
+      _value = null;
     } else {
       _value = literal.getFieldValue();
     }
   }
 
   public FieldSpec.DataType getType() {
-    if (_type == FieldSpec.DataType.BOOLEAN || _type == FieldSpec.DataType.NULL) {
-      return _type;
-    }
-    return inferLiteralDataType(_value.toString());
+    return _type;
   }
 
   // TODO: Avoid passing in inferred data type when we have the right data type in place.
@@ -120,8 +80,8 @@ public class LiteralContext {
   // This ctor is only used for special handling in subquery.
   public LiteralContext(FieldSpec.DataType type, Object value) {
     _type = type;
-    if(type == FieldSpec.DataType.NULL){
-      _value = NullSentinel.INSTANCE;
+    if(type == FieldSpec.DataType.UNKNOWN){
+      _value = null;
     } else {
       _value = value;
     }
@@ -129,7 +89,7 @@ public class LiteralContext {
 
   @Override
   public int hashCode() {
-    return 31 * _value.hashCode();
+    return 31 * Objects.hashCode(_value) + Objects.hashCode(_type);
   }
 
   @Override
@@ -147,6 +107,6 @@ public class LiteralContext {
   @Override
   public String toString() {
     // TODO: print out the type.
-    return '\'' + _value.toString() + '\'';
+    return '\'' + String.valueOf(_value) + '\'';
   }
 }
