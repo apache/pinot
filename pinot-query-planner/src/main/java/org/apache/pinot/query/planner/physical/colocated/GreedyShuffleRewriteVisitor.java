@@ -44,6 +44,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -242,6 +243,11 @@ public class GreedyShuffleRewriteVisitor
 
   @Override
   public Set<ColocationKey> visitSort(SortNode node, GreedyShuffleRewriteContext context) {
+    return node.getInputs().get(0).visit(this, context);
+  }
+
+  @Override
+  public Set<ColocationKey> visitWindow(WindowNode node, GreedyShuffleRewriteContext context) {
     return node.getInputs().get(0).visit(this, context);
   }
 

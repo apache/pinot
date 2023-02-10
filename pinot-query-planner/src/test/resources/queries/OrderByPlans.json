@@ -1,0 +1,86 @@
+{
+  "order_by_planning_tests": {
+    "queries": [
+      {
+        "description": "Simple Order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2])",
+          "\n  LogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n      LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Simple Order by with alias on select column",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1 FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(value1=[$2])",
+          "\n  LogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n      LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select * order by",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a ORDER BY col1 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0], fetch=[10])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select * order by on 2 columns with descending",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], sort1=[$0], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[10])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[2, 0 DESC]])",
+          "\n    LogicalSort(sort0=[$2], sort1=[$0], dir0=[ASC], dir1=[DESC], fetch=[10])",
+          "\n      LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Order by and group by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
+          "\n        LogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalAggregate(group=[{2}], EXPR$1=[$SUM0($1)])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Order by and group by with alias",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalAggregate(group=[{0}], sum=[$SUM0($1)])",
+          "\n        LogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalAggregate(group=[{2}], sum=[$SUM0($1)])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      }
+    ]
+  }
+}

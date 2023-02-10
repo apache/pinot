@@ -34,8 +34,8 @@ public class PinotQueryRuleSets {
 
   public static final Collection<RelOptRule> LOGICAL_OPT_RULES =
       Arrays.asList(EnumerableRules.ENUMERABLE_FILTER_RULE, EnumerableRules.ENUMERABLE_JOIN_RULE,
-          EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_SORT_RULE,
-          EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
+          EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_WINDOW_RULE,
+          EnumerableRules.ENUMERABLE_SORT_RULE, EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
 
           // push a filter into a join
           CoreRules.FILTER_INTO_JOIN,
@@ -61,6 +61,11 @@ public class PinotQueryRuleSets {
           CoreRules.PROJECT_REMOVE,
           // reorder sort and projection
           CoreRules.SORT_PROJECT_TRANSPOSE,
+
+          // convert OVER aggregate to logical WINDOW
+          CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW,
+          // push project through WINDOW
+          CoreRules.PROJECT_WINDOW_TRANSPOSE,
 
           // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
 
@@ -99,6 +104,7 @@ public class PinotQueryRuleSets {
           PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
 
           PinotJoinExchangeNodeInsertRule.INSTANCE,
-          PinotAggregateExchangeNodeInsertRule.INSTANCE
+          PinotAggregateExchangeNodeInsertRule.INSTANCE,
+          PinotWindowExchangeNodeInsertRule.INSTANCE
       );
 }

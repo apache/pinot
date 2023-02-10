@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -60,7 +61,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
 
   @Test
-  public void testAddReplaceRemoveSegment() {
+  public void testAddReplaceRemoveSegment()
+      throws IOException {
     verifyAddReplaceRemoveSegment(HashFunction.NONE, false);
     verifyAddReplaceRemoveSegment(HashFunction.MD5, false);
     verifyAddReplaceRemoveSegment(HashFunction.MURMUR3, false);
@@ -69,7 +71,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     verifyAddReplaceRemoveSegment(HashFunction.MURMUR3, true);
   }
 
-  private void verifyAddReplaceRemoveSegment(HashFunction hashFunction, boolean enableSnapshot) {
+  private void verifyAddReplaceRemoveSegment(HashFunction hashFunction, boolean enableSnapshot)
+      throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             "timeCol", hashFunction, null, false, mock(ServerMetrics.class));
@@ -196,6 +199,19 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Remove new segment1, should be no-op
+    upsertMetadataManager.removeSegment(newSegment1);
+    // new segment1: 1 -> {4, 120}
+    assertEquals(recordLocationMap.size(), 1);
+    checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
+    assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
   }
 
   private List<RecordInfo> getRecordInfoList(int numRecords, int[] primaryKeys, int[] timestamps) {
@@ -274,13 +290,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testAddRecord() {
+  public void testAddRecord()
+      throws IOException {
     verifyAddRecord(HashFunction.NONE);
     verifyAddRecord(HashFunction.MD5);
     verifyAddRecord(HashFunction.MURMUR3);
   }
 
-  private void verifyAddRecord(HashFunction hashFunction) {
+  private void verifyAddRecord(HashFunction hashFunction)
+      throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             "timeCol", hashFunction, null, false, mock(ServerMetrics.class));
@@ -339,6 +357,23 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 3});
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Add record should be no-op
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(0), 4, new IntWrapper(120)));
+    // segment1: 1 -> {1, 120}
+    // segment2: 0 -> {3, 100}, 2 -> {1, 120}, 3 -> {0, 100}
+    checkRecordLocation(recordLocationMap, 0, segment2, 3, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 3});
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
   }
 
   @Test
