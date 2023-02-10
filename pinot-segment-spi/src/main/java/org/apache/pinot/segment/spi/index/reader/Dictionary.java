@@ -244,7 +244,13 @@ public interface Dictionary extends Closeable {
     }
   }
 
-  default void getDictIds(List<String> strings, IntSet dictIds) {
-    throw new UnsupportedOperationException();
+  default void getDictIds(List<String> values, IntSet dictIds, int inPredicateSparseThreshold,
+      int inPredicateSortThreshold) {
+    for (String value : values) {
+      int dictId = indexOf(value);
+      if (dictId >= 0) {
+        dictIds.add(dictId);
+      }
+    }
   }
 }

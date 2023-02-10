@@ -79,6 +79,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -333,6 +334,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
             e.getMessage());
       }
+      handleBigInClause(serverPinotQuery);
       if (_defaultHllLog2m > 0) {
         handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);
       }
@@ -701,6 +703,49 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  private void handleBigInClause(PinotQuery serverPinotQuery) {
+    int inPredicateSortThreshold = Integer.parseInt(serverPinotQuery.getQueryOptions()
+        .getOrDefault(Broker.Request.QueryOptionKey.IN_PREDICATE_SORT_THRESHOLD,
+            Broker.Request.QueryOptionValue.DEFAULT_IN_PREDICATE_SORT_THRESHOLD));
+    String rawTableName = TableNameBuilder.extractRawTableName(serverPinotQuery.getDataSource().getTableName());
+    if (serverPinotQuery.getFilterExpression() != null) {
+      handleBigInClause(rawTableName, serverPinotQuery.getFilterExpression(), inPredicateSortThreshold);
+    }
+    if (serverPinotQuery.getHavingExpression() != null) {
+      handleBigInClause(rawTableName, serverPinotQuery.getHavingExpression(), inPredicateSortThreshold);
+    }
+  }
+
+  private void handleBigInClause(String rawTableName, Expression expression, int inPredicateSortThreshold) {
+    if (expression.getType() == ExpressionType.FUNCTION) {
+      Function functionCall = expression.getFunctionCall();
+
+      switch (functionCall.getOperator()) {
+        case "IN":
+        case "NOT_IN":
+          List<Expression> operands = functionCall.getOperands();
+          if (operands.size() > inPredicateSortThreshold && isExpressionStringColumn(operands.get(0), rawTableName)) {
+            Collections.sort(operands.subList(1, operands.size()));
+          }
+          break;
+        default:
+          for (Expression operand : functionCall.getOperands()) {
+            handleBigInClause(rawTableName, operand, inPredicateSortThreshold);
+          }
+          break;
+      }
+    }
+  }
+
+  private boolean isExpressionStringColumn(Expression expression, String rawTableName) {
+    if (expression.getType() == ExpressionType.IDENTIFIER) {
+      String columnName = expression.getIdentifier().getName();
+      FieldSpec fieldSpecFor = _tableCache.getSchema(rawTableName).getFieldSpecFor(columnName);
+      return fieldSpecFor != null && fieldSpecFor.getDataType() == FieldSpec.DataType.STRING;
+    }
+    return false;
   }
 
   private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {

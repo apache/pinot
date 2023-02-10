@@ -38,7 +38,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 @SuppressWarnings("rawtypes")
 public abstract class BaseImmutableDictionary implements Dictionary {
-  private static final int SPARSE_THRESHOLD = 1000;
   private final ValueReader _valueReader;
   private final int _length;
   private final int _numBytesPerValue;
@@ -283,8 +282,9 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return new byte[_numBytesPerValue];
   }
 
-  public void getDictIds(List<String> values, IntSet dictIds) {
-    if (length() / values.size() > SPARSE_THRESHOLD) {
+  public void getDictIds(List<String> values, IntSet dictIds, int inPredicateSparseThreshold,
+      int inPredicateSortThreshold) {
+    if (length() / values.size() > inPredicateSparseThreshold || values.size() < inPredicateSortThreshold) {
       for (String value : values) {
         int dictId = indexOf(value);
         if (dictId >= 0) {

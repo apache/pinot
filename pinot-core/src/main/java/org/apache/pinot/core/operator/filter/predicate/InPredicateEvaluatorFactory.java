@@ -30,14 +30,16 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
 
 /**
@@ -50,28 +52,15 @@ public class InPredicateEvaluatorFactory {
   /**
    * Create a new instance of dictionary based IN predicate evaluator.
    *
-   * @param inPredicate IN predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
+   * @param inPredicate  IN predicate to evaluate
+   * @param dictionary   Dictionary for the column
+   * @param dataType     Data type for the column
+   * @param queryOptions Query options
    * @return Dictionary based IN predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(InPredicate inPredicate,
-      Dictionary dictionary, DataType dataType) {
-    return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, null);
-  }
-
-  /**
-   * Create a new instance of dictionary based IN predicate evaluator.
-   *
-   * @param inPredicate IN predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
-   * @param bloomFilter bloomFilter for the column
-   * @return Dictionary based IN predicate evaluator
-   */
-  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(InPredicate inPredicate,
-      Dictionary dictionary, DataType dataType, BloomFilterReader bloomFilter) {
-    return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, bloomFilter);
+      Dictionary dictionary, DataType dataType, Map<String, String> queryOptions) {
+    return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, queryOptions);
   }
 
   /**
@@ -171,9 +160,16 @@ public class InPredicateEvaluatorFactory {
     int[] _matchingDictIds;
 
     DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary, DataType dataType,
-        BloomFilterReader bloomFilter) {
+        Map<String, String> queryOptions) {
       super(inPredicate);
-      _matchingDictIdSet = PredicateUtils.getDictIdSet(inPredicate, dictionary, dataType, bloomFilter);
+      int inPredicateSparseThreshold = Integer.parseInt(
+          queryOptions.getOrDefault(QueryOptionKey.IN_PREDICATE_SPARSE_THRESHOLD,
+              QueryOptionValue.DEFAULT_IN_PREDICATE_SPARSE_THRESHOLD));
+      int inPredicateSortThreshold = Integer.parseInt(
+          queryOptions.getOrDefault(QueryOptionKey.IN_PREDICATE_SORT_THRESHOLD,
+              QueryOptionValue.DEFAULT_IN_PREDICATE_SORT_THRESHOLD));
+      _matchingDictIdSet = PredicateUtils.getDictIdSet(inPredicate, dictionary, dataType, inPredicateSparseThreshold,
+          inPredicateSortThreshold);
       _numMatchingDictIds = _matchingDictIdSet.size();
       if (_numMatchingDictIds == 0) {
         _alwaysFalse = true;
