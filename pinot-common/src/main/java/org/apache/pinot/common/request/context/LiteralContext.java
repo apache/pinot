@@ -56,15 +56,14 @@ public class LiteralContext {
     return _type;
   }
 
-  // TODO: Avoid passing in inferred data type when we have the right data type in place.
-  public BigDecimal getBigDecimalValue(FieldSpec.DataType dataType) {
-    if (dataType == FieldSpec.DataType.BOOLEAN) {
+  public BigDecimal getBigDecimalValue() {
+    if (_type == FieldSpec.DataType.BOOLEAN) {
       return PinotDataType.BOOLEAN.toBigDecimal(_value);
     }
-    if (dataType.isNumeric()) {
+    if (_type.isNumeric()) {
       return new BigDecimal(_value.toString());
     }
-    if (dataType == FieldSpec.DataType.TIMESTAMP) {
+    if (_type == FieldSpec.DataType.TIMESTAMP) {
       // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
       // assigned to _longLiteral.
       return PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_value.toString()));

@@ -61,7 +61,7 @@ public class LiteralTransformFunction implements TransformFunction {
     Preconditions.checkNotNull(literalContext);
     _literal = literalContext.getValue();
     _dataType = literalContext.getType();
-    _bigDecimalLiteral = literalContext.getBigDecimalValue(_dataType);
+    _bigDecimalLiteral = literalContext.getBigDecimalValue();
     _intLiteral = _bigDecimalLiteral.intValue();
     _longLiteral = _bigDecimalLiteral.longValue();
     _floatLiteral = _bigDecimalLiteral.floatValue();

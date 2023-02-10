@@ -34,12 +34,12 @@ public class LiteralContextTest {
     LiteralContext nullContext1 = new LiteralContext(literal);
     Assert.assertEquals(nullContext1.getValue(), null);
     Assert.assertEquals(nullContext1.toString(), "'null'");
-    Assert.assertEquals(nullContext1.getBigDecimalValue(FieldSpec.DataType.UNKNOWN), BigDecimal.ZERO);
+    Assert.assertEquals(nullContext1.getBigDecimalValue(), BigDecimal.ZERO);
     // Create literal context from object and type
     LiteralContext nullContext2 = new LiteralContext(FieldSpec.DataType.UNKNOWN, null);
     Assert.assertEquals(nullContext2.getValue(), null);
     Assert.assertEquals(nullContext2.toString(), "'null'");
-    Assert.assertEquals(nullContext2.getBigDecimalValue(FieldSpec.DataType.UNKNOWN), BigDecimal.ZERO);
+    Assert.assertEquals(nullContext2.getBigDecimalValue(), BigDecimal.ZERO);
     // Check different literal objects are equal and have same hash code.
     Assert.assertTrue(nullContext1.equals(nullContext2));
     Assert.assertTrue(nullContext1.hashCode() == nullContext2.hashCode());
