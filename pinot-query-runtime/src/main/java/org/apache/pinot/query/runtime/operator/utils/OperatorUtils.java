@@ -19,11 +19,8 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.datatable.DataTable;
-
 
 public class OperatorUtils {
 
@@ -57,90 +54,5 @@ public class OperatorUtils {
     functionName = StringUtils.remove(functionName, " ");
     functionName = OPERATOR_TOKEN_MAPPING.getOrDefault(functionName, functionName);
     return functionName;
-  }
-
-  /**
-   * aggregate metadata in transferable blocks such as query metrics
-   * @param metadataList
-   * @return aggregated metadata with keys only used for query metrics. \
-   * User should replace existing keys in metadata with this result
-   * but should take care of keeping the remaining keys as it is
-   */
-  public static Map<String, String> aggregateMetadata(List<Map<String, String>> metadataList) {
-
-    long numDocsScanned = 0L;
-    long numEntriesScannedInFilter = 0L;
-    long numEntriesScannedPostFilter = 0L;
-    long numTotalDocs = 0;
-    long numSegmentsQueried = 0;
-    long numSegmentsProcessed = 0;
-    long numSegmentsMatched = 0;
-    long numConsumingSegmentsQueried = 0;
-
-    for (Map<String, String> metadata: metadataList) {
-      String numDocsScannedString =
-          metadata.get(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName());
-      if (numDocsScannedString != null) {
-        numDocsScanned += Long.parseLong(numDocsScannedString);
-      }
-      String numEntriesScannedInFilterString =
-          metadata.get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName());
-      if (numEntriesScannedInFilterString != null) {
-        numEntriesScannedInFilter += Long.parseLong(numEntriesScannedInFilterString);
-      }
-      String numEntriesScannedPostFilterString =
-          metadata.get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName());
-      if (numEntriesScannedPostFilterString != null) {
-        numEntriesScannedPostFilter += Long.parseLong(numEntriesScannedPostFilterString);
-      }
-      String numTotalDocsString =
-          metadata.get(DataTable.MetadataKey.TOTAL_DOCS.getName());
-      if (numTotalDocsString != null) {
-        numTotalDocs += Long.parseLong(numTotalDocsString);
-      }
-
-      String numSegmentsQueriedString =
-          metadata.get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName());
-      if (numSegmentsQueriedString != null) {
-        numSegmentsQueried += Long.parseLong(numSegmentsQueriedString);
-      }
-
-      String numSegmentsProcessedString =
-          metadata.get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName());
-      if (numSegmentsProcessedString != null) {
-        numSegmentsProcessed += Long.parseLong(numSegmentsProcessedString);
-      }
-
-      String numSegmentsMatchedString =
-          metadata.get(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName());
-      if (numSegmentsMatchedString != null) {
-        numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
-      }
-
-      String numConsumingSegmentsQueriedString =
-          metadata.get(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName());
-      if (numConsumingSegmentsQueriedString != null) {
-        numConsumingSegmentsQueried += Long.parseLong(numConsumingSegmentsQueriedString);
-      }
-    }
-
-    Map<String, String> aggregatedMetadata = new HashMap<>();
-    aggregatedMetadata.put(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName(),
-        String.valueOf(numDocsScanned));
-    aggregatedMetadata.put(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(),
-        String.valueOf(numEntriesScannedInFilter));
-    aggregatedMetadata.put(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(),
-        String.valueOf(numEntriesScannedPostFilter));
-    aggregatedMetadata.put(DataTable.MetadataKey.TOTAL_DOCS.getName(),
-        String.valueOf(numTotalDocs));
-    aggregatedMetadata.put(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName(),
-        String.valueOf(numSegmentsQueried));
-    aggregatedMetadata.put(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName(),
-        String.valueOf(numSegmentsProcessed));
-    aggregatedMetadata.put(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName(),
-        String.valueOf(numSegmentsMatched));
-    aggregatedMetadata.put(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(),
-        String.valueOf(numConsumingSegmentsQueried));
-    return aggregatedMetadata;
   }
 }

@@ -19,11 +19,10 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Stopwatch;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.operator.utils.StatsAggregator;
+
 
 public class OperatorStats {
   private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
@@ -36,14 +35,14 @@ public class OperatorStats {
 
   private int _numBlock = 0;
   private int _numRows = 0;
-  private final Map<String, String> _executionStats;
+  private StatsAggregator _statsAggregator;
 
 
   public OperatorStats(long requestId, int stageId, String operatorType) {
     _stageId = stageId;
     _requestId = requestId;
     _operatorType = operatorType;
-    _executionStats = new HashMap<>();
+    _statsAggregator = new StatsAggregator();
   }
 
   public void startTimer() {
@@ -63,16 +62,16 @@ public class OperatorStats {
     _numRows += numRows;
   }
 
-  public void recordExecutionStats(Map<String, String> newExecutionStats) {
-    _executionStats.putAll(OperatorUtils.aggregateMetadata(List.of(newExecutionStats, _executionStats)));
+  public void recordExecutionStats(Map<String, String> executionStats) {
+    _statsAggregator.aggregate(executionStats);
   }
 
   public Map<String, String> getExecutionStats() {
-    return _executionStats;
+    return _statsAggregator.getStats();
   }
 
   public void clearExecutionStats() {
-    _executionStats.clear();
+    _statsAggregator = new StatsAggregator();
   }
 
   // TODO: Return the string as a JSON string.

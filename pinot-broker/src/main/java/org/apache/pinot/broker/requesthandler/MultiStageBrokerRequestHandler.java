@@ -209,6 +209,30 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0")));
     brokerResponse.setNumConsumingSegmentsQueried(
         Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), "0")));
+
+    brokerResponse.setNumSegmentsPrunedByServer(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), "0")));
+    brokerResponse.setNumSegmentsPrunedInvalid(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), "0")));
+    brokerResponse.setNumSegmentsPrunedByLimit(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), "0")));
+    brokerResponse.setNumSegmentsPrunedByValue(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), "0")));
+    brokerResponse.setExplainPlanNumEmptyFilterSegments(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
+            "0")));
+    brokerResponse.setExplainPlanNumMatchAllFilterSegments(Long.parseLong(
+        stats.getOrDefault(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(), "0")));
+    brokerResponse.setNumConsumingSegmentsQueried(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), "0")));
+    brokerResponse.setMinConsumingFreshnessTimeMs(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), "0")));
+    brokerResponse.setNumConsumingSegmentsProcessed(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), "0")));
+    brokerResponse.setNumConsumingSegmentsMatched(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), "0")));
+    brokerResponse.setNumGroupsLimitReached(
+        Boolean.parseBoolean(stats.getOrDefault(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "0")));
   }
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {

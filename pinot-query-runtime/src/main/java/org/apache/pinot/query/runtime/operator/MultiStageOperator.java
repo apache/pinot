@@ -51,7 +51,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
         LOGGER.warn("Recorded operator stats: " + _operatorStats);
-        if(nextBlock.isSuccessfulEndOfStreamBlock()) {
+        if (nextBlock.isSuccessfulEndOfStreamBlock()) {
           return TransferableBlockUtils.getEndOfStreamTransferableBlock(_operatorStats.getExecutionStats());
         }
       }
