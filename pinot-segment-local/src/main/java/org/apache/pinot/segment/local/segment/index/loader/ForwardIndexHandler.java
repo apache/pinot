@@ -160,9 +160,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         case DISABLE_DICTIONARY_FOR_FORWARD_INDEX_DISABLED_COLUMN: {
           // The forward index is already disabled for this column and no action needs to be taken on the forward index.
           // Just remove the dictionary since the dictionary has also been disabled.
-          // Note: Certain indexes need to be regenerated when the dictionary is enabled / disabled. Toggling the
-          // dictionary without a forward index can cause issues when regenerating these indexes when the other index
-          // handlers run. The only option in such a scenario will be to refresh or back-fill the forward index.
           removeDictionaryFromForwardIndexDisabledColumn(column, segmentWriter);
           if (segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
             throw new IOException(
