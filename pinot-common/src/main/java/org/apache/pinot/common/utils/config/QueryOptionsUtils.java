@@ -23,7 +23,9 @@ import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
@@ -35,7 +37,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValu
 public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
-
 
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
@@ -189,5 +190,26 @@ public class QueryOptionsUtils {
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
     return groupByTrimThreshold != null ? Integer.parseInt(groupByTrimThreshold) : null;
+  }
+
+  // Sample input: k1:1/k1:2/k1:3/k2:4/k2:5/k2:6
+  // Sample output: {k1=[1, 2, 3], k2=[4, 5, 6]}
+  public static Map<String, Set<Integer>> getColumnPartitionMap(Map<String, String> queryOptions) {
+    Map<String, Set<Integer>> columnPartitionMap = new HashMap<>();
+    String columnPartitionConfig = queryOptions.get(QueryOptionKey.COLUMN_PARTITION_MAP);
+    if (columnPartitionConfig != null) {
+      String[] columnPartitions = columnPartitionConfig.split("/");
+      for (String columnPartition : columnPartitions) {
+        String[] columnPartitionSplit = columnPartition.split(":");
+        Preconditions.checkState(columnPartitionSplit.length == 2, "Invalid column partition config: %s",
+            columnPartitionConfig);
+        String column = columnPartitionSplit[0];
+        if (!columnPartitionMap.containsKey(column)) {
+          columnPartitionMap.put(column, new HashSet<>());
+        }
+        columnPartitionMap.get(column).add(Integer.parseInt(columnPartitionSplit[1]));
+      }
+    }
+    return columnPartitionMap;
   }
 }

@@ -307,6 +307,7 @@ public class CommonConstants {
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
+        public static final String COLUMN_PARTITION_MAP = "columnPartitionMap";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated

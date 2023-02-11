@@ -61,6 +61,9 @@ public class SegmentPrunerService {
           case SegmentPrunerProvider.COLUMN_VALUE_SEGMENT_PRUNER_NAME:
             _prunerStatsUpdaters.put(pruner, SegmentPrunerStatistics::setValuePruned);
             break;
+          case SegmentPrunerProvider.PARTITIONS_SEGMENT_PRUNER_NAME:
+            _prunerStatsUpdaters.put(pruner, SegmentPrunerStatistics::setPartitionPruned);
+            break;
           default:
             _prunerStatsUpdaters.put(pruner, (stats, value) -> { });
             break;

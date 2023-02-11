@@ -20,7 +20,9 @@
 package org.apache.pinot.common.utils.config;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -42,5 +44,14 @@ public class QueryOptionsUtilsTest {
     // Then:
     Assert.assertEquals(resolved.get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING), "true");
     Assert.assertEquals(resolved.get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE), "false");
+  }
+
+  @Test
+  public void testGetColumnPartitionMap() {
+    Map<String, Set<Integer>> columnPartitionMap =
+        QueryOptionsUtils.getColumnPartitionMap(ImmutableMap.of("columnPartitionMap", "k1:1/k1:2/k1:3/k2:4/k2:5/k2:6"));
+
+    Assert.assertEquals(columnPartitionMap.get("k1"), ImmutableSet.of(1, 2, 3));
+    Assert.assertEquals(columnPartitionMap.get("k2"), ImmutableSet.of(4, 5, 6));
   }
 }

@@ -26,6 +26,8 @@ public class SegmentPrunerStatistics {
 
   private int _limitPruned;
 
+  private int _partitionPruned;
+
   public int getInvalidSegments() {
     return _invalidSegments;
   }
@@ -48,5 +50,13 @@ public class SegmentPrunerStatistics {
 
   public void setLimitPruned(int limitPruned) {
     _limitPruned = limitPruned;
+  }
+
+  public int getPartitionPruned() {
+    return _partitionPruned;
+  }
+
+  public void setPartitionPruned(int partitionPruned) {
+    _partitionPruned = partitionPruned;
   }
 }

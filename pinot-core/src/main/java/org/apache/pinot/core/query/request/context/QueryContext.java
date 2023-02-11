@@ -122,6 +122,8 @@ public class QueryContext {
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
+  // Explicitly specify the column partitions to query
+  private Map<String, Set<Integer>> _columnPartitionMap;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, List<String> aliasList, @Nullable FilterContext filter,
@@ -393,6 +395,14 @@ public class QueryContext {
     _serverReturnFinalResult = serverReturnFinalResult;
   }
 
+  public Map<String, Set<Integer>> getColumnPartitionMap() {
+    return _columnPartitionMap;
+  }
+
+  public void setColumnPartitionMap(Map<String, Set<Integer>> columnPartitionMap) {
+    _columnPartitionMap = columnPartitionMap;
+  }
+
   /**
    * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
    * within the scope of a query.
@@ -511,6 +521,7 @@ public class QueryContext {
               _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
+      queryContext.setColumnPartitionMap(QueryOptionsUtils.getColumnPartitionMap(_queryOptions));
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

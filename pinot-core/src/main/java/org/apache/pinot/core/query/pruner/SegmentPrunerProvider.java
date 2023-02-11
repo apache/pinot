@@ -37,10 +37,12 @@ public class SegmentPrunerProvider {
 
   public static final String COLUMN_VALUE_SEGMENT_PRUNER_NAME = "columnvaluesegmentpruner";
   public static final String SELECTION_QUERY_SEGMENT_PRUNER_NAME = "selectionquerysegmentpruner";
+  public static final String PARTITIONS_SEGMENT_PRUNER_NAME = "partitionssegmentpruner";
 
   static {
     PRUNER_MAP.put(COLUMN_VALUE_SEGMENT_PRUNER_NAME, ColumnValueSegmentPruner.class);
     PRUNER_MAP.put(SELECTION_QUERY_SEGMENT_PRUNER_NAME, SelectionQuerySegmentPruner.class);
+    PRUNER_MAP.put(PARTITIONS_SEGMENT_PRUNER_NAME, PartitionsSegmentPruner.class);
   }
 
   @Nullable
