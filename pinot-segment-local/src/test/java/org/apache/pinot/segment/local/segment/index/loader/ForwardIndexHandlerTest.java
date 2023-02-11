@@ -816,7 +816,7 @@ public class ForwardIndexHandlerTest {
     operationMap = fwdIndexHandler.computeOperation(writer);
     assertEquals(operationMap.size(), 1);
     assertEquals(operationMap.get(DIM_DICT_INTEGER),
-        ForwardIndexHandler.Operation.DISABLE_FORWARD_INDEX_FOR_DICT_COLUMN_WITH_TEMPORARY_RECONSTRUCTION);
+        ForwardIndexHandler.Operation.DISABLE_FORWARD_INDEX_AND_DICT_FOR_DICT_COLUMN);
 
     // TEST9: Disable dictionary on a column that already has forward index disabled
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
@@ -827,7 +827,7 @@ public class ForwardIndexHandlerTest {
     operationMap = fwdIndexHandler.computeOperation(writer);
     assertEquals(operationMap.size(), 1);
     assertEquals(operationMap.get(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER),
-        ForwardIndexHandler.Operation.RECONSTRUCT_TEMPORARY_FORWARD_INDEX_FOR_RAW_COLUMN);
+        ForwardIndexHandler.Operation.DISABLE_DICTIONARY_FOR_FORWARD_INDEX_DISABLED_COLUMN);
 
     // TEST10: Disable inverted index on a column that already has forward index disabled
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
@@ -871,9 +871,25 @@ public class ForwardIndexHandlerTest {
       Assert.fail("Disabling dictionary on forward index disabled column without inverted index but which has a "
           + "range index is not possible");
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Must disable inverted index (disabled), FST (disabled) and range (enabled) "
-          + "index to disable the dictionary for a forwardIndexDisabled column: "
-          + "DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX or refresh / back-fill the forward index");
+      assertEquals(e.getMessage(), "Must disable range (enabled) index to disable the dictionary for a "
+          + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX or refresh / "
+          + "back-fill the forward index");
+    }
+
+    // TEST13: Disable dictionary on a column that already has forward index disabled and inverted index enabled with
+    // a range index
+    indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
+    indexLoadingConfig.getNoDictionaryColumns().add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    indexLoadingConfig.getRangeIndexColumns().add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
+    try {
+      operationMap = fwdIndexHandler.computeOperation(writer);
+      Assert.fail("Disabling dictionary on forward index disabled column with inverted index and a range index "
+          + "is not possible");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Must disable range (enabled) index to disable the dictionary for a "
+          + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER or refresh / back-fill the "
+          + "forward index");
     }
   }
 

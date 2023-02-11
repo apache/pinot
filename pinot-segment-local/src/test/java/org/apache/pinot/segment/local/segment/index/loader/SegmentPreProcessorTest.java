@@ -2068,24 +2068,6 @@ public class SegmentPreProcessorTest {
     // Add the column to the no dictionary column list
     Set<String> existingNoDictionaryColumns = _indexLoadingConfig.getNoDictionaryColumns();
     _indexLoadingConfig.getNoDictionaryColumns().addAll(forwardIndexDisabledColumns);
-
-    // Create a segment in V3, add a new column with no forward index enabled
-    constructV3Segment();
-    segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
-    // should be null since column does not exist in the schema
-    assertNull(columnMetadata);
-
-    try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
-          _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING,
-          100000);
-      Assert.fail("Should not be able to disable forward index for raw column without also disabling inverted index");
-    } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Must disable inverted index (enabled) and FST (disabled) index to disable "
-          + "the dictionary for a forwardIndexDisabled column: newForwardIndexDisabledColumnMV");
-    }
-
     // Disable the inverted index and validate that disabling the forward index goes through
     _indexLoadingConfig.getInvertedIndexColumns().remove(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
 
@@ -2189,22 +2171,6 @@ public class SegmentPreProcessorTest {
 
     // Add the column to the noDictionaryColumns list
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_DICT);
-
-    constructV3Segment();
-    segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_DICT);
-    assertNotNull(columnMetadata);
-
-    try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
-          _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
-          100000);
-      Assert.fail("Segment creation should not go through since inverted index is enabled for noDict column");
-    } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Must disable inverted index (enabled) and FST (disabled) to disable the "
-          + "dictionary and forward index for column: column5");
-    }
-
     // Also remove the column from the inverted index list and try again
     _indexLoadingConfig.getInvertedIndexColumns().remove(EXISTING_STRING_COL_DICT);
 
@@ -2308,8 +2274,8 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getFSTIndexColumns().remove(EXISTING_STRING_COL_DICT);
 
     // Remove COLUMN1_NAME from the dictionary list and inverted index column list while leaving it on the range list
-    // Test that we are able to regenerate the range index in this scenario (since the existing segment should have a
-    // forward index for this column)
+    // Test reload fails since dictionary is being disabled for a forward index disabled column and range index has
+    // to be changed.
     _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN1_NAME);
     _indexLoadingConfig.getInvertedIndexColumns().remove(COLUMN1_NAME);
 
@@ -2318,14 +2284,15 @@ public class SegmentPreProcessorTest {
     columnMetadata = segmentMetadata.getColumnMetadataFor(COLUMN1_NAME);
     assertNotNull(columnMetadata);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN1_NAME, 51594, 16,
-        _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, null, true, DataType.INT,
-        100000);
-    createAndValidateIndex(ColumnIndexType.RANGE_INDEX, COLUMN1_NAME, 51594, 16,
-        _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, null, true, DataType.INT,
-        100000);
-    validateIndexDoesNotExist(COLUMN1_NAME, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX);
+    try {
+      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN1_NAME, 51594, 16,
+          _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, null, true, DataType.INT,
+          100000);
+      Assert.fail("Should fail since we are disabling dictionary for forward index disabled column with range index");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Must disable range (enabled) index to disable the dictionary and forward "
+          + "index for column: column1 or refresh / back-fill the forward index");
+    }
 
     // Reset indexLoadingConfig to remove the column from additional index lists
     _indexLoadingConfig.getRangeIndexColumns().remove(COLUMN1_NAME);

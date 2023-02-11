@@ -968,9 +968,9 @@ public final class TableConfigUtils {
 
     if (!hasDictionary || !hasInvertedIndex) {
       LOGGER.warn("Forward index has been disabled for column {}. Either dictionary ({}) and / or inverted index ({}) "
-          + "has been disabled. If the forward index needs to be regenerated or another index added please refresh or "
-          + "back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.", columnName,
-          hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
+              + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
+              + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.",
+          columnName, hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
     }
   }
 

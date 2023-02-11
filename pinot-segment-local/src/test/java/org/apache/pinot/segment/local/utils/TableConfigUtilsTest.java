@@ -1009,6 +1009,51 @@ public class TableConfigUtilsTest {
           + "< 2. Cannot disable forward index for column myCol1. Either disable range index or create range index "
           + "with version >= 2 to use this feature");
     }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2")).setInvertedIndexColumns(Arrays.asList("myCol2")).build();
+    try {
+      // Enable forward index disabled flag for a column with inverted index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.RAW,
+          FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should not be able to disable dictionary but keep inverted index");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "Cannot create an Inverted index on column myCol2 specified in the "
+          + "noDictionaryColumns config");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2")).build();
+    try {
+      // Enable forward index disabled flag for a column with FST index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.RAW,
+          FieldConfig.IndexType.FST, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should not be able to disable dictionary but keep inverted index");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "FST Index is only enabled on dictionary encoded columns");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("intCol")).setRangeIndexColumns(Arrays.asList("intCol")).build();
+    try {
+      // Enable forward index disabled flag for a column with FST index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.RAW,
+          FieldConfig.IndexType.RANGE, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.fail("Range index with forward index disabled no dictionary column is allowed");
+    }
   }
 
   @Test
