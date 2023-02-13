@@ -62,7 +62,7 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
-import org.apache.pinot.segment.local.upsert.ComparisonColumn;
+import org.apache.pinot.segment.local.upsert.ComparisonValue;
 import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
@@ -561,7 +561,7 @@ public class MutableSegmentImpl implements MutableSegment {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
 
     if (isUpsertEnabled()) {
-      Map<String, ComparisonColumn> comparisonColumns = new HashMap<>();
+      Map<String, ComparisonValue> comparisonColumns = new HashMap<>();
 
       for (String columnName : _upsertComparisonColumns) {
         Object comparisonValue = row.getValue(columnName);
@@ -570,7 +570,7 @@ public class MutableSegmentImpl implements MutableSegment {
             "Upsert comparison column: %s must be comparable", columnName);
 
         comparisonColumns.put(columnName,
-            new ComparisonColumn(columnName, (Comparable) comparisonValue, row.isNullValue(columnName)));
+            new ComparisonValue((Comparable) comparisonValue, row.isNullValue(columnName)));
       }
       return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
     }

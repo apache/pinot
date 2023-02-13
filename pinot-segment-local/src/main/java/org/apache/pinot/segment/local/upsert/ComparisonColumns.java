@@ -8,13 +8,13 @@ import javax.annotation.Nonnull;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ComparisonColumns implements Comparable {
   private ComparisonColumns _other = null;
-  private final Map<String, ComparisonColumn> _comparisonColumns;
+  private final Map<String, ComparisonValue> _comparisonColumns;
 
-  public ComparisonColumns(Map<String, ComparisonColumn> comparisonColumns) {
+  public ComparisonColumns(Map<String, ComparisonValue> comparisonColumns) {
     _comparisonColumns = comparisonColumns;
   }
 
-  public Map<String, ComparisonColumn> getComparisonColumns() {
+  public Map<String, ComparisonValue> getComparisonColumns() {
     return _comparisonColumns;
   }
 
@@ -30,20 +30,22 @@ public class ComparisonColumns implements Comparable {
 
     /* Capture other for later use in {@link RecordInfo#getComparisonValue()} */
     _other = (ComparisonColumns) other;
-    for (Map.Entry<String, ComparisonColumn> columnEntry : _comparisonColumns.entrySet()) {
-      ComparisonColumn comparisonColumn = columnEntry.getValue();
-      // "this" may only 1 non-null value at most. _other may have all non-null values, however.
-      if (comparisonColumn.isNull) {
+    int numNull = 0;
+    for (Map.Entry<String, ComparisonValue> columnEntry : _comparisonColumns.entrySet()) {
+      ComparisonValue comparisonValue = columnEntry.getValue();
+      // "this" may have at most 1 non-null value. _other may have all non-null values, however.
+      if (comparisonValue.isNull()) {
+        numNull++;
         continue;
       }
 
-      ComparisonColumn otherComparisonColumn = _other.getComparisonColumns().get(comparisonColumn.columnName);
-      if (otherComparisonColumn == null) {
+      ComparisonValue otherComparisonValue = _other.getComparisonColumns().get(columnEntry.getKey());
+      if (otherComparisonValue == null) {
         // This can happen if a new column is added to the list of coparisonColumns. We want o support that without
         // requiring a server restart, so handle the null here.
         return 1;
       }
-      return comparisonColumn.comparisonValue.compareTo(otherComparisonColumn.comparisonValue);
+      return comparisonValue.getComparisonValue().compareTo(otherComparisonValue.getComparisonValue());
     }
 
     return -1;

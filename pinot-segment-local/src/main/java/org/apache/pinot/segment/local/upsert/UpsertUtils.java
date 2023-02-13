@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -147,14 +146,14 @@ public class UpsertUtils {
     }
 
     public ComparisonColumns getComparisonColumns(int docId) {
-      Map<String, ComparisonColumn> comparisonColumns = new HashMap<>();
+      Map<String, ComparisonValue> comparisonColumns = new HashMap<>();
 
       for (String comparisonColumnName : _comparisonColumnReaders.keySet()) {
         PinotSegmentColumnReader columnReader = _comparisonColumnReaders.get(comparisonColumnName);
         Comparable comparisonValue = (Comparable) getValue(columnReader, docId);
 
         comparisonColumns.put(comparisonColumnName,
-            new ComparisonColumn(comparisonColumnName, comparisonValue, columnReader.isNull(docId)));
+            new ComparisonValue(comparisonColumnName, comparisonValue, columnReader.isNull(docId)));
 
       }
       return new ComparisonColumns(comparisonColumns);
