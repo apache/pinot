@@ -211,7 +211,7 @@ public class TableRebalancer {
     // Calculate instance partitions for tiers if configured
     List<Tier> sortedTiers = getSortedTiers(tableConfig);
     Map<String, InstancePartitions> tierToInstancePartitionsMap =
-        getTierToInstancePartitionsMap(tableNameWithType, sortedTiers);
+        getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
 
     LOGGER.info("Calculating the target assignment for table: {}", tableNameWithType);
     SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
@@ -353,7 +353,8 @@ public class TableRebalancer {
           try {
             // Re-calculate the instance partitions in case the instance configs changed during the rebalance
             instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false);
-            tierToInstancePartitionsMap = getTierToInstancePartitionsMap(tableNameWithType, sortedTiers);
+            tierToInstancePartitionsMap =
+                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
             targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
                 tierToInstancePartitionsMap, rebalanceConfig);
           } catch (Exception e) {
@@ -524,16 +525,17 @@ public class TableRebalancer {
   }
 
   @Nullable
-  private Map<String, InstancePartitions> getTierToInstancePartitionsMap(String tableNameWithType,
-      @Nullable List<Tier> sortedTiers) {
+  private Map<String, InstancePartitions> getTierToInstancePartitionsMap(TableConfig tableConfig,
+      @Nullable List<Tier> sortedTiers, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     if (sortedTiers == null) {
       return null;
     }
     Map<String, InstancePartitions> tierToInstancePartitionsMap = new HashMap<>();
     for (Tier tier : sortedTiers) {
       LOGGER.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
-          tableNameWithType);
-      tierToInstancePartitionsMap.put(tier.getName(), getInstancePartitionsForTier(tier, tableNameWithType));
+          tableConfig.getTableName());
+      tierToInstancePartitionsMap.put(tier.getName(),
+          getInstancePartitionsForTier(tableConfig, tier, reassignInstances, bootstrap, dryRun));
     }
     return tierToInstancePartitionsMap;
   }
@@ -545,16 +547,45 @@ public class TableRebalancer {
    *  InstancePartitions to zk.
    *  Then we'll be able to support replica group assignment while creating InstancePartitions for tiers
    */
-  private InstancePartitions getInstancePartitionsForTier(Tier tier, String tableNameWithType) {
-    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
-        _helixManager.getHelixPropertyStore(), tier.getName());
+  private InstancePartitions getInstancePartitionsForTier(TableConfig tableConfig, Tier tier, boolean reassignInstances,
+      boolean bootstrap, boolean dryRun) {
+    PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
+    InstancePartitions defaultInstancePartitions =
+        InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig.getTableName(),
+            tier.getName(), storage.getServerTag());
+
+    if (tier.getInstanceAssignmentConfig() == null) {
+      return defaultInstancePartitions;
+    }
+
+    String tableNameWithType = tableConfig.getTableName();
+    String instancePartitionName =
+        InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(), tier.getName());
+    if (reassignInstances) {
+      // Set existing instance partition to null if bootstrap mode is enabled, so that the instance partition
+      // map can be fully recalculated.
+      InstancePartitions existingInstancePartitions = bootstrap ? null
+          : InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+              instancePartitionName);
+      InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
+      InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(tier.getName(),
+          _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
+          existingInstancePartitions, tier.getInstanceAssignmentConfig());
+      if (!dryRun) {
+        LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
+        InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+      }
+      return instancePartitions;
+    }
+
+    InstancePartitions instancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+            InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tier.getName()));
     if (instancePartitions != null) {
       return instancePartitions;
     }
 
-    PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-    return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType,
-        tier.getName(), storage.getServerTag());
+    return defaultInstancePartitions;
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,

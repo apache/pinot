@@ -144,7 +144,7 @@ public class SegmentRelocatorTest {
         createSegmentMetadataZNRecord(segmentName, "hotTier"));
     // Move to new tier as set in tier configs.
     List<Tier> sortedTiers = Collections.singletonList(
-        new Tier("coldTier", new FixedTierSegmentSelector(null, Collections.singleton("seg01")), null));
+        new Tier("coldTier", new FixedTierSegmentSelector(null, Collections.singleton("seg01")), null, null));
     SegmentRelocator.updateSegmentTargetTier(tableName, "seg01", sortedTiers, helixMgrMock);
     ArgumentCaptor<SegmentZKMetadata> recordCapture = ArgumentCaptor.forClass(SegmentZKMetadata.class);
     verify(helixMgrMock).updateZkMetadata(eq(tableName), recordCapture.capture(), eq(10));

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.tier;
 
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+
+
 /**
  * Represents a tier of storage in Pinot. It consists of
  * name - unique name given to a tier in the table config and to create instancePartitions for the tier
@@ -29,11 +32,14 @@ public class Tier {
   private final String _name;
   private final TierSegmentSelector _segmentSelector;
   private final TierStorage _storage;
+  private final InstanceAssignmentConfig _instanceAssignmentConfig;
 
-  public Tier(String name, TierSegmentSelector segmentSelector, TierStorage storage) {
+  public Tier(String name, TierSegmentSelector segmentSelector, TierStorage storage,
+      InstanceAssignmentConfig instanceAssignmentConfig) {
     _name = name;
     _segmentSelector = segmentSelector;
     _storage = storage;
+    _instanceAssignmentConfig = instanceAssignmentConfig;
   }
 
   public String getName() {
@@ -46,6 +52,10 @@ public class Tier {
 
   public TierStorage getStorage() {
     return _storage;
+  }
+
+  public InstanceAssignmentConfig getInstanceAssignmentConfig() {
+    return _instanceAssignmentConfig;
   }
 
   @Override

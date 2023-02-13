@@ -1764,7 +1764,8 @@ public class PinotHelixResourceManager {
       for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
         if (tierConfig.getInstanceAssignmentConfig() != null) {
           if (override || InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-              InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierConfig.getName())) == null) {
+              InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierConfig.getName()))
+              == null) {
             InstancePartitions instancePartitions =
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
                     tierConfig.getInstanceAssignmentConfig());

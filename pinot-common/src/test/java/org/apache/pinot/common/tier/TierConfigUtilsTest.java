@@ -156,24 +156,24 @@ public class TierConfigUtilsTest {
 
     Tier tier1 =
         new Tier("tier1", new TimeBasedTierSegmentSelector(null, "30d"), new PinotServerTierStorage(
-            "tag_OFFLINE", null, null));
+            "tag_OFFLINE", null, null), null);
     Tier tier2 =
         new Tier("tier2", new TimeBasedTierSegmentSelector(null, "1000d"),
-            new PinotServerTierStorage("tag_OFFLINE", null, null));
+            new PinotServerTierStorage("tag_OFFLINE", null, null), null);
     Tier tier3 =
         new Tier("tier3", new TimeBasedTierSegmentSelector(null, "24h"),
-            new PinotServerTierStorage("tag_OFFLINE", null, null));
+            new PinotServerTierStorage("tag_OFFLINE", null, null), null);
     Tier tier4 =
         new Tier("tier4", new TimeBasedTierSegmentSelector(null, "10m"),
-            new PinotServerTierStorage("tag_OFFLINE", null, null));
+            new PinotServerTierStorage("tag_OFFLINE", null, null), null);
     Tier tier5 =
         new Tier("tier5", new TimeBasedTierSegmentSelector(null, "1d"),
-            new PinotServerTierStorage("tag_OFFLINE", null, null));
+            new PinotServerTierStorage("tag_OFFLINE", null, null), null);
 
     Tier tier6 = new Tier("tier6", new FixedTierSegmentSelector(null, Sets.newHashSet("seg0")),
-        new PinotServerTierStorage("tag_OFFLINE", null, null));
+        new PinotServerTierStorage("tag_OFFLINE", null, null), null);
     Tier tier7 = new Tier("tier6", new FixedTierSegmentSelector(null, Sets.newHashSet("seg1")),
-        new PinotServerTierStorage("tag_OFFLINE", null, null));
+        new PinotServerTierStorage("tag_OFFLINE", null, null), null);
 
     Assert.assertEquals(tierComparator.compare(tier1, tier2), 1);
     Assert.assertEquals(tierComparator.compare(tier1, tier3), -1);

@@ -158,9 +158,9 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     _tierInstancePartitionsMap.put(TIER_C_NAME, instancePartitionsTierC);
 
     _sortedTiers = Lists.newArrayList(
-        new Tier(TIER_C_NAME, new TestSegmentSelectorC(), new PinotServerTierStorage(TAG_C_NAME, null, null)),
-        new Tier(TIER_B_NAME, new TestSegmentSelectorB(), new PinotServerTierStorage(TAG_B_NAME, null, null)),
-        new Tier(TIER_A_NAME, new TestSegmentSelectorA(), new PinotServerTierStorage(TAG_A_NAME, null, null)));
+        new Tier(TIER_C_NAME, new TestSegmentSelectorC(), new PinotServerTierStorage(TAG_C_NAME, null, null), null),
+        new Tier(TIER_B_NAME, new TestSegmentSelectorB(), new PinotServerTierStorage(TAG_B_NAME, null, null), null),
+        new Tier(TIER_A_NAME, new TestSegmentSelectorA(), new PinotServerTierStorage(TAG_A_NAME, null, null), null));
   }
 
   @Test
