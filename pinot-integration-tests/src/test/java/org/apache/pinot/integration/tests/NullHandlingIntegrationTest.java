@@ -188,9 +188,11 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testTotalCountUsingCountLiteral()
+  public void testTotalCountWithNullHandlingQueryOptionEnabled()
           throws Exception {
-    String query = "SELECT COUNT(1) FROM " + getTableName();
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " option(enableNullHandling=true)";
+    testQuery(query);
+    query = "SELECT COUNT(1) FROM " + getTableName() + " option(enableNullHandling=true)";
     testQuery(query);
   }
 }
