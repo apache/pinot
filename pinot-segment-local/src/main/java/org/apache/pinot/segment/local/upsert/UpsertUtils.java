@@ -153,7 +153,7 @@ public class UpsertUtils {
         Comparable comparisonValue = (Comparable) getValue(columnReader, docId);
 
         comparisonColumns.put(comparisonColumnName,
-            new ComparisonValue(comparisonColumnName, comparisonValue, columnReader.isNull(docId)));
+            new ComparisonValue(comparisonValue, columnReader.isNull(docId)));
 
       }
       return new ComparisonColumns(comparisonColumns);

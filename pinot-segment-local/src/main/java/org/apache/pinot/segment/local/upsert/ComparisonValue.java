@@ -8,6 +8,7 @@ public class ComparisonValue {
   public ComparisonValue(Comparable comparisonValue) {
     this(comparisonValue, false);
   }
+
   public ComparisonValue(Comparable comparisonValue, boolean isNull) {
     _comparisonValue = comparisonValue;
     _isNull = isNull;
@@ -21,4 +22,3 @@ public class ComparisonValue {
     return _isNull;
   }
 }
-

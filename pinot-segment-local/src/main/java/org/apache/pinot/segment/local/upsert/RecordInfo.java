@@ -78,7 +78,6 @@ public class RecordInfo {
           comparisonResult >= 0 ? inboundValue.getComparisonValue() : existingValue.getComparisonValue();
 
       mergedComparisonColumns.put(columnName, new ComparisonValue(comparisonValue));
-
     }
     return new ComparisonColumns(mergedComparisonColumns);
   }
