@@ -186,4 +186,11 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     query = "SELECT description FROM " + getTableName() + " where description IS NOT DISTINCT FROM description";
     testQuery(query);
   }
+
+  @Test
+  public void testTotalCountUsingCountLiteral()
+          throws Exception {
+    String query = "SELECT COUNT(1) FROM " + getTableName();
+    testQuery(query);
+  }
 }
