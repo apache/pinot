@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.lineage;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,5 +53,20 @@ public class SegmentLineageUtils {
         }
       }
     }
+  }
+
+  public static Set<String> getReplacedSegments(SegmentLineage segmentLineage) {
+    Set<String> segmentsToFilterOut = new HashSet<>();
+    if (segmentLineage != null) {
+      for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+          segmentsToFilterOut.addAll(lineageEntry.getSegmentsFrom());
+        } else {
+          segmentsToFilterOut.addAll(lineageEntry.getSegmentsTo());
+        }
+      }
+    }
+    return segmentsToFilterOut;
   }
 }

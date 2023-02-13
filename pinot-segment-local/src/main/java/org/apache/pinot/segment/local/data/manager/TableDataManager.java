@@ -140,6 +140,15 @@ public interface TableDataManager {
   List<SegmentDataManager> acquireAllSegments();
 
   /**
+   * Acquires all segments of the table.
+   * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
+   *
+   * @param excludeReplacedSegments Whether to exclude replaced segments
+   * @return List of segment data managers
+   */
+  List<SegmentDataManager> acquireAllSegments(boolean excludeReplacedSegments);
+
+  /**
    * Acquires the segments with the given segment names.
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    * This method may return some recently deleted segments in missingSegments. The caller can identify those segments

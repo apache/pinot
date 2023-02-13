@@ -808,7 +808,9 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-          List<String> columns) {
+          List<String> columns,
+      @ApiParam(value = "Whether to exclude replaced segments in the response") @QueryParam("excludeReplacedSegments")
+      @DefaultValue("false") String excludeReplacedSegments) {
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.REALTIME) {
@@ -822,7 +824,8 @@ public class PinotTableRestletResource {
 
     String segmentsMetadata;
     try {
-      JsonNode segmentsMetadataJson = getAggregateMetadataFromServer(tableNameWithType, columns, numReplica);
+      JsonNode segmentsMetadataJson = getAggregateMetadataFromServer(tableNameWithType, columns,
+          Boolean.parseBoolean(excludeReplacedSegments), numReplica);
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
@@ -837,15 +840,17 @@ public class PinotTableRestletResource {
    * This is a helper method to get the metadata for all segments for a given table name.
    * @param tableNameWithType name of the table along with its type
    * @param columns name of the columns
+   * @param excludeReplacedSegments indicates whether response should exclude replaced segments.
    * @param numReplica num or replica for the table
    * @return aggregated metadata of the table segments
    */
-  private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica)
+  private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns,
+      boolean excludeReplacedSegments, int numReplica)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
-        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, excludeReplacedSegments,
+        numReplica, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   @GET

@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -45,6 +46,9 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -265,13 +269,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public List<SegmentDataManager> acquireAllSegments() {
+    return acquireAllSegments(false);
+  }
+
+  @Override
+  public List<SegmentDataManager> acquireAllSegments(boolean excludeReplacedSegments) {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
       if (segmentDataManager.increaseReferenceCount()) {
         segmentDataManagers.add(segmentDataManager);
       }
     }
-    return segmentDataManagers;
+    // Fetch the segment lineage metadata, and conditionally filter out replaced segments based on segment lineage.
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, _tableNameWithType);
+    if (segmentLineage == null || !excludeReplacedSegments) {
+      return segmentDataManagers;
+    } else {
+      Set<String> replacedSegments = SegmentLineageUtils.getReplacedSegments(segmentLineage);
+      List<SegmentDataManager> filteredSegmentDataManagers = new ArrayList<>();
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        if (!replacedSegments.contains(segmentDataManager.getSegmentName())) {
+          filteredSegmentDataManagers.add(segmentDataManager);
+        }
+      }
+      return filteredSegmentDataManagers;
+    }
   }
 
   @Override
@@ -591,7 +613,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata,
       File destTarFile) throws Exception {
     Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme() != null,
-            "Download peers require non null peer download scheme");
+        "Download peers require non null peer download scheme");
     List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName,
         _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager, _tableNameWithType);
     if (peerSegmentURIs.isEmpty()) {
@@ -604,10 +626,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Next download the segment from a randomly chosen server using configured scheme.
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(peerSegmentURIs, destTarFile, zkMetadata.getCrypterName());
       LOGGER.info("Fetched segment {} from peers: {} to: {} of size: {}", segmentName, peerSegmentURIs, destTarFile,
-              destTarFile.length());
+          destTarFile.length());
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from peers {} to: {}", segmentName,
-              _tableNameWithType, peerSegmentURIs, destTarFile);
+          _tableNameWithType, peerSegmentURIs, destTarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1L);
       throw e;
     }

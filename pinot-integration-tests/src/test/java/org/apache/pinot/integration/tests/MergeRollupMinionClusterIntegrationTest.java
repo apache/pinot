@@ -52,6 +52,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -59,10 +60,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -612,8 +610,9 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
     // Check total doc is half of the original after all merge tasks are finished
     JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
-    assertEquals(actualJson.get("resultTable").get("rows").get(0).get(0).asInt(),
-        expectedJson.get("resultTable").get("rows").get(0).get(0).asInt() / 2);
+    int numRowsAfterMergeTasks = actualJson.get("resultTable").get("rows").get(0).get(0).asInt();
+    int numRowsBeforeMergeTasks = expectedJson.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(numRowsAfterMergeTasks, numRowsBeforeMergeTasks / 2);
     // Check time column is rounded
     JsonNode responseJson =
         postQuery("SELECT count(*), DaysSinceEpoch FROM myTable2 GROUP BY DaysSinceEpoch ORDER BY DaysSinceEpoch");
@@ -626,6 +625,23 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
     assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
         "mergeRollupTaskDelayInNumBuckets.myTable2_OFFLINE.150days"));
+
+    JsonNode metadataResponseWithReplacedSegments = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/" + SINGLE_LEVEL_ROLLUP_TEST_TABLE
+            + "/metadata?excludeReplacedSegments=false"));
+    JsonNode metadataResponseWithoutReplacedSegments = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/" + SINGLE_LEVEL_ROLLUP_TEST_TABLE
+            + "/metadata?excludeReplacedSegments=true"));
+
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
+    assertEquals(_helixResourceManager.getSegmentsFor(tableNameWithType, true).size(),
+        metadataResponseWithoutReplacedSegments.get("numSegments").asInt());
+    assertEquals(_helixResourceManager.getSegmentsFor(tableNameWithType, false).size(),
+        metadataResponseWithReplacedSegments.get("numSegments").asInt());
+
+    int numRowsFromMetadataWithoutReplacedSegments = metadataResponseWithoutReplacedSegments.get("numRows").asInt();
+    assertNotEquals(metadataResponseWithReplacedSegments, metadataResponseWithoutReplacedSegments);
+    assertEquals(numRowsAfterMergeTasks, numRowsFromMetadataWithoutReplacedSegments);
   }
 
   /**

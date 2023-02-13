@@ -63,7 +63,8 @@ public class ServerSegmentMetadataReader {
    *   table.
    */
   public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
-      BiMap<String, String> serverEndPoints, List<String> columns, int numReplica, int timeoutMs) {
+      BiMap<String, String> serverEndPoints, List<String> columns, boolean excludeReplacedSegments, int numReplica,
+      int timeoutMs) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading aggregated segment metadata from {} servers for table: {} with timeout: {}ms", numServers,
         tableNameWithType, timeoutMs);
@@ -71,7 +72,8 @@ public class ServerSegmentMetadataReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint);
+      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, excludeReplacedSegments,
+          endpoint);
       serverUrls.add(serverUrl);
     }
 
@@ -181,10 +183,11 @@ public class ServerSegmentMetadataReader {
   }
 
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, List<String> columns,
-      String endpoint) {
+      boolean excludeReplacedSegments, String endpoint) {
     try {
       tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8.name());
-      String paramsStr = generateColumnsParam(columns);
+      String columnsParam = generateColumnsParam(columns);
+      String paramsStr = generateExcludeReplacedSegmentsParam(columnsParam, excludeReplacedSegments);
       return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e.getCause());
@@ -214,5 +217,13 @@ public class ServerSegmentMetadataReader {
     }
     paramsStr = String.join("&", params);
     return paramsStr;
+  }
+
+  private String generateExcludeReplacedSegmentsParam(String columnsParam, boolean excludeReplacedSegments) {
+    if (excludeReplacedSegments) {
+      return columnsParam.equals("") ? "excludeReplacedSegments=true" : String.format("%s&excludeReplacedSegments=true",
+          columnsParam);
+    }
+    return columnsParam;
   }
 }
