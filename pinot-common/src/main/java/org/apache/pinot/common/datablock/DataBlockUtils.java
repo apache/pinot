@@ -130,7 +130,8 @@ public final class DataBlockUtils {
         case DOUBLE:
           rowSizeInBytes += 8;
           break;
-        case STRING:
+        case STRING: // fall through
+        case UNKNOWN:
           rowSizeInBytes += 4;
           break;
         // Object and array. (POSITION|LENGTH)

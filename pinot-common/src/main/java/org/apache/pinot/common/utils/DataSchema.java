@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.ByteArrayOutputStream;
@@ -47,6 +48,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 @JsonPropertyOrder({"columnNames", "columnDataTypes"})
 public class DataSchema {
+  private static final String SERDE_NULL = "null";
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
   private ColumnDataType[] _storedColumnDataTypes;
@@ -267,10 +269,12 @@ public class DataSchema {
     LONG_ARRAY(new long[0]),
     FLOAT_ARRAY(new float[0]),
     DOUBLE_ARRAY(new double[0]),
+    UNKNOWN(SERDE_NULL),
     BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
     TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
     STRING_ARRAY(new String[0]),
-    BYTES_ARRAY(new byte[0][]);
+    BYTES_ARRAY(new byte[0][]),
+    UNKNOWN_ARRAY(STRING_ARRAY, ImmutableList.of(SERDE_NULL));
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final Ordering<ColumnDataType> NUMERIC_TYPE_ORDERING = Ordering.explicit(INT, LONG, FLOAT, DOUBLE);
@@ -376,6 +380,8 @@ public class DataSchema {
           return DataType.JSON;
         case BYTES:
           return DataType.BYTES;
+        case UNKNOWN:
+          return DataType.UNKNOWN;
         default:
           throw new IllegalStateException(String.format("Cannot convert ColumnDataType: %s to DataType", this));
       }
@@ -424,6 +430,8 @@ public class DataSchema {
           return (byte[][]) value;
         case OBJECT:
           return (Serializable) value;
+        case UNKNOWN:
+          return SERDE_NULL;
         default:
           throw new IllegalStateException(String.format("Cannot convert: '%s' to type: %s", value, this));
       }
@@ -486,6 +494,8 @@ public class DataSchema {
           return formatTimestampArray(value);
         case BYTES_ARRAY:
           return (byte[][]) value;
+        case UNKNOWN:
+          return SERDE_NULL;
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
@@ -586,6 +596,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case UNKNOWN:
+          return UNKNOWN;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
@@ -609,6 +621,7 @@ public class DataSchema {
           return STRING_ARRAY;
         case BYTES:
           return BYTES_ARRAY;
+        case UNKNOWN:
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }

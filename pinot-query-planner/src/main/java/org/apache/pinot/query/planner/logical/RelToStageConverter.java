@@ -191,10 +191,6 @@ public final class RelToStageConverter {
     return columnDataType.toDataType();
   }
 
-  public static PinotDataType convertToPinotDataType(RelDataType relDataType) {
-    return PinotDataType.getPinotDataTypeForExecution(convertToColumnDataType(relDataType));
-  }
-
   /**
    * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this
    * back to the proper primitive type for Pinot.

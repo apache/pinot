@@ -816,6 +816,60 @@ public enum PinotDataType {
     }
   },
 
+  UNKNOWN {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from unknown to int");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from unknown to long");
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      // NOTE: No need to trim here because Float.valueOf() will trim the string
+      throw new UnsupportedOperationException("Cannot convert value from unknown to float");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      // NOTE: No need to trim here because Double.valueOf() will trim the string
+      throw new UnsupportedOperationException("Cannot convert value from unknown to double");
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from unknown to BigDecimal");
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from unknown to boolean");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from unknown to timestamp");
+    }
+
+    @Override
+    public String toString(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from unknown to string");
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from unknown to bytes");
+    }
+
+    @Override
+    public String convert(Object value, PinotDataType sourceType) {
+      throw new UnsupportedOperationException("Conversion for sourceType:" + sourceType + " is not supported");
+    }
+  },
+
   BYTE_ARRAY {
     @Override
     public byte[] toBytes(Object value) {
@@ -1451,8 +1505,10 @@ public enum PinotDataType {
   }
 
   /**
-   * Returns the {@link PinotDataType} for the given {@link ColumnDataType} for query execution purpose. Returns
-   * primitive array type for multi-valued types.
+   * Returns the {@link PinotDataType} for the given {@link ColumnDataType} for query execution in scalar functions and
+   * query response.
+   * Returns primitive array type for multi-valued types.
+   *
    */
   public static PinotDataType getPinotDataTypeForExecution(ColumnDataType columnDataType) {
     switch (columnDataType) {
@@ -1486,6 +1542,8 @@ public enum PinotDataType {
         return PRIMITIVE_DOUBLE_ARRAY;
       case STRING_ARRAY:
         return STRING_ARRAY;
+      case UNKNOWN:
+        return UNKNOWN;
       default:
         throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }

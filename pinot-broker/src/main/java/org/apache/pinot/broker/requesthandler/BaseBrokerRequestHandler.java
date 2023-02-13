@@ -1336,6 +1336,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
         break;
+      case NULL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
+        row.add("null");
       default:
         break;
     }
