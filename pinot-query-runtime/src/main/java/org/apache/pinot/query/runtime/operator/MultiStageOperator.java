@@ -47,8 +47,8 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     _operatorStatsMap = new HashMap<>();
   }
 
-  public OperatorStats getOperatorStats() {
-    return _operatorStats;
+  public Map<String, OperatorStats> getOperatorStatsMap() {
+    return _operatorStatsMap;
   }
 
   @Override
@@ -65,6 +65,10 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       if (nextBlock.isEndOfStreamBlock()) {
         LOGGER.info("Recorded operator stats: " + _operatorStats);
         if (nextBlock.isSuccessfulEndOfStreamBlock()) {
+          for (MultiStageOperator op : getChildOperators()) {
+            _operatorStatsMap.putAll(op.getOperatorStatsMap());
+          }
+
           if (!_operatorStats.getExecutionStats().isEmpty()) {
             _operatorStatsMap.put(toExplainString() + "_" + _requestId + "_" + _stageId, _operatorStats);
           }

@@ -151,7 +151,6 @@ public class SortOperator extends MultiStageOperator {
           return;
         } else if (TransferableBlockUtils.isEndOfStream(block)) {
           _readyToConstruct = true;
-          _operatorStatsMap.putAll(block.getResultMetadata());
           return;
         }
 
