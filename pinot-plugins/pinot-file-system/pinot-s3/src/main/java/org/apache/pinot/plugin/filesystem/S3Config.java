@@ -100,9 +100,10 @@ public class S3Config {
         Integer.parseInt(pinotConfig.getProperty(SESSION_DURATION_SECONDS, DEFAULT_SESSION_DURATION_SECONDS));
     _asyncSessionUpdateEnabled = Boolean.parseBoolean(
         pinotConfig.getProperty(ASYNC_SESSION_UPDATED_ENABLED, DEFAULT_ASYNC_SESSION_UPDATED_ENABLED));
-    // non-positive values to disable multipart upload.
+    // Objects uploaded via putObject are limited at 5G. Setting this to 5G by default, so that smaller objects
+    // continue to be uploaded by putObject methods just as before, while the larger ones are uploaded in multi parts.
     _minObjectSizeForMultiPartUpload =
-        DataSizeUtils.toBytes(pinotConfig.getProperty(MIN_OBJECT_SIZE_FOR_MULTI_PART_UPLOAD, "-1"));
+        DataSizeUtils.toBytes(pinotConfig.getProperty(MIN_OBJECT_SIZE_FOR_MULTI_PART_UPLOAD, "5G"));
     _multiPartUploadPartSize = DataSizeUtils.toBytes(
         pinotConfig.getProperty(MULTI_PART_UPLOAD_PART_SIZE, DEFAULT_MULTI_PART_UPLOAD_PART_SIZE));
     Preconditions.checkArgument(_multiPartUploadPartSize > MULTI_PART_UPLOAD_MIN_PART_SIZE,
