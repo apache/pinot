@@ -193,7 +193,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testTotalCountWithNullHandlingQueryOptionEnabled()
           throws Exception {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    String pinotQuery = "SELECT COUNT(*) FROM " + getTableName() + "; SET ENABLENULLHANDLING = true";
+    String pinotQuery = "SELECT COUNT(*) FROM " + getTableName() + " option(enableNullHandling=true)";
     String h2Query = "SELECT COUNT(*) FROM " + getTableName();
     testQuery(pinotQuery, h2Query);
 
