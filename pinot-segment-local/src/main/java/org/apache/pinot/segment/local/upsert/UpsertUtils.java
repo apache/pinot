@@ -154,7 +154,6 @@ public class UpsertUtils {
 
         comparisonColumns.put(comparisonColumnName,
             new ComparisonValue(comparisonValue, columnReader.isNull(docId)));
-
       }
       return new ComparisonColumns(comparisonColumns);
     }
