@@ -45,6 +45,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -57,6 +58,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -130,12 +132,14 @@ public class PinotInstanceAssignmentRestletResource {
   @Path("/tables/{tableName}/assignInstances")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Assign server instances to a table")
-  public Map<InstancePartitionsType, InstancePartitions> assignInstances(
+  public Map<String, InstancePartitions> assignInstances(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable
           InstancePartitionsType instancePartitionsType,
+      @ApiParam(value = "Whether to assign tier instances") @DefaultValue("false") @QueryParam("includeTier")
+          boolean includeTier,
       @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun) {
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    Map<String, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -186,6 +190,13 @@ public class PinotInstanceAssignmentRestletResource {
       }
     }
 
+    if (includeTier) {
+      TableConfig tableConfig = _resourceManager.getTableConfig(tableName);
+      if (tableConfig != null) {
+        assignInstancesForTier(instancePartitionsMap, tableConfig, instanceConfigs);
+      }
+    }
+
     if (instancePartitionsMap.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Failed to find the instance assignment config",
           Response.Status.NOT_FOUND);
@@ -207,22 +218,40 @@ public class PinotInstanceAssignmentRestletResource {
    * @param instanceConfigs list of instance configs
    * @param instancePartitionsType type of instancePartitions
    */
-  private void assignInstancesForInstancePartitionsType(
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
-      List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
+  private void assignInstancesForInstancePartitionsType(Map<String, InstancePartitions> instancePartitionsMap,
+      TableConfig tableConfig, List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
     if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      instancePartitionsMap.put(instancePartitionsType, InstancePartitionsUtils.fetchInstancePartitionsWithRename(
-          _resourceManager.getPropertyStore(), tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
-          instancePartitionsType.getInstancePartitionsName(rawTableName)));
+      instancePartitionsMap.put(instancePartitionsType.toString(),
+          InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
+              tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
+              instancePartitionsType.getInstancePartitionsName(rawTableName)));
       return;
     }
     InstancePartitions existingInstancePartitions =
         InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
             InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
-    instancePartitionsMap.put(instancePartitionsType, new InstanceAssignmentDriver(tableConfig)
-        .assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions));
+    instancePartitionsMap.put(instancePartitionsType.toString(),
+        new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
+            existingInstancePartitions));
+  }
+
+  private void assignInstancesForTier(Map<String, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
+      List<InstanceConfig> instanceConfigs) {
+    if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
+      for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+        if (tierConfig.getInstanceAssignmentConfig() != null) {
+          InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+              _resourceManager.getHelixZkManager().getHelixPropertyStore(),
+              InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(), tierConfig.getName()));
+
+          instancePartitionsMap.put(tierConfig.getName(),
+              new InstanceAssignmentDriver(tableConfig).assignInstances(tierConfig.getName(), instanceConfigs,
+                  existingInstancePartitions, tierConfig.getInstanceAssignmentConfig()));
+        }
+      }
+    }
   }
 
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
