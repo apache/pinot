@@ -22,6 +22,10 @@ public class ComparisonColumns implements Comparable {
     return _other;
   }
 
+  public void reset() {
+    _other = null;
+  }
+
   @Override
   public int compareTo(@Nonnull Object other) {
 

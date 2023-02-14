@@ -189,6 +189,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     startOperation();
     try {
+      recordInfo.reset();
       doAddRecord(segment, recordInfo);
     } finally {
       finishOperation();
@@ -361,6 +362,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     startOperation();
     try {
+      recordInfo.reset();
       return doUpdateRecord(record, recordInfo);
     } finally {
       finishOperation();

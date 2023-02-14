@@ -50,6 +50,12 @@ public class RecordInfo {
     return _comparisonValue;
   }
 
+  public void reset() {
+    if (_comparisonValue instanceof ComparisonColumns) {
+      ((ComparisonColumns) _comparisonValue).reset();
+    }
+  }
+
   private ComparisonColumns mergeComparisonColumnValues() {
     // first, we'll merge the values of this new row with the comparison values from any previous upsert
     // Note that we only reach this code by way of predicate which confirms _comparisonValue is of type
