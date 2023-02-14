@@ -886,7 +886,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>1.2.0-incubating</version>
+        <version>3.3.0</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
