@@ -420,7 +420,8 @@ public class DataSchema {
           return (float[]) value;
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
-        case STRING_ARRAY:
+        case STRING_ARRAY: // fall through
+        case UNKNOWN_ARRAY:
           return (String[]) value;
         case BOOLEAN_ARRAY:
           return toBooleanArray(value);

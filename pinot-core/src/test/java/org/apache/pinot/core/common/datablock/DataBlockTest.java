@@ -35,9 +35,10 @@ import org.testng.annotations.Test;
 
 
 public class DataBlockTest {
-  private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES = ImmutableList.of(
-      DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.JSON, DataSchema.ColumnDataType.BYTES,
-      DataSchema.ColumnDataType.BYTES_ARRAY);
+  private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES =
+      ImmutableList.of(DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.JSON,
+          DataSchema.ColumnDataType.BYTES, DataSchema.ColumnDataType.BYTES_ARRAY, DataSchema.ColumnDataType.UNKNOWN,
+          DataSchema.ColumnDataType.UNKNOWN_ARRAY);
   private static final int TEST_ROW_COUNT = 5;
 
   @Test
@@ -55,8 +56,8 @@ public class DataBlockTest {
     // Assert processing exception and original exception both matches.
     String actual = dataBlock.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
     Assert.assertEquals(actual, expected);
-    Assert.assertTrue(dataBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
-        .contains(originalException.getMessage()));
+    Assert.assertTrue(
+        dataBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(originalException.getMessage()));
   }
 
   @Test(dataProvider = "testTypeNullPercentile")
@@ -73,8 +74,8 @@ public class DataBlockTest {
       }
     }
 
-    DataSchema dataSchema = new DataSchema(columnNames.toArray(new String[]{}),
-        columnDataTypes.toArray(new DataSchema.ColumnDataType[]{}));
+    DataSchema dataSchema =
+        new DataSchema(columnNames.toArray(new String[]{}), columnDataTypes.toArray(new DataSchema.ColumnDataType[]{}));
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT, nullPercentile);
     List<Object[]> columnars = DataBlockTestUtils.convertColumnar(dataSchema, rows);
     RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
@@ -85,8 +86,9 @@ public class DataBlockTest {
       for (int rowId = 0; rowId < TEST_ROW_COUNT; rowId++) {
         Object rowVal = DataBlockTestUtils.getElement(rowBlock, rowId, colId, columnDataType);
         Object colVal = DataBlockTestUtils.getElement(columnarBlock, rowId, colId, columnDataType);
-        Assert.assertEquals(rowVal, colVal, "Error comparing Row/Column Block at (" + rowId + "," + colId + ")"
-            + " of Type: " + columnDataType + "! rowValue: [" + rowVal + "], columnarValue: [" + colVal + "]");
+        Assert.assertEquals(rowVal, colVal,
+            "Error comparing Row/Column Block at (" + rowId + "," + colId + ")" + " of Type: " + columnDataType
+                + "! rowValue: [" + rowVal + "], columnarValue: [" + colVal + "]");
       }
     }
   }

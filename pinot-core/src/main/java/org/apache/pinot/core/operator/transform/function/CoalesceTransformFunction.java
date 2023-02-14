@@ -308,8 +308,6 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       DataType dataType = func.getResultMetadata().getDataType();
       if (_dataType == null) {
         _dataType = dataType;
-      } else {
-        Preconditions.checkArgument(dataType == _dataType, "Argument types have to be the same.");
       }
       _transformFunctions[i] = func;
     }

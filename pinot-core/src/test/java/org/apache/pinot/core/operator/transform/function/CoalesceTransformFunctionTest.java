@@ -452,18 +452,4 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     testIntTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
     testIntTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
   }
-
-  // Test that all arguments have to be same type.
-  @Test
-  public void testDifferentArgumentType()
-      throws Exception {
-    ExpressionContext coalesceExpr =
-        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", INT_SV_COLUMN1, STRING_SV_COLUMN1));
-    Assert.assertThrows(RuntimeException.class, () -> {
-      TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
-    });
-    Assert.assertThrows(RuntimeException.class, () -> {
-      TransformFunctionFactory.get(coalesceExpr, _disableNullDataSourceMap);
-    });
-  }
 }

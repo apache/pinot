@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.docvalsets;
 
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -42,18 +41,14 @@ import org.roaringbitmap.RoaringBitmap;
 public class TransformBlockValSet implements BlockValSet {
   private final ProjectionBlock _projectionBlock;
   private final TransformFunction _transformFunction;
-  private final ExpressionContext _expression;
   private final boolean _isNullHandlingEnabled;
-
-  private RoaringBitmap _nullBitmap;
 
   private int[] _numMVEntries;
 
   public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction,
-      ExpressionContext expression, boolean isNullHandlingEnabled) {
+      boolean isNullHandlingEnabled) {
     _projectionBlock = projectionBlock;
     _transformFunction = transformFunction;
-    _expression = expression;
     _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
