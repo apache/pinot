@@ -162,7 +162,7 @@ public class HashJoinOperator extends MultiStageOperator {
         return;
       }
       if (TransferableBlockUtils.isEndOfStream(rightBlock)) {
-        _operatorStats.recordExecutionStats(rightBlock.getResultMetadata());
+        _operatorStatsMap.putAll(rightBlock.getResultMetadata());
         _isHashTableBuilt = true;
         return;
       }
@@ -185,7 +185,7 @@ public class HashJoinOperator extends MultiStageOperator {
     }
     if (leftBlock.isNoOpBlock() || (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows())) {
       if (!leftBlock.getResultMetadata().isEmpty()) {
-        _operatorStats.recordExecutionStats(leftBlock.getResultMetadata());
+        _operatorStatsMap.putAll(leftBlock.getResultMetadata());
       }
 
       if (leftBlock.isSuccessfulEndOfStreamBlock()) {
@@ -210,7 +210,7 @@ public class HashJoinOperator extends MultiStageOperator {
           }
         }
       }
-      _operatorStats.recordExecutionStats(leftBlock.getResultMetadata());
+      _operatorStatsMap.putAll(leftBlock.getResultMetadata());
       _isTerminated = true;
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }

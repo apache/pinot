@@ -45,6 +45,8 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.OperatorStats;
+import org.apache.pinot.query.runtime.operator.utils.StatsAggregator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
@@ -166,7 +168,11 @@ public class QueryDispatcher {
       if (transferableBlock.isNoOpBlock()) {
         continue;
       } else if (transferableBlock.isEndOfStreamBlock()) {
-        metadata.putAll(transferableBlock.getResultMetadata());
+        StatsAggregator statsAggregator = new StatsAggregator();
+        for (OperatorStats operatorStats : transferableBlock.getResultMetadata().values()) {
+          statsAggregator.aggregate(operatorStats.getExecutionStats());
+        }
+        metadata.putAll(statsAggregator.getStats());
         return resultDataBlocks;
       }
       resultDataBlocks.add(transferableBlock.getDataBlock());

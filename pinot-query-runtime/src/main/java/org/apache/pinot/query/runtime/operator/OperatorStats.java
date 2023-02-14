@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.query.runtime.operator.utils.StatsAggregator;
 
-
 public class OperatorStats {
   private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
 
@@ -36,7 +35,6 @@ public class OperatorStats {
   private int _numBlock = 0;
   private int _numRows = 0;
   private StatsAggregator _statsAggregator;
-
 
   public OperatorStats(long requestId, int stageId, String operatorType) {
     _stageId = stageId;
@@ -68,6 +66,18 @@ public class OperatorStats {
 
   public Map<String, String> getExecutionStats() {
     return _statsAggregator.getStats();
+  }
+
+  public int getStageId() {
+    return _stageId;
+  }
+
+  public long getRequestId() {
+    return _requestId;
+  }
+
+  public String getOperatorType() {
+    return _operatorType;
   }
 
   public void clearExecutionStats() {

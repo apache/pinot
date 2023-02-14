@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -32,10 +35,20 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   // TODO: Move to OperatorContext class.
+  protected final long _requestId;
+  protected final int _stageId;
   protected final OperatorStats _operatorStats;
+  protected final Map<String, OperatorStats> _operatorStatsMap;
 
   public MultiStageOperator(long requestId, int stageId) {
+    _requestId = requestId;
+    _stageId = stageId;
     _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStatsMap = new HashMap<>();
+  }
+
+  public OperatorStats getOperatorStats() {
+    return _operatorStats;
   }
 
   @Override
@@ -50,9 +63,13 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       _operatorStats.endTimer();
       // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
-        LOGGER.warn("Recorded operator stats: " + _operatorStats);
+        LOGGER.info("Recorded operator stats: " + _operatorStats);
         if (nextBlock.isSuccessfulEndOfStreamBlock()) {
-          return TransferableBlockUtils.getEndOfStreamTransferableBlock(_operatorStats.getExecutionStats());
+          if (!_operatorStats.getExecutionStats().isEmpty()) {
+            _operatorStatsMap.put(toExplainString() + "_" + _requestId + "_" + _stageId, _operatorStats);
+          }
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+              OperatorUtils.getMetadataFromOperatorStats(_operatorStatsMap));
         }
       }
       return nextBlock;

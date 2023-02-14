@@ -100,7 +100,7 @@ public class TransformOperator extends MultiStageOperator {
     }
 
     if (TransferableBlockUtils.isEndOfStream(block)) {
-      _operatorStats.recordExecutionStats(block.getResultMetadata());
+      _operatorStatsMap.putAll(block.getResultMetadata());
       return block;
     }
 

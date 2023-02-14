@@ -194,7 +194,7 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       } else if (block.isEndOfStreamBlock()) {
         _readyToConstruct = true;
-        _operatorStats.recordExecutionStats(block.getResultMetadata());
+        _operatorStatsMap.putAll(block.getResultMetadata());
         return true;
       }
 

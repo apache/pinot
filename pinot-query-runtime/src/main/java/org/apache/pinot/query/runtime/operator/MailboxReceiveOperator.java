@@ -142,7 +142,6 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     int startingIdx = _serverIdx;
     int openMailboxCount = 0;
     int eosMailboxCount = 0;
-    _operatorStats.clearExecutionStats();
     // For all non-singleton distribution, we poll from every instance to check mailbox content.
     // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
     for (int i = 0; i < _sendingMailbox.size(); i++) {
@@ -165,7 +164,8 @@ public class MailboxReceiveOperator extends MultiStageOperator {
               return block;
             } else {
               if (!block.getResultMetadata().isEmpty()) {
-                _operatorStats.recordExecutionStats(block.getResultMetadata());
+                _operatorStats.clearExecutionStats();
+                _operatorStatsMap.putAll(block.getResultMetadata());
               }
               eosMailboxCount++;
             }

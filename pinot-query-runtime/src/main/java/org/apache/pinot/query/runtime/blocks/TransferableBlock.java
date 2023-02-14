@@ -35,14 +35,14 @@ import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-
+import org.apache.pinot.query.runtime.operator.OperatorStats;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 /**
  * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
  * {@link org.apache.pinot.common.proto.Mailbox}.
  */
 public class TransferableBlock implements Block {
-
   private final DataBlock.Type _type;
   private final DataSchema _dataSchema;
   private final int _numRows;
@@ -79,9 +79,9 @@ public class TransferableBlock implements Block {
     _metadata = new HashMap<>();
   }
 
-  public Map<String, String> getResultMetadata() {
+  public Map<String, OperatorStats> getResultMetadata() {
     if (isSuccessfulEndOfStreamBlock()) {
-      return ((MetadataBlock) _dataBlock).getStats();
+      return OperatorUtils.getOperatorStatsFromMetadata((MetadataBlock) _dataBlock);
     }
     return new HashMap<>();
   }
