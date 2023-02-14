@@ -18,5 +18,15 @@
     "event_id": "bb",
     "description" : "late arrival",
     "secondsSinceEpoch": 1567205392
+  },
+  {
+    "event_id": "aa",
+    "description" : "first arrival, other column",
+    "otherComparisonColumn": 1567205395
+  },
+  {
+    "event_id": "aa",
+    "description" : "late arrival, other column",
+    "otherComparisonColumn": 1567205393
   }
 ]
