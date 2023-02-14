@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -144,6 +145,11 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   @Override
   public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getBytesValuesMV();
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return projectionBlock.getBlockValueSet(_columnName).getNullBitmap();
   }
 
   @Override

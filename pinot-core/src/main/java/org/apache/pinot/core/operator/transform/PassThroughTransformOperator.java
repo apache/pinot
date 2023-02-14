@@ -23,6 +23,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.PassThroughTransformBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -38,9 +39,9 @@ public class PassThroughTransformOperator extends TransformOperator {
    * @param projectionOperator Projection operator
    * @param expressions Collection of expressions to evaluate
    */
-  public PassThroughTransformOperator(ProjectionOperator projectionOperator,
+  public PassThroughTransformOperator(QueryContext queryContext, ProjectionOperator projectionOperator,
       Collection<ExpressionContext> expressions) {
-    super(projectionOperator, expressions);
+    super(queryContext, projectionOperator, expressions);
   }
 
   @Override
@@ -49,7 +50,7 @@ public class PassThroughTransformOperator extends TransformOperator {
     if (projectionBlock == null) {
       return null;
     } else {
-      return new PassThroughTransformBlock(projectionBlock, _transformFunctionMap);
+      return new PassThroughTransformBlock(projectionBlock, _transformFunctionMap, _isNullHandlingEnabled);
     }
   }
 

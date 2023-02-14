@@ -25,6 +25,7 @@ import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
@@ -113,14 +114,12 @@ public class RequestContextUtils {
       case FUNCTION:
         Function thriftFunction = thriftExpression.getFunctionCall();
         return getFilter(thriftFunction);
-      case IDENTIFIER:
+      case IDENTIFIER: // fall through
+      case LITERAL:
         // Convert "WHERE a" to "WHERE a = true"
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
-      case LITERAL:
-        // TODO: Handle literals.
-        throw new IllegalStateException();
-      default:
+     default:
         throw new IllegalStateException();
     }
   }
@@ -229,6 +228,9 @@ public class RequestContextUtils {
     if (thriftExpression.getType() != ExpressionType.LITERAL) {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
+    }
+    if(thriftExpression.getLiteral().getSetField() == Literal._Fields.NULL_VALUE){
+      return String.valueOf(null);
     }
     return thriftExpression.getLiteral().getFieldValue().toString();
   }

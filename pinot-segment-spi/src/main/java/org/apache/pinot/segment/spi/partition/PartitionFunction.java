@@ -38,7 +38,7 @@ public interface PartitionFunction extends Serializable {
    * @param value Value for which to determine the partition id.
    * @return partition id for the value.
    */
-  int getPartition(Object value);
+  int getPartition(@Nullable Object value);
 
   /**
    * Returns the name of the partition function.

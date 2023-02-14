@@ -61,6 +61,7 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     }
     _resultMetadata = new TransformResultMetadata(firstArgument.getResultMetadata().getDataType(), true, false);
     _argument = firstArgument;
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

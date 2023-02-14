@@ -665,10 +665,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           LOGGER.debug("Remove track of running query: {}", requestId);
         }
       } else {
-        brokerResponse =
-            processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-                offlineRoutingTable,
-                realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
+        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
+            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
+            requestContext);
       }
 
       brokerResponse.setExceptions(exceptions);
@@ -694,8 +693,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Extract source info from incoming request
       _queryLogger.log(
           new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, numUnavailableSegments,
-              serverStats,
-              brokerResponse, totalTimeMs, requesterIdentity));
+              serverStats, brokerResponse, totalTimeMs, requesterIdentity));
 
       return brokerResponse;
     } finally {
@@ -1339,6 +1337,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       case NULL_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
         row.add("null");
+        break;
       default:
         break;
     }

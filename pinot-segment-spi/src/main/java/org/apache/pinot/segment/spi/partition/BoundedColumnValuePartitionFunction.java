@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -62,9 +63,9 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
+  public int getPartition(@Nullable Object value) {
     for (int i = 0; i < _numPartitions - 1; i++) {
-      if (_values[i].equalsIgnoreCase(value.toString())) {
+      if (_values[i].equalsIgnoreCase(String.valueOf(value))) {
         return i + 1;
       }
     }

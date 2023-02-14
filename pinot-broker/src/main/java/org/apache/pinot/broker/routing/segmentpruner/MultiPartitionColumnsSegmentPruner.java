@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -210,8 +211,15 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null) {
           PartitionInfo partitionInfo = columnPartitionInfoMap.get(identifier.getName());
+          Literal literal = operands.get(1).getLiteral();
+          Object literalValue;
+          if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+            literalValue = null;
+          } else {
+            literalValue = literal.getFieldValue();
+          }
           return partitionInfo == null || partitionInfo._partitions.contains(
-              partitionInfo._partitionFunction.getPartition(operands.get(1).getLiteral().getFieldValue()));
+              partitionInfo._partitionFunction.getPartition(literalValue));
         } else {
           return true;
         }

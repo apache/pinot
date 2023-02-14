@@ -91,8 +91,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
     TransformFunction returnValueMetadata = arguments.get(0);
     Preconditions.checkState(returnValueMetadata instanceof LiteralTransformFunction,
         "First argument of GROOVY transform function must be a literal, representing a json string");
-    // TODO: Handle null literal
-    String returnValueMetadataStr = ((LiteralTransformFunction) returnValueMetadata).getLiteral().toString();
+    String returnValueMetadataStr = ((LiteralTransformFunction) returnValueMetadata).getStringLiteral();
     try {
       JsonNode returnValueMetadataJson = JsonUtils.stringToJsonNode(returnValueMetadataStr);
       Preconditions.checkState(returnValueMetadataJson.hasNonNull(RETURN_TYPE_KEY),
@@ -134,19 +133,19 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       // construct arguments string for GroovyFunctionEvaluator
       String argumentsStr = IntStream.range(0, _numGroovyArgs).mapToObj(i -> ARGUMENT_PREFIX + i)
           .collect(Collectors.joining(GROOVY_ARG_DELIMITER));
-      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(
-          String.format(GROOVY_TEMPLATE_WITH_ARGS, ((LiteralTransformFunction) groovyTransformFunction).getLiteral(),
-              argumentsStr));
+      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String.format(GROOVY_TEMPLATE_WITH_ARGS,
+          ((LiteralTransformFunction) groovyTransformFunction).getStringLiteral(), argumentsStr));
 
       _transformToValuesFunctions = new BiFunction[_numGroovyArgs];
       _fetchElementFunctions = new BiFunction[_numGroovyArgs];
       initFunctions();
     } else {
       _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String.format(GROOVY_TEMPLATE_WITHOUT_ARGS,
-          ((LiteralTransformFunction) groovyTransformFunction).getLiteral()));
+          ((LiteralTransformFunction) groovyTransformFunction).getStringLiteral()));
     }
     _sourceArrays = new Object[_numGroovyArgs];
     _bindingValues = new Object[_numGroovyArgs];
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

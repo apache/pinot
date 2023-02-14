@@ -87,9 +87,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     // Collect all values for the VALUE_IN transform function
     _stringValueSet = new HashSet<>(numArguments - 1);
     for (int i = 1; i < numArguments; i++) {
-      // TODO: Handle null literal
-      _stringValueSet.add(((LiteralTransformFunction) arguments.get(i)).getLiteral().toString());
+      _stringValueSet.add(((LiteralTransformFunction) arguments.get(i)).getStringLiteral());
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

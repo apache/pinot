@@ -36,11 +36,13 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 public class TransformBlock implements Block {
   protected final ProjectionBlock _projectionBlock;
   protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
+  protected final boolean _isNullHandlingEnabled;
 
-  public TransformBlock(ProjectionBlock projectionBlock,
-      Map<ExpressionContext, TransformFunction> transformFunctionMap) {
+  public TransformBlock(ProjectionBlock projectionBlock, Map<ExpressionContext, TransformFunction> transformFunctionMap,
+      boolean isNullHandlingEnabled) {
     _projectionBlock = projectionBlock;
     _transformFunctionMap = transformFunctionMap;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   public int getNumDocs() {
@@ -55,7 +57,8 @@ public class TransformBlock implements Block {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return _projectionBlock.getBlockValueSet(expression.getIdentifier());
     } else {
-      return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression), expression);
+      return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression), expression,
+          _isNullHandlingEnabled);
     }
   }
 

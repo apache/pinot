@@ -22,6 +22,8 @@ import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -66,6 +68,9 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
+
+    // Setting data table version to 4
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @AfterClass
@@ -185,5 +190,30 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     testQuery(query);
     query = "SELECT description FROM " + getTableName() + " where description IS NOT DISTINCT FROM description";
     testQuery(query);
+  }
+
+  @Test
+  public void testIsNull()
+      throws Exception {
+//    String sqlQuery = "SELECT null IS NULL FROM mytable OPTION(enableNullHandling=true)";
+//    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+//    JsonNode rows = response.get("resultTable").get("rows");
+//    assertTrue(response.get("exceptions").isEmpty());
+//    assertEquals(rows.size(), 1);
+//    assertTrue(rows.get(0).get(0).asBoolean());
+//    String sqlQuery = "SELECT COUNT(*) FROM " + getTableName() + " WHERE null IS NULL";
+//    String sqlQuery = "SELECT add(salary, null) FROM " + getTableName() + "  OPTION(enableNullHandling=true);";
+
+//    String sqlQuery = "SELECT isNull(add(salary, null)) FROM " + getTableName() + "  OPTION
+//    (enableNullHandling=true);";
+
+    String query = "SELECT CASE WHEN salary IS NULL THEN null ELSE 0 END FROM " + getTableName();
+//    JsonNode response = postQuery(query, _brokerBaseApiUrl);
+//    JsonNode rows = response.get("resultTable").get("rows");
+//    assertTrue(response.get("exceptions").isEmpty());
+//    assertEquals(rows.get(0).get(0).asBoolean(), true);
+    testQuery(query);
+
+//    assertTrue(rows.get(0).get(0).asBoolean());
   }
 }

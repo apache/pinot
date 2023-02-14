@@ -289,7 +289,8 @@ public class TransformFunctionFactory {
         if (transformFunctionClass != null) {
           // Transform function
           try {
-            transformFunction = transformFunctionClass.newInstance();
+            transformFunction =
+                transformFunctionClass.getDeclaredConstructor().newInstance();
           } catch (Exception e) {
             throw new RuntimeException("Caught exception while constructing transform function: " + functionName, e);
           }

@@ -228,7 +228,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   public void testGreatestTransformFunctionInt() {
     TransformFunction transformFunction = testGreatestPreconditions(
         String.format("greatest(%s, %d, cast(%s as INT))", INT_SV_COLUMN, -1, FLOAT_SV_COLUMN));
-    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.LONG);
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(intValues[i], Math.max(Math.max(_intSVValues[i], -1), (int) _floatSVValues[i]));

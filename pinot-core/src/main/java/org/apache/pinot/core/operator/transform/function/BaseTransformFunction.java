@@ -19,11 +19,15 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -70,9 +74,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.STRING, false, false);
   protected static final TransformResultMetadata JSON_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.JSON, false, false);
-  // TODO: Support MV BYTES
-  protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
-      new TransformResultMetadata(DataType.BYTES, false, false);
 
   // These buffers are used to hold the result for different result types. When the subclass overrides a method, it can
   // reuse the buffer for that method. E.g. if transformToIntValuesSV is overridden, the result can be written into
@@ -90,6 +91,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected double[][] _doubleValuesMV;
   protected String[][] _stringValuesMV;
   protected byte[][][] _bytesValuesMV;
+
+  protected List<TransformFunction> _arguments;
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    _arguments = arguments;
+  }
 
   @Override
   public Dictionary getDictionary() {
@@ -614,5 +622,14 @@ public abstract class BaseTransformFunction implements TransformFunction {
       ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
     }
     return _bytesValuesMV;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (TransformFunction arg : _arguments) {
+      bitmap.or(arg.getNullBitmap(projectionBlock));
+    }
+    return bitmap;
   }
 }

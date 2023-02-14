@@ -73,8 +73,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
     TransformFunction keyValueFunction = arguments.get(1);
     Preconditions.checkState(keyValueFunction instanceof LiteralTransformFunction,
         "Key value must be a literal (number or string)");
-    // TODO: Handle null literal
-    String keyValue = ((LiteralTransformFunction) keyValueFunction).getLiteral().toString();
+    String keyValue = ((LiteralTransformFunction) keyValueFunction).getStringLiteral();
     _keyDictId = keyColumnDictionary.indexOf(keyValue);
 
     _valueColumnFunction = arguments.get(2);
@@ -83,6 +82,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
     Preconditions.checkState(!valueColumnMetadata.isSingleValue() && _valueColumnDictionary != null,
         "Value column must be dictionary-encoded multi-value column");
     _resultMetadata = new TransformResultMetadata(valueColumnMetadata.getDataType(), true, true);
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

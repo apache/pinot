@@ -59,6 +59,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     _resultDataType =
         _transformFunction.getResultMetadata().getDataType() == DataType.BIG_DECIMAL ? DataType.BIG_DECIMAL
             : DataType.DOUBLE;
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

@@ -60,6 +60,7 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("The argument of ArraySum transform function must be numeric");
     }
     _argument = firstArgument;
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

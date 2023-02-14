@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 
 
 /**
@@ -49,7 +50,7 @@ public class ModuloPartitionFunction implements PartitionFunction {
    * @return Partition id for the given value.
    */
   @Override
-  public int getPartition(Object value) {
+  public int getPartition(@Nullable Object value) {
     if (value instanceof Integer) {
       return toNonNegative((Integer) value % _numPartitions);
     } else if (value instanceof Long) {
@@ -60,7 +61,7 @@ public class ModuloPartitionFunction implements PartitionFunction {
       return toNonNegative((int) (Long.parseLong((String) value) % _numPartitions));
     } else {
       throw new IllegalArgumentException(
-          "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
+          "Illegal argument for partitioning, expected Integer, got: " + value);
     }
   }
 

@@ -46,8 +46,8 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     List<Object[]> inputs = new ArrayList<>();
 
     // max in array (returns SV INT)
-    groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().max()', %s)",
+    groovyTransformFunction =
+        String.format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().max()', %s)",
             INT_MV_COLUMN);
     int[] expectedResult1 = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -56,8 +56,8 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.INT, true, expectedResult1});
 
     // simple addition (returns SV LONG)
-    groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"LONG\", \"isSingleValue\":true}', 'arg0 + arg1', %s, %s)",
+    groovyTransformFunction =
+        String.format("groovy('{\"returnType\":\"LONG\", \"isSingleValue\":true}', 'arg0 + arg1', %s, %s)",
             INT_SV_COLUMN, LONG_SV_COLUMN);
     long[] expectedResult2 = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -66,9 +66,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.LONG, true, expectedResult2});
 
     // minimum of 2 numbers (returns SV DOUBLE)
-    groovyTransformFunction = String.format(
-        "groovy('{\"returnType\":\"DOUBLE\", \"isSingleValue\":true}', 'Math.min(arg0, arg1)', %s, %s)",
-        DOUBLE_SV_COLUMN, INT_SV_COLUMN);
+    groovyTransformFunction =
+        String.format("groovy('{\"returnType\":\"DOUBLE\", \"isSingleValue\":true}', 'Math.min(arg0, arg1)', %s, %s)",
+            DOUBLE_SV_COLUMN, INT_SV_COLUMN);
     double[] expectedResult3 = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult3[i] = Math.min(_intSVValues[i], _doubleSVValues[i]);
@@ -97,8 +97,8 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.STRING, true, expectedResult5});
 
     // find all in array that match (returns MV INT)
-    groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', 'arg0.findAll{it < 5}', %s)",
+    groovyTransformFunction =
+        String.format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', 'arg0.findAll{it < 5}', %s)",
             INT_MV_COLUMN);
     int[][] expectedResult6 = new int[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -125,13 +125,15 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.STRING, false, expectedResult8});
 
     // nested groovy functions
-    String groovy1 = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().max()', %s)", INT_MV_COLUMN);
-    String groovy2 = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().min()', %s)", INT_MV_COLUMN);
-    groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', '[arg0, arg1, arg2.sum()]', %s, %s, %s)",
-            groovy1, groovy2, INT_MV_COLUMN);
+    String groovy1 =
+        String.format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().max()', %s)",
+            INT_MV_COLUMN);
+    String groovy2 =
+        String.format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().min()', %s)",
+            INT_MV_COLUMN);
+    groovyTransformFunction = String.format(
+        "groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', '[arg0, arg1, arg2.sum()]', %s, %s, %s)", groovy1,
+        groovy2, INT_MV_COLUMN);
     int[][] expectedResult9 = new int[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
       IntSummaryStatistics stats = Arrays.stream(_intMVValues[i]).summaryStatistics();
@@ -140,8 +142,8 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.INT, false, expectedResult9});
 
     // nested with other functions
-    groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0 + arg1', %s, arraylength(%s))",
+    groovyTransformFunction =
+        String.format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0 + arg1', %s, arraylength(%s))",
             INT_SV_COLUMN, INT_MV_COLUMN);
     int[] expectedResult10 = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -150,10 +152,9 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.INT, true, expectedResult10});
 
     // Operations between a BigDecimal, and a double (returns SV BIG_DECIMAL)
-    groovyTransformFunction = String.format(
-        "groovy('{\"returnType\":\"BIG_DECIMAL\", \"isSingleValue\":true}', "
-            + "'arg0.min(BigDecimal.valueOf(arg1)).subtract(BigDecimal.ONE)', %s, %s)",
-        BIG_DECIMAL_SV_COLUMN, DOUBLE_SV_COLUMN);
+    groovyTransformFunction = String.format("groovy('{\"returnType\":\"BIG_DECIMAL\", \"isSingleValue\":true}', "
+            + "'arg0.min(BigDecimal.valueOf(arg1)).subtract(BigDecimal.ONE)', %s, %s)", BIG_DECIMAL_SV_COLUMN,
+        DOUBLE_SV_COLUMN);
     BigDecimal[] expectedResult11 = new BigDecimal[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult11[i] = _bigDecimalSVValues[i].min(BigDecimal.valueOf(_doubleSVValues[i])).subtract(BigDecimal.ONE);

@@ -57,6 +57,7 @@ public class ArrayLengthTransformFunction extends BaseTransformFunction {
           "The argument of ARRAYLENGTH transform function must be a multi-valued column or a transform function");
     }
     _argument = firstArgument;
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

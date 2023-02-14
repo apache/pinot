@@ -70,7 +70,7 @@ public class TransformPlanNode implements PlanNode {
     if (hasNonIdentifierExpression) {
       return new TransformOperator(_queryContext, projectionOperator, _expressions);
     } else {
-      return new PassThroughTransformOperator(projectionOperator, _expressions);
+      return new PassThroughTransformOperator(_queryContext, projectionOperator, _expressions);
     }
   }
 }

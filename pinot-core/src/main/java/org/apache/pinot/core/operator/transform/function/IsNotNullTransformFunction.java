@@ -54,6 +54,7 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
     } else {
       _nullValueVectorIterator = null;
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

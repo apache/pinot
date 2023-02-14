@@ -49,7 +49,6 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 argument is required for ArrayAverage transform function");
     }
-
     // Check that the argument is a multi-valued column or transform function
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || firstArgument.getResultMetadata().isSingleValue()) {
@@ -60,6 +59,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("The argument of ArrayAverage transform function must be numeric");
     }
     _argument = firstArgument;
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

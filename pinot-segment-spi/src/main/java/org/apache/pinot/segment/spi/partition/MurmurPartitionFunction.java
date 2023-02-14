@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -41,8 +42,8 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
-    return (murmur2(value.toString().getBytes(UTF_8)) & Integer.MAX_VALUE) % _numPartitions;
+  public int getPartition(@Nullable Object value) {
+    return (murmur2(String.valueOf(value).getBytes(UTF_8)) & Integer.MAX_VALUE) % _numPartitions;
   }
 
   @Override

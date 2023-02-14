@@ -38,6 +38,8 @@ public class StarTreeTransformPlanNode implements PlanNode {
   private final List<ExpressionContext> _groupByExpressions;
   private final StarTreeProjectionPlanNode _starTreeProjectionPlanNode;
 
+  private final QueryContext _queryContext;
+
   public StarTreeTransformPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap) {
@@ -60,6 +62,7 @@ public class StarTreeTransformPlanNode implements PlanNode {
     _starTreeProjectionPlanNode =
         new StarTreeProjectionPlanNode(queryContext, starTreeV2, projectionColumns, predicateEvaluatorsMap,
             groupByColumns);
+    _queryContext = queryContext;
   }
 
   @Override
@@ -67,6 +70,6 @@ public class StarTreeTransformPlanNode implements PlanNode {
     // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
     //       - They are all columns (not functions or constants), where no transform is required
     //       - We never call TransformOperator.getResultMetadata() or TransformOperator.getDictionary() on them
-    return new TransformOperator(_starTreeProjectionPlanNode.run(), _groupByExpressions);
+    return new TransformOperator(_queryContext, _starTreeProjectionPlanNode.run(), _groupByExpressions);
   }
 }

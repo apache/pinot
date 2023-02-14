@@ -103,15 +103,13 @@ public class LookupTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(dimTableNameFunction instanceof LiteralTransformFunction,
         "First argument must be a literal(string) representing the dimension table name");
     // Lookup parameters
-    // TODO: Handle null literal
     String dimTableName = TableNameBuilder.OFFLINE.tableNameWithType(
-        ((LiteralTransformFunction) dimTableNameFunction).getLiteral().toString());
+        ((LiteralTransformFunction) dimTableNameFunction).getStringLiteral());
 
     TransformFunction dimColumnFunction = arguments.get(1);
     Preconditions.checkArgument(dimColumnFunction instanceof LiteralTransformFunction,
         "Second argument must be a literal(string) representing the column name from dimension table to lookup");
-    // TODO: Handle null literal
-    _dimColumnName = ((LiteralTransformFunction) dimColumnFunction).getLiteral().toString();
+    _dimColumnName = ((LiteralTransformFunction) dimColumnFunction).getStringLiteral();
 
     List<TransformFunction> joinArguments = arguments.subList(2, arguments.size());
     int numJoinArguments = joinArguments.size();
@@ -120,7 +118,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
       Preconditions.checkArgument(dimJoinKeyFunction instanceof LiteralTransformFunction,
           "JoinKey argument must be a literal(string) representing the primary key for the dimension table");
       // TODO: Handle null literal
-      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral().toString());
+      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getStringLiteral());
 
       TransformFunction factJoinValueFunction = joinArguments.get((i * 2) + 1);
       TransformResultMetadata factJoinValueFunctionResultMetadata = factJoinValueFunction.getResultMetadata();
@@ -157,6 +155,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
       _nullFloatValue = ((Number) defaultNullValue).floatValue();
       _nullDoubleValue = ((Number) defaultNullValue).intValue();
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

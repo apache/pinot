@@ -81,6 +81,8 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _rows;
 
+  private final QueryContext _queryContext;
+
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
@@ -106,6 +108,8 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
             _nullHandlingEnabled);
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         comparator);
+
+    _queryContext = queryContext;
   }
 
   @Override
@@ -262,7 +266,8 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
-    TransformOperator transformOperator = new TransformOperator(projectionOperator, nonOrderByExpressions);
+    TransformOperator transformOperator =
+        new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 
     // Fill the non-order-by expression values
     int numNonOrderByExpressions = nonOrderByExpressions.size();

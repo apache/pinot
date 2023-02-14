@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -42,8 +43,8 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
-    return abs(Arrays.hashCode(value.toString().getBytes(UTF_8))) % _numPartitions;
+  public int getPartition(@Nullable Object value) {
+    return abs(Arrays.hashCode(String.valueOf(value).getBytes(UTF_8))) % _numPartitions;
   }
 
   @Override

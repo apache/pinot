@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 
 
 /**
@@ -37,8 +38,8 @@ public class HashCodePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
-    return abs(value.toString().hashCode()) % _numPartitions;
+  public int getPartition(@Nullable Object value) {
+    return abs(String.valueOf(value).hashCode()) % _numPartitions;
   }
 
   @Override

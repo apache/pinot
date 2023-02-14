@@ -54,10 +54,11 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
           "zoneId parameter %s must be a literal", _name);
       // TODO: Handle null literal
       _chronology = ISOChronology.getInstance(
-          DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getLiteral().toString()));
+          DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getStringLiteral()));
     } else {
       _chronology = UTC;
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

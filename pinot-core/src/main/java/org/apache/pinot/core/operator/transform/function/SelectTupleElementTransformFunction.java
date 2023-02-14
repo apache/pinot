@@ -38,7 +38,6 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
 
   private final String _name;
 
-  protected List<TransformFunction> _arguments;
   private TransformResultMetadata _resultMetadata;
 
   public SelectTupleElementTransformFunction(String name) {
@@ -71,7 +70,7 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
       }
     }
     _resultMetadata = new TransformResultMetadata(dataType, true, false);
-    _arguments = arguments;
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

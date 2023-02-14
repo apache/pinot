@@ -66,8 +66,7 @@ public class InTransformFunction extends BaseTransformFunction {
     for (int i = 1; i < numArguments; i++) {
       TransformFunction valueFunction = arguments.get(i);
       if (valueFunction instanceof LiteralTransformFunction) {
-        // TODO: Handle null literal
-        stringValues.add(((LiteralTransformFunction) valueFunction).getLiteral().toString());
+        stringValues.add(((LiteralTransformFunction) valueFunction).getStringLiteral());
       } else {
         allLiteralValues = false;
         break;
@@ -130,6 +129,7 @@ public class InTransformFunction extends BaseTransformFunction {
         _valueFunctions[i - 1] = valueFunction;
       }
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

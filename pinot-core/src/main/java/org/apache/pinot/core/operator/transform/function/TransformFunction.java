@@ -25,6 +25,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -193,4 +194,6 @@ public interface TransformFunction {
    * @return Transformation result
    */
   byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock);
+
+  RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock);
 }

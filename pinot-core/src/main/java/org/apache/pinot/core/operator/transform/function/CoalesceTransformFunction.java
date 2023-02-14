@@ -336,6 +336,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       default:
         throw new UnsupportedOperationException("Coalesce only supports numerical and string data type");
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

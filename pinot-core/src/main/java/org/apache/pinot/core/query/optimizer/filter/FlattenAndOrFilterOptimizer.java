@@ -40,6 +40,9 @@ public class FlattenAndOrFilterOptimizer implements FilterOptimizer {
 
   private Expression optimize(Expression filterExpression) {
     Function function = filterExpression.getFunctionCall();
+    if (function == null) {
+      return filterExpression;
+    }
     String operator = function.getOperator();
     if (!operator.equals(FilterKind.AND.name()) && !operator.equals(FilterKind.OR.name())) {
       return filterExpression;

@@ -49,13 +49,13 @@ public class PowerTransformFunction extends BaseTransformFunction {
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
-      // TODO: Handle null literal
-      _exponent = Double.parseDouble(((LiteralTransformFunction) _rightTransformFunction).getLiteral().toString());
+      _exponent = ((LiteralTransformFunction) _rightTransformFunction).getDoubleLiteral();
       _fixedExponent = true;
     }
     Preconditions.checkArgument(
         _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
             .isSingleValue(), "Argument must be single-valued for transform function: %s", getName());
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

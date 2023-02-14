@@ -25,7 +25,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -51,13 +50,15 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   protected final Map<String, DataSource> _dataSourceMap;
   protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
 
+  protected final boolean _isNullHandlingEnabled;
+
   /**
    *
    * @param queryContext the query context
    * @param projectionOperator Projection operator
    * @param expressions Collection of expressions to evaluate
    */
-  public TransformOperator(@Nullable QueryContext queryContext, ProjectionOperator projectionOperator,
+  public TransformOperator(QueryContext queryContext, ProjectionOperator projectionOperator,
       Collection<ExpressionContext> expressions) {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
@@ -65,15 +66,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
       TransformFunction transformFunction = TransformFunctionFactory.get(queryContext, expression, _dataSourceMap);
       _transformFunctionMap.put(expression, transformFunction);
     }
-  }
-
-  /**
-   *
-   * @param projectionOperator Projection operator
-   * @param expressions Collection of expressions to evaluate
-   */
-  public TransformOperator(ProjectionOperator projectionOperator, Collection<ExpressionContext> expressions) {
-    this(null, projectionOperator, expressions);
+    _isNullHandlingEnabled = queryContext.isNullHandlingEnabled();
   }
 
   /**
@@ -112,7 +105,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
       return null;
     } else {
       Tracing.activeRecording().setNumChildren(_dataSourceMap.size());
-      return new TransformBlock(projectionBlock, _transformFunctionMap);
+      return new TransformBlock(projectionBlock, _transformFunctionMap, _isNullHandlingEnabled);
     }
   }
 

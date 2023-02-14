@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.common.request.context;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.type.DataTypeFactory;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -41,14 +45,58 @@ public class LiteralContext {
   private FieldSpec.DataType _type;
   private Object _value;
 
+  // TODO: Deprecate the usage case for this function.
+  @VisibleForTesting
+  static private Pair<FieldSpec.DataType, Object> inferLiteralDataTypeAndValue(String literal) {
+    // Try to interpret the literal as number
+    try {
+      Number number = NumberUtils.createNumber(literal);
+      if  (number instanceof BigDecimal || number instanceof BigInteger) {
+        return ImmutablePair.of(FieldSpec.DataType.BIG_DECIMAL, new BigDecimal(literal));
+      } else {
+        return ImmutablePair.of(FieldSpec.DataType.STRING, literal);
+      }
+    } catch (Exception e) {
+      // Ignored
+    }
+
+    // Try to interpret the literal as TIMESTAMP
+    try {
+      Timestamp timestamp = Timestamp.valueOf(literal);
+      return ImmutablePair.of(FieldSpec.DataType.TIMESTAMP, timestamp);
+    } catch (Exception e) {
+      // Ignored
+    }
+    return ImmutablePair.of(FieldSpec.DataType.STRING, literal);
+  }
+
   public LiteralContext(Literal literal) {
     Preconditions.checkState(literal.getFieldValue() != null,
         "Field value cannot be null for field:" + literal.getSetField());
-    _type = DataTypeFactory.createDataType(literal.getSetField());
-    if(_type == FieldSpec.DataType.UNKNOWN){
-      _value = null;
-    } else {
-      _value = literal.getFieldValue();
+    switch (literal.getSetField()){
+      case BOOL_VALUE:
+        _type = FieldSpec.DataType.BOOLEAN;
+        _value = literal.getFieldValue();
+        break;
+      case DOUBLE_VALUE:
+        _type = FieldSpec.DataType.DOUBLE;
+        _value = literal.getFieldValue();
+        break;
+      case LONG_VALUE:
+        _type = FieldSpec.DataType.LONG;
+        _value = literal.getFieldValue();
+        break;
+      case NULL_VALUE:
+        _type = FieldSpec.DataType.UNKNOWN;
+        _value = null;
+        break;
+      case STRING_VALUE:
+        Pair<FieldSpec.DataType, Object> typeAndValue = inferLiteralDataTypeAndValue(literal.getFieldValue().toString());
+        _type = typeAndValue.getLeft();
+        _value = typeAndValue.getRight();
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported data type:" + literal.getSetField());
     }
   }
 
@@ -57,6 +105,9 @@ public class LiteralContext {
   }
 
   public BigDecimal getBigDecimalValue() {
+    if(_type == FieldSpec.DataType.BIG_DECIMAL){
+      return (BigDecimal) _value;
+    }
     if (_type == FieldSpec.DataType.BOOLEAN) {
       return PinotDataType.BOOLEAN.toBigDecimal(_value);
     }

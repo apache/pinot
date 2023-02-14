@@ -28,7 +28,6 @@ import org.apache.pinot.core.operator.transform.function.LiteralTransformFunctio
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
@@ -63,7 +62,7 @@ public class StPointFunction extends BaseTransformFunction {
       Preconditions.checkArgument(transformFunction instanceof LiteralTransformFunction,
           "Third argument must be a literal of integer: %s", getName());
       // TODO: Handle null literal
-      _isGeography = BooleanUtils.toBoolean(((LiteralTransformFunction) transformFunction).getLiteral().toString());
+      _isGeography = ((LiteralTransformFunction) transformFunction).getBooleanLiteral();
     }
   }
 

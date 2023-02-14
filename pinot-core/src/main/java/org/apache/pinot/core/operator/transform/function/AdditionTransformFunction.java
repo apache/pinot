@@ -49,19 +49,17 @@ public class AdditionTransformFunction extends BaseTransformFunction {
     if (arguments.size() < 2) {
       throw new IllegalArgumentException("At least 2 arguments are required for ADD transform function");
     }
-
     _resultDataType = DataType.DOUBLE;
     for (TransformFunction argument : arguments) {
       if (argument instanceof LiteralTransformFunction) {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
         DataType dataType = literalTransformFunction.getResultMetadata().getDataType();
         if (dataType == DataType.BIG_DECIMAL) {
-          // TODO: Handle null literal
           _literalBigDecimalSum =
-              _literalBigDecimalSum.add(new BigDecimal(literalTransformFunction.getLiteral().toString()));
+              _literalBigDecimalSum.add(literalTransformFunction.getBigDecimalLiteral());
           _resultDataType = DataType.BIG_DECIMAL;
         } else {
-          _literalDoubleSum += Double.parseDouble(((LiteralTransformFunction) argument).getLiteral().toString());
+          _literalDoubleSum += literalTransformFunction.getDoubleLiteral();
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {
@@ -76,6 +74,7 @@ public class AdditionTransformFunction extends BaseTransformFunction {
     if (_resultDataType == DataType.BIG_DECIMAL) {
       _literalBigDecimalSum = _literalBigDecimalSum.add(BigDecimal.valueOf(_literalDoubleSum));
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

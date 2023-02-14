@@ -30,7 +30,9 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -68,8 +70,24 @@ public class LiteralTransformFunction implements TransformFunction {
     _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
-  public Object getLiteral() {
-    return _literal;
+  public BigDecimal getBigDecimalLiteral() {
+    return _bigDecimalLiteral;
+  }
+
+  public int getIntLiteral() {
+    return _intLiteral;
+  }
+
+  public double getDoubleLiteral() {
+    return _doubleLiteral;
+  }
+
+  public String getStringLiteral() {
+    return String.valueOf(_literal);
+  }
+
+  public boolean getBooleanLiteral() {
+    return BooleanUtils.toBoolean(_literal);
   }
 
   @Override
@@ -131,7 +149,7 @@ public class LiteralTransformFunction implements TransformFunction {
           Arrays.fill(longResult, _longLiteral);
         }
       } else {
-        Arrays.fill(longResult, Timestamp.valueOf(_literal.toString()).getTime());
+        Arrays.fill(longResult, Timestamp.valueOf(getStringLiteral()).getTime());
       }
       _longResult = longResult;
     }
@@ -184,8 +202,7 @@ public class LiteralTransformFunction implements TransformFunction {
     String[] stringResult = _stringResult;
     if (stringResult == null || stringResult.length < numDocs) {
       stringResult = new String[numDocs];
-      // TODO: Handle null literal
-      Arrays.fill(stringResult, _literal.toString());
+      Arrays.fill(stringResult, getStringLiteral());
       _stringResult = stringResult;
     }
     return stringResult;
@@ -198,7 +215,7 @@ public class LiteralTransformFunction implements TransformFunction {
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
       // TODO: Handle null literal
-      Arrays.fill(bytesResult, BytesUtils.toBytes(_literal.toString()));
+      Arrays.fill(bytesResult, BytesUtils.toBytes(getStringLiteral()));
       _bytesResult = bytesResult;
     }
     return bytesResult;
@@ -232,5 +249,15 @@ public class LiteralTransformFunction implements TransformFunction {
   @Override
   public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    RoaringBitmap bitmap = new RoaringBitmap();
+    if (_literal == null && _dataType == DataType.UNKNOWN) {
+      bitmap.add(0L, length);
+    }
+    return bitmap;
   }
 }

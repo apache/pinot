@@ -36,6 +36,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -189,8 +190,15 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       case EQUALS: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
+          Literal literal = operands.get(1).getLiteral();
+          Object literalValue;
+          if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+            literalValue = null;
+          } else {
+            literalValue = literal.getFieldValue();
+          }
           return partitionInfo._partitions.contains(
-              partitionInfo._partitionFunction.getPartition(operands.get(1).getLiteral().getFieldValue().toString()));
+              partitionInfo._partitionFunction.getPartition(String.valueOf(literalValue)));
         } else {
           return true;
         }

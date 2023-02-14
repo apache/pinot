@@ -41,6 +41,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -234,7 +235,14 @@ public class TimeSegmentPruner implements SegmentPruner {
       case EQUALS: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          Literal literal = operands.get(1).getLiteral();
+          Object literalValue;
+          if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+            literalValue = null;
+          } else {
+            literalValue = literal.getFieldValue();
+          }
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue));
           return Collections.singletonList(new Interval(timeStamp, timeStamp));
         } else {
           return null;
@@ -246,8 +254,14 @@ public class TimeSegmentPruner implements SegmentPruner {
           int numOperands = operands.size();
           List<Interval> intervals = new ArrayList<>(numOperands - 1);
           for (int i = 1; i < numOperands; i++) {
-            long timeStamp =
-                _timeFormatSpec.fromFormatToMillis(operands.get(i).getLiteral().getFieldValue().toString());
+            Literal literal = operands.get(i).getLiteral();
+            Object literalValue;
+            if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+              literalValue = null;
+            } else {
+              literalValue = literal.getFieldValue();
+            }
+            long timeStamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue));
             intervals.add(new Interval(timeStamp, timeStamp));
           }
           return intervals;
@@ -258,7 +272,14 @@ public class TimeSegmentPruner implements SegmentPruner {
       case GREATER_THAN: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          Literal literal = operands.get(1).getLiteral();
+          Object literalValue;
+          if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+            literalValue = null;
+          } else {
+            literalValue = literal.getFieldValue();
+          }
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue));
           return Collections.singletonList(new Interval(timeStamp + 1, MAX_END_TIME));
         } else {
           return null;
@@ -267,7 +288,14 @@ public class TimeSegmentPruner implements SegmentPruner {
       case GREATER_THAN_OR_EQUAL: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          Literal literal = operands.get(1).getLiteral();
+          Object literalValue;
+          if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+            literalValue = null;
+          } else {
+            literalValue = literal.getFieldValue();
+          }
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue));
           return Collections.singletonList(new Interval(timeStamp, MAX_END_TIME));
         } else {
           return null;
@@ -275,8 +303,15 @@ public class TimeSegmentPruner implements SegmentPruner {
       }
       case LESS_THAN: {
         Identifier identifier = operands.get(0).getIdentifier();
+        Literal literal = operands.get(1).getLiteral();
+        Object literalValue;
+        if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+          literalValue = null;
+        } else {
+          literalValue = literal.getFieldValue();
+        }
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue));
           if (timeStamp > MIN_START_TIME) {
             return Collections.singletonList(new Interval(MIN_START_TIME, timeStamp - 1));
           } else {
@@ -288,8 +323,15 @@ public class TimeSegmentPruner implements SegmentPruner {
       }
       case LESS_THAN_OR_EQUAL: {
         Identifier identifier = operands.get(0).getIdentifier();
+        Literal literal = operands.get(1).getLiteral();
+        Object literalValue;
+        if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+          literalValue = null;
+        } else {
+          literalValue = literal.getFieldValue();
+        }
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue));
           if (timeStamp >= MIN_START_TIME) {
             return Collections.singletonList(new Interval(MIN_START_TIME, timeStamp));
           } else {
@@ -300,12 +342,24 @@ public class TimeSegmentPruner implements SegmentPruner {
         }
       }
       case BETWEEN: {
+        Literal literal0 = operands.get(1).getLiteral();
+        Object literalValue0;
+        if (literal0.getSetField() == Literal._Fields.NULL_VALUE) {
+          literalValue0 = null;
+        } else {
+          literalValue0 = literal0.getFieldValue();
+        }
+        Literal literal1 = operands.get(2).getLiteral();
+        Object literalValue1;
+        if (literal1.getSetField() == Literal._Fields.NULL_VALUE) {
+          literalValue1 = null;
+        } else {
+          literalValue1 = literal1.getFieldValue();
+        }
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long startTimestamp =
-              _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
-          long endTimestamp =
-              _timeFormatSpec.fromFormatToMillis(operands.get(2).getLiteral().getFieldValue().toString());
+          long startTimestamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue0));
+          long endTimestamp = _timeFormatSpec.fromFormatToMillis(String.valueOf(literalValue1));
           if (endTimestamp >= startTimestamp) {
             return Collections.singletonList(new Interval(startTimestamp, endTimestamp));
           } else {

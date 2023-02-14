@@ -97,6 +97,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
               + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
           _rightTransformFunction.getName(), _rightStoredType));
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

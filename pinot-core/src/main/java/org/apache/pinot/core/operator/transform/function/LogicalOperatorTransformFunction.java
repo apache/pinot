@@ -31,11 +31,9 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
  * The results are BOOLEAN type.
  */
 public abstract class LogicalOperatorTransformFunction extends BaseTransformFunction {
-  protected List<TransformFunction> _arguments;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    _arguments = arguments;
     int numArguments = arguments.size();
     if (numArguments <= 1) {
       throw new IllegalArgumentException(
@@ -49,6 +47,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
             "Unsupported argument of index: " + i + ", expecting single-valued boolean/number");
       }
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

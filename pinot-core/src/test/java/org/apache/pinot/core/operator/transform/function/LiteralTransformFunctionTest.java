@@ -29,11 +29,11 @@ public class LiteralTransformFunctionTest {
   public void testLiteralTransformFunction() {
     LiteralTransformFunction trueBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
     Assert.assertEquals(trueBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(trueBoolean.getLiteral(), true);
+    Assert.assertEquals(trueBoolean.getBooleanLiteral(), true);
     LiteralTransformFunction falseBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, false));
     Assert.assertEquals(falseBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(falseBoolean.getLiteral(), false);
+    Assert.assertEquals(falseBoolean.getBooleanLiteral(), false);
     LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
-    Assert.assertEquals(nullLiteral.getLiteral(), null);
+    Assert.assertEquals(nullLiteral.getStringLiteral(), "null");
   }
 }

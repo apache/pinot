@@ -85,7 +85,7 @@ abstract class BaseGapfillProcessor {
 
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteralString());
     _gapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteralString());
-    if (args.get(5).getLiteralString() == null) {
+    if (args.get(5).getLiteral() == null) {
       _postGapfillDateTimeGranularity = _gapfillDateTimeGranularity;
     } else {
       _postGapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(5).getLiteralString());

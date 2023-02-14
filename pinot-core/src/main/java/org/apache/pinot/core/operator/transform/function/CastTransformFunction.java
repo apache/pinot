@@ -54,9 +54,8 @@ public class CastTransformFunction extends BaseTransformFunction {
     boolean sourceSV = sourceMetadata.isSingleValue();
     TransformFunction castFormatTransformFunction = arguments.get(1);
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
-      // TODO: Handle null literal
       String targetType =
-          ((LiteralTransformFunction) castFormatTransformFunction).getLiteral().toString().toUpperCase();
+          ((LiteralTransformFunction) castFormatTransformFunction).getStringLiteral().toUpperCase();
       switch (targetType) {
         case "INT":
         case "INTEGER":
@@ -98,6 +97,7 @@ public class CastTransformFunction extends BaseTransformFunction {
     } else {
       throw new IllegalArgumentException("Invalid cast to type - " + castFormatTransformFunction.getName());
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

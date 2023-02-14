@@ -55,8 +55,7 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
     if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
       if (_rightTransformFunction instanceof LiteralTransformFunction) {
-        // TODO: Handle null literal
-        _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral().toString());
+        _scale = ((LiteralTransformFunction) _rightTransformFunction).getIntLiteral();
         _fixedScale = true;
       }
       Preconditions.checkArgument(
@@ -69,6 +68,7 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
 
     Preconditions.checkArgument(_leftTransformFunction.getResultMetadata().isSingleValue(),
         "Argument must be single-valued for transform function: %s", getName());
+    super.init(arguments, dataSourceMap);
   }
 
   private boolean isIntegralResultDatatype(TransformFunction transformFunction) {

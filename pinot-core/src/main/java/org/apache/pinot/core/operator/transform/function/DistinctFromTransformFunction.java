@@ -85,6 +85,7 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
         || !(_rightTransformFunction instanceof IdentifierTransformFunction)) {
       throw new IllegalArgumentException("Only column names are supported in DistinctFrom transformation.");
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

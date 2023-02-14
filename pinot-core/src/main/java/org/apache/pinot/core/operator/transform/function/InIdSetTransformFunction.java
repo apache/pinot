@@ -60,11 +60,11 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
 
     _transformFunction = arguments.get(0);
     try {
-      // TODO: Handle null literal
-      _idSet = IdSets.fromBase64String(((LiteralTransformFunction) arguments.get(1)).getLiteral().toString());
+      _idSet = IdSets.fromBase64String(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
     } catch (IOException e) {
       throw new IllegalArgumentException("Caught exception while deserializing IdSet", e);
     }
+    super.init(arguments, dataSourceMap);
   }
 
   @Override

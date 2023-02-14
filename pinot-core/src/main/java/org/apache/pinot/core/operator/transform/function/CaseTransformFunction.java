@@ -83,6 +83,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Collections.reverse(_elseThenStatements);
     Collections.reverse(_whenStatements);
     _resultMetadata = calculateResultMetadata();
+    super.init(arguments, dataSourceMap);
   }
 
   private void constructStatementList(List<TransformFunction> arguments) {

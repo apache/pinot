@@ -30,8 +30,9 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 public class PassThroughTransformBlock extends TransformBlock {
 
   public PassThroughTransformBlock(ProjectionBlock projectionBlock,
-      Map<ExpressionContext, TransformFunction> transformFunctionMap) {
-    super(projectionBlock, transformFunctionMap);
+      Map<ExpressionContext, TransformFunction> transformFunctionMap,
+      boolean isNullHandlingEnabled) {
+    super(projectionBlock, transformFunctionMap, isNullHandlingEnabled);
   }
 
   @Override
