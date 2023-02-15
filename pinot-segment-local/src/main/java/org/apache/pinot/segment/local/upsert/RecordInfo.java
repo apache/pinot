@@ -18,17 +18,16 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-@SuppressWarnings({"rawtypes"})
+@SuppressWarnings("rawtypes")
 public class RecordInfo {
   private final PrimaryKey _primaryKey;
   private final int _docId;
   private final Comparable _comparisonValue;
 
-  public RecordInfo(PrimaryKey primaryKey, int docId, @Nullable Comparable comparisonValue) {
+  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
     _primaryKey = primaryKey;
     _docId = docId;
     _comparisonValue = comparisonValue;
