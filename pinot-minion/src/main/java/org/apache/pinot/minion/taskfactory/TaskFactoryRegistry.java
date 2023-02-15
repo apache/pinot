@@ -58,7 +58,7 @@ import org.slf4j.MDC;
  */
 public class TaskFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskFactoryRegistry.class);
-  private static final int MAX_TASK_RESULT_INFO_LEN = 100;
+  private static final int MAX_TASK_RESULT_INFO_LEN = 1000;
 
   private final Map<String, TaskFactory> _taskFactoryRegistry = new HashMap<>();
 
@@ -197,7 +197,7 @@ public class TaskFactoryRegistry {
   }
 
   private static String extractAndTrimRootCauseMessage(Throwable th) {
-    String rootCauseMessage = ExceptionUtils.getRootCauseMessage(th);
+    String rootCauseMessage = ExceptionUtils.getStackTrace(th);
     if (rootCauseMessage != null && rootCauseMessage.length() > MAX_TASK_RESULT_INFO_LEN) {
       return rootCauseMessage.substring(0, MAX_TASK_RESULT_INFO_LEN);
     }
