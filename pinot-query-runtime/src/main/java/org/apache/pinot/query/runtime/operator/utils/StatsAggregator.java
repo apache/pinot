@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.function.LongConsumer;
 import org.apache.pinot.common.datatable.DataTable;
 
-
+//TODO: Remove this and use BaseReduceService.ExecutionStatsAggregator
 public class StatsAggregator {
   private long _numDocsScanned = 0L;
   private long _numEntriesScannedInFilter = 0L;

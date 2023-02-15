@@ -46,7 +46,6 @@ public class TransferableBlock implements Block {
   private final DataBlock.Type _type;
   private final DataSchema _dataSchema;
   private final int _numRows;
-  private final Map<String, String> _metadata;
 
   private DataBlock _dataBlock;
   private List<Object[]> _container;
@@ -56,18 +55,12 @@ public class TransferableBlock implements Block {
   }
 
   @VisibleForTesting
-  TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
-      boolean isErrorBlock) {
-    this(container, dataSchema, containerType, false, new HashMap<>());
-  }
-
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
-      boolean isErrorBlock, Map<String, String> metadata) {
+      boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
     _numRows = _container.size();
-    _metadata = metadata;
   }
 
   public TransferableBlock(DataBlock dataBlock) {
@@ -76,7 +69,6 @@ public class TransferableBlock implements Block {
     _type = dataBlock instanceof ColumnarDataBlock ? DataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? DataBlock.Type.ROW : DataBlock.Type.METADATA;
     _numRows = _dataBlock.getNumberOfRows();
-    _metadata = new HashMap<>();
   }
 
   public Map<String, OperatorStats> getResultMetadata() {

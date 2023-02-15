@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Joiner;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,14 +64,14 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       _operatorStats.endTimer();
       // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
-        LOGGER.info("Recorded operator stats: " + _operatorStats);
         if (nextBlock.isSuccessfulEndOfStreamBlock()) {
           for (MultiStageOperator op : getChildOperators()) {
             _operatorStatsMap.putAll(op.getOperatorStatsMap());
           }
 
           if (!_operatorStats.getExecutionStats().isEmpty()) {
-            _operatorStatsMap.put(toExplainString() + "_" + _requestId + "_" + _stageId, _operatorStats);
+            String operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId);
+            _operatorStatsMap.put(operatorId, _operatorStats);
           }
           return TransferableBlockUtils.getEndOfStreamTransferableBlock(
               OperatorUtils.getMetadataFromOperatorStats(_operatorStatsMap));

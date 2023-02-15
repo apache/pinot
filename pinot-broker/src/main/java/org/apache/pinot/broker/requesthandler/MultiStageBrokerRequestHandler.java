@@ -167,10 +167,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     ResultTable queryResults;
-    Map<String, String> stats = new HashMap<>();
+    Map<String, String> metadata = new HashMap<>();
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions(), stats);
+          sqlNodeAndOptions.getOptions(), metadata);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
@@ -185,13 +185,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
 
-    attachMetadataToResponse(stats, brokerResponse);
+    attachMetadataToResponse(metadata, brokerResponse);
 
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     return brokerResponse;
   }
 
+  //TODO: Remove this duplicate method, use the implementation from V1 engine
   private void attachMetadataToResponse(Map<String, String> stats, BrokerResponseNative brokerResponse) {
     brokerResponse.setNumDocsScanned(
         Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName(), "0")));

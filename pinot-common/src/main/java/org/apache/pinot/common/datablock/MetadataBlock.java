@@ -80,11 +80,6 @@ public class MetadataBlock extends BaseDataBlock {
     private String _type;
     private Map<String, String> _stats;
 
-//    @JsonCreator
-//    public Contents(@JsonProperty("type") String type) {
-//      _type = type;
-//    }
-
     @JsonCreator
     public Contents(@JsonProperty("type") String type, @JsonProperty("stats") Map<String, String> stats) {
       _type = type;
@@ -93,8 +88,7 @@ public class MetadataBlock extends BaseDataBlock {
 
     @JsonCreator
     public Contents() {
-      _type = null;
-      _stats = new HashMap<>();
+      this(null, new HashMap<>());
     }
 
     public String getType() {
@@ -117,8 +111,7 @@ public class MetadataBlock extends BaseDataBlock {
   private final Contents _contents;
 
   public MetadataBlock(MetadataBlockType type) {
-    super(0, null, new String[0], new byte[]{0}, toContents(new Contents(type.name(), new HashMap<>())));
-    _contents = new Contents(type.name(), new HashMap<>());
+    this(type, new HashMap<>());
   }
 
   public MetadataBlock(MetadataBlockType type, Map<String, String> stats) {
