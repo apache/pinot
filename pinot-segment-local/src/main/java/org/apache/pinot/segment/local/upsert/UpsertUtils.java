@@ -21,10 +21,8 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -77,18 +75,32 @@ public class UpsertUtils {
     };
   }
 
+  public static RecordInfoReader makeRecordReader(IndexSegment segment, List<String> primaryKeyColumns,
+      List<String> comparisonColumns) {
+
+    if (comparisonColumns.size() > 1) {
+      return new RecordInfoReader(segment, primaryKeyColumns, comparisonColumns);
+    }
+    return new RecordInfoReader(segment, primaryKeyColumns, comparisonColumns.get(0));
+  }
+
   public static class RecordInfoReader implements Closeable {
     public final PrimaryKeyReader _primaryKeyReader;
     public final ComparisonColumnReader _comparisonColumnReader;
 
     public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, List<String> comparisonColumns) {
       _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
-      _comparisonColumnReader = new ComparisonColumnReader(segment, comparisonColumns);
+      _comparisonColumnReader = new MultiComparisonColumnReader(segment, comparisonColumns);
+    }
+
+    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, String comparisonColumn) {
+      _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
+      _comparisonColumnReader = new SingleComparisonColumnReader(segment, comparisonColumn);
     }
 
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
-      return new RecordInfo(primaryKey, docId, _comparisonColumnReader.getComparisonColumns(docId));
+      return new RecordInfo(primaryKey, docId, _comparisonColumnReader.getComparisonValue(docId));
     }
 
     @Override
@@ -135,39 +147,7 @@ public class UpsertUtils {
     }
   }
 
-  public static class ComparisonColumnReader implements Closeable {
-    public final Map<String, PinotSegmentColumnReader> _comparisonColumnReaders;
-
-    public ComparisonColumnReader(IndexSegment segment, List<String> comparisonColumns) {
-      _comparisonColumnReaders = new HashMap<>();
-      for (String comparisonColumn : comparisonColumns) {
-        _comparisonColumnReaders.put(comparisonColumn, new PinotSegmentColumnReader(segment, comparisonColumn));
-      }
-    }
-
-    public ComparisonColumns getComparisonColumns(int docId) {
-      Map<String, ComparisonValue> comparisonColumns = new HashMap<>();
-
-      for (String comparisonColumnName : _comparisonColumnReaders.keySet()) {
-        PinotSegmentColumnReader columnReader = _comparisonColumnReaders.get(comparisonColumnName);
-        Comparable comparisonValue = (Comparable) getValue(columnReader, docId);
-
-        comparisonColumns.put(comparisonColumnName,
-            new ComparisonValue(comparisonValue, columnReader.isNull(docId)));
-      }
-      return new ComparisonColumns(comparisonColumns);
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      for (PinotSegmentColumnReader comparisonColumnReader : _comparisonColumnReaders.values()) {
-        comparisonColumnReader.close();
-      }
-    }
-  }
-
-  private static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
+  static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
     Object value = columnReader.getValue(docId);
     return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
   }

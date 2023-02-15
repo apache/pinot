@@ -561,21 +561,29 @@ public class MutableSegmentImpl implements MutableSegment {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
 
     if (isUpsertEnabled()) {
-      Map<String, ComparisonValue> comparisonColumns = new HashMap<>();
-
-      for (String columnName : _upsertComparisonColumns) {
-        Object comparisonValue = row.getValue(columnName);
-
-        Preconditions.checkState(comparisonValue instanceof Comparable,
-            "Upsert comparison column: %s must be comparable", columnName);
-
-        comparisonColumns.put(columnName,
-            new ComparisonValue((Comparable) comparisonValue, row.isNullValue(columnName)));
+      if (_upsertComparisonColumns.size() > 1) {
+        return multiComparisonRecordInfo(primaryKey, docId, row);
       }
-      return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
+      Comparable comparisonValue = (Comparable) row.getValue(_upsertComparisonColumns.get(0));
+      return new RecordInfo(primaryKey, docId, comparisonValue);
     }
 
     return new RecordInfo(primaryKey, docId, null);
+  }
+
+  private RecordInfo multiComparisonRecordInfo(PrimaryKey primaryKey, int docId, GenericRow row) {
+    Map<String, ComparisonValue> comparisonColumns = new HashMap<>();
+
+    for (String columnName : _upsertComparisonColumns) {
+      Object comparisonValue = row.getValue(columnName);
+
+      Preconditions.checkState(comparisonValue instanceof Comparable,
+          "Upsert comparison column: %s must be comparable", columnName);
+
+      comparisonColumns.put(columnName,
+          new ComparisonValue((Comparable) comparisonValue, row.isNullValue(columnName)));
+    }
+    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
   }
 
   private void updateDictionary(GenericRow row) {
