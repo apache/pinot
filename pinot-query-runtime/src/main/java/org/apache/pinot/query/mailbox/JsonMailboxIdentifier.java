@@ -36,6 +36,8 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
   private final String _jobId;
   private final String _from;
   private final String _to;
+  private final int _senderStageId;
+  private final int _receiverStageId;
 
   private final VirtualServerAddress _fromAddress;
   private final VirtualServerAddress _toAddress;
@@ -44,11 +46,15 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
   public JsonMailboxIdentifier(
       @JsonProperty(value = "jobId") String jobId,
       @JsonProperty(value = "from") String from,
-      @JsonProperty(value = "to") String to
+      @JsonProperty(value = "to") String to,
+      @JsonProperty(value = "senderStageId") int senderStageId,
+      @JsonProperty(value = "receiverStageId") int receiverStageId
   ) {
     _jobId = jobId;
     _from = from;
     _to = to;
+    _senderStageId = senderStageId;
+    _receiverStageId = receiverStageId;
     _fromAddress = VirtualServerAddress.parse(_from);
     _toAddress = VirtualServerAddress.parse(_to);
   }
@@ -56,11 +62,15 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
   public JsonMailboxIdentifier(
       String jobId,
       VirtualServerAddress from,
-      VirtualServerAddress to
+      VirtualServerAddress to,
+      int senderStageId,
+      int receiverStageId
   ) {
     _jobId = jobId;
     _from = from.toString();
     _to = to.toString();
+    _senderStageId = senderStageId;
+    _receiverStageId = receiverStageId;
     _fromAddress = from;
     _toAddress = to;
   }
@@ -100,6 +110,16 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
     return _toAddress;
   }
 
+  @Override
+  public int getSenderStageId() {
+    return _senderStageId;
+  }
+
+  @Override
+  public int getReceiverStageId() {
+    return _receiverStageId;
+  }
+
   @JsonIgnore
   @Override
   public boolean isLocal() {
@@ -125,11 +145,13 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
     }
     JsonMailboxIdentifier that = (JsonMailboxIdentifier) o;
     return Objects.equals(_jobId, that._jobId) && Objects.equals(_from, that._from) && Objects.equals(_to, that._to)
-        && Objects.equals(_fromAddress, that._fromAddress) && Objects.equals(_toAddress, that._toAddress);
+        && Objects.equals(_senderStageId, that._senderStageId)
+        && Objects.equals(_receiverStageId, that._receiverStageId) && Objects.equals(_fromAddress, that._fromAddress)
+        && Objects.equals(_toAddress, that._toAddress);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_jobId, _from, _to, _fromAddress, _toAddress);
+    return Objects.hash(_jobId, _from, _to, _senderStageId, _receiverStageId, _fromAddress, _toAddress);
   }
 }
