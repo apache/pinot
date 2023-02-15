@@ -30,16 +30,14 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
 
 /**
@@ -55,12 +53,12 @@ public class NotInPredicateEvaluatorFactory {
    * @param notInPredicate NOT_IN predicate to evaluate
    * @param dictionary     Dictionary for the column
    * @param dataType       Data type for the column
-   * @param queryOptions   Query options
+   * @param queryContext   Query context
    * @return Dictionary based NOT_IN predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotInPredicate notInPredicate,
-      Dictionary dictionary, DataType dataType, Map<String, String> queryOptions) {
-    return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary, dataType, queryOptions);
+      Dictionary dictionary, DataType dataType, QueryContext queryContext) {
+    return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary, dataType, queryContext);
   }
 
   /**
@@ -162,16 +160,10 @@ public class NotInPredicateEvaluatorFactory {
     int[] _nonMatchingDictIds;
 
     DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary, DataType dataType,
-        Map<String, String> queryOptions) {
+        QueryContext queryContext) {
       super(notInPredicate);
-      int inPredicateSparseThreshold = Integer.parseInt(
-          queryOptions.getOrDefault(QueryOptionKey.IN_PREDICATE_SPARSE_THRESHOLD,
-              QueryOptionValue.DEFAULT_IN_PREDICATE_SPARSE_THRESHOLD));
-      int inPredicateSortThreshold = Integer.parseInt(
-          queryOptions.getOrDefault(QueryOptionKey.IN_PREDICATE_SORT_THRESHOLD,
-              QueryOptionValue.DEFAULT_IN_PREDICATE_SORT_THRESHOLD));
       _nonMatchingDictIdSet = PredicateUtils.getDictIdSet(notInPredicate, dictionary, dataType,
-          inPredicateSparseThreshold, inPredicateSortThreshold);
+          queryContext);
       _numNonMatchingDictIds = _nonMatchingDictIdSet.size();
       if (_numNonMatchingDictIds == 0) {
         _alwaysTrue = true;

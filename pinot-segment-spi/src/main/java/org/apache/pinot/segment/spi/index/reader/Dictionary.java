@@ -244,8 +244,7 @@ public interface Dictionary extends Closeable {
     }
   }
 
-  default void getDictIds(List<String> values, IntSet dictIds, int inPredicateSparseThreshold,
-      int inPredicateSortThreshold) {
+  default void getDictIds(List<String> values, IntSet dictIds) {
     for (String value : values) {
       int dictId = indexOf(value);
       if (dictId >= 0) {

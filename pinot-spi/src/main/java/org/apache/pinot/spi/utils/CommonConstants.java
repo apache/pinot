@@ -44,7 +44,6 @@ public class CommonConstants {
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
-
   /**
    * The state of the consumer for a given segment
    */
@@ -310,7 +309,6 @@ public class CommonConstants {
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
         // Handle IN predicate evaluation for big IN lists
-        public static final String IN_PREDICATE_SPARSE_THRESHOLD = "inPredicateSparseThreshold";
         public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
@@ -324,7 +322,6 @@ public class CommonConstants {
 
       public static class QueryOptionValue {
         public static final String ROUTING_FORCE_HLC = "FORCE_HLC";
-        public static final String DEFAULT_IN_PREDICATE_SPARSE_THRESHOLD = "1000";
         public static final String DEFAULT_IN_PREDICATE_SORT_THRESHOLD = "1000";
       }
     }

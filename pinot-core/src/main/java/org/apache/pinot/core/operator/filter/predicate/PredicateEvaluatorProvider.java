@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import com.google.common.collect.ImmutableMap;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -28,6 +26,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -40,11 +39,11 @@ public class PredicateEvaluatorProvider {
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType) {
-    return getPredicateEvaluator(predicate, dictionary, dataType, ImmutableMap.of());
+    return getPredicateEvaluator(predicate, dictionary, dataType, null);
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
-      DataType dataType, Map<String, String> queryOptions) {
+      DataType dataType, @Nullable QueryContext queryContext) {
     try {
       if (dictionary != null) {
         // dictionary based predicate evaluators
@@ -57,10 +56,10 @@ public class PredicateEvaluatorProvider {
                 .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary, dataType);
           case IN:
             return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary,
-                dataType, queryOptions);
+                dataType, queryContext);
           case NOT_IN:
             return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary,
-                dataType, queryOptions);
+                dataType, queryContext);
           case RANGE:
             return RangePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
@@ -97,8 +96,8 @@ public class PredicateEvaluatorProvider {
   }
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource,
-      Map<String, String> queryOptions) {
+      QueryContext queryContext) {
     return getPredicateEvaluator(predicate, dataSource.getDictionary(),
-        dataSource.getDataSourceMetadata().getDataType(), queryOptions);
+        dataSource.getDataSourceMetadata().getDataType(), queryContext);
   }
 }

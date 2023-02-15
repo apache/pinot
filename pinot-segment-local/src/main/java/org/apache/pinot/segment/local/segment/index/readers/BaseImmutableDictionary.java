@@ -282,37 +282,32 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return new byte[_numBytesPerValue];
   }
 
-  public void getDictIds(List<String> values, IntSet dictIds, int inPredicateSparseThreshold,
-      int inPredicateSortThreshold) {
-    if (length() / values.size() > inPredicateSparseThreshold || values.size() < inPredicateSortThreshold) {
-      for (String value : values) {
-        int dictId = indexOf(value);
-        if (dictId >= 0) {
-          dictIds.add(dictId);
-        }
+  /**
+   * Returns the dictionary id for the given sorted values.
+   * @param sortedValues
+   * @param dictIds
+   */
+  public void getDictIds(List<String> sortedValues, IntSet dictIds) {
+    int valueIdx = 0;
+    int dictIdx = 0;
+    byte[] utf8 = null;
+    boolean needNewUtf8 = true;
+    while (valueIdx < sortedValues.size() && dictIdx < length()) {
+      if (needNewUtf8) {
+        utf8 = sortedValues.get(valueIdx).getBytes(StandardCharsets.UTF_8);
       }
-    } else {
-      int valueIdx = 0;
-      int dictIdx = 0;
-      byte[] utf8 = null;
-      boolean needNewUtf8 = true;
-      while (valueIdx < values.size() && dictIdx < length()) {
-        if (needNewUtf8) {
-          utf8 = values.get(valueIdx).getBytes(StandardCharsets.UTF_8);
-        }
-        int comparison = _valueReader.compareUtf8Bytes(dictIdx, _numBytesPerValue, utf8);
-        if (comparison == 0) {
-          dictIds.add(dictIdx);
-          dictIdx++;
-          valueIdx++;
-          needNewUtf8 = true;
-        } else if (comparison > 0) {
-          valueIdx++;
-          needNewUtf8 = true;
-        } else {
-          dictIdx++;
-          needNewUtf8 = false;
-        }
+      int comparison = _valueReader.compareUtf8Bytes(dictIdx, _numBytesPerValue, utf8);
+      if (comparison == 0) {
+        dictIds.add(dictIdx);
+        dictIdx++;
+        valueIdx++;
+        needNewUtf8 = true;
+      } else if (comparison > 0) {
+        valueIdx++;
+        needNewUtf8 = true;
+      } else {
+        dictIdx++;
+        needNewUtf8 = false;
       }
     }
   }
