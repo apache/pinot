@@ -130,7 +130,7 @@ public class PinotUpsertRestletResource {
     // Here we only calculate the map content size. TODO: Add the map entry size and the array size within the map.
     int bytesPerValue = 60;
     List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
-    if (!comparisonColumns.isEmpty()) {
+    if (comparisonColumns != null) {
       for (String columnName : comparisonColumns) {
         FieldSpec.DataType dt = schema.getFieldSpecFor(columnName).getDataType();
         if (!dt.isFixedWidth()) {
