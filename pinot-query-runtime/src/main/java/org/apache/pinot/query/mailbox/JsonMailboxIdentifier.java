@@ -110,12 +110,6 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
     return _toAddress;
   }
 
-  @JsonIgnore
-  @Override
-  public boolean isLocal() {
-    return _fromAddress.equals(_toAddress);
-  }
-
   @Override
   public int getSenderStageId() {
     return _senderStageId;
@@ -124,6 +118,12 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
   @Override
   public int getReceiverStageId() {
     return _receiverStageId;
+  }
+
+  @JsonIgnore
+  @Override
+  public boolean isLocal() {
+    return _fromAddress.equals(_toAddress);
   }
 
   @Override

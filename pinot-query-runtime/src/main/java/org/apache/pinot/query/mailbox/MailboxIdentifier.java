@@ -51,7 +51,13 @@ public interface MailboxIdentifier {
    */
   boolean isLocal();
 
+  /**
+   * @return stage-id of the stage that is sending the data across this mailbox.
+   */
   int getSenderStageId();
 
+  /**
+   * @return stage-id of the stage that is receiving the data from this mailbox.
+   */
   int getReceiverStageId();
 }

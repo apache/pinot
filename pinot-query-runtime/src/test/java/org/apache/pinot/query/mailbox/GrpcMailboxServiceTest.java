@@ -41,6 +41,8 @@ import org.testng.annotations.Test;
 
 public class GrpcMailboxServiceTest {
 
+  private static final int DEFAULT_SENDER_STAGE_ID = 0;
+  private static final int DEFAULT_RECEIVER_STAGE_ID = 1;
   private static final DataSchema TEST_DATA_SCHEMA = new DataSchema(new String[]{"foo", "bar"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
 
@@ -79,7 +81,7 @@ public class GrpcMailboxServiceTest {
         "happypath",
         new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
         new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0),
-        0, 1);
+        DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
     SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
@@ -111,7 +113,9 @@ public class GrpcMailboxServiceTest {
     JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
         "exception",
         new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
-        new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0), 0, 1);
+        new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0),
+        DEFAULT_SENDER_STAGE_ID,
+        DEFAULT_RECEIVER_STAGE_ID);
     SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
