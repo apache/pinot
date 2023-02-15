@@ -120,23 +120,35 @@ public class MutableSegmentImplUpsertTest {
     setup(upsertConfig);
     ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
     if (upsertConfig.getComparisonColumns() == null) {
-      Assert.assertFalse(bitmap.contains(0));
-      Assert.assertTrue(bitmap.contains(1));
-      Assert.assertTrue(bitmap.contains(2));
-      Assert.assertFalse(bitmap.contains(3));
-      Assert.assertFalse(bitmap.contains(4));
-      Assert.assertFalse(bitmap.contains(5));
-      Assert.assertFalse(bitmap.contains(6));
-      Assert.assertTrue(bitmap.contains(7));
-    } else {
+      // aa
       Assert.assertFalse(bitmap.contains(0));
       Assert.assertTrue(bitmap.contains(1));
       Assert.assertFalse(bitmap.contains(2));
       Assert.assertFalse(bitmap.contains(3));
-      Assert.assertTrue(bitmap.contains(4));
-      Assert.assertFalse(bitmap.contains(5));
+      // bb
+      Assert.assertFalse(bitmap.contains(4));
+      Assert.assertTrue(bitmap.contains(5));
       Assert.assertFalse(bitmap.contains(6));
-      Assert.assertTrue(bitmap.contains(7));
+      // cc
+      Assert.assertFalse(bitmap.contains(7));
+      Assert.assertTrue(bitmap.contains(8));
+      // dd
+      Assert.assertTrue(bitmap.contains(9));
+    } else {
+      // aa
+      Assert.assertFalse(bitmap.contains(0));
+      Assert.assertFalse(bitmap.contains(1));
+      Assert.assertTrue(bitmap.contains(2));
+      Assert.assertFalse(bitmap.contains(3));
+      // bb
+      Assert.assertFalse(bitmap.contains(4));
+      Assert.assertTrue(bitmap.contains(5));
+      Assert.assertFalse(bitmap.contains(6));
+      // cc
+      Assert.assertFalse(bitmap.contains(7));
+      Assert.assertTrue(bitmap.contains(8));
+      // dd
+      Assert.assertTrue(bitmap.contains(9));
     }
   }
 }
