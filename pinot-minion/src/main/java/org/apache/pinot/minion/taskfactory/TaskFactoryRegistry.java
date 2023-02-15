@@ -58,6 +58,7 @@ import org.slf4j.MDC;
  */
 public class TaskFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskFactoryRegistry.class);
+  private static final int MAX_TASK_RESULT_INFO_LEN = 100;
 
   private final Map<String, TaskFactory> _taskFactoryRegistry = new HashMap<>();
 
@@ -159,7 +160,7 @@ public class TaskFactoryRegistry {
                       MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
                 }
                 LOGGER.info("Task: {} got cancelled", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.CANCELED, ExceptionUtils.getStackTrace(e));
+                return new TaskResult(TaskResult.Status.CANCELED, extractAndTrimRootCauseMessage(e));
               } catch (FatalException e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
@@ -168,7 +169,7 @@ public class TaskFactoryRegistry {
                       MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
                 }
                 LOGGER.error("Caught fatal exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FATAL_FAILED, ExceptionUtils.getStackTrace(e));
+                return new TaskResult(TaskResult.Status.FATAL_FAILED, extractAndTrimRootCauseMessage(e));
               } catch (Exception e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
@@ -177,7 +178,7 @@ public class TaskFactoryRegistry {
                       MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 }
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FAILED, ExceptionUtils.getStackTrace(e));
+                return new TaskResult(TaskResult.Status.FAILED, extractAndTrimRootCauseMessage(e));
               }
             }
 
@@ -193,6 +194,14 @@ public class TaskFactoryRegistry {
       };
       _taskFactoryRegistry.put(taskType, taskFactory);
     }
+  }
+
+  private static String extractAndTrimRootCauseMessage(Throwable th) {
+    String rootCauseMessage = ExceptionUtils.getRootCauseMessage(th);
+    if (rootCauseMessage != null && rootCauseMessage.length() > MAX_TASK_RESULT_INFO_LEN) {
+      return rootCauseMessage.substring(0, MAX_TASK_RESULT_INFO_LEN);
+    }
+    return rootCauseMessage;
   }
 
   /**
