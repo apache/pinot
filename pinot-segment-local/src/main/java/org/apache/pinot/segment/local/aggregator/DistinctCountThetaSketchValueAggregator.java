@@ -32,7 +32,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.DISTINCTCOUNTHLL;
+    return AggregationFunctionType.DISTINCTCOUNTTHETASKETCH;
   }
 
   @Override
