@@ -29,7 +29,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Sketch> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  private static final int DEFAULT_LOG2M_BYTE_SIZE = 180;
 
   @Override
   public AggregationFunctionType getAggregationType() {
