@@ -115,7 +115,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
     Preconditions.checkState(!_windowFrame.isRows(), "Only RANGE type frames are supported at present");
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
-    Preconditions.checkState(_windowFrame.isUnboundedFollowing() || _windowFrame.isUpperBoundCurrentRow(),
+    Preconditions.checkState(_windowFrame.isUnboundedFollowing()
+            || (_windowFrame.isUpperBoundCurrentRow() && isPartitionByOnly),
         "Only default frame is supported, upperBound must be UNBOUNDED FOLLOWING or CURRENT ROW");
 
     // we expect all agg calls to be aggregate function calls

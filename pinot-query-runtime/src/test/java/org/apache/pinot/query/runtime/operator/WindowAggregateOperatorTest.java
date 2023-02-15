@@ -417,13 +417,12 @@ public class WindowAggregateOperatorTest {
         Collections.emptyList(), outSchema, inSchema, 1, 2, _serverAddress);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only default frame is "
-      + "supported, upperBound must be UNBOUNDED FOLLOWING since order by is not present")
-  public void testShouldThrowOnCustomFramesCurrentRow() {
-    // TODO: Remove this test once order by support is added (uses CURRENT ROW as the upper bound by default)
+  @Test
+  public void testShouldNotThrowCurrentRowPartitionByOrderByOnSameKey() {
     // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
-    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(1));
+    List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
     Mockito.when(_input.nextBlock())
@@ -432,9 +431,20 @@ public class WindowAggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"},
         new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
-    WindowAggregateOperator operator = new WindowAggregateOperator(_input, group, Collections.emptyList(),
-        Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 0, false,
-        Collections.emptyList(), outSchema, inSchema, 1, 2, _serverAddress);
+    WindowAggregateOperator operator = new WindowAggregateOperator(_input, group, order,
+        Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
+        calls, Integer.MIN_VALUE, 0, false, Collections.emptyList(), outSchema, inSchema, 1, 2, _serverAddress);
+
+    // When:
+    TransferableBlock block1 = operator.nextBlock();
+    TransferableBlock block2 = operator.nextBlock();
+
+    // Then:
+    Mockito.verify(_input, Mockito.times(2)).nextBlock();
+    Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, "foo", 2.0},
+        "Expected three columns (original two columns, agg value)");
+    Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only default frame is "
@@ -458,7 +468,7 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only default frame is "
-      + "supported, upperBound must be UNBOUNDED FOLLOWING since order by is not present")
+      + "supported, upperBound must be UNBOUNDED FOLLOWING or CURRENT ROW")
   public void testShouldThrowOnCustomFramesCustomFollowing() {
     // TODO: Remove this test once custom frame support is added
     // Given:
