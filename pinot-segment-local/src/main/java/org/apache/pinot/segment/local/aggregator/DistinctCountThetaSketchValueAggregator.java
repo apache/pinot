@@ -20,9 +20,7 @@ package org.apache.pinot.segment.local.aggregator;
 
 import org.apache.datasketches.theta.SingleItemSketch;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.Union;
-import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -54,7 +52,9 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   // Utility method to merge two sketches
   private Sketch union(Sketch left, Sketch right) {
     // TODO: Handle configurable nominal entries for StarTreeBuilder
-    Union u = Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
+    Union u = Union.builder()
+      .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
+      .buildUnion();
     u.update(left);
     u.update(right);
     return u.getResult().compact();
