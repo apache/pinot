@@ -36,12 +36,10 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -218,15 +216,5 @@ public class DriverUtils {
     Pattern pattern = Pattern.compile(LIMIT_STATEMENT_REGEX, Pattern.CASE_INSENSITIVE);
     Matcher matcher = pattern.matcher(query);
     return matcher.find();
-  }
-
-  public static String enableNullHandling(PinotConnection connection, String query) {
-    if (query.contains(QueryOptionKey.ENABLE_NULL_HANDLING)) {
-      return query;
-    }
-
-    return connection.isNullHandlingEnabled()
-      ? String.format("SET %s = true; %s", QueryOptionKey.ENABLE_NULL_HANDLING, query)
-      : query;
   }
 }
