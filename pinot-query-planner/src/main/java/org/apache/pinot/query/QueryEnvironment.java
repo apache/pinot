@@ -55,6 +55,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.hints.PinotHintStrategies;
 import org.apache.pinot.query.planner.logical.StagePlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
@@ -102,7 +103,7 @@ public class QueryEnvironment {
             _catalogReader)))
         .defaultSchema(_rootSchema.plus())
         .sqlToRelConverterConfig(SqlToRelConverter.config()
-            .withHintStrategyTable(getHintStrategyTable())
+            .withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
             .withTrimUnusedFields(true)
             // SUB-QUERY Threshold is useless as we are encoding all IN clause in-line anyway
             .withInSubQueryThreshold(Integer.MAX_VALUE)
