@@ -67,19 +67,21 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   private int _serverIdx;
   private TransferableBlock _upstreamErrorBlock;
 
-  private static MailboxIdentifier toMailboxId(VirtualServer sender, long jobId, long stageId,
-      VirtualServerAddress receiver) {
+  private static MailboxIdentifier toMailboxId(VirtualServer sender, long jobId, int senderStageId,
+      int receiverStageId, VirtualServerAddress receiver) {
     return new JsonMailboxIdentifier(
-        String.format("%s_%s", jobId, stageId),
+        String.format("%s_%s", jobId, senderStageId),
         new VirtualServerAddress(sender),
-        receiver);
+        receiver,
+        senderStageId,
+        receiverStageId);
   }
 
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
   public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
       List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType, VirtualServerAddress receiver,
-      long jobId, int stageId, Long timeoutMs) {
-    super(jobId, stageId);
+      long jobId, int senderStageId, int receiverStageId, Long timeoutMs) {
+    super(jobId, senderStageId);
     _mailboxService = mailboxService;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
@@ -103,12 +105,12 @@ public class MailboxReceiveOperator extends MultiStageOperator {
         _sendingMailbox = Collections.emptyList();
       } else {
         _sendingMailbox =
-            Collections.singletonList(toMailboxId(singletonInstance, jobId, stageId, receiver));
+            Collections.singletonList(toMailboxId(singletonInstance, jobId, senderStageId, receiverStageId, receiver));
       }
     } else {
       _sendingMailbox = new ArrayList<>(sendingStageInstances.size());
       for (VirtualServer instance : sendingStageInstances) {
-        _sendingMailbox.add(toMailboxId(instance, jobId, stageId, receiver));
+        _sendingMailbox.add(toMailboxId(instance, jobId, senderStageId, receiverStageId, receiver));
       }
     }
     _upstreamErrorBlock = null;

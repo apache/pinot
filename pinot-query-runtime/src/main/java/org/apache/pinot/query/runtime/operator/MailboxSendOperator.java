@@ -70,16 +70,18 @@ public class MailboxSendOperator extends MultiStageOperator {
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      VirtualServerAddress sendingServer, long jobId, int stageId) {
+      VirtualServerAddress sendingServer, long jobId, int stageId, int receiverStageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        server -> toMailboxId(server, jobId, stageId, sendingServer), BlockExchange::getExchange, jobId, stageId);
+        server -> toMailboxId(server, jobId, stageId, receiverStageId, sendingServer), BlockExchange::getExchange,
+        jobId, stageId, receiverStageId);
   }
 
   @VisibleForTesting
   MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int stageId) {
+      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int stageId,
+      int receiverStageId) {
     super(jobId, stageId);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
@@ -153,10 +155,10 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private static JsonMailboxIdentifier toMailboxId(
-      VirtualServer destination, long jobId, int stageId, VirtualServerAddress sender) {
+      VirtualServer destination, long jobId, int stageId, int receiverStageId, VirtualServerAddress sender) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, stageId),
         sender,
-        new VirtualServerAddress(destination));
+        new VirtualServerAddress(destination), stageId, receiverStageId);
   }
 }

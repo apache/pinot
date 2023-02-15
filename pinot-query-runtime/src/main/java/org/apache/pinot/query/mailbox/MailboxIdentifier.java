@@ -50,4 +50,8 @@ public interface MailboxIdentifier {
    * @return true if sender and receiver are in the same JVM.
    */
   boolean isLocal();
+
+  int getSenderStageId();
+
+  int getReceiverStageId();
 }
