@@ -63,6 +63,9 @@ public class ValueAggregatorFactory {
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
         return new PercentileTDigestValueAggregator();
+      case DISTINCTCOUNTTHETASKETCH:
+      case DISTINCTCOUNTRAWTHETASKETCH:
+        return new DistinctCountThetaSketchValueAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

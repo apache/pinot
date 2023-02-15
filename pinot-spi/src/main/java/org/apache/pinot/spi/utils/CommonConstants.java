@@ -91,6 +91,8 @@ public class CommonConstants {
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
 
+    public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 65536; // 2 to the power of 16, for tradeoffs see datasketches library
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 
