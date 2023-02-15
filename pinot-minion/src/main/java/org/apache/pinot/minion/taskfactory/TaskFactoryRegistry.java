@@ -58,6 +58,17 @@ import org.slf4j.MDC;
  */
 public class TaskFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskFactoryRegistry.class);
+  // we use 1000 as the limit for the following reasons:
+  // 1. Task results reported (inlcudeing info messages) here will be saved into znode
+  //    (<pinot cluster name>/PROPERTYSTORE/TaskRebalancer/<Helix job name>), which has a default limit of 1M.
+  //    Since tasks belonging to the same helix job will be saved in the same znode, info messages cannot be too long,
+  //    Otherwise, the znode may be too large, causing communication issue between zookeeper clients and zookeeper,
+  //    which results in instance crash and znode not updatable.
+  // 2. Info messages stored in znode are fetched by minion task APIs (/tasks/{taskType}/debug, /tasks/{taskType}/debug,
+  //    /tasks/task/{taskName}/debug) for debugging purpose, so the info must contain enough info.
+  // 1000 is a reasonable choice, because with this length, the info message will contain relatively rich info for
+  // debugging. At the same time, with znode compressed, the helix job znode can hold ~1000 helix tasks (1M/1000=1000),
+  // which is enough in most use cases.
   private static final int MAX_TASK_RESULT_INFO_LEN = 1000;
 
   private final Map<String, TaskFactory> _taskFactoryRegistry = new HashMap<>();
