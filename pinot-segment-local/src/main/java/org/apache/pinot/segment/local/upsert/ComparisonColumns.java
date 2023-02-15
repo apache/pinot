@@ -59,7 +59,7 @@ public class ComparisonColumns implements Comparable {
         return 1;
       }
 
-      int comparisonResult = comparisonValue.getComparisonValue().compareTo(otherComparisonValue.getComparisonValue());
+      int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
       if (comparisonResult >= 0) {
         _comparisonColumns = merge(((ComparisonColumns) other).getComparisonColumns(), _comparisonColumns);
         return comparisonResult;
@@ -92,7 +92,7 @@ public class ComparisonColumns implements Comparable {
         continue;
       }
 
-      int comparisonResult = inboundValue.getComparisonValue().compareTo(existingValue.getComparisonValue());
+      int comparisonResult = inboundValue.compareTo(existingValue);
       Comparable comparisonValue =
           comparisonResult >= 0 ? inboundValue.getComparisonValue() : existingValue.getComparisonValue();
 

@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import javax.annotation.Nonnull;
+
+
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ComparisonValue {
+public class ComparisonValue implements Comparable {
   private final Comparable _comparisonValue;
   private final boolean _isNull;
 
@@ -38,5 +41,13 @@ public class ComparisonValue {
 
   public boolean isNull() {
     return _isNull;
+  }
+
+  @Override
+  public int compareTo(@Nonnull Object o) {
+    if (o instanceof ComparisonValue) {
+      return _comparisonValue.compareTo(((ComparisonValue) o).getComparisonValue());
+    }
+    return _comparisonValue.compareTo(o);
   }
 }
