@@ -126,6 +126,8 @@ public class MutableSegmentImplUpsertTest {
       Assert.assertFalse(bitmap.contains(3));
       Assert.assertFalse(bitmap.contains(4));
       Assert.assertFalse(bitmap.contains(5));
+      Assert.assertFalse(bitmap.contains(6));
+      Assert.assertTrue(bitmap.contains(7));
     } else {
       Assert.assertFalse(bitmap.contains(0));
       Assert.assertTrue(bitmap.contains(1));
@@ -133,6 +135,8 @@ public class MutableSegmentImplUpsertTest {
       Assert.assertFalse(bitmap.contains(3));
       Assert.assertTrue(bitmap.contains(4));
       Assert.assertFalse(bitmap.contains(5));
+      Assert.assertFalse(bitmap.contains(6));
+      Assert.assertTrue(bitmap.contains(7));
     }
   }
 }

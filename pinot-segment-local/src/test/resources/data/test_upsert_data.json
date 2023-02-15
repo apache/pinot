@@ -28,5 +28,14 @@
     "event_id": "aa",
     "description" : "late arrival, other column",
     "otherComparisonColumn": 1567205393
+  },
+  {
+    "event_id": "cc",
+    "description" : "first arrival, all null comparison columns"
+  },
+  {
+    "event_id": "cc",
+    "description" : "second",
+    "secondsSinceEpoch": 1567205390
   }
 ]
