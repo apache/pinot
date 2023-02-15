@@ -287,12 +287,15 @@ public abstract class BaseImmutableDictionary implements Dictionary {
    * @param sortedValues
    * @param dictIds
    */
+  @Override
   public void getDictIds(List<String> sortedValues, IntSet dictIds) {
     int valueIdx = 0;
     int dictIdx = 0;
     byte[] utf8 = null;
     boolean needNewUtf8 = true;
-    while (valueIdx < sortedValues.size() && dictIdx < length()) {
+    int sortedValuesSize = sortedValues.size();
+    int dictLength = length();
+    while (valueIdx < sortedValuesSize && dictIdx < dictLength) {
       if (needNewUtf8) {
         utf8 = sortedValues.get(valueIdx).getBytes(StandardCharsets.UTF_8);
       }

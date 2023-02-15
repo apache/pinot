@@ -244,8 +244,13 @@ public interface Dictionary extends Closeable {
     }
   }
 
-  default void getDictIds(List<String> values, IntSet dictIds) {
-    for (String value : values) {
+  /**
+   * Returns the dictIds for the given sorted values. This method is for the IN/NOT IN predicate evaluation.
+   * @param sortedValues
+   * @param dictIds
+   */
+  default void getDictIds(List<String> sortedValues, IntSet dictIds) {
+    for (String value : sortedValues) {
       int dictId = indexOf(value);
       if (dictId >= 0) {
         dictIds.add(dictId);

@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -57,7 +58,7 @@ public class InPredicateEvaluatorFactory {
    * @return Dictionary based IN predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(InPredicate inPredicate,
-      Dictionary dictionary, DataType dataType, QueryContext queryContext) {
+      Dictionary dictionary, DataType dataType, @Nullable QueryContext queryContext) {
     return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, queryContext);
   }
 
@@ -158,7 +159,7 @@ public class InPredicateEvaluatorFactory {
     int[] _matchingDictIds;
 
     DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary, DataType dataType,
-        QueryContext queryContext) {
+        @Nullable QueryContext queryContext) {
       super(inPredicate);
       _matchingDictIdSet = PredicateUtils.getDictIdSet(inPredicate, dictionary, dataType, queryContext);
       _numMatchingDictIds = _matchingDictIdSet.size();

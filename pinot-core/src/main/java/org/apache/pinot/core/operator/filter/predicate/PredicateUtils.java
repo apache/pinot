@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import com.google.common.base.Equivalence;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.BaseInPredicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -73,7 +76,7 @@ public class PredicateUtils {
    * Returns a dictionary id set of the values in the given IN/NOT_IN predicate.
    */
   public static IntSet getDictIdSet(BaseInPredicate inPredicate, Dictionary dictionary, DataType dataType,
-      QueryContext queryContext) {
+      @Nullable QueryContext queryContext) {
     List<String> values = inPredicate.getValues();
     int hashSetSize = Integer.min(HashUtil.getMinHashSetSize(values.size()), MAX_INITIAL_DICT_ID_SET_SIZE);
     IntSet dictIdSet = new IntOpenHashSet(hashSetSize);
@@ -142,10 +145,9 @@ public class PredicateUtils {
         }
         break;
       case STRING:
-        int inPredicateSortThreshold = Integer.parseInt(queryContext.getQueryOptions()
+        if (queryContext == null || values.size() <= Integer.parseInt(queryContext.getQueryOptions()
             .getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.IN_PREDICATE_SORT_THRESHOLD,
-                CommonConstants.Broker.Request.QueryOptionValue.DEFAULT_IN_PREDICATE_SORT_THRESHOLD));
-        if (values.size() < inPredicateSortThreshold) {
+                CommonConstants.Broker.Request.QueryOptionValue.DEFAULT_IN_PREDICATE_SORT_THRESHOLD))) {
           for (String value : values) {
             int dictId = dictionary.indexOf(value);
             if (dictId >= 0) {
@@ -153,10 +155,12 @@ public class PredicateUtils {
             }
           }
         } else {
-          List<String> sortedValues = queryContext.getOrComputeSharedValue(List.class, values, v -> {
-            values.sort(String::compareTo);
-            return values;
-          });
+          List<String> sortedValues =
+              queryContext.getOrComputeSharedValue(List.class, Equivalence.identity().wrap(inPredicate), k -> {
+                List<String> copyValues = new ArrayList<>(values);
+                copyValues.sort(null);
+                return copyValues;
+              });
           dictionary.getDictIds(sortedValues, dictIdSet);
         }
         break;
