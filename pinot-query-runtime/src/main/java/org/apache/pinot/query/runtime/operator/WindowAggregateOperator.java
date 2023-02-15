@@ -115,8 +115,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
     Preconditions.checkState(!_windowFrame.isRows(), "Only RANGE type frames are supported at present");
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
-    Preconditions.checkState(_windowFrame.isUnboundedFollowing(),
-        "Only default frame is supported, upperBound must be UNBOUNDED FOLLOWING since order by is not present");
+    Preconditions.checkState(_windowFrame.isUnboundedFollowing() || _windowFrame.isUpperBoundCurrentRow(),
+        "Only default frame is supported, upperBound must be UNBOUNDED FOLLOWING or CURRENT ROW");
 
     // we expect all agg calls to be aggregate function calls
     _aggCalls = aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
@@ -182,15 +182,15 @@ public class WindowAggregateOperator extends MultiStageOperator {
       return true;
     }
 
-    if (groupSet == null || (groupSet.size() != orderSet.size())) {
+    if (groupSet == null || groupSet.isEmpty() || (groupSet.size() != orderSet.size())) {
       return false;
     }
 
     Set<Integer> partitionByInputRefIndexes = new HashSet<>();
     Set<Integer> orderByInputRefIndexes = new HashSet<>();
     for (int i = 0; i < groupSet.size(); i++) {
-      partitionByInputRefIndexes.add(((RexExpression.InputRef) groupSet.get(0)).getIndex());
-      orderByInputRefIndexes.add(((RexExpression.InputRef) orderSet.get(0)).getIndex());
+      partitionByInputRefIndexes.add(((RexExpression.InputRef) groupSet.get(i)).getIndex());
+      orderByInputRefIndexes.add(((RexExpression.InputRef) orderSet.get(i)).getIndex());
     }
 
     boolean isPartitionByOnly = partitionByInputRefIndexes.equals(orderByInputRefIndexes);

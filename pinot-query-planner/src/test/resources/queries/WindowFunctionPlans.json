@@ -647,7 +647,7 @@
         ]
       },
       {
-        "description": "single empty OVER() with aggregate and group by",
+        "description": "single OVER(PARTITION BY) with aggregate and group by",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), MIN(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
@@ -662,7 +662,7 @@
         ]
       },
       {
-        "description": "single empty OVER() with aggregate avg and group by",
+        "description": "single OVER(PARTITION BY) with aggregate avg and group by",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
@@ -678,7 +678,7 @@
         ]
       },
       {
-        "description": "single empty OVER() with aggregate avg and group by and order by",
+        "description": "single OVER(PARTITION BY) with aggregate avg and group by and order by",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3 ORDER BY a.col3",
         "output": [
           "Execution Plan",
@@ -945,7 +945,7 @@
         ]
       },
       {
-        "description": "single OVER(PARTITION BY) with select col and group by",
+        "description": "multiple OVER(PARTITION BY) with select col and group by",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, MIN(a.col3) OVER(PARTITION BY a.col1), AVG(a.col3) OVER(PARTITION BY a.col1) FROM a GROUP BY a.col1, a.col3",
         "output": [
           "Execution Plan",
@@ -960,7 +960,7 @@
         ]
       },
       {
-        "description": "single empty OVER() with aggregate and group by",
+        "description": "multiple OVER(PARTITION BY)s with aggregate and group by",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), MIN(a.col3) OVER(PARTITION BY a.col3), SUM(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
@@ -975,7 +975,7 @@
         ]
       },
       {
-        "description": "single empty OVER() with aggregate avg and group by",
+        "description": "multiple OVER(PARTITION BY)s with aggregate avg and group by",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER(PARTITION BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3",
         "output": [
           "Execution Plan",
@@ -991,7 +991,7 @@
         ]
       },
       {
-        "description": "single empty OVER() with aggregate avg and group by and order by",
+        "description": "multiple OVER(PARTITION BY)s with aggregate avg and group by and order by",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3), AVG(a.col3) OVER(PARTITION BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col3) FROM a GROUP BY a.col3 ORDER BY a.col3",
         "output": [
           "Execution Plan",
