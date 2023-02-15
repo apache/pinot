@@ -155,10 +155,10 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private static JsonMailboxIdentifier toMailboxId(
-      VirtualServer destination, long jobId, int stageId, int receiverStageId, VirtualServerAddress sender) {
+      VirtualServer destination, long jobId, int senderStageId, int receiverStageId, VirtualServerAddress sender) {
     return new JsonMailboxIdentifier(
-        String.format("%s_%s", jobId, stageId),
+        String.format("%s_%s", jobId, senderStageId),
         sender,
-        new VirtualServerAddress(destination), stageId, receiverStageId);
+        new VirtualServerAddress(destination), senderStageId, receiverStageId);
   }
 }
