@@ -47,7 +47,7 @@ public class PinotConnection extends AbstractBaseConnection {
   private boolean _closed;
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
-  private final HashMap<String, Boolean> _queryOptions = new HashMap<>();
+  private final HashMap<String, Boolean> _queryOptions = new HashMap<String, Boolean>();
 
   public static final String BROKER_LIST = "brokers";
 
@@ -73,7 +73,7 @@ public class PinotConnection extends AbstractBaseConnection {
     }
     _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
 
-    for (var possibleQueryOption: POSSIBLE_QUERY_OPTIONS) {
+    for (String possibleQueryOption: POSSIBLE_QUERY_OPTIONS) {
       _queryOptions.put(possibleQueryOption, Boolean.parseBoolean(properties.getProperty(possibleQueryOption)));
     }
   }
@@ -84,7 +84,7 @@ public class PinotConnection extends AbstractBaseConnection {
 
   protected String enableQueryOptions(String sql) {
     var optionsBuilder = new StringBuilder();
-    for (var optionEntry: _queryOptions.entrySet()) {
+    for (HashMap.Entry<String, Boolean> optionEntry: _queryOptions.entrySet()) {
       if (optionEntry.getValue() && !sql.contains(optionEntry.getKey())) {
         optionsBuilder.append("SET ").append(optionEntry.getKey()).append("=true;\n");
       }
