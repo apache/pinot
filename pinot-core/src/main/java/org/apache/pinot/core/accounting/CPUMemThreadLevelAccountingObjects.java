@@ -52,6 +52,15 @@ public class CPUMemThreadLevelAccountingObjects {
     // will put preemption reasons in this for the killed thread to pickup
     AtomicReference<Exception> _errorStatus = new AtomicReference<>();
 
+    @Override
+    public String toString() {
+      TaskEntry taskEntry = _currentThreadTaskStatus.get();
+      return "ThreadEntry{"
+          + "_currentThreadTaskStatus=" + (taskEntry == null ? "idle" : taskEntry.toString())
+          + ", _errorStatus=" + _errorStatus
+          + '}';
+    }
+
     /**
      * set the thread tracking info to null and usage samples to zero
      */

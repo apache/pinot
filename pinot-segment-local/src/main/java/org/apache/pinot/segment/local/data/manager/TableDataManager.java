@@ -62,6 +62,8 @@ public interface TableDataManager {
    */
   void shutDown();
 
+  boolean isShutDown();
+
   /**
    * Adds a loaded immutable segment into the table.
    */

@@ -873,6 +873,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     closeStreamConsumers();
+    // Do not allow building segment when table data manager is already shut down
+    if (_realtimeTableDataManager.isShutDown()) {
+      _segmentLogger.warn("Table data manager is already shut down");
+      return null;
+    }
     try {
       final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {

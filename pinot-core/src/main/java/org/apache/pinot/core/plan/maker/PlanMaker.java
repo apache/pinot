@@ -28,6 +28,7 @@ import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -35,6 +36,11 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
  */
 @InterfaceAudience.Private
 public interface PlanMaker {
+
+  /**
+   * Initializes the plan maker.
+   */
+  void init(PinotConfiguration queryExecutorConfig);
 
   /**
    * Returns an instance level {@link Plan} which contains the logical execution plan for multiple segments.

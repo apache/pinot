@@ -40,11 +40,17 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
+  public void stop() {
+    for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.stop();
+    }
+  }
+
+  @Override
   public void close()
       throws IOException {
-    for (ConcurrentMapPartitionUpsertMetadataManager partitionUpsertMetadataManager
-        : _partitionMetadataManagerMap.values()) {
-      partitionUpsertMetadataManager.close();
+    for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.close();
     }
   }
 }

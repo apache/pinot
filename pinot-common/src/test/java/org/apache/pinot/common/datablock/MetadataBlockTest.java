@@ -21,6 +21,7 @@ package org.apache.pinot.common.datablock;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -37,7 +38,7 @@ public class MetadataBlockTest {
     MetadataBlock metadataBlock = new MetadataBlock(type);
 
     // Then:
-    byte[] expected = new ObjectMapper().writeValueAsBytes(new MetadataBlock.Contents("EOS"));
+    byte[] expected = new ObjectMapper().writeValueAsBytes(new MetadataBlock.Contents("EOS", new HashMap<>()));
     assertEquals(metadataBlock._variableSizeDataBytes, expected);
   }
 
