@@ -44,7 +44,7 @@ public class PinotStatementTest {
   }
 
   @Test
-  public void setEnableNullHandlingTest()
+  public void testSetEnableNullHandling()
       throws Exception {
     Properties props = new Properties();
     props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
@@ -58,7 +58,7 @@ public class PinotStatementTest {
   }
 
   @Test
-  public void setDisableNullHandlingTest()
+  public void testSetDisableNullHandling()
       throws Exception {
     Properties props = new Properties();
     props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "false");
@@ -72,7 +72,21 @@ public class PinotStatementTest {
   }
 
   @Test
-  public void setUseMultistageEngineTest()
+  public void testPresetEnableNullHandling()
+      throws Exception {
+    Properties props = new Properties();
+    props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    PinotConnection pinotConnection =
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    Statement statement = pinotConnection.createStatement();
+    Assert.assertNotNull(statement);
+    String presetSql = DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING) + BASIC_TEST_QUERY;
+    statement.executeQuery(presetSql);
+    Assert.assertEquals(presetSql, _dummyPinotClientTransport.getLastQuery().substring(0, presetSql.length()));
+  }
+
+  @Test
+  public void testSetUseMultistageEngine()
       throws Exception {
     Properties props = new Properties();
     props.put(QueryOptionKey.USE_MULTISTAGE_ENGINE, "true");
@@ -87,7 +101,7 @@ public class PinotStatementTest {
   }
 
   @Test
-  public void setAllPossibleQueryOptionsTest()
+  public void testSetAllPossibleQueryOptions()
       throws Exception {
     Properties props = new Properties();
     for (String option : PinotConnection.POSSIBLE_QUERY_OPTIONS) {

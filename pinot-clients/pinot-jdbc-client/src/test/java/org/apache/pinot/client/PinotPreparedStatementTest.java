@@ -125,7 +125,7 @@ public class PinotPreparedStatementTest {
   }
 
   @Test
-  public void setEnableNullHandlingTest()
+  public void testSetEnableNullHandling()
       throws Exception {
     Properties props = new Properties();
     props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
@@ -138,7 +138,7 @@ public class PinotPreparedStatementTest {
   }
 
   @Test
-  public void setEnableNullHandlingTest2()
+  public void testSetEnableNullHandling2()
       throws Exception {
     Properties props = new Properties();
     props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
