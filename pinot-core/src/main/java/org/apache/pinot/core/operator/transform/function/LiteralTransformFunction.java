@@ -24,6 +24,8 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -38,10 +40,8 @@ import org.roaringbitmap.RoaringBitmap;
 /**
  * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
  * LITERAL. The data type is inferred from the literal string.
- * TODO: Preserve the type of the literal instead of inferring the type from the string
  */
 public class LiteralTransformFunction implements TransformFunction {
-  // TODO: Deprecate the string representation of literal.
   private final Object _literal;
   private final DataType _dataType;
   private final int _intLiteral;
@@ -111,12 +111,22 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToDictIdsSV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToDictIdsSVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToDictIdsSVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
   public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToDictIdsMV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[][]> transformToDictIdsMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToDictIdsMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
@@ -135,6 +145,11 @@ public class LiteralTransformFunction implements TransformFunction {
       _intResult = intResult;
     }
     return intResult;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   @Override
@@ -157,6 +172,11 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
+  }
+
+  @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     float[] floatResult = _floatResult;
@@ -168,6 +188,11 @@ public class LiteralTransformFunction implements TransformFunction {
       _floatResult = floatResult;
     }
     return floatResult;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
   }
 
   @Override
@@ -185,6 +210,11 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
+  }
+
+  @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     BigDecimal[] bigDecimalResult = _bigDecimalResult;
@@ -197,6 +227,11 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     String[] stringResult = _stringResult;
@@ -206,6 +241,11 @@ public class LiteralTransformFunction implements TransformFunction {
       _stringResult = stringResult;
     }
     return stringResult;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
   }
 
   @Override
@@ -222,42 +262,79 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBytesValuesSV(projectionBlock));
+  }
+
+  @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToIntValuesMV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToIntValuesMV is not supported for LiteralTransformFunction");
   }
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToLongValuesMV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToLongValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToFloatValuesMV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToFloatValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToDoubleValuesMV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToDoubleValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToStringValuesMV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToStringValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
   public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToBytesValuesMV is not supported for LiteralTransformFunction");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, byte[][][]> transformToBytesValuesMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("transformToBytesValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
   public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    // Treat all unknown type values as null regardless of the value.
+    if(_dataType != DataType.UNKNOWN){
+      return null;
+    }
     int length = projectionBlock.getNumDocs();
     RoaringBitmap bitmap = new RoaringBitmap();
-    if (_literal == null && _dataType == DataType.UNKNOWN) {
-      bitmap.add(0L, length);
-    }
+    bitmap.add(0L, length);
     return bitmap;
   }
 }

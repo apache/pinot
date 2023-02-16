@@ -22,11 +22,14 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -60,234 +63,165 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   private TransformResultMetadata _resultMetadata;
 
   /**
-   * Returns a bit map of corresponding column.
-   * Returns an empty bitmap by default if null option is disabled.
-   */
-  private static RoaringBitmap[] getNullBitMaps(ProjectionBlock projectionBlock,
-      TransformFunction[] transformFunctions) {
-    RoaringBitmap[] roaringBitmaps = new RoaringBitmap[transformFunctions.length];
-    for (int i = 0; i < roaringBitmaps.length; i++) {
-      TransformFunction func = transformFunctions[i];
-      if (func instanceof IdentifierTransformFunction) {
-        String columnName = ((IdentifierTransformFunction) func).getColumnName();
-        RoaringBitmap nullBitmap = projectionBlock.getBlockValueSet(columnName).getNullBitmap();
-        roaringBitmaps[i] = nullBitmap;
-      } else {
-        // Consider literal as not null.
-        roaringBitmaps[i] = new RoaringBitmap();
-      }
-    }
-    return roaringBitmaps;
-  }
-
-  /**
    * Get transform int results based on store type.
    * @param projectionBlock
    */
-  private int[] getIntTransformResults(ProjectionBlock projectionBlock) {
+  private Pair<RoaringBitmap, int[]> getIntTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[length];
     }
-    int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    int[][] data = new int[width][length];
-    RoaringBitmap filledData = new RoaringBitmap();
-    for (int i = 0; i < length; i++) {
-      boolean hasNonNullValue = false;
-      for (int j = 0; j < width; j++) {
-        // Consider value as null only when null option is enabled.
-        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
-          data[j] = _transformFunctions[j].transformToIntValuesSV(projectionBlock);
-        }
-        hasNonNullValue = true;
-        _intValuesSV[i] = data[j][i];
-        break;
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, length);
+    for(TransformFunction func: _transformFunctions){
+      if(nullBitmap.isEmpty()){
+        return ImmutablePair.of(null, _intValuesSV);
       }
-      if (!hasNonNullValue) {
-        _intValuesSV[i] = NULL_INT;
-      }
+      Pair<RoaringBitmap, int[]> curResult = func.transformToIntValuesSVWithNull(projectionBlock);
+      RoaringBitmap curBitmap = curResult.getLeft();
+      int[] curValues = curResult.getRight();
+      nullBitmap.forEach((IntConsumer) (i) -> {
+        if (!curBitmap.contains(i)) {
+          nullBitmap.remove(i);
+          _intValuesSV[i] = curValues[i];
+        }});
     }
-    return _intValuesSV;
+    return ImmutablePair.of(nullBitmap, _intValuesSV);
   }
 
   /**
    * Get transform long results based on store type.
    * @param projectionBlock
    */
-  private long[] getLongTransformResults(ProjectionBlock projectionBlock) {
+  private Pair<RoaringBitmap, long[]> getLongTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_longValuesSV == null) {
       _longValuesSV = new long[length];
     }
-    int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    long[][] data = new long[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
-    for (int i = 0; i < length; i++) {
-      boolean hasNonNullValue = false;
-      for (int j = 0; j < width; j++) {
-        // Consider value as null only when null option is enabled.
-        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
-          data[j] = _transformFunctions[j].transformToLongValuesSV(projectionBlock);
-        }
-        hasNonNullValue = true;
-        _longValuesSV[i] = data[j][i];
-        break;
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, length);
+    for(TransformFunction func: _transformFunctions){
+      if(nullBitmap.isEmpty()){
+        return ImmutablePair.of(null, _longValuesSV);
       }
-      if (!hasNonNullValue) {
-        _longValuesSV[i] = NULL_LONG;
-      }
+      Pair<RoaringBitmap, long[]> curResult = func.transformToLongValuesSVWithNull(projectionBlock);
+      RoaringBitmap curBitmap = curResult.getLeft();
+      long[] curValues = curResult.getRight();
+      nullBitmap.forEach((IntConsumer) (i) -> {
+        if (!curBitmap.contains(i)) {
+          nullBitmap.remove(i);
+          _longValuesSV[i] = curValues[i];
+        }});
     }
-    return _longValuesSV;
+    return ImmutablePair.of(nullBitmap, _longValuesSV);
   }
 
   /**
    * Get transform float results based on store type.
    * @param projectionBlock
    */
-  private float[] getFloatTransformResults(ProjectionBlock projectionBlock) {
+  private Pair<RoaringBitmap, float[]> getFloatTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_floatValuesSV == null) {
       _floatValuesSV = new float[length];
     }
-    int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    float[][] data = new float[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
-    for (int i = 0; i < length; i++) {
-      boolean hasNonNullValue = false;
-      for (int j = 0; j < width; j++) {
-        // Consider value as null only when null option is enabled.
-        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
-          data[j] = _transformFunctions[j].transformToFloatValuesSV(projectionBlock);
-        }
-        hasNonNullValue = true;
-        _floatValuesSV[i] = data[j][i];
-        break;
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, length);
+    for(TransformFunction func: _transformFunctions){
+      if(nullBitmap.isEmpty()){
+        return ImmutablePair.of(null, _floatValuesSV);
       }
-      if (!hasNonNullValue) {
-        _floatValuesSV[i] = NULL_FLOAT;
-      }
+      Pair<RoaringBitmap, float[]> curResult = func.transformToFloatValuesSVWithNull(projectionBlock);
+      RoaringBitmap curBitmap = curResult.getLeft();
+      float[] curValues = curResult.getRight();
+      nullBitmap.forEach((IntConsumer) (i) -> {
+        if (!curBitmap.contains(i)) {
+          nullBitmap.remove(i);
+          _floatValuesSV[i] = curValues[i];
+        }});
     }
-    return _floatValuesSV;
+    return ImmutablePair.of(nullBitmap, _floatValuesSV);
   }
 
   /**
    * Get transform double results based on store type.
    * @param projectionBlock
    */
-  private double[] getDoubleTransformResults(ProjectionBlock projectionBlock) {
+  private Pair<RoaringBitmap, double[]> getDoubleTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[length];
     }
-    int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    double[][] data = new double[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
-    for (int i = 0; i < length; i++) {
-      boolean hasNonNullValue = false;
-      for (int j = 0; j < width; j++) {
-        // Consider value as null only when null option is enabled.
-        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
-          data[j] = _transformFunctions[j].transformToDoubleValuesSV(projectionBlock);
-        }
-        hasNonNullValue = true;
-        _doubleValuesSV[i] = data[j][i];
-        break;
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, length);
+    for(TransformFunction func: _transformFunctions){
+      if(nullBitmap.isEmpty()){
+        return ImmutablePair.of(null, _doubleValuesSV);
       }
-      if (!hasNonNullValue) {
-        _doubleValuesSV[i] = NULL_DOUBLE;
-      }
+      Pair<RoaringBitmap, double[]> curResult = func.transformToDoubleValuesSVWithNull(projectionBlock);
+      RoaringBitmap curBitmap = curResult.getLeft();
+      double[] curValues = curResult.getRight();
+      nullBitmap.forEach((IntConsumer) (i) -> {
+        if (!curBitmap.contains(i)) {
+          nullBitmap.remove(i);
+          _doubleValuesSV[i] = curValues[i];
+        }});
     }
-    return _doubleValuesSV;
+    return ImmutablePair.of(nullBitmap, _doubleValuesSV);
   }
 
   /**
    * Get transform BigDecimal results based on store type.
    * @param projectionBlock
    */
-  private BigDecimal[] getBigDecimalTransformResults(ProjectionBlock projectionBlock) {
+  private Pair<RoaringBitmap, BigDecimal[]> getBigDecimalTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[length];
     }
-    int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    BigDecimal[][] data = new BigDecimal[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
-    for (int i = 0; i < length; i++) {
-      boolean hasNonNullValue = false;
-      for (int j = 0; j < width; j++) {
-        // Consider value as null only when null option is enabled.
-        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
-          data[j] = _transformFunctions[j].transformToBigDecimalValuesSV(projectionBlock);
-        }
-        hasNonNullValue = true;
-        _bigDecimalValuesSV[i] = data[j][i];
-        break;
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, length);
+    for(TransformFunction func: _transformFunctions){
+      if(nullBitmap.isEmpty()){
+        return ImmutablePair.of(null, _bigDecimalValuesSV);
       }
-      if (!hasNonNullValue) {
-        _bigDecimalValuesSV[i] = NULL_BIG_DECIMAL;
-      }
+      Pair<RoaringBitmap, BigDecimal[]> curResult = func.transformToBigDecimalValuesSVWithNull(projectionBlock);
+      RoaringBitmap curBitmap = curResult.getLeft();
+      BigDecimal[] curValues = curResult.getRight();
+      nullBitmap.forEach((IntConsumer) (i) -> {
+        if (!curBitmap.contains(i)) {
+          nullBitmap.remove(i);
+          _bigDecimalValuesSV[i] = curValues[i];
+        }});
     }
-    return _bigDecimalValuesSV;
+    return ImmutablePair.of(nullBitmap, _bigDecimalValuesSV);
   }
 
   /**
    * Get transform String results based on store type.
    * @param projectionBlock
    */
-  private String[] getStringTransformResults(ProjectionBlock projectionBlock) {
+  private Pair<RoaringBitmap, String[]> getStringTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[length];
     }
-    int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    String[][] data = new String[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
-    for (int i = 0; i < length; i++) {
-      boolean hasNonNullValue = false;
-      for (int j = 0; j < width; j++) {
-        // Consider value as null only when null option is enabled.
-        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
-          data[j] = _transformFunctions[j].transformToStringValuesSV(projectionBlock);
-        }
-        hasNonNullValue = true;
-        _stringValuesSV[i] = data[j][i];
-        break;
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, length);
+    for(TransformFunction func: _transformFunctions){
+      if(nullBitmap.isEmpty()){
+        return ImmutablePair.of(null, _stringValuesSV);
       }
-      if (!hasNonNullValue) {
-        _stringValuesSV[i] = NULL_STRING;
-      }
+      Pair<RoaringBitmap, String[]> curResult = func.transformToStringValuesSVWithNull(projectionBlock);
+      RoaringBitmap curBitmap = curResult.getLeft();
+      String[] curValues = curResult.getRight();
+      nullBitmap.forEach((IntConsumer) (i) -> {
+        if (!curBitmap.contains(i)) {
+          nullBitmap.remove(i);
+          _stringValuesSV[i] = curValues[i];
+        }});
     }
-    return _stringValuesSV;
+    return ImmutablePair.of(nullBitmap, _stringValuesSV);
   }
 
   @Override
@@ -302,9 +236,6 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     _transformFunctions = new TransformFunction[argSize];
     for (int i = 0; i < argSize; i++) {
       TransformFunction func = arguments.get(i);
-      Preconditions.checkArgument(
-          func instanceof IdentifierTransformFunction || func instanceof LiteralTransformFunction,
-          "Only column names and literals are supported in COALESCE.");
       DataType dataType = func.getResultMetadata().getDataType();
       if (_dataType == null) {
         _dataType = dataType;
@@ -344,48 +275,78 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_dataType != DataType.INT) {
-      return super.transformToIntValuesSV(projectionBlock);
+      return super.transformToIntValuesSVWithNull(projectionBlock);
     }
     return getIntTransformResults(projectionBlock);
   }
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_dataType != DataType.LONG) {
-      return super.transformToLongValuesSV(projectionBlock);
+      return super.transformToLongValuesSVWithNull(projectionBlock);
     }
     return getLongTransformResults(projectionBlock);
   }
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_dataType != DataType.FLOAT) {
-      return super.transformToFloatValuesSV(projectionBlock);
+      return super.transformToFloatValuesSVWithNull(projectionBlock);
     }
     return getFloatTransformResults(projectionBlock);
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_dataType != DataType.DOUBLE) {
-      return super.transformToDoubleValuesSV(projectionBlock);
+      return super.transformToDoubleValuesSVWithNull(projectionBlock);
     }
     return getDoubleTransformResults(projectionBlock);
   }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_dataType != DataType.BIG_DECIMAL) {
-      return super.transformToBigDecimalValuesSV(projectionBlock);
+      return super.transformToBigDecimalValuesSVWithNull(projectionBlock);
     }
     return getBigDecimalTransformResults(projectionBlock);
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_dataType != DataType.STRING) {
-      return super.transformToStringValuesSV(projectionBlock);
+      return super.transformToStringValuesSVWithNull(projectionBlock);
     }
     return getStringTransformResults(projectionBlock);
   }

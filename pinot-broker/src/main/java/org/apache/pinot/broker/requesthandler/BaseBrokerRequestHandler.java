@@ -257,7 +257,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext)
       throws Exception {
-    LOGGER.debug("SQL query for request {}: {}", requestId, query);
+    LOGGER.info("SQL query for request {}: {}", requestId, query);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
@@ -1299,9 +1299,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private void computeResultsForLiteral(Literal literal, List<String> columnNames,
       List<DataSchema.ColumnDataType> columnTypes, List<Object> row) {
-    Object fieldValue = literal.getFieldValue();
-    columnNames.add(fieldValue.toString());
     switch (literal.getSetField()) {
+      case NULL_VALUE:
+        columnNames.add("null");
+        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
+        row.add(null);
+        return;
       case BOOL_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.BOOLEAN);
         row.add(literal.getBoolValue());
@@ -1334,13 +1337,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
         break;
-      case NULL_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
-        row.add("null");
-        break;
       default:
         break;
     }
+    columnNames.add(literal.getFieldValue().toString());
   }
 
   /**

@@ -22,16 +22,18 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class IsNotNullTransformFunction extends BaseTransformFunction {
-  private PeekableIntIterator _nullValueVectorIterator;
+  private TransformFunction _transformFunction;
 
   @Override
   public String getName() {
@@ -40,20 +42,8 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions.checkArgument(arguments.size() == 1,
-        "Exact 1 argument is required for IS_NOT_NULL operator function");
-    TransformFunction transformFunction = arguments.get(0);
-    if (!(transformFunction instanceof IdentifierTransformFunction)) {
-      throw new IllegalArgumentException(
-          "Only column names are supported in IS_NOT_NULL. Support for functions is planned for future release");
-    }
-    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    NullValueVectorReader nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
-    if (nullValueVectorReader != null) {
-      _nullValueVectorIterator = nullValueVectorReader.getNullBitmap().getIntIterator();
-    } else {
-      _nullValueVectorIterator = null;
-    }
+    Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NULL operator function");
+    _transformFunction = arguments.get(0);
     super.init(arguments, dataSourceMap);
   }
 
@@ -64,27 +54,27 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+    throw new UnsupportedOperationException("IsNotNull is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
     if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
+      _intValuesSV = new int[numDocs];
     }
-    Arrays.fill(_intValuesSV, 1);
-    int[] docIds = projectionBlock.getDocIds();
-    if (_nullValueVectorIterator != null) {
-      int currentDocIdIndex = 0;
-      while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
-        _nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);
-        if (_nullValueVectorIterator.hasNext()) {
-          currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, _nullValueVectorIterator.next());
-          if (currentDocIdIndex >= 0) {
-            _intValuesSV[currentDocIdIndex] = 0;
-            currentDocIdIndex++;
-          } else {
-            currentDocIdIndex = -currentDocIdIndex - 1;
-          }
-        }
-      }
+    RoaringBitmap bitmap = _transformFunction.getNullBitmap(projectionBlock);
+    if (bitmap == null) {
+      Arrays.fill(_intValuesSV, 1);
+      return ImmutablePair.of(null, _intValuesSV);
     }
-    return _intValuesSV;
+    bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 1);
+    bitmap.flip(0L, numDocs);
+    return ImmutablePair.of(null , _intValuesSV);
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return null;
   }
 }

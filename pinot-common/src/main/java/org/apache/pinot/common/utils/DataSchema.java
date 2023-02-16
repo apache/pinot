@@ -269,12 +269,12 @@ public class DataSchema {
     LONG_ARRAY(new long[0]),
     FLOAT_ARRAY(new float[0]),
     DOUBLE_ARRAY(new double[0]),
-    UNKNOWN(SERDE_NULL),
+    UNKNOWN(STRING, ""),
     BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
     TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
     STRING_ARRAY(new String[0]),
     BYTES_ARRAY(new byte[0][]),
-    UNKNOWN_ARRAY(STRING_ARRAY, ImmutableList.of(SERDE_NULL));
+    UNKNOWN_ARRAY(STRING_ARRAY, ImmutableList.of(""));
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final Ordering<ColumnDataType> NUMERIC_TYPE_ORDERING = Ordering.explicit(INT, LONG, FLOAT, DOUBLE);
@@ -420,8 +420,7 @@ public class DataSchema {
           return (float[]) value;
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
-        case STRING_ARRAY: // fall through
-        case UNKNOWN_ARRAY:
+        case STRING_ARRAY:
           return (String[]) value;
         case BOOLEAN_ARRAY:
           return toBooleanArray(value);
@@ -432,6 +431,7 @@ public class DataSchema {
         case OBJECT:
           return (Serializable) value;
         case UNKNOWN:
+        case UNKNOWN_ARRAY:
           return SERDE_NULL;
         default:
           throw new IllegalStateException(String.format("Cannot convert: '%s' to type: %s", value, this));
@@ -496,6 +496,7 @@ public class DataSchema {
         case BYTES_ARRAY:
           return (byte[][]) value;
         case UNKNOWN:
+        case UNKNOWN_ARRAY:
           return SERDE_NULL;
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
@@ -623,6 +624,7 @@ public class DataSchema {
         case BYTES:
           return BYTES_ARRAY;
         case UNKNOWN:
+          return UNKNOWN_ARRAY;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }

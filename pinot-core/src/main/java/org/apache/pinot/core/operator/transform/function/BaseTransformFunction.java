@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -28,6 +29,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.apache.commons.lang3.tuple.Pair;
 
 
 /**
@@ -110,8 +112,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, int[]> transformToDictIdsSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDictIdsSV(projectionBlock));
+  }
+
+  @Override
   public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("transformToDictIdsMV is not supported for current transform function");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[][]> transformToDictIdsMVWithNull(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException(
+        "transformToDictIdsMVWithNull is not supported for current transform function");
   }
 
   @Override
@@ -155,6 +168,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
+  }
+
+  @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_longValuesSV == null) {
@@ -192,6 +210,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _longValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
   }
 
   @Override
@@ -235,6 +258,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleValuesSV == null) {
@@ -272,6 +300,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 
   @Override
@@ -319,6 +352,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_stringValuesSV == null) {
@@ -363,6 +401,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
+  }
+
+  @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_bytesValuesSV == null) {
@@ -388,6 +431,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _bytesValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBytesValuesSV(projectionBlock));
   }
 
   @Override
@@ -433,6 +481,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
+  }
+
+
+  @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_longValuesMV == null) {
@@ -472,6 +526,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _longValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesMV(projectionBlock));
   }
 
   @Override
@@ -517,6 +576,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesMV(projectionBlock));
+  }
+
+  @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleValuesMV == null) {
@@ -556,6 +620,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _doubleValuesMV;
+  }
+
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesMV(projectionBlock));
   }
 
   @Override
@@ -600,6 +668,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _stringValuesMV;
   }
 
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesMV(projectionBlock));
+  }
+
   @Override
   public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
@@ -624,11 +696,18 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _bytesValuesMV;
   }
 
+  public Pair<RoaringBitmap, byte[][][]> transformToBytesValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBytesValuesMV(projectionBlock));
+  }
+
   @Override
   public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     RoaringBitmap bitmap = new RoaringBitmap();
     for (TransformFunction arg : _arguments) {
-      bitmap.or(arg.getNullBitmap(projectionBlock));
+      RoaringBitmap argBitmap = arg.getNullBitmap(projectionBlock);
+      if (argBitmap != null) {
+        bitmap.or(argBitmap);
+      }
     }
     return bitmap;
   }

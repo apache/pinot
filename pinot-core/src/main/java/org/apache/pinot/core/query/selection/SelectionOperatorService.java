@@ -139,6 +139,7 @@ public class SelectionOperatorService {
     LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
     while (_rows.size() > _offset) {
       Object[] row = _rows.poll();
+      // TODO: Fix null value ordering.
       assert row != null;
       Object[] extractedRow = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {

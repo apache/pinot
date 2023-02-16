@@ -152,6 +152,29 @@ public class DataTableSerDeTest {
   }
 
   @Test(dataProvider = "versionProvider")
+  public void testAllDataTypes(int dataTableVersion)
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
+    int numColumns = columnDataTypes.length;
+    String[] columnNames = new String[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnNames[i] = columnDataTypes[i].name();
+    }
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
+
+    DataTable dataTable = dataTableBuilder.build();
+    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+  }
+
+  @Test(dataProvider = "versionProvider")
   public void testExecutionThreadCpuTimeNs(int dataTableVersion)
       throws IOException {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
@@ -186,6 +209,139 @@ public class DataTableSerDeTest {
     Assert.assertTrue(
         Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
     DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+  }
+
+  @Test
+  public void testV3V4Compatibility()
+      throws IOException {
+    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
+    int numColumns = columnDataTypes.length;
+    String[] columnNames = new String[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnNames[i] = columnDataTypes[i].name();
+    }
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    // TODO: verify data table compatibility across multi-stage and normal query engine.
+    // TODO: see https://github.com/apache/pinot/pull/8874/files#r894806085
+
+    // Verify V4 broker can deserialize data table (has data, but has no metadata) send by V3 server
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilder dataTableBuilderV3WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
+
+    DataTable dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
+    DataTable newDataTable =
+        DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    Assert.assertEquals(newDataTable.getMetadata().size(), 0);
+
+    // Verify V4 broker can deserialize data table (has data and metadata) send by V3 server
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize data table (only has metadata) send by V3 server
+    DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V3 data table
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize (has data, but has no metadata) send by V4 server(with ThreadCpuTimeMeasurement
+    // disabled)
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    DataTableBuilder dataTableBuilderV4WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    fillDataTableWithRandomData(dataTableBuilderV4WithDataOnly, columnDataTypes, numColumns);
+    DataTable dataTableV4 = dataTableBuilderV4WithDataOnly.build(); // create a V4 data table
+    // Deserialize data table bytes as V4
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes());
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    Assert.assertEquals(newDataTable.getMetadata().size(), 0);
+
+    // Verify V4 broker can deserialize data table (has data and metadata) send by V4 server(with
+    // ThreadCpuTimeMeasurement disabled)
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV4.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    // Deserialize data table bytes as V4
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes()); // Broker deserialize data table bytes as V4
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize data table (only has metadata) send by V4 server(with
+    // ThreadCpuTimeMeasurement disabled)
+    DataTableBuilder dataTableBuilderV4WithMetadataDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    dataTableV4 = dataTableBuilderV4WithMetadataDataOnly.build(); // create a V4 data table
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV4.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes()); // Broker deserialize data table bytes as V4
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize (has data, but has no metadata) send by V4 server(with ThreadCpuTimeMeasurement
+    // enabled)
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    dataTableV4 = dataTableBuilderV4WithDataOnly.build(); // create a V4 data table
+    // Deserialize data table bytes as V4
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes());
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    Assert.assertEquals(newDataTable.getMetadata().size(), 1);
+    Assert.assertTrue(newDataTable.getMetadata().containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
+
+    // Verify V4 broker can deserialize data table (has data and metadata) send by V4 server(with
+    // ThreadCpuTimeMeasurement enabled)
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV4.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    // Deserialize data table bytes as V4
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes()); // Broker deserialize data table bytes as V4
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
+      Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
+      newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
+    }
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize data table (only has metadata) send by V4 server(with
+    // ThreadCpuTimeMeasurement enabled)
+    dataTableV4 = dataTableBuilderV4WithMetadataDataOnly.build(); // create a V4 data table
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV4.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes()); // Broker deserialize data table bytes as V4
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
+      Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
+      newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
+    }
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
   }
 
   @Test
@@ -524,9 +680,6 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
-          case UNKNOWN_ARRAY:
-          case UNKNOWN:
-            break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
         }
@@ -614,8 +767,6 @@ public class DataTableSerDeTest {
                 ERROR_MESSAGE);
             break;
           case BYTES_ARRAY:
-          case UNKNOWN:
-          case UNKNOWN_ARRAY:
             // TODO: add once implementation of datatable bytes array support is added
             break;
           case STRING_ARRAY:

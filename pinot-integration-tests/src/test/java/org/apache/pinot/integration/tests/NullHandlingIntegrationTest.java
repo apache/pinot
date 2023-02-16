@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -29,13 +31,16 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.AssertJUnit.assertTrue;
+
+
 
 /**
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  * The data pushed to Kafka includes null values.
  */
 public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
-
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -195,24 +200,54 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testIsNull()
       throws Exception {
-//    String sqlQuery = "SELECT null IS NULL FROM mytable OPTION(enableNullHandling=true)";
-//    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
-//    JsonNode rows = response.get("resultTable").get("rows");
-//    assertTrue(response.get("exceptions").isEmpty());
-//    assertEquals(rows.size(), 1);
-//    assertTrue(rows.get(0).get(0).asBoolean());
-//    String sqlQuery = "SELECT COUNT(*) FROM " + getTableName() + " WHERE null IS NULL";
-//    String sqlQuery = "SELECT add(salary, null) FROM " + getTableName() + "  OPTION(enableNullHandling=true);";
+    String sqlQuery = "SELECT null FROM mytable OPTION(enableNullHandling=true)";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "null");
 
-//    String sqlQuery = "SELECT isNull(add(salary, null)) FROM " + getTableName() + "  OPTION
-//    (enableNullHandling=true);";
+    sqlQuery = "SELECT isNotNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), true);
 
-    String query = "SELECT CASE WHEN salary IS NULL THEN null ELSE 0 END FROM " + getTableName();
+    sqlQuery = "SELECT isNotNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), false);
+
+    sqlQuery = "SELECT isNull(add(null, salary)) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 10);
+    for(int i = 0; i < 10; ++i){
+      assertEquals(rows.get(i).get(0).asBoolean(), true);
+    }
+    sqlQuery = "SELECT isNull(salary) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    System.out.println("yao" + rows.asText());
+
+    sqlQuery = "SELECT CASE WHEN salary IS NULL THEN null ELSE 0 END FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    System.out.println("yao" + rows.asText());
+
+    sqlQuery = "SELECT CASE WHEN salary IS NOT NULL THEN null ELSE 6 END FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    System.out.println("yao" + rows.asText());
 //    JsonNode response = postQuery(query, _brokerBaseApiUrl);
 //    JsonNode rows = response.get("resultTable").get("rows");
 //    assertTrue(response.get("exceptions").isEmpty());
-//    assertEquals(rows.get(0).get(0).asBoolean(), true);
-    testQuery(query);
+
+//    testQuery(query);
 
 //    assertTrue(rows.get(0).get(0).asBoolean());
   }

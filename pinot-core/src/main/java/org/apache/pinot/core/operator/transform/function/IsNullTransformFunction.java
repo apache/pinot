@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -52,21 +54,26 @@ public class IsNullTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+    throw new UnsupportedOperationException("IsNull is not supported when enableNullHandling is set to false");
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
     if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
+      _intValuesSV = new int[numDocs];
     }
     RoaringBitmap bitmap = _transformFunction.getNullBitmap(projectionBlock);
     if (bitmap == null) {
       Arrays.fill(_intValuesSV, 0);
-      return _intValuesSV;
+      return ImmutablePair.of(null, _intValuesSV);
     }
     bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 1);
-    return _intValuesSV;
+    return ImmutablePair.of(bitmap , _intValuesSV);
   }
 
   @Override
   public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
-    return new RoaringBitmap();
+    return null;
   }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -32,7 +33,6 @@ import org.roaringbitmap.RoaringBitmap;
  * Interface for transform functions.
  */
 public interface TransformFunction {
-
   /**
    * Returns the name of the transform function.
    * <p>This name should be unique among all transform functions.
@@ -75,6 +75,8 @@ public interface TransformFunction {
    */
   int[] transformToDictIdsSV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, int[]> transformToDictIdsSVWithNull(ProjectionBlock projectionBlock);
+
   /**
    * Transforms the data from the given projection block to multi-valued dictionary Ids.
    *
@@ -82,6 +84,8 @@ public interface TransformFunction {
    * @return Transformation result
    */
   int[][] transformToDictIdsMV(ProjectionBlock projectionBlock);
+
+  Pair<RoaringBitmap, int[][]> transformToDictIdsMVWithNull(ProjectionBlock projectionBlock);
 
   /**
    * SINGLE-VALUED APIs
@@ -95,6 +99,8 @@ public interface TransformFunction {
    */
   int[] transformToIntValuesSV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock);
+
   /**
    * Transforms the data from the given projection block to single-valued long values.
    *
@@ -102,6 +108,8 @@ public interface TransformFunction {
    * @return Transformation result
    */
   long[] transformToLongValuesSV(ProjectionBlock projectionBlock);
+
+  Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to single-valued float values.
@@ -111,6 +119,8 @@ public interface TransformFunction {
    */
   float[] transformToFloatValuesSV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock);
+
   /**
    * Transforms the data from the given projection block to single-valued double values.
    *
@@ -118,6 +128,8 @@ public interface TransformFunction {
    * @return Transformation result
    */
   double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock);
+
+  Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to single-valued BigDecimal values.
@@ -127,6 +139,8 @@ public interface TransformFunction {
    */
   BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock);
+
   /**
    * Transforms the data from the given projection block to single-valued string values.
    *
@@ -135,6 +149,9 @@ public interface TransformFunction {
    */
   String[] transformToStringValuesSV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock);
+
+
   /**
    * Transforms the data from the given projection block to single-valued bytes values.
    *
@@ -142,6 +159,9 @@ public interface TransformFunction {
    * @return Transformation result
    */
   byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock);
+
+  Pair<RoaringBitmap, byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock);
+
 
   /**
    * MULTI-VALUED APIs
@@ -155,6 +175,8 @@ public interface TransformFunction {
    */
   int[][] transformToIntValuesMV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock);
+
   /**
    * Transforms the data from the given projection block to multi-valued long values.
    *
@@ -162,6 +184,8 @@ public interface TransformFunction {
    * @return Transformation result
    */
   long[][] transformToLongValuesMV(ProjectionBlock projectionBlock);
+
+  Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to multi-valued float values.
@@ -171,6 +195,8 @@ public interface TransformFunction {
    */
   float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock);
+
   /**
    * Transforms the data from the given projection block to multi-valued double values.
    *
@@ -178,6 +204,8 @@ public interface TransformFunction {
    * @return Transformation result
    */
   double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock);
+
+  Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to multi-valued string values.
@@ -187,6 +215,9 @@ public interface TransformFunction {
    */
   String[][] transformToStringValuesMV(ProjectionBlock projectionBlock);
 
+  Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock);
+
+
   /**
    * Transforms the data from the given projection block to multi-valued bytes values.
    *
@@ -194,6 +225,9 @@ public interface TransformFunction {
    * @return Transformation result
    */
   byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock);
+
+  Pair<RoaringBitmap, byte[][][]> transformToBytesValuesMVWithNull(ProjectionBlock projectionBlock);
+
 
   RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock);
 }

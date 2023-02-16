@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -77,8 +79,20 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Pair<RoaringBitmap, int[]> transformToDictIdsSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getDictionaryIdsSV());
+  }
+
+  @Override
   public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getDictionaryIdsMV();
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[][]> transformToDictIdsMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getDictionaryIdsMV());
   }
 
   @Override
@@ -87,8 +101,20 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getIntValuesSV());
+  }
+
+  @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getLongValuesSV();
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getLongValuesSV());
   }
 
   @Override
@@ -97,14 +123,31 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getFloatValuesSV());
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
   }
 
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV());
+  }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getBigDecimalValuesSV();
+  }
+
+  @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getBigDecimalValuesSV());
   }
 
   @Override
@@ -113,8 +156,20 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getStringValuesSV());
+  }
+
+  @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getBytesValuesSV();
+  }
+
+  @Override
+  public Pair<RoaringBitmap, byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getBytesValuesSV());
   }
 
   @Override
@@ -123,8 +178,20 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getIntValuesMV());
+  }
+
+  @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getLongValuesMV();
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getLongValuesMV());
   }
 
   @Override
@@ -133,8 +200,20 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getFloatValuesMV());
+  }
+
+  @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesMV();
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getDoubleValuesMV());
   }
 
   @Override
@@ -143,8 +222,20 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getStringValuesMV());
+  }
+
+  @Override
   public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getBytesValuesMV();
+  }
+
+  @Override
+  public Pair<RoaringBitmap, byte[][][]> transformToBytesValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock),
+        projectionBlock.getBlockValueSet(_columnName).getBytesValuesMV());
   }
 
   @Override
