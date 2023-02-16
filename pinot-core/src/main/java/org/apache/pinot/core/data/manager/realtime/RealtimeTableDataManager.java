@@ -246,14 +246,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doShutdown() {
     if (_tableUpsertMetadataManager != null) {
+      // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
+      _tableUpsertMetadataManager.stop();
+      for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
+        segmentDataManager.destroy();
+      }
       try {
         _tableUpsertMetadataManager.close();
       } catch (IOException e) {
         _logger.warn("Cannot close upsert metadata manager properly for table: {}", _tableNameWithType, e);
       }
-    }
-    for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
-      segmentDataManager.destroy();
+    } else {
+      for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
+        segmentDataManager.destroy();
+      }
     }
     if (_leaseExtender != null) {
       _leaseExtender.shutDown();

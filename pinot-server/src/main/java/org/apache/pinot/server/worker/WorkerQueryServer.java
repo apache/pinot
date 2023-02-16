@@ -79,7 +79,7 @@ public class WorkerQueryServer {
     int servicePort =
         newConfig.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT);
     if (servicePort == -1) {
-      servicePort = newConfig.getProperty(CommonConstants.Server.CONFIG_OF_NETTY_PORT,
+      servicePort = newConfig.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
           CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
       newConfig.addProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, servicePort);
     }

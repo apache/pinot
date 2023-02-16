@@ -530,7 +530,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
-    ServerConf serverConf = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
+    ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();

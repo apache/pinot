@@ -182,7 +182,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  public void addRecord(MutableSegment segment, RecordInfo recordInfo) {
+  protected void doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
@@ -217,12 +217,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  public GenericRow updateRecord(GenericRow record, RecordInfo recordInfo) {
-    // Directly return the record when partial-upsert is not enabled
-    if (_partialUpsertHandler == null) {
-      return record;
-    }
-
+  protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
+    assert _partialUpsertHandler != null;
     AtomicReference<GenericRow> previousRecordReference = new AtomicReference<>();
     RecordLocation currentRecordLocation = _primaryKeyToRecordLocationMap.computeIfPresent(
         HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (pk, recordLocation) -> {

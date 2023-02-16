@@ -86,6 +86,10 @@ public class SegmentLineage {
     _lineageEntries.put(lineageEntryId, lineageEntry);
   }
 
+  public Map<String, LineageEntry> getLineageEntries() {
+    return _lineageEntries;
+  }
+
   /**
    * Retrieve lineage entry
    * @param lineageEntryId the id for the lineage entry

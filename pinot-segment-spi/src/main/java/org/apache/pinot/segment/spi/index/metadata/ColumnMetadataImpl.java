@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
@@ -290,8 +291,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
     // Only support zero padding
     String padding = config.getString(Segment.SEGMENT_PADDING_CHARACTER, null);
-    Preconditions.checkState(String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR).equals(padding),
-        "Got non-zero string padding: %s", padding);
+    Preconditions.checkState(String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)
+        .equals(StringEscapeUtils.unescapeJava(padding)), "Got non-zero string padding: %s", padding);
 
     String partitionFunctionName = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION), null);
     if (partitionFunctionName != null) {

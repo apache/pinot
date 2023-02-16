@@ -181,7 +181,8 @@ public class PinotLLCRealtimeSegmentManager {
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
     _metadataEventNotifierFactory =
-        MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX));
+        MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX),
+            helixResourceManager);
     _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentMetadataCommitNumLocks();
     _idealStateUpdateLocks = new Lock[_numIdealStateUpdateLocks];
     for (int i = 0; i < _numIdealStateUpdateLocks; i++) {

@@ -168,7 +168,6 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
       _resultSet.beforeFirst();
       return true;
     } else {
-      _resultSet = null;
       return false;
     }
   }
@@ -216,7 +215,6 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
       _resultSet.beforeFirst();
       return true;
     } else {
-      _resultSet = null;
       return false;
     }
   }

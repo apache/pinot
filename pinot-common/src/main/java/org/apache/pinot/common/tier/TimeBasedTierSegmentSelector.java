@@ -57,6 +57,12 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
         .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}", segmentName,
             tableNameWithType);
 
+    // don't try to move consuming segments
+    if (!segmentZKMetadata.getStatus().isCompleted()) {
+      return false;
+    }
+
+
     // get segment end time to decide if segment gets selected
     long endTimeMs = segmentZKMetadata.getEndTimeMs();
     Preconditions

@@ -33,9 +33,13 @@ import org.testng.annotations.Test;
 
 
 public class RoundRobinSchedulerTest {
+  private static final int DEFAULT_SENDER_STAGE_ID = 0;
+  private static final int DEFAULT_RECEIVER_STAGE_ID = 1;
 
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1_1", "0@foo:2", "0@bar:3");
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1_2", "0@foo:2", "0@bar:3");
+  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1_1", "0@foo:2", "0@bar:3",
+      DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
+  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1_2", "0@foo:2", "0@bar:3",
+      DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
 
   @Mock
   private MultiStageOperator _operator;
@@ -56,7 +60,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleNewOpChainsImmediately() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -70,7 +74,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldNotScheduleRescheduledOpChainsImmediately() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -83,8 +87,8 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainOnDataAvailable() {
     // Given:
-    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
-    OpChain chain2 = new OpChain(_operator, ImmutableList.of(MAILBOX_2), 123, 1);
+    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
+    OpChain chain2 = new OpChain(_operator, ImmutableList.of(MAILBOX_2), 123, DEFAULT_RECEIVER_STAGE_ID);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -101,7 +105,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainAfterTimeout() {
     // Given:
-    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
     AtomicLong ticker = new AtomicLong(0);
     RoundRobinScheduler scheduler = new RoundRobinScheduler(100, ticker::get);
 
@@ -117,7 +121,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainOnDataAvailableBeforeRegister() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -132,7 +136,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldNotScheduleRescheduledOpChainOnDataAvailableForDifferentMailbox() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -146,7 +150,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainOnDataAvailableForAnyMailbox() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1, MAILBOX_2), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1, MAILBOX_2), 123, DEFAULT_RECEIVER_STAGE_ID);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
