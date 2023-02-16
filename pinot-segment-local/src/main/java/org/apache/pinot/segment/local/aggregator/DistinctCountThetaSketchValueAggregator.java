@@ -31,6 +31,15 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Sketch> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
+  Union union;
+
+  public DistinctCountThetaSketchValueAggregator() {
+    // TODO: Handle configurable nominal entries for StarTreeBuilder
+    this.union = Union.builder()
+            .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
+            .buildUnion();
+  };
+
   @Override
   public AggregationFunctionType getAggregationType() {
     return AggregationFunctionType.DISTINCTCOUNTTHETASKETCH;
@@ -68,13 +77,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   // Utility method to merge two sketches
   private Sketch union(Sketch left, Sketch right) {
-    // TODO: Handle configurable nominal entries for StarTreeBuilder
-    Union u = Union.builder()
-      .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
-      .buildUnion();
-    u.update(left);
-    u.update(right);
-    return u.getResult().compact();
+    return union.union(left, right);
   }
 
   @Override
@@ -86,7 +89,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       initialValue = singleItemSketch(rawValue);
-      _maxByteSize = Math.max(_maxByteSize, initialValue.getCurrentBytes(true));
+      _maxByteSize = Math.max(_maxByteSize, initialValue.getCurrentBytes());
     }
     return initialValue;
   }
@@ -101,7 +104,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
       right = singleItemSketch(rawValue);
     }
     Sketch result = union(value, right).compact();
-    _maxByteSize = Math.max(_maxByteSize, result.getCurrentBytes(true));
+    _maxByteSize = Math.max(_maxByteSize, result.getCurrentBytes());
     return result;
   }
 
@@ -109,7 +112,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   @Override
   public Sketch applyAggregatedValue(Sketch value, Sketch aggregatedValue) {
     Sketch result = union(value, aggregatedValue);
-    _maxByteSize = Math.max(_maxByteSize, result.getCurrentBytes(true));
+    _maxByteSize = Math.max(_maxByteSize, result.getCurrentBytes());
     return result;
   }
 

@@ -55,7 +55,7 @@ public class DistinctCountThetaSketchValueAggregatorTest {
         // and should update the max size
         assertEquals(
                 agg.getMaxAggregatedValueByteSize(),
-                result.getCurrentBytes(true)
+                result.getCurrentBytes()
         );
     }
 
@@ -66,23 +66,23 @@ public class DistinctCountThetaSketchValueAggregatorTest {
         Sketch result1 = input1.compact();
         UpdateSketch input2 = Sketches.updateSketchBuilder().build();
         IntStream.range(0, 1000).forEach(input2::update);
-        Sketch result2 = input1.compact();
+        Sketch result2 = input2.compact();
         DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
         Sketch result = agg.applyAggregatedValue(result1, result2);
         Union union = Union.builder()
           .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
-        union.update(result1);
-        union.update(result2);
+
+        Sketch merged = union.union(result1, result2);
 
         assertEquals(
                 result.getEstimate(),
-                union.getResult().getEstimate()
+                merged.getEstimate()
         );
 
         // and should update the max size
         assertEquals(
                 agg.getMaxAggregatedValueByteSize(),
-                union.getResult().getCurrentBytes(true)
+                merged.getCurrentBytes()
         );
     }
 
@@ -93,24 +93,24 @@ public class DistinctCountThetaSketchValueAggregatorTest {
         Sketch result1 = input1.compact();
         UpdateSketch input2 = Sketches.updateSketchBuilder().build();
         IntStream.range(0, 1000).forEach(input2::update);
-        Sketch result2 = input1.compact();
+        Sketch result2 = input2.compact();
         DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
         byte[] result2bytes = agg.serializeAggregatedValue(result2);
         Sketch result = agg.applyRawValue(result1, result2bytes);
         Union union = Union.builder()
           .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
-        union.update(result1);
-        union.update(result2);
+
+        Sketch merged = union.union(result1, result2);
 
         assertEquals(
                 result.getEstimate(),
-                union.getResult().getEstimate()
+                merged.getEstimate()
         );
 
         // and should update the max size
         assertEquals(
                 agg.getMaxAggregatedValueByteSize(),
-                union.getResult().getCurrentBytes(true)
+                merged.getCurrentBytes()
         );
     }
 
