@@ -167,6 +167,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
             Mailbox.MailboxStatus.newBuilder().setMailboxId(mailboxContent.getMailboxId())
                 .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY, String.valueOf(remainingCapacity));
         if (mailboxContent.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY) != null) {
+          builder.putAllMetadata(mailboxContent.getMetadataMap());
           builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
         }
         Mailbox.MailboxStatus status = builder.build();

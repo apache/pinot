@@ -350,6 +350,33 @@ public class S3PinotFSTest {
   }
 
   @Test
+  public void testMultiPartUpload()
+      throws Exception {
+    String fileName = "copyFile.txt";
+
+    File fileToCopy = new File(getClass().getClassLoader().getResource(fileName).getFile());
+
+    // input file size is 20
+    _s3PinotFS.setMultiPartUploadConfigs(1, 3);
+    try {
+      _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
+    } finally {
+      // disable multipart upload again for the other UT cases.
+      _s3PinotFS.setMultiPartUploadConfigs(-1, 128 * 1024 * 1024);
+    }
+
+    HeadObjectResponse headObjectResponse = _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, fileName));
+
+    Assert.assertEquals(headObjectResponse.contentLength(), (Long) fileToCopy.length());
+
+    File fileToDownload = new File("copyFile_download_multipart.txt").getAbsoluteFile();
+    _s3PinotFS.copyToLocalFile(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)), fileToDownload);
+    Assert.assertEquals(fileToCopy.length(), fileToDownload.length());
+
+    fileToDownload.deleteOnExit();
+  }
+
+  @Test
   public void testOpenFile()
       throws Exception {
     String fileName = "sample.txt";
