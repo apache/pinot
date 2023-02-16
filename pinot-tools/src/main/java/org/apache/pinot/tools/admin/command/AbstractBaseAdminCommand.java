@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
@@ -101,11 +102,14 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     try {
       return readInputStream(conn.getInputStream());
     } catch (Exception e) {
-      return readInputStream(conn.getErrorStream());
+      if (conn.getErrorStream() != null) {
+        return readInputStream(conn.getErrorStream());
+      }
+      throw new IOException("Request failed due to connection error", e);
     }
   }
 
-  private static String readInputStream(InputStream inputStream)
+  private static String readInputStream(@NotNull InputStream inputStream)
       throws IOException {
     final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
     final StringBuilder sb = new StringBuilder();
