@@ -158,6 +158,7 @@ public class AggregateOperator extends MultiStageOperator {
       }
       rows.add(row);
     }
+
     _hasReturnedAggregateBlock = true;
     if (rows.size() == 0) {
       if (_groupSet.size() == 0) {

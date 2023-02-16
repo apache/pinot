@@ -28,7 +28,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -44,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link BaseOperator#getNextBlock()} API.
+ * {@link MultiStageOperator#getNextBlock()}()} API.
  *
  *  MailboxReceiveOperator receives mailbox from mailboxService from sendingStageInstances.
  *  We use sendingStageInstance to deduce mailboxId and fetch the content from mailboxService.
@@ -143,7 +142,6 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     int startingIdx = _serverIdx;
     int openMailboxCount = 0;
     int eosMailboxCount = 0;
-
     // For all non-singleton distribution, we poll from every instance to check mailbox content.
     // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
     for (int i = 0; i < _sendingMailbox.size(); i++) {
@@ -165,6 +163,10 @@ public class MailboxReceiveOperator extends MultiStageOperator {
             if (!block.isEndOfStreamBlock()) {
               return block;
             } else {
+              if (!block.getResultMetadata().isEmpty()) {
+                _operatorStats.clearExecutionStats();
+                _operatorStatsMap.putAll(block.getResultMetadata());
+              }
               eosMailboxCount++;
             }
           }

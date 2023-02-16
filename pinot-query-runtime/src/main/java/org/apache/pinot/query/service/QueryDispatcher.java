@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,6 +45,9 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.OperatorStats;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.operator.utils.StatsAggregator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
@@ -65,6 +69,13 @@ public class QueryDispatcher {
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
       MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
+    return submitAndReduce(requestId, queryPlan, mailboxService, timeoutMs, queryOptions, new HashMap<>());
+  }
+
+  public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
+      MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions,
+      Map<String, String> metadata)
+      throws Exception {
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
     // run reduce stage and return result.
@@ -73,15 +84,9 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
         reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(),
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
-    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
-    mailboxReceiveOperator.toExplainString();
-    long toResultTableStartTime = System.currentTimeMillis();
-    ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
+    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, metadata);
+    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
-    LOGGER.debug(
-        "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
-            - toResultTableStartTime) + " ms");
-    return resultTable;
   }
 
   public int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
@@ -141,6 +146,36 @@ public class QueryDispatcher {
       if (transferableBlock.isNoOpBlock()) {
         continue;
       } else if (transferableBlock.isEndOfStreamBlock()) {
+        return resultDataBlocks;
+      }
+      resultDataBlocks.add(transferableBlock.getDataBlock());
+    }
+    throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
+  }
+
+  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
+      Map<String, String> metadata) {
+    List<DataBlock> resultDataBlocks = new ArrayList<>();
+    TransferableBlock transferableBlock;
+    long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
+    while (System.nanoTime() < timeoutWatermark) {
+      transferableBlock = mailboxReceiveOperator.nextBlock();
+      if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
+        // TODO: we only received bubble up error from the execution stage tree.
+        // TODO: query dispatch should also send cancel signal to the rest of the execution stage tree.
+        throw new RuntimeException(
+            "Received error query execution result block: " + transferableBlock.getDataBlock().getExceptions());
+      }
+      if (transferableBlock.isNoOpBlock()) {
+        continue;
+      } else if (transferableBlock.isEndOfStreamBlock()) {
+        StatsAggregator statsAggregator = new StatsAggregator();
+        for (Map.Entry<String, OperatorStats> entry : transferableBlock.getResultMetadata().entrySet()) {
+          LOGGER.info("Broker Query Execution Stats, OperatorId: {}, OperatorStats: {}", entry.getKey(),
+              OperatorUtils.operatorStatsToJson(entry.getValue()));
+          statsAggregator.aggregate(entry.getValue().getExecutionStats());
+        }
+        metadata.putAll(statsAggregator.getStats());
         return resultDataBlocks;
       }
       resultDataBlocks.add(transferableBlock.getDataBlock());
