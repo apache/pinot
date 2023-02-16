@@ -83,7 +83,7 @@ public class PinotConnection extends AbstractBaseConnection {
   }
 
   protected String enableQueryOptions(String sql) {
-    var optionsBuilder = new StringBuilder();
+    StringBuilder optionsBuilder = new StringBuilder();
     for (HashMap.Entry<String, Boolean> optionEntry: _queryOptions.entrySet()) {
       if (optionEntry.getValue() && !sql.contains(optionEntry.getKey())) {
         optionsBuilder.append("SET ").append(optionEntry.getKey()).append("=true;\n");
