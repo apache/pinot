@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-//import java.io.FileWriter;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
