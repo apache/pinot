@@ -35,7 +35,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   public DistinctCountThetaSketchValueAggregator() {
     // TODO: Handle configurable nominal entries for StarTreeBuilder
-    this._union = Union.builder()
+    _union = Union.builder()
             .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
             .buildUnion();
   };
