@@ -31,11 +31,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Sketch> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
-  Union union;
+  Union _union;
 
   public DistinctCountThetaSketchValueAggregator() {
     // TODO: Handle configurable nominal entries for StarTreeBuilder
-    this.union = Union.builder()
+    this._union = Union.builder()
             .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
             .buildUnion();
   };
@@ -77,7 +77,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   // Utility method to merge two sketches
   private Sketch union(Sketch left, Sketch right) {
-    return union.union(left, right);
+    return _union.union(left, right);
   }
 
   @Override
