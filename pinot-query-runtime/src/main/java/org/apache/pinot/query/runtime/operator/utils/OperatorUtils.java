@@ -87,7 +87,7 @@ public class OperatorUtils {
 
       OperatorStats operatorStats = new OperatorStats(requestId, stageId, operatorType);
       operatorStats.recordExecutionStats(
-          JsonUtils.jsonNodeToObject(operatorStatsNode.get("executionStats"), new TypeReference<>() {
+          JsonUtils.jsonNodeToObject(operatorStatsNode.get("executionStats"), new TypeReference<Map<String, String>>() {
           }));
 
       return operatorStats;

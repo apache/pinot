@@ -55,7 +55,7 @@ public class TransferableBlock implements Block {
   }
 
   @VisibleForTesting
-  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
+  TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
       boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
