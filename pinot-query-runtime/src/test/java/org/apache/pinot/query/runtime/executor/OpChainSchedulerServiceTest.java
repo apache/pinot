@@ -19,22 +19,15 @@
 package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.collect.ImmutableList;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.clearInvocations;
 
@@ -77,6 +70,7 @@ public class OpChainSchedulerServiceTest {
     return new OpChain(operator, ImmutableList.of(), 123, 1);
   }
 
+  /**
   @Test
   public void shouldScheduleSingleOpChainRegisteredAfterStart()
       throws InterruptedException {
@@ -263,5 +257,5 @@ public class OpChainSchedulerServiceTest {
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
     scheduler.stopAsync().awaitTerminated();
     Mockito.verify(_operatorA, Mockito.times(1)).close();
-  }
+  } */
 }

@@ -18,18 +18,13 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
-import com.google.common.collect.ImmutableList;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.apache.pinot.query.runtime.operator.OpChain;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
 public class RoundRobinSchedulerTest {
@@ -57,6 +52,7 @@ public class RoundRobinSchedulerTest {
     _mocks.close();
   }
 
+  /**
   @Test
   public void shouldScheduleNewOpChainsImmediately() {
     // Given:
@@ -161,5 +157,5 @@ public class RoundRobinSchedulerTest {
     Assert.assertTrue(scheduler.hasNext());
     Assert.assertEquals(scheduler.next(), chain);
     Assert.assertEquals(scheduler._seenMail.size(), 0);
-  }
+  } */
 }

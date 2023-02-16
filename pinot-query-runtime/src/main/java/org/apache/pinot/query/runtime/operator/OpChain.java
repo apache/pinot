@@ -34,13 +34,13 @@ public class OpChain implements AutoCloseable {
   private final MultiStageOperator _root;
   private final Set<MailboxIdentifier> _receivingMailbox;
   private final OpChainStats _stats;
-  private final String _id;
+  private final OpChainId _id;
 
   public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
     _root = root;
     _receivingMailbox = new HashSet<>(receivingMailboxes);
-    _id = String.format("%s_%s", requestId, stageId);
-    _stats = new OpChainStats(_id);
+    _id = new OpChainId(requestId, stageId);
+    _stats = new OpChainStats(_id.toString());
   }
 
   public Operator<TransferableBlock> getRoot() {
@@ -49,6 +49,10 @@ public class OpChain implements AutoCloseable {
 
   public Set<MailboxIdentifier> getReceivingMailbox() {
     return _receivingMailbox;
+  }
+
+  public OpChainId getId() {
+    return _id;
   }
 
   // TODO: Move OperatorStats here.
