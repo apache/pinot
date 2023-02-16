@@ -183,6 +183,13 @@ public class HashJoinOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isNoOpBlock() || (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows())) {
+      if (!leftBlock.getResultMetadata().isEmpty()) {
+      }
+
+      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
+
       return leftBlock;
     }
     // TODO: Moved to a different function.

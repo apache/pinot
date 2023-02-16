@@ -39,6 +39,10 @@ public final class TransferableBlockUtils {
     return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
   }
 
+  public static TransferableBlock getEndOfStreamTransferableBlock(Map<String, String> statsMap) {
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(statsMap));
+  }
+
   public static TransferableBlock getNoOpTransferableBlock() {
     return new TransferableBlock(DataBlockUtils.getNoOpBlock());
   }

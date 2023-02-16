@@ -31,6 +31,8 @@ import org.testng.annotations.Test;
 
 public class InMemoryMailboxServiceTest {
 
+  private static final int DEFAULT_SENDER_STAGE_ID = 0;
+  private static final int DEFAULT_RECEIVER_STAGE_ID = 1;
   private static final DataSchema TEST_DATA_SCHEMA = new DataSchema(new String[]{"foo", "bar"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
   private static final int NUM_ENTRIES = 5;
@@ -40,7 +42,8 @@ public class InMemoryMailboxServiceTest {
       throws Exception {
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
     final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 0, 0));
+        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 0, 0),
+        DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
     InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
         mailboxId);
     InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId);
@@ -76,7 +79,8 @@ public class InMemoryMailboxServiceTest {
   public void testNonLocalMailboxId() {
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
     final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 1, 0));
+        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 1, 0),
+        DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
 
     // Test getReceivingMailbox
     try {
