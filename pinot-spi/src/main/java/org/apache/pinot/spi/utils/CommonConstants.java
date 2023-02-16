@@ -314,6 +314,9 @@ public class CommonConstants {
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
+        // Handle IN predicate evaluation for big IN lists
+        public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";
@@ -325,6 +328,7 @@ public class CommonConstants {
 
       public static class QueryOptionValue {
         public static final String ROUTING_FORCE_HLC = "FORCE_HLC";
+        public static final String DEFAULT_IN_PREDICATE_SORT_THRESHOLD = "1000";
       }
     }
 

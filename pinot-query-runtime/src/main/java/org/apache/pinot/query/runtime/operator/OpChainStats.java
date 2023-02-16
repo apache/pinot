@@ -21,6 +21,8 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Suppliers;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -46,6 +48,7 @@ public class OpChainStats {
   private final AtomicLong _queuedCount = new AtomicLong();
 
   private final String _id;
+  private Map<String, OperatorStats> _operatorStatsMap = new HashMap<>();
 
   public OpChainStats(String id) {
     _id = id;
@@ -74,6 +77,14 @@ public class OpChainStats {
     if (!_executeStopwatch.isRunning()) {
       _executeStopwatch.start();
     }
+  }
+
+  public Map<String, OperatorStats> getOperatorStatsMap() {
+    return _operatorStatsMap;
+  }
+
+  public void setOperatorStatsMap(Map<String, OperatorStats> operatorStatsMap) {
+    _operatorStatsMap = operatorStatsMap;
   }
 
   @Override

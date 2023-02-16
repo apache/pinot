@@ -94,7 +94,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)), reduceNode.getSenderStageId(),
-            reduceNode.getDataSchema(), new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
+            reduceNode.getStageId(), reduceNode.getDataSchema(),
+            new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
       } else {
         for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
