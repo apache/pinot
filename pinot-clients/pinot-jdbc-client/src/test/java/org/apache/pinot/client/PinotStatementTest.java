@@ -20,11 +20,15 @@ package org.apache.pinot.client;
 
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Properties;
+import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class PinotStatementTest {
+  private static final String BASIC_TEST_QUERY = "SELECT * FROM dummy";
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
   private DummyPinotControllerTransport _dummyPinotControllerTransport = DummyPinotControllerTransport.create();
 
@@ -34,8 +38,69 @@ public class PinotStatementTest {
     PinotConnection connection =
         new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     Statement statement = new PinotStatement(connection);
-    ResultSet resultSet = statement.executeQuery("select * from dummy");
+    ResultSet resultSet = statement.executeQuery(BASIC_TEST_QUERY);
     Assert.assertNotNull(resultSet);
     Assert.assertEquals(statement.getConnection(), connection);
+  }
+
+  @Test
+  public void setEnableNullHandlingTest()
+      throws Exception {
+    Properties props = new Properties();
+    props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    PinotConnection pinotConnection =
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    Statement statement = pinotConnection.createStatement();
+    Assert.assertNotNull(statement);
+    statement.executeQuery(BASIC_TEST_QUERY);
+    String expectedSql = DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING) + BASIC_TEST_QUERY;
+    Assert.assertEquals(expectedSql, _dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()));
+  }
+
+  @Test
+  public void setDisableNullHandlingTest()
+      throws Exception {
+    Properties props = new Properties();
+    props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "false");
+    PinotConnection pinotConnection =
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    Statement statement = pinotConnection.createStatement();
+    Assert.assertNotNull(statement);
+    statement.executeQuery(BASIC_TEST_QUERY);
+    String expectedSql = BASIC_TEST_QUERY;
+    Assert.assertEquals(expectedSql, _dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()));
+  }
+
+  @Test
+  public void setUseMultistageEngineTest()
+      throws Exception {
+    Properties props = new Properties();
+    props.put(QueryOptionKey.USE_MULTISTAGE_ENGINE, "true");
+    PinotConnection pinotConnection =
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    Statement statement = pinotConnection.createStatement();
+    Assert.assertNotNull(statement);
+    statement.executeQuery(BASIC_TEST_QUERY);
+    String expectedSql =
+        DriverUtils.createSetQueryOptionString(QueryOptionKey.USE_MULTISTAGE_ENGINE) + BASIC_TEST_QUERY;
+    Assert.assertEquals(expectedSql, _dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()));
+  }
+
+  @Test
+  public void setAllPossibleQueryOptionsTest()
+      throws Exception {
+    Properties props = new Properties();
+    for (String option : PinotConnection.POSSIBLE_QUERY_OPTIONS) {
+      props.put(option, "true");
+    }
+    PinotConnection pinotConnection =
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    Statement statement = pinotConnection.createStatement();
+    Assert.assertNotNull(statement);
+    statement.executeQuery(BASIC_TEST_QUERY);
+    String resultingQuery = _dummyPinotClientTransport.getLastQuery();
+    for (String option : PinotConnection.POSSIBLE_QUERY_OPTIONS) {
+      Assert.assertTrue(resultingQuery.contains(DriverUtils.createSetQueryOptionString(option)));
+    }
   }
 }

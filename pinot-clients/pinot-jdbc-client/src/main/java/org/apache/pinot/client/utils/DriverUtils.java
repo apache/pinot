@@ -217,4 +217,8 @@ public class DriverUtils {
     Matcher matcher = pattern.matcher(query);
     return matcher.find();
   }
+
+  public static String createSetQueryOptionString(String queryOption) {
+    return "SET " + queryOption + "=true;\n";
+  }
 }

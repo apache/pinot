@@ -31,6 +31,7 @@ import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
+import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,7 @@ import org.slf4j.LoggerFactory;
 public class PinotConnection extends AbstractBaseConnection {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
-  private static final String[] POSSIBLE_QUERY_OPTIONS = {
+  protected static final String[] POSSIBLE_QUERY_OPTIONS = {
     QueryOptionKey.ENABLE_NULL_HANDLING,
     QueryOptionKey.USE_MULTISTAGE_ENGINE
   };
@@ -86,7 +87,7 @@ public class PinotConnection extends AbstractBaseConnection {
     StringBuilder optionsBuilder = new StringBuilder();
     for (HashMap.Entry<String, Boolean> optionEntry: _queryOptions.entrySet()) {
       if (optionEntry.getValue() && !sql.contains(optionEntry.getKey())) {
-        optionsBuilder.append("SET ").append(optionEntry.getKey()).append("=true;\n");
+        optionsBuilder.append(DriverUtils.createSetQueryOptionString(optionEntry.getKey()));
       }
     }
     optionsBuilder.append(sql);
