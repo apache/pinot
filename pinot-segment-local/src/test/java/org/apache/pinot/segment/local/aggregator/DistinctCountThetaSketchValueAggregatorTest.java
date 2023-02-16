@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.util.stream.IntStream;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
-
-import java.util.stream.IntStream;
 
 import static org.testng.Assert.assertEquals;
 
