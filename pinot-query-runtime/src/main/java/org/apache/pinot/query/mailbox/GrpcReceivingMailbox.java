@@ -120,8 +120,9 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   private TransferableBlock fromMailboxContent(MailboxContent mailboxContent)
       throws IOException {
     ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
+    DataBlock dataBlock = null;
     if (byteBuffer.hasRemaining()) {
-      DataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+      dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
       if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
         return TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
       }
@@ -131,6 +132,9 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     }
 
     if (mailboxContent.getMetadataOrDefault(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "false").equals("true")) {
+      if (dataBlock instanceof MetadataBlock) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(((MetadataBlock) dataBlock).getStats());
+      }
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
 

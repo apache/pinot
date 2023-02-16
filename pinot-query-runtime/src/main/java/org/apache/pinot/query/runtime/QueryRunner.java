@@ -156,7 +156,7 @@ public class QueryRunner {
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
               sendNode.getStageId()), receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
           sendNode.getPartitionKeySelector(), _rootServer, serverQueryRequests.get(0).getRequestId(),
-          sendNode.getStageId());
+          sendNode.getStageId(), sendNode.getReceiverStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);

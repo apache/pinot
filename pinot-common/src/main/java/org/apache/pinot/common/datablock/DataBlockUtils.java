@@ -68,6 +68,11 @@ public final class DataBlockUtils {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
   }
 
+  public static MetadataBlock getEndOfStreamDataBlock(Map<String, String> stats) {
+    // TODO: add query statistics metadata for the block.
+    return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
+  }
+
   public static MetadataBlock getNoOpBlock() {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.NOOP);
   }
