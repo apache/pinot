@@ -47,6 +47,10 @@ public class StarTreeIndexContainer implements Closeable {
   @Override
   public void close()
       throws IOException {
-    // The startree index buffer is owned by segment reader now.
+    // The startree index data buffer is owned by segment reader, but still need to close those startree instances as
+    // they have created their own fwd value readers.
+    for (StarTreeV2 starTree : _starTrees) {
+      starTree.close();
+    }
   }
 }

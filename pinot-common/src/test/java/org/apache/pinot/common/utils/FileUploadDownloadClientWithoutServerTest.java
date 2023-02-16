@@ -16,20 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.events;
+package org.apache.pinot.common.utils;
 
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import java.net.URI;
+import java.net.URISyntaxException;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
-public class DefaultMetadataEventNotifierFactory extends MetadataEventNotifierFactory {
-
-  @Override
-  public void init(PinotConfiguration configuration, PinotHelixResourceManager pinotHelixResourceManager) {
+public class FileUploadDownloadClientWithoutServerTest {
+  @Test
+  public void testExtractBaseURI()
+      throws URISyntaxException {
+    Assert.assertEquals(FileUploadDownloadClient.extractBaseURI(new URI("http://example.com:8000/a/b?c=d")),
+        new URI("http://example.com:8000"));
   }
 
-  @Override
-  public MetadataEventNotifier create() {
-    return new DefaultMetadataEventNotifier();
+  @Test
+  public void testGetURI()
+      throws URISyntaxException {
+    Assert.assertEquals(FileUploadDownloadClient.getURI("http", "example.com", 8000),
+        new URI("http://example.com:8000"));
   }
 }

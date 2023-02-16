@@ -21,10 +21,14 @@ package org.apache.pinot.plugin.minion.tasks;
 import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
@@ -59,6 +63,33 @@ public class SegmentConversionUtils {
   private static final double DEFAULT_RETRY_SCALE_FACTOR = 2.0;
 
   private SegmentConversionUtils() {
+  }
+
+  /**
+   * Gets segment names for the given table
+   * @param tableNameWithType a table name with type
+   * @param controllerBaseURI the controller base URI
+   * @param authProvider a {@link AuthProvider}
+   * @return a set of segment names
+   * @throws Exception when there are exceptions getting segment names for the given table
+   */
+  public static Set<String> getSegmentNamesForTable(String tableNameWithType, URI controllerBaseURI,
+      @Nullable AuthProvider authProvider)
+      throws Exception {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    SSLContext sslContext = MinionContext.getInstance().getSSLContext();
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
+      Map<String, List<String>> tableTypeToSegmentNames =
+          fileUploadDownloadClient.getSegments(controllerBaseURI, rawTableName, tableType, true, authProvider);
+      if (tableTypeToSegmentNames != null && !tableTypeToSegmentNames.isEmpty()) {
+        List<String> allSegmentNameList = tableTypeToSegmentNames.get(tableType.toString());
+        if (!CollectionUtils.isEmpty(allSegmentNameList)) {
+          return new HashSet<>(allSegmentNameList);
+        }
+      }
+      return Collections.emptySet();
+    }
   }
 
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,

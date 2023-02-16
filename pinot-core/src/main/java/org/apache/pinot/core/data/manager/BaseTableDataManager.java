@@ -107,6 +107,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Cache used for identifying segments which could not be acquired since they were recently deleted.
   protected Cache<String, String> _recentlyDeletedSegments;
 
+  protected volatile boolean _shutDown;
+
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
@@ -182,11 +184,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void shutDown() {
     _logger.info("Shutting down table data manager for table: {}", _tableNameWithType);
+    _shutDown = true;
     doShutdown();
     _logger.info("Shut down table data manager for table: {}", _tableNameWithType);
   }
 
   protected abstract void doShutdown();
+
+  @Override
+  public boolean isShutDown() {
+    return _shutDown;
+  }
 
   /**
    * {@inheritDoc}

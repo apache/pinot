@@ -30,6 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_READ_MODE;
 
 
 /**
@@ -125,11 +128,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String DELETED_SEGMENTS_CACHE_TTL_MINUTES = "table.deleted.segments.cache.ttl.minutes";
   private static final String PEER_DOWNLOAD_SCHEME = "peer.download.scheme";
 
-  private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
+  private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
-  private PinotConfiguration _instanceDataManagerConfiguration = null;
+
+  private final PinotConfiguration _instanceDataManagerConfiguration;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
       throws ConfigurationException {
@@ -146,7 +150,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
       throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       Optional.ofNullable(_instanceDataManagerConfiguration.getProperty(keyString))
-
           .orElseThrow(() -> new ConfigurationException("Cannot find required key : " + keyString));
     }
   }
@@ -163,7 +166,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public String getInstanceDataDir() {
-    return _instanceDataManagerConfiguration.getProperty(INSTANCE_DATA_DIR);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_DATA_DIR, DEFAULT_INSTANCE_DATA_DIR);
   }
 
   @Override
@@ -173,7 +176,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public String getInstanceSegmentTarDir() {
-    return _instanceDataManagerConfiguration.getProperty(INSTANCE_SEGMENT_TAR_DIR);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_SEGMENT_TAR_DIR, DEFAULT_INSTANCE_SEGMENT_TAR_DIR);
   }
 
   @Override
@@ -188,7 +191,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public ReadMode getReadMode() {
-    return ReadMode.valueOf(_instanceDataManagerConfiguration.getProperty(READ_MODE));
+    return ReadMode.valueOf(_instanceDataManagerConfiguration.getProperty(READ_MODE, DEFAULT_READ_MODE));
   }
 
   @Override

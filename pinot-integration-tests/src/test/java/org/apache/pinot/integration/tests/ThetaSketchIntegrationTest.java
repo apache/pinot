@@ -206,6 +206,20 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       runAndAssert(query, expected);
     }
 
+     // gender = female DIFF course = history
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''History''', "
+          + "'SET_DIFF($1, $2)') from " + DEFAULT_TABLE_NAME;
+      int expected = 50 + 110 + 70 + 130;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''History''', "
+          + "'SET_DIFF(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
     // group by gender
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
