@@ -160,25 +160,16 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       // NOTE: Instances will be sorted here because 'tempOnlineInstances' is a TreeSet. We need the online instances to
       //       be sorted for replica-group routing to work. For multiple segments with the same online instances, if the
       //       list is sorted, the same index in the list will always point to the same instance.
-      List<String> onlineInstances = new ArrayList<>(tempOnlineInstances.size());
-      segmentToOnlineInstancesMap.put(segment, onlineInstances);
-
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances = unavailableInstancesMap.get(instancesInIdealState);
-      if (unavailableInstances == null) {
-        // No unavailable instance, add all instances as online instance
-        for (String instance : tempOnlineInstances) {
-          onlineInstances.add(instance);
-          instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
+      for (String instance : tempOnlineInstances) {
+        if(unavailableInstances != null && unavailableInstances.contains(instance)){
+          continue;
         }
-      } else {
-        // Some instances are unavailable, add the remaining instances as online instance
-        for (String instance : tempOnlineInstances) {
-          if (!unavailableInstances.contains(instance)) {
-            onlineInstances.add(instance);
-            instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
-          }
-        }
+        List<String> onlineInstances = new ArrayList<>(tempOnlineInstances.size());
+        onlineInstances.add(instance);
+        instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
+        segmentToOnlineInstancesMap.put(segment, onlineInstances);
       }
     }
   }

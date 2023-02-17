@@ -121,7 +121,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       if (segmentsToUpdate.contains(segment)) {
         List<String> enabledInstancesForSegment =
             calculateEnabledInstancesForSegment(segment, _segmentToOnlineInstancesMap.get(segment),
-                newUnavailableSegments);
+                newUnavailableSegments, "onInstanceChange");
         entry.setValue(enabledInstancesForSegment);
       } else {
         if (currentUnavailableSegments.contains(segment)) {
@@ -160,7 +160,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     for (Map.Entry<String, List<String>> entry : _segmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       List<String> enabledInstancesForSegment =
-          calculateEnabledInstancesForSegment(segment, entry.getValue(), unavailableSegments);
+          calculateEnabledInstancesForSegment(segment, entry.getValue(), unavailableSegments, "onAssignmentChange");
       segmentToEnabledInstancesMap.put(segment, enabledInstancesForSegment);
     }
 
@@ -231,7 +231,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    */
   @Nullable
   private List<String> calculateEnabledInstancesForSegment(String segment, List<String> onlineInstancesForSegment,
-      Set<String> unavailableSegments) {
+      Set<String> unavailableSegments, String debugString) {
     List<String> enabledInstancesForSegment = new ArrayList<>(onlineInstancesForSegment.size());
     for (String onlineInstance : onlineInstancesForSegment) {
       if (_enabledInstances.contains(onlineInstance)) {
@@ -246,15 +246,15 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       List<String> offlineInstancesForSegment = _segmentToOfflineInstancesMap.get(segment);
       for (String offlineInstance : offlineInstancesForSegment) {
         if (_enabledInstances.contains(offlineInstance)) {
-          LOGGER.info(
-              "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
+          LOGGER.info(debugString,
+              ":Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
                   + "disabled, but find enabled OFFLINE instance: {} from OFFLINE instances: {}, not counting the "
                   + "segment as unavailable)", segment, _tableNameWithType, onlineInstancesForSegment, offlineInstance,
               offlineInstancesForSegment);
           return null;
         }
       }
-      LOGGER.warn(
+      LOGGER.warn(debugString,
           "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} and OFFLINE "
               + "instances: {} are disabled, counting segment as unavailable)", segment, _tableNameWithType,
           onlineInstancesForSegment, offlineInstancesForSegment);
