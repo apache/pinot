@@ -62,8 +62,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
 
-  public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics, @Nullable
-      AdaptiveServerSelector adaptiveServerSelector) {
+  public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
   }
 
@@ -162,13 +162,15 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       //       list is sorted, the same index in the list will always point to the same instance.
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances = unavailableInstancesMap.get(instancesInIdealState);
+      List<String> onlineInstances = new ArrayList<>(tempOnlineInstances.size());
       for (String instance : tempOnlineInstances) {
-        if(unavailableInstances != null && unavailableInstances.contains(instance)){
+        if (unavailableInstances != null && unavailableInstances.contains(instance)) {
           continue;
         }
-        List<String> onlineInstances = new ArrayList<>(tempOnlineInstances.size());
         onlineInstances.add(instance);
         instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
+      }
+      if (!onlineInstances.isEmpty()) {
         segmentToOnlineInstancesMap.put(segment, onlineInstances);
       }
     }
