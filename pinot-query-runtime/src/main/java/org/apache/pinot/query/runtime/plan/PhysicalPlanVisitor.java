@@ -67,7 +67,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
             node.getExchangeType(), context.getServer(),
-            context.getRequestId(), node.getSenderStageId(), context.getTimeoutMs());
+            context.getRequestId(), node.getSenderStageId(), node.getStageId(), context.getTimeoutMs());
     context.addReceivingMailboxes(mailboxReceiveOperator.getSendingMailbox());
     return mailboxReceiveOperator;
   }
@@ -78,7 +78,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
     return new MailboxSendOperator(context.getMailboxService(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getServer(), context.getRequestId(), node.getStageId());
+        context.getServer(), context.getRequestId(), node.getStageId(), node.getReceiverStageId());
   }
 
   @Override

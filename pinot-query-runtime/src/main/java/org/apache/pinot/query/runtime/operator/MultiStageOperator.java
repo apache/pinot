@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Joiner;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -31,10 +36,20 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   // TODO: Move to OperatorContext class.
-  private final OperatorStats _operatorStats;
+  protected final long _requestId;
+  protected final int _stageId;
+  protected final OperatorStats _operatorStats;
+  protected final Map<String, OperatorStats> _operatorStatsMap;
 
   public MultiStageOperator(long requestId, int stageId) {
+    _requestId = requestId;
+    _stageId = stageId;
     _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStatsMap = new HashMap<>();
+  }
+
+  public Map<String, OperatorStats> getOperatorStatsMap() {
+    return _operatorStatsMap;
   }
 
   @Override
@@ -49,7 +64,18 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       _operatorStats.endTimer();
       // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
-        LOGGER.info("Recorded operator stats: " + _operatorStats);
+        if (nextBlock.isSuccessfulEndOfStreamBlock()) {
+          for (MultiStageOperator op : getChildOperators()) {
+            _operatorStatsMap.putAll(op.getOperatorStatsMap());
+          }
+
+          if (!_operatorStats.getExecutionStats().isEmpty()) {
+            String operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId);
+            _operatorStatsMap.put(operatorId, _operatorStats);
+          }
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+              OperatorUtils.getMetadataFromOperatorStats(_operatorStatsMap));
+        }
       }
       return nextBlock;
     }
