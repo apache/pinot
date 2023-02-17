@@ -19,8 +19,11 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class GreatestTransformFunction extends SelectTupleElementTransformFunction {
@@ -47,6 +50,13 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   }
 
   @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
+  }
+
+
+  @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_longValuesSV == null) {
@@ -61,6 +71,12 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       }
     }
     return _longValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
   }
 
   @Override
@@ -81,6 +97,12 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   }
 
   @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_doubleValuesSV == null) {
@@ -95,6 +117,12 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       }
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 
   @Override
@@ -115,6 +143,12 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   }
 
   @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_stringValuesSV == null) {
@@ -131,5 +165,11 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       }
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
   }
 }

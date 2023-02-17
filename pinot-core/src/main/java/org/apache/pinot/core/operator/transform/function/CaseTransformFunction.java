@@ -343,7 +343,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _intValuesSV[j] = intValues[j];
-              if(!bitmap.contains(j) && result.getLeft().contains(j)){
+              if(result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -409,8 +409,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _longValuesSV[j] = longValues[j];
-              if(result.getLeft() != null) {
-                bitmap.or(result.getLeft());
+              if(result.getLeft() != null && result.getLeft().contains(j)) {
+                bitmap.add(j);
               }
             }
           }
@@ -475,8 +475,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _floatValuesSV[j] = floatValues[j];
-              if(result.getLeft() != null) {
-                bitmap.or(result.getLeft());
+              if(result.getLeft() != null && result.getLeft().contains(j)) {
+                bitmap.add(j);
               }
             }
           }
@@ -541,8 +541,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _doubleValuesSV[j] = doubleValues[j];
-              if(result.getLeft() != null) {
-                bitmap.or(result.getLeft());
+              if(result.getLeft() != null && result.getLeft().contains(j)) {
+                bitmap.add(j);
               }
             }
           }
@@ -607,8 +607,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _bigDecimalValuesSV[j] = bigDecimalValues[j];
-              if(result.getLeft() != null) {
-                bitmap.or(result.getLeft());
+              if(result.getLeft() != null && result.getLeft().contains(j)) {
+                bitmap.add(j);
               }
             }
           }
@@ -673,8 +673,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _stringValuesSV[j] = stringValues[j];
-              if(result.getLeft() != null) {
-                bitmap.or(result.getLeft());
+              if(result.getLeft() != null && result.getLeft().contains(j)) {
+                bitmap.add(j);
               }
             }
           }
@@ -738,8 +738,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _bytesValuesSV[j] = bytesValues[j];
-              if(result.getLeft() != null) {
-                bitmap.or(result.getLeft());
+              if(result.getLeft() != null && result.getLeft().contains(j)) {
+                bitmap.add(j);
               }
             }
           }
@@ -770,8 +770,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
         } else {
           for (int j = 0; j < projectionBlock.getNumDocs(); j++) {
             if (selected[j] == i) {
-              if(result != null) {
-                bitmap.or(result);
+              if(result != null && result.contains(j)) {
+                bitmap.add(j);
               }
             }
           }

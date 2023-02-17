@@ -68,8 +68,8 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
       Arrays.fill(_intValuesSV, 1);
       return ImmutablePair.of(null, _intValuesSV);
     }
-    bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 1);
     bitmap.flip(0L, numDocs);
+    bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 1);
     return ImmutablePair.of(null , _intValuesSV);
   }
 

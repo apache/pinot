@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -30,6 +32,7 @@ import org.joda.time.Chronology;
 import org.joda.time.DateTimeField;
 import org.joda.time.DateTimeZone;
 import org.joda.time.chrono.ISOChronology;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class DateTimeTransformFunction extends BaseTransformFunction {
@@ -52,7 +55,6 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     if (arguments.size() == 2) {
       Preconditions.checkArgument(arguments.get(1) instanceof LiteralTransformFunction,
           "zoneId parameter %s must be a literal", _name);
-      // TODO: Handle null literal
       _chronology = ISOChronology.getInstance(
           DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getStringLiteral()));
     } else {
@@ -72,6 +74,11 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+    return _timestampsFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_intValuesSV == null) {
@@ -80,6 +87,10 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     long[] timestamps = _timestampsFunction.transformToLongValuesSV(projectionBlock);
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;
+  }
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   protected abstract void convert(long[] timestamps, int numDocs, int[] output);

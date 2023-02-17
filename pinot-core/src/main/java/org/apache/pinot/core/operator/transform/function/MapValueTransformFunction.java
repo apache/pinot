@@ -21,10 +21,13 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -118,5 +121,10 @@ public class MapValueTransformFunction extends BaseTransformFunction {
       _dictIds[i] = valueDictId;
     }
     return _dictIds;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 }

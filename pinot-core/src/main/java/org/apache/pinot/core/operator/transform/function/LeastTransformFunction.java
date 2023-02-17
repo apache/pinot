@@ -19,8 +19,11 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class LeastTransformFunction extends SelectTupleElementTransformFunction {
@@ -44,6 +47,11 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       }
     }
     return _intValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
   }
 
   @Override

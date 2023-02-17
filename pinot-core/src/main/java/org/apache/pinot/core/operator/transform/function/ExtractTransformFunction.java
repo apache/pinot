@@ -20,12 +20,15 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.Chronology;
 import org.joda.time.DateTimeField;
 import org.joda.time.chrono.ISOChronology;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class ExtractTransformFunction extends BaseTransformFunction {
@@ -59,6 +62,11 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+    return _mainTransformFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_intValuesSV == null) {
@@ -67,6 +75,12 @@ public class ExtractTransformFunction extends BaseTransformFunction {
     long[] timestamps = _mainTransformFunction.transformToLongValuesSV(projectionBlock);
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   private void convert(long[] timestamps, int numDocs, int[] output) {

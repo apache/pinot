@@ -22,11 +22,14 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class CastTransformFunction extends BaseTransformFunction {
@@ -106,6 +109,11 @@ public class CastTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+    return _transformFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     switch (_resultMetadata.getDataType()) {
       case INT:
@@ -115,6 +123,12 @@ public class CastTransformFunction extends BaseTransformFunction {
       default:
         return super.transformToIntValuesSV(projectionBlock);
     }
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   // TODO: Add it to the interface
@@ -166,6 +180,12 @@ public class CastTransformFunction extends BaseTransformFunction {
     }
   }
 
+  @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
+  }
+
   // TODO: Add it to the interface
   private long[] transformToTimestampValuesSV(ProjectionBlock projectionBlock) {
     if (_sourceDataType.getStoredType() == DataType.STRING) {
@@ -191,6 +211,12 @@ public class CastTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() == DataType.DOUBLE) {
       return _transformFunction.transformToDoubleValuesSV(projectionBlock);
@@ -200,12 +226,24 @@ public class CastTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
+  }
+
+  @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() == DataType.BIG_DECIMAL) {
       return _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
     } else {
       return super.transformToBigDecimalValuesSV(projectionBlock);
     }
+  }
+
+  @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
   }
 
   @Override
@@ -278,6 +316,12 @@ public class CastTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
+  }
+
+  @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
     switch (_resultMetadata.getDataType()) {
       case INT:
@@ -287,6 +331,12 @@ public class CastTransformFunction extends BaseTransformFunction {
       default:
         return super.transformToIntValuesMV(projectionBlock);
     }
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
   }
 
   // TODO: Add it to the interface
@@ -334,6 +384,12 @@ public class CastTransformFunction extends BaseTransformFunction {
     }
   }
 
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesMV(projectionBlock));
+  }
+
   // TODO: Add it to the interface
   private long[][] transformToTimestampValuesMV(ProjectionBlock projectionBlock) {
     if (_sourceDataType.getStoredType() == DataType.STRING) {
@@ -359,12 +415,24 @@ public class CastTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesMV(projectionBlock));
+  }
+
+  @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() == DataType.DOUBLE) {
       return _transformFunction.transformToDoubleValuesMV(projectionBlock);
     } else {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesMV(projectionBlock));
   }
 
   @Override
@@ -426,5 +494,11 @@ public class CastTransformFunction extends BaseTransformFunction {
       }
     }
     return _stringValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesMV(projectionBlock));
   }
 }

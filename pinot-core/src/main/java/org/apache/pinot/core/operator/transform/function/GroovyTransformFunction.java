@@ -32,6 +32,8 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.EnumUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -39,6 +41,7 @@ import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -235,6 +238,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       _intValuesSV[i] = (int) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
     return _intValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
   }
 
   @Override

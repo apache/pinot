@@ -169,7 +169,16 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getUnknownLiteralExpression() {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setNullValue(true);
+    return expression;
+  }
+
   public static Expression getLiteralExpression(Object object) {
+    if(object == null){
+      return getUnknownLiteralExpression();
+    }
     if (object instanceof Integer || object instanceof Long) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }

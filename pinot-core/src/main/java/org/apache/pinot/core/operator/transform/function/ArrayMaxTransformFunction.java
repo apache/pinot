@@ -21,10 +21,13 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -90,6 +93,11 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
+  }
+
+  @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(projectionBlock);
@@ -107,6 +115,11 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       _longValuesSV[i] = maxRes;
     }
     return _longValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
   }
 
   @Override
@@ -130,6 +143,11 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(projectionBlock);
@@ -147,6 +165,11 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       _doubleValuesSV[i] = maxRes;
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 
   @Override
@@ -169,5 +192,11 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       _stringValuesSV[i] = maxRes;
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
   }
 }

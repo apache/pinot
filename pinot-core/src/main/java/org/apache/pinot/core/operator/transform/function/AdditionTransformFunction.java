@@ -109,8 +109,10 @@ public class AdditionTransformFunction extends BaseTransformFunction {
     return _doubleValuesSV;
   }
 
+  @Override
   public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), _doubleValuesSV);
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 
   @Override
@@ -134,7 +136,9 @@ public class AdditionTransformFunction extends BaseTransformFunction {
     return _bigDecimalValuesSV;
   }
 
+  @Override
   public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), _bigDecimalValuesSV);
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
   }
 }

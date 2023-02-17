@@ -69,7 +69,7 @@ public class IsNullTransformFunction extends BaseTransformFunction {
       return ImmutablePair.of(null, _intValuesSV);
     }
     bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 1);
-    return ImmutablePair.of(bitmap , _intValuesSV);
+    return ImmutablePair.of(null , _intValuesSV);
   }
 
   @Override

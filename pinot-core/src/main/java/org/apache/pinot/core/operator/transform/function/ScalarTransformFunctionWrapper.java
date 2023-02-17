@@ -24,6 +24,8 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -32,6 +34,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -125,6 +128,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       _intValuesSV[i] = (int) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
     }
     return _intValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   @Override

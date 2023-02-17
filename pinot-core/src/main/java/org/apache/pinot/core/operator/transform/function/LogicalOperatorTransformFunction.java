@@ -21,9 +21,13 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.concurrent.Immutable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -71,6 +75,12 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
       }
     }
     return _intValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Support the right null behavior
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   abstract int getLogicalFuncResult(int left, int right);

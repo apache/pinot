@@ -20,9 +20,12 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -83,5 +86,11 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
       _doubleValuesSV[i] = sumRes;
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 }

@@ -29,6 +29,8 @@ import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -37,6 +39,7 @@ import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluator;
 import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluators;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -138,6 +141,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     }
     // operating on the output of another transform so can't pass the evaluation down to the storage
     return transformTransformedValuesToIntValuesSV(projectionBlock);
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
   }
 
   private int[] transformTransformedValuesToIntValuesSV(ProjectionBlock projectionBlock) {

@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
@@ -30,6 +32,7 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochT
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -122,6 +125,11 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+    return _mainTransformFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata != LONG_SV_NO_DICTIONARY_METADATA) {
       return super.transformToLongValuesSV(projectionBlock);
@@ -143,6 +151,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata != STRING_SV_NO_DICTIONARY_METADATA) {
       return super.transformToStringValuesSV(projectionBlock);
@@ -161,5 +175,11 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
           length);
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
   }
 }

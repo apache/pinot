@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -29,6 +31,7 @@ import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -70,6 +73,12 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   @Override
   public TransformResultMetadata getResultMetadata() {
     return BOOLEAN_SV_NO_DICTIONARY_METADATA;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Support the right null behavior
+    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
   }
 
   @Override

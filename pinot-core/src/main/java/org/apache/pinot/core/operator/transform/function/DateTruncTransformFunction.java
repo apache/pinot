@@ -22,12 +22,15 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.DateTimeField;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -128,6 +131,11 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+    return _mainTransformFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_longValuesSV == null) {
@@ -140,5 +148,10 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
               TimeUnit.MILLISECONDS);
     }
     return _longValuesSV;
+  }
+
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    // TODO: Optimize the perf later.
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 }
