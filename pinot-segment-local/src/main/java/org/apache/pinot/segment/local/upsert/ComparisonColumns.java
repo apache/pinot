@@ -39,9 +39,32 @@ public class ComparisonColumns implements Comparable {
 
   @Override
   public int compareTo(@Nonnull Object other) {
-    Preconditions.checkState(other instanceof ComparisonColumns,
-        "ComparisonColumns is only Comparable with another instance of ComparisonColumns");
+    if (other instanceof ComparisonColumns) {
+      return compareToComparisonColumns((ComparisonColumns) other);
+    }
 
+    // If other is not an instance of ComparisonColumns, it must be the case that the upsert config has been updated
+    // since last server restart.
+    //
+    // In the case where the upsert config is edited between restarts, the first comparison for an existing row will
+    // end up comparing a value from the _new_ column against the previously stored Comparable from the _previous_
+    // column. The same functionality can be used here, where the previously stored Comparable will be compared
+    // against the non-null ComparisonColumn value.
+    return compareToComparable(other);
+  }
+
+  private int compareToComparable(@Nonnull Object other) {
+
+    for (Map.Entry<String, ComparisonValue> columnEntry : _comparisonColumns.entrySet()) {
+      ComparisonValue comparisonValue = columnEntry.getValue();
+      if (!comparisonValue.isNull()) {
+        return comparisonValue.compareTo(other);
+      }
+    }
+    return -1;
+  }
+
+  private int compareToComparisonColumns(@Nonnull ComparisonColumns other) {
     for (Map.Entry<String, ComparisonValue> columnEntry : _comparisonColumns.entrySet()) {
       ComparisonValue comparisonValue = columnEntry.getValue();
       // Inbound records may have at most 1 non-null value. _other may have all non-null values, however.
@@ -49,19 +72,18 @@ public class ComparisonColumns implements Comparable {
         continue;
       }
 
-      ComparisonValue otherComparisonValue =
-          ((ComparisonColumns) other).getComparisonColumns().get(columnEntry.getKey());
+      ComparisonValue otherComparisonValue = other.getComparisonColumns().get(columnEntry.getKey());
 
       if (otherComparisonValue == null) {
         // This can happen if a new column is added to the list of comparisonColumns. We want to support that without
         // requiring a server restart, so handle the null here.
-        _comparisonColumns = merge(((ComparisonColumns) other).getComparisonColumns(), _comparisonColumns);
+        _comparisonColumns = merge(other.getComparisonColumns(), _comparisonColumns);
         return 1;
       }
 
       int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
       if (comparisonResult >= 0) {
-        _comparisonColumns = merge(((ComparisonColumns) other).getComparisonColumns(), _comparisonColumns);
+        _comparisonColumns = merge(other.getComparisonColumns(), _comparisonColumns);
         return comparisonResult;
       }
     }
