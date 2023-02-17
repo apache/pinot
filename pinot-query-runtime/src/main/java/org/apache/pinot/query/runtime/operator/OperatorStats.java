@@ -19,9 +19,9 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Stopwatch;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.query.runtime.operator.utils.StatsAggregator;
 
 public class OperatorStats {
   private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
@@ -34,13 +34,13 @@ public class OperatorStats {
 
   private int _numBlock = 0;
   private int _numRows = 0;
-  private StatsAggregator _statsAggregator;
+  private Map<String, String> _executionStats;
 
   public OperatorStats(long requestId, int stageId, String operatorType) {
     _stageId = stageId;
     _requestId = requestId;
     _operatorType = operatorType;
-    _statsAggregator = new StatsAggregator();
+    _executionStats = new HashMap<>();
   }
 
   public void startTimer() {
@@ -61,11 +61,11 @@ public class OperatorStats {
   }
 
   public void recordExecutionStats(Map<String, String> executionStats) {
-    _statsAggregator.aggregate(executionStats);
+    _executionStats = executionStats;
   }
 
   public Map<String, String> getExecutionStats() {
-    return _statsAggregator.getStats();
+    return _executionStats;
   }
 
   public int getStageId() {
@@ -78,10 +78,6 @@ public class OperatorStats {
 
   public String getOperatorType() {
     return _operatorType;
-  }
-
-  public void clearExecutionStats() {
-    _statsAggregator = new StatsAggregator();
   }
 
   // TODO: Return the string as a JSON string.

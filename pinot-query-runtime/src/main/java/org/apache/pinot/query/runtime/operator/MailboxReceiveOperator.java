@@ -164,7 +164,6 @@ public class MailboxReceiveOperator extends MultiStageOperator {
               return block;
             } else {
               if (!block.getResultMetadata().isEmpty()) {
-                _operatorStats.clearExecutionStats();
                 _operatorStatsMap.putAll(block.getResultMetadata());
               }
               eosMailboxCount++;
