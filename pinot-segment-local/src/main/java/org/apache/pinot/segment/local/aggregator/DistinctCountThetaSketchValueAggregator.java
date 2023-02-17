@@ -35,10 +35,8 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   public DistinctCountThetaSketchValueAggregator() {
     // TODO: Handle configurable nominal entries for StarTreeBuilder
-    _union = Union.builder()
-            .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
-            .buildUnion();
-  };
+    _union = Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -56,9 +54,9 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   // Utility method to create a theta sketch with one item in it
   private Sketch singleItemSketch(Object rawValue) {
     // TODO: Handle configurable nominal entries for StarTreeBuilder
-    UpdateSketch sketch = Sketches.updateSketchBuilder()
-      .setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
-      .build();
+    UpdateSketch sketch =
+        Sketches.updateSketchBuilder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
+            .build();
     if (rawValue instanceof String) {
       sketch.update((String) rawValue);
     } else if (rawValue instanceof Integer) {
@@ -94,7 +92,6 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
     return initialValue;
   }
 
-
   @Override
   public Sketch applyRawValue(Sketch value, Object rawValue) {
     Sketch right;
@@ -107,7 +104,6 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
     _maxByteSize = Math.max(_maxByteSize, result.getCurrentBytes());
     return result;
   }
-
 
   @Override
   public Sketch applyAggregatedValue(Sketch value, Sketch aggregatedValue) {
