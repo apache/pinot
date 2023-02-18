@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -49,11 +52,10 @@ public class RoundRobinScheduler implements OpChainScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoundRobinScheduler.class);
   private static final String AVAILABLE_RELEASE_THREAD_NAME = "round-robin-scheduler-release-thread";
 
-  private final long _releaseTimeout;
+  private final long _releaseTimeoutMs;
   private final Supplier<Long> _ticker;
 
   private final Map<OpChainId, OpChain> _aliveChains = new ConcurrentHashMap<>();
-  private final Set<OpChainId> _runningChains = Sets.newConcurrentHashSet();
   final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
   private final Map<OpChainId, Long> _available = new ConcurrentHashMap<>();
 
@@ -62,12 +64,13 @@ public class RoundRobinScheduler implements OpChainScheduler {
   private final Lock _lock = new ReentrantLock();
   private final ScheduledExecutorService _availableOpChainReleaseService;
 
-  public RoundRobinScheduler(long releaseTimeout) {
-    this(releaseTimeout, System::currentTimeMillis);
+  public RoundRobinScheduler(long releaseTimeoutMs) {
+    this(releaseTimeoutMs, System::currentTimeMillis);
   }
 
-  public RoundRobinScheduler(long releaseTimeoutMs, Supplier<Long> ticker) {
-    _releaseTimeout = releaseTimeoutMs;
+  RoundRobinScheduler(long releaseTimeoutMs, Supplier<Long> ticker) {
+    Preconditions.checkArgument(releaseTimeoutMs > 0, "Release timeout for round-robin scheduler should be > 0ms");
+    _releaseTimeoutMs = releaseTimeoutMs;
     _ticker = ticker;
     _availableOpChainReleaseService = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r);
@@ -75,28 +78,29 @@ public class RoundRobinScheduler implements OpChainScheduler {
       t.setDaemon(true);
       return t;
     });
-    if (releaseTimeoutMs > 0) {
-      _availableOpChainReleaseService.scheduleAtFixedRate(() -> {
-        for (Map.Entry<OpChainId, Long> entry : _available.entrySet()) {
-          if (Thread.interrupted()) {
-            LOGGER.warn("Thread={} interrupted. Scheduler may be shutting down.", AVAILABLE_RELEASE_THREAD_NAME);
-            break;
-          }
-          OpChainId opChainId = entry.getKey();
-          if (_ticker.get() + _releaseTimeout > entry.getValue()) {
-            _lock.lock();
-            try {
-              if (_available.containsKey(opChainId)) {
-                _available.remove(opChainId);
-                _ready.offer(_aliveChains.get(opChainId));
-              }
-            } finally {
-              _lock.unlock();
-            }
-          }
+    _availableOpChainReleaseService.scheduleAtFixedRate(() -> {
+      List<OpChainId> timedOutWaiting = new ArrayList<>();
+      for (Map.Entry<OpChainId, Long> entry : _available.entrySet()) {
+        if (Thread.interrupted()) {
+          LOGGER.warn("Thread={} interrupted. Scheduler may be shutting down.", AVAILABLE_RELEASE_THREAD_NAME);
+          break;
         }
-      }, _releaseTimeout, _releaseTimeout, TimeUnit.MILLISECONDS);
-    }
+        if (_ticker.get() + _releaseTimeoutMs > entry.getValue()) {
+          timedOutWaiting.add(entry.getKey());
+        }
+      }
+      for (OpChainId opChainId : timedOutWaiting) {
+        _lock.lock();
+        try {
+          if (_available.containsKey(opChainId)) {
+            _available.remove(opChainId);
+            _ready.offer(_aliveChains.get(opChainId));
+          }
+        } finally {
+          _lock.unlock();
+        }
+      }
+    }, _releaseTimeoutMs, _releaseTimeoutMs, TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -116,8 +120,6 @@ public class RoundRobinScheduler implements OpChainScheduler {
     _lock.lock();
     try {
       _aliveChains.remove(operatorChain.getId());
-      // deregister can only be called if the OpChain is running, so remove from _runningChains.
-      _runningChains.remove(operatorChain.getId());
       // it could be that the onDataAvailable callback was called when the OpChain was executing, in which case there
       // could be a dangling entry in _seenMail.
       _seenMail.remove(operatorChain.getId());
@@ -128,10 +130,9 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public void yield(OpChain operatorChain) {
-    long releaseTs = _releaseTimeout < 0 ? Long.MAX_VALUE : _ticker.get() + _releaseTimeout;
+    long releaseTs = _ticker.get() + _releaseTimeoutMs;
     _lock.lock();
     try {
-      _runningChains.remove(operatorChain.getId());
       // It could be that this OpChain received data before it could be yielded completely. In that case, mark it ready
       // to get it scheduled asap.
       if (_seenMail.contains(operatorChain.getId())) {
@@ -161,16 +162,15 @@ public class RoundRobinScheduler implements OpChainScheduler {
       if (!_aliveChains.containsKey(opChainId)) {
         return;
       }
-      if (_runningChains.contains(opChainId)) {
-        // If the OpChain is running right now, mark it in _seenMail. When there's an attempt to yield the OpChain
-        // after it's done running, we'll check against this and mark it ready to run again. If after the current run
-        // the OpChain is finished, then we'll clean-up _seenMail in deregister.
-        _seenMail.add(opChainId);
-        return;
-      }
       if (_available.containsKey(opChainId)) {
         _available.remove(opChainId);
         _ready.offer(_aliveChains.get(opChainId));
+      } else {
+        // There are two cases here:
+        // 1. OpChain is in the _ready queue: the next time it gets polled, we'll remove the _seenMail entry.
+        // 2. OpChain is running: the next time yield is called for it, we'll check against _seenMail and put it back
+        //    in the _ready queue again.
+        _seenMail.add(opChainId);
       }
     } finally {
       _lock.unlock();
@@ -180,19 +180,8 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public OpChain next(long time, TimeUnit timeUnit) throws InterruptedException {
-    // Poll outside the lock since we don't want to block inside the lock.
-    // This is thread-safe anyways since we use a BlockingQueue.
     OpChain op = _ready.poll(time, timeUnit);
-    _lock.lock();
-    try {
-      if (op != null) {
-        _runningChains.add(op.getId());
-      }
-      trace("Polled " + op);
-      return op;
-    } finally {
-      _lock.unlock();
-    }
+    return op;
   }
 
   @Override
