@@ -170,6 +170,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         onlineInstances.add(instance);
         instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
       }
+      // TODO: We are ignoring new segment here. We should mark new segment as not available as well.
       if (!onlineInstances.isEmpty()) {
         segmentToOnlineInstancesMap.put(segment, onlineInstances);
       }
