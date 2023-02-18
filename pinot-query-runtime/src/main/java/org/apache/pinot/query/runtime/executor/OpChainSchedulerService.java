@@ -82,7 +82,6 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
             }
 
             if (!result.isEndOfStreamBlock()) {
-              // not complete, needs to re-register for scheduling
               _scheduler.yield(operatorChain);
             } else {
               isFinished = true;

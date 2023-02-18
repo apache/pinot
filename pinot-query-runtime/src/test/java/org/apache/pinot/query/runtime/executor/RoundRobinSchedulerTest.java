@@ -18,28 +18,38 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
+import com.google.common.collect.ImmutableList;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class RoundRobinSchedulerTest {
   private static final int DEFAULT_SENDER_STAGE_ID = 0;
   private static final int DEFAULT_RECEIVER_STAGE_ID = 1;
+  private static final int DEFAULT_POLL_TIMEOUT_MS = 0;
+  private static final int DEFAULT_RELEASE_TIMEOUT_MS = 10;
 
   private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1_1", "0@foo:2", "0@bar:3",
       DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1_2", "0@foo:2", "0@bar:3",
-      DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
+  private static final OpChainId OP_CHAIN_ID = new OpChainId(1, DEFAULT_RECEIVER_STAGE_ID);
 
   @Mock
   private MultiStageOperator _operator;
 
   private AutoCloseable _mocks;
+
+  private RoundRobinScheduler _scheduler;
 
   @BeforeClass
   public void beforeClass() {
@@ -52,110 +62,59 @@ public class RoundRobinSchedulerTest {
     _mocks.close();
   }
 
-  /**
+  @AfterTest
+  public void afterTest() {
+    _scheduler.shutdownNow();
+  }
+
   @Test
-  public void shouldScheduleNewOpChainsImmediately() {
-    // Given:
+  public void testSchedulerHappyPath()
+      throws InterruptedException {
     OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
-    RoundRobinScheduler scheduler = new RoundRobinScheduler();
+    _scheduler = new RoundRobinScheduler(DEFAULT_RELEASE_TIMEOUT_MS);
+    _scheduler.register(chain);
 
-    // When:
-    scheduler.register(chain, true);
+    // OpChain is scheduled immediately
+    Assert.assertEquals(_scheduler.next(DEFAULT_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS), chain);
+    // No op-chains ready, so scheduler returns null
+    Assert.assertNull(_scheduler.next(DEFAULT_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+    // When Op-Chain is done executing, yield is called
+    _scheduler.yield(chain);
+    // When data is received, callback is called
+    _scheduler.onDataAvailable(MAILBOX_1);
+    // next should return the OpChain immediately after the callback
+    Assert.assertEquals(_scheduler.next(DEFAULT_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS), chain);
+    // Say the OpChain is done, then a de-register will be called
+    _scheduler.deregister(chain);
 
-    // Then:
-    Assert.assertTrue(scheduler.hasNext());
-    Assert.assertEquals(scheduler.next(), chain);
+    // There should be no entries left in the scheduler
+    Assert.assertEquals(0,
+        _scheduler.aliveChainsSize() + _scheduler.readySize() + _scheduler.seenMailSize() + _scheduler.availableSize());
   }
 
   @Test
-  public void shouldNotScheduleRescheduledOpChainsImmediately() {
-    // Given:
+  public void testSchedulerWhenSenderDies()
+      throws InterruptedException {
     OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
-    RoundRobinScheduler scheduler = new RoundRobinScheduler();
+    _scheduler = new RoundRobinScheduler(DEFAULT_RELEASE_TIMEOUT_MS);
+    _scheduler.register(chain);
 
-    // When:
-    scheduler.register(chain, false);
+    // OpChain runs immediately after registration
+    Assert.assertEquals(_scheduler.next(DEFAULT_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS), chain);
+    // No more OpChains to run
+    Assert.assertNull(_scheduler.next(DEFAULT_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+    // When op-chain returns a no-op block, suspend it
+    _scheduler.yield(chain);
 
-    // Then:
-    Assert.assertFalse(scheduler.hasNext());
+    // Unless a callback is called, the chain would remain suspended. However, the scheduler will automatically
+    // promote available OpChains to ready every releaseMs.
+    Assert.assertEquals(_scheduler.next(DEFAULT_RELEASE_TIMEOUT_MS + 100, TimeUnit.MILLISECONDS), chain);
+
+    // Assuming the OpChain has timed out, the OpChain will be de-registered
+    _scheduler.deregister(chain);
+
+    // There should be no entries left in the scheduler
+    Assert.assertEquals(0,
+        _scheduler.aliveChainsSize() + _scheduler.readySize() + _scheduler.seenMailSize() + _scheduler.availableSize());
   }
-
-  @Test
-  public void shouldScheduleRescheduledOpChainOnDataAvailable() {
-    // Given:
-    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
-    OpChain chain2 = new OpChain(_operator, ImmutableList.of(MAILBOX_2), 123, DEFAULT_RECEIVER_STAGE_ID);
-    RoundRobinScheduler scheduler = new RoundRobinScheduler();
-
-    // When:
-    scheduler.register(chain1, false);
-    scheduler.register(chain2, false);
-    scheduler.onDataAvailable(MAILBOX_1);
-
-    // Then:
-    Assert.assertTrue(scheduler.hasNext());
-    Assert.assertEquals(scheduler.next(), chain1);
-    Assert.assertFalse(scheduler.hasNext());
-  }
-
-  @Test
-  public void shouldScheduleRescheduledOpChainAfterTimeout() {
-    // Given:
-    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
-    AtomicLong ticker = new AtomicLong(0);
-    RoundRobinScheduler scheduler = new RoundRobinScheduler(100, ticker::get);
-
-    // When:
-    scheduler.register(chain1, false);
-    ticker.set(101);
-
-    // Then:
-    Assert.assertTrue(scheduler.hasNext());
-    Assert.assertEquals(scheduler.next(), chain1);
-  }
-
-  @Test
-  public void shouldScheduleRescheduledOpChainOnDataAvailableBeforeRegister() {
-    // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
-    RoundRobinScheduler scheduler = new RoundRobinScheduler();
-
-    // When:
-    scheduler.onDataAvailable(MAILBOX_1);
-    scheduler.register(chain, false);
-
-    // Then:
-    Assert.assertTrue(scheduler.hasNext());
-    Assert.assertEquals(scheduler.next(), chain);
-  }
-
-  @Test
-  public void shouldNotScheduleRescheduledOpChainOnDataAvailableForDifferentMailbox() {
-    // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, DEFAULT_RECEIVER_STAGE_ID);
-    RoundRobinScheduler scheduler = new RoundRobinScheduler();
-
-    // When:
-    scheduler.register(chain, false);
-    scheduler.onDataAvailable(MAILBOX_2);
-
-    // Then:
-    Assert.assertFalse(scheduler.hasNext());
-  }
-
-  @Test
-  public void shouldScheduleRescheduledOpChainOnDataAvailableForAnyMailbox() {
-    // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1, MAILBOX_2), 123, DEFAULT_RECEIVER_STAGE_ID);
-    RoundRobinScheduler scheduler = new RoundRobinScheduler();
-
-    // When:
-    scheduler.register(chain, false);
-    scheduler.onDataAvailable(MAILBOX_2);
-
-    // Then:
-    Assert.assertTrue(scheduler.hasNext());
-    Assert.assertEquals(scheduler.next(), chain);
-    Assert.assertEquals(scheduler._seenMail.size(), 0);
-  } */
 }

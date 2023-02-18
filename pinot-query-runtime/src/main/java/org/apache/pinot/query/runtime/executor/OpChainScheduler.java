@@ -73,7 +73,7 @@ public interface OpChainScheduler {
       throws InterruptedException;
 
   /**
-   * @return the number of operator chains that are awaiting execution
+   * @return the number of operator chains registered with the scheduler
    */
   int size();
 
