@@ -32,6 +32,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
@@ -172,6 +173,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {
+      LOGGER.error("Caught exception while executing WindowAggregationOperator, returning an error block", e);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
@@ -179,11 +181,11 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private boolean isPartitionByOnlyQuery(List<RexExpression> groupSet, List<RexExpression> orderSet,
       List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection) {
-    if (orderSet == null || orderSet.isEmpty()) {
+    if (CollectionUtils.isEmpty(orderSet)) {
       return true;
     }
 
-    if (groupSet == null || groupSet.isEmpty() || (groupSet.size() != orderSet.size())) {
+    if (CollectionUtils.isEmpty(groupSet) || (groupSet.size() != orderSet.size())) {
       return false;
     }
 

@@ -184,6 +184,11 @@
         ]
       },
       {
+        "description": "Single empty OVER() with select col and filter which matches no rows",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER() FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200",
+        "outputs": []
+      },
+      {
         "description": "Single empty OVER() with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER() FROM {tbl} WHERE string_col IN ('b', 'c')",
         "outputs": [
@@ -280,6 +285,20 @@
           [101, 101, 398],
           [150, 300, 398]
         ]
+      },
+      {
+        "description": "Single empty OVER() with select col, agg col and group by with a filter",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER() FROM {tbl} WHERE int_col < 100 GROUP BY int_col",
+        "outputs": [
+          [2, 6, 47],
+          [3, 9, 47],
+          [42, 252, 47]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with select col, agg col and group by with a filter that matches no rows",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER() FROM {tbl} WHERE int_col > 200 GROUP BY int_col",
+        "outputs": []
       },
       {
         "description": "Multiple empty OVER()s",
@@ -439,6 +458,11 @@
         ]
       },
       {
+        "description": "Multiple empty OVER()s with select col and filter that matches no rows",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(), MIN(double_col) OVER() FROM {tbl} WHERE string_col = 'a' AND bool_col != false AND int_col > 200",
+        "outputs": []
+      },
+      {
         "description": "Multiple empty OVER()s with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER(), AVG(double_col) OVER() FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
         "outputs": [
@@ -555,6 +579,19 @@
           [300, 300, 972.54, 97.25399999999999],
           [400, 800, 972.54, 97.25399999999999]
         ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col, agg col and group by with a filter",
+        "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(), AVG({tbl}.double_col) OVER() FROM {tbl} WHERE double_col > 100 GROUP BY double_col",
+        "outputs": [
+          [300, 300, 700, 350],
+          [400, 800, 700, 350]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col, agg col and group by with a filter that matches no rows",
+        "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(), AVG({tbl}.double_col) OVER() FROM {tbl} WHERE double_col > 500 GROUP BY double_col",
+        "outputs": []
       }
     ]
   },
@@ -789,6 +826,11 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY) with select col and filter that matches no rows",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col) FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200",
+        "outputs": []
+      },
+      {
         "description": "Single OVER(PARTITION BY) with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col) FROM {tbl} WHERE string_col IN ('b', 'c')",
         "outputs": [
@@ -904,6 +946,19 @@
           [100, 100, 100],
           [150, 300, 150]
         ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col, agg col and group by with a filter",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} WHERE int_col >= 100 GROUP BY int_col",
+        "outputs": [
+          [100, 100, 100],
+          [150, 300, 150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col, agg col and group by with a filter that matches no rows",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} WHERE int_col > 200 GROUP BY int_col",
+        "outputs": []
       },
       {
         "description": "Multiple OVER(PARTITION BY)s",
