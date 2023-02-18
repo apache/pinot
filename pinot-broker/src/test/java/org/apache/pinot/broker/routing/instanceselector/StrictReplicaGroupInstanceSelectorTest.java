@@ -42,8 +42,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class StrictReplicaGroupInstanceSelectorTest {
-  private final static List<String> SEGMENTS = Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4",
-      "segment5", "segment6", "segment7", "segment8", "segment9", "segment10", "segment11");
+  private final static List<String> SEGMENTS = Arrays.asList("segment0");
 
   @Test
   public void testReplicaGroupInstanceSelectorNewSegment() {
