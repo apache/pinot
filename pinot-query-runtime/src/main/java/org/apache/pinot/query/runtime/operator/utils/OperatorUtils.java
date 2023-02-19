@@ -31,6 +31,10 @@ import org.slf4j.LoggerFactory;
 
 
 public class OperatorUtils {
+  public static final String NUM_BLOCKS = "numBlocks";
+  public static final String NUM_ROWS = "numRows";
+  public static final String WALL_TIME = "wallTime";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(OperatorUtils.class);
   private static final Map<String, String> OPERATOR_TOKEN_MAPPING = new HashMap<>();
 

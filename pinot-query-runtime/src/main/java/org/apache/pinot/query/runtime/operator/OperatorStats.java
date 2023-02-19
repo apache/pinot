@@ -22,6 +22,8 @@ import com.google.common.base.Stopwatch;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+
 
 public class OperatorStats {
   private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
@@ -65,6 +67,9 @@ public class OperatorStats {
   }
 
   public Map<String, String> getExecutionStats() {
+    _executionStats.put(OperatorUtils.NUM_BLOCKS, String.valueOf(_numBlock));
+    _executionStats.put(OperatorUtils.NUM_ROWS, String.valueOf(_numRows));
+    _executionStats.put(OperatorUtils.WALL_TIME, String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
     return _executionStats;
   }
 
