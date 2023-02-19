@@ -22,7 +22,9 @@ import com.google.common.base.Joiner;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
@@ -38,13 +40,15 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   // TODO: Move to OperatorContext class.
   protected final long _requestId;
   protected final int _stageId;
+  protected final VirtualServerAddress _serverAddress;
   protected final OperatorStats _operatorStats;
   protected final Map<String, OperatorStats> _operatorStatsMap;
 
-  public MultiStageOperator(long requestId, int stageId) {
+  public MultiStageOperator(long requestId, int stageId, @Nullable VirtualServerAddress serverAddress) {
     _requestId = requestId;
     _stageId = stageId;
     _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _serverAddress = serverAddress;
     _operatorStatsMap = new HashMap<>();
   }
 
@@ -70,7 +74,12 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
           }
 
           if (!_operatorStats.getExecutionStats().isEmpty()) {
-            String operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId);
+            String operatorId;
+            if (_serverAddress != null) {
+               operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId, _serverAddress);
+            } else {
+               operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId);
+            }
             _operatorStatsMap.put(operatorId, _operatorStats);
           }
           return TransferableBlockUtils.getEndOfStreamTransferableBlock(

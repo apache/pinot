@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -108,6 +109,37 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     Preconditions.checkNotNull(mailboxReceiveOperator);
     return QueryDispatcher.toResultTable(
         QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS),
+        queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
+  }
+
+  protected List<Object[]> queryRunner(String sql, ExecutionStatsAggregator executionStatsAggregator) {
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    Map<String, String> requestMetadataMap =
+        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()),
+            QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
+            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    MailboxReceiveOperator mailboxReceiveOperator = null;
+    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
+      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
+        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
+        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
+            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
+            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)), reduceNode.getSenderStageId(),
+            reduceNode.getStageId(), reduceNode.getDataSchema(),
+            new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
+            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
+      } else {
+        for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
+          DistributedStagePlan distributedStagePlan =
+              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance.getServer()).processQuery(distributedStagePlan, requestMetadataMap);
+        }
+      }
+    }
+    Preconditions.checkNotNull(mailboxReceiveOperator);
+    return QueryDispatcher.toResultTable(
+        QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS,
+            executionStatsAggregator),
         queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
   }
 

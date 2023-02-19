@@ -82,7 +82,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int senderStageId,
       int receiverStageId) {
-    super(jobId, senderStageId);
+    super(jobId, senderStageId, null);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
     List<MailboxIdentifier> receivingMailboxes;

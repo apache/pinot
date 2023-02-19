@@ -80,7 +80,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
       List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType, VirtualServerAddress receiver,
       long jobId, int senderStageId, int receiverStageId, Long timeoutMs) {
-    super(jobId, senderStageId);
+    super(jobId, senderStageId, receiver);
     _mailboxService = mailboxService;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
@@ -165,6 +165,15 @@ public class MailboxReceiveOperator extends MultiStageOperator {
             } else {
               if (!block.getResultMetadata().isEmpty()) {
                 _operatorStatsMap.putAll(block.getResultMetadata());
+//                for(String operatorId: block.getResultMetadata().keySet()) {
+//                  //TODO: Remove this hack!
+//                  if (!operatorId.contains("serverId")) {
+//                    _operatorStatsMap.put(operatorId + "_serverId" + mailboxId.getFromHost(),
+//                        block.getResultMetadata().get(operatorId));
+//                  } else {
+//                    _operatorStatsMap.put(operatorId, block.getResultMetadata().get(operatorId));
+//                  }
+//                }
               }
               eosMailboxCount++;
             }

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -127,29 +128,11 @@ public class QueryDispatcher {
   }
 
   public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs) {
-    List<DataBlock> resultDataBlocks = new ArrayList<>();
-    TransferableBlock transferableBlock;
-    long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
-    while (System.nanoTime() < timeoutWatermark) {
-      transferableBlock = mailboxReceiveOperator.nextBlock();
-      if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
-        // TODO: we only received bubble up error from the execution stage tree.
-        // TODO: query dispatch should also send cancel signal to the rest of the execution stage tree.
-        throw new RuntimeException(
-            "Received error query execution result block: " + transferableBlock.getDataBlock().getExceptions());
-      }
-      if (transferableBlock.isNoOpBlock()) {
-        continue;
-      } else if (transferableBlock.isEndOfStreamBlock()) {
-        return resultDataBlocks;
-      }
-      resultDataBlocks.add(transferableBlock.getDataBlock());
-    }
-    throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
+    return reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, null);
   }
 
   public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
-      ExecutionStatsAggregator executionStatsAggregator) {
+      @Nullable ExecutionStatsAggregator executionStatsAggregator) {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
     long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
@@ -164,10 +147,12 @@ public class QueryDispatcher {
       if (transferableBlock.isNoOpBlock()) {
         continue;
       } else if (transferableBlock.isEndOfStreamBlock()) {
-        for (Map.Entry<String, OperatorStats> entry : transferableBlock.getResultMetadata().entrySet()) {
-          LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
-              OperatorUtils.operatorStatsToJson(entry.getValue()));
-          executionStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+        if (executionStatsAggregator != null) {
+          for (Map.Entry<String, OperatorStats> entry : transferableBlock.getResultMetadata().entrySet()) {
+            LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
+                OperatorUtils.operatorStatsToJson(entry.getValue()));
+            executionStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+          }
         }
         return resultDataBlocks;
       }
