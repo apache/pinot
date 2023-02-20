@@ -572,15 +572,15 @@ public class TablesResource {
             recordsLagMap.put(k, v.getRecordsLag());
             availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
-          @Deprecated Map<String, String> partitiionToOffsetMap =
+          @Deprecated Map<String, String> partitionToOffsetMap =
               realtimeSegmentDataManager.getPartitionToCurrentOffset();
           segmentConsumerInfoList.add(
               new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
                   realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
-                  partitiionToOffsetMap,
+                  partitionToOffsetMap,
                   new SegmentConsumerInfo.PartitionOffsetInfo(
-                      partitiionToOffsetMap,
+                      partitionToOffsetMap,
                       partitionStateMap.entrySet().stream().collect(
                           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
                       ), recordsLagMap, availabilityLagMsMap)));
