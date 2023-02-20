@@ -69,7 +69,8 @@ public class OperatorStats {
   public Map<String, String> getExecutionStats() {
     _executionStats.put(OperatorUtils.NUM_BLOCKS, String.valueOf(_numBlock));
     _executionStats.put(OperatorUtils.NUM_ROWS, String.valueOf(_numRows));
-    _executionStats.put(OperatorUtils.WALL_TIME, String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
+    _executionStats.put(OperatorUtils.THREAD_EXECUTION_TIME,
+        String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
     return _executionStats;
   }
 
