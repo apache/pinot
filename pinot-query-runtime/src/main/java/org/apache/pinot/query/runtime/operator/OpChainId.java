@@ -23,16 +23,18 @@ import java.util.Objects;
 
 public class OpChainId {
   final long _requestId;
+  final int _virtualServerId;
   final int _stageId;
 
-  public OpChainId(long requestId, int stageId) {
+  public OpChainId(long requestId, int virtualServerId, int stageId) {
     _requestId = requestId;
+    _virtualServerId = virtualServerId;
     _stageId = stageId;
   }
 
   @Override
   public String toString() {
-    return String.format("%s_%s", _requestId, _stageId);
+    return String.format("%s_%s_%s", _requestId, _virtualServerId, _stageId);
   }
 
   @Override
@@ -44,11 +46,12 @@ public class OpChainId {
       return false;
     }
     OpChainId opChainId = (OpChainId) o;
-    return _requestId == opChainId._requestId && _stageId == opChainId._stageId;
+    return _requestId == opChainId._requestId && _virtualServerId == opChainId._virtualServerId
+        && _stageId == opChainId._stageId;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_requestId, _stageId);
+    return Objects.hash(_requestId, _virtualServerId, _stageId);
   }
 }

@@ -112,7 +112,6 @@ public class QueryServerEnclosure {
   public void start()
       throws Exception {
     PinotConfiguration configuration = new PinotConfiguration(_runnerConfig);
-    _queryRunner = new QueryRunner();
     _queryRunner.init(configuration, _instanceDataManager, _helixManager, mockServiceMetrics());
     _queryRunner.start();
   }

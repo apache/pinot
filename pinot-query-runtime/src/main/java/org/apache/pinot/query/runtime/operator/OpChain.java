@@ -36,10 +36,11 @@ public class OpChain implements AutoCloseable {
   private final OpChainStats _stats;
   private final OpChainId _id;
 
-  public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
+  public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, int virtualServerId,
+      long requestId, int stageId) {
     _root = root;
     _receivingMailbox = new HashSet<>(receivingMailboxes);
-    _id = new OpChainId(requestId, stageId);
+    _id = new OpChainId(requestId, virtualServerId, stageId);
     _stats = new OpChainStats(_id.toString());
   }
 

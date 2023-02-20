@@ -113,7 +113,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
           LOGGER.warn("Thread={} interrupted. Scheduler may be shutting down.", AVAILABLE_RELEASE_THREAD_NAME);
           break;
         }
-        if (_ticker.get() + _releaseTimeoutMs > entry.getValue()) {
+        if (_ticker.get() > entry.getValue()) {
           timedOutWaiting.add(entry.getKey());
         }
       }
@@ -133,6 +133,8 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public void register(OpChain operatorChain) {
+    Preconditions.checkState(!_aliveChains.containsKey(operatorChain.getId()),
+        String.format("Tried to re-register op-chain: %s", operatorChain.getId()));
     _lock.lock();
     try {
       _aliveChains.put(operatorChain.getId(), operatorChain);
@@ -145,12 +147,15 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public void deregister(OpChain operatorChain) {
+    Preconditions.checkState(_aliveChains.containsKey(operatorChain.getId()),
+        "Tried to de-register an un-registered op-chain");
     _lock.lock();
     try {
-      _aliveChains.remove(operatorChain.getId());
+      OpChainId chainId = operatorChain.getId();
+      _aliveChains.remove(chainId);
       // it could be that the onDataAvailable callback was called when the OpChain was executing, in which case there
       // could be a dangling entry in _seenMail.
-      _seenMail.remove(operatorChain.getId());
+      _seenMail.remove(chainId);
     } finally {
       _lock.unlock();
     }
@@ -178,7 +183,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
   public void onDataAvailable(MailboxIdentifier mailbox) {
     // TODO: Should we add an API in MailboxIdentifier to get the requestId?
     OpChainId opChainId = new OpChainId(Long.parseLong(mailbox.getJobId().split("_")[0]),
-        mailbox.getReceiverStageId());
+        mailbox.getToHost().virtualId(), mailbox.getReceiverStageId());
     // If this chain isn't alive as per the scheduler, don't do anything. If the OpChain is registered after this, it
     // will anyways be scheduled to run since new OpChains are run immediately.
     if (!_aliveChains.containsKey(opChainId)) {
