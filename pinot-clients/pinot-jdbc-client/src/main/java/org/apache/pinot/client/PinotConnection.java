@@ -26,12 +26,12 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
-import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +48,7 @@ public class PinotConnection extends AbstractBaseConnection {
   private boolean _closed;
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
-  private final HashMap<String, Boolean> _queryOptions = new HashMap<String, Boolean>();
+  private final Map<String, Boolean> _queryOptions = new HashMap<String, Boolean>();
 
   public static final String BROKER_LIST = "brokers";
 
@@ -83,15 +83,8 @@ public class PinotConnection extends AbstractBaseConnection {
     return _session;
   }
 
-  protected String enableQueryOptions(String sql) {
-    StringBuilder optionsBuilder = new StringBuilder();
-    for (HashMap.Entry<String, Boolean> optionEntry: _queryOptions.entrySet()) {
-      if (optionEntry.getValue() && !sql.contains(optionEntry.getKey())) {
-        optionsBuilder.append(DriverUtils.createSetQueryOptionString(optionEntry.getKey()));
-      }
-    }
-    optionsBuilder.append(sql);
-    return optionsBuilder.toString();
+  public Map<String, Boolean> getQueryOptions() {
+    return _queryOptions;
   }
 
   private List<String> getBrokerList(String controllerURL, String tenant) {

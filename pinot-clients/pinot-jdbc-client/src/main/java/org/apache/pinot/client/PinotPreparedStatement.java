@@ -51,7 +51,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
     if (!DriverUtils.queryContainsLimitStatement(_query)) {
       _query += " " + LIMIT_STATEMENT + " " + _maxRows;
     }
-    _query = _connection.enableQueryOptions(_query);
+    _query = DriverUtils.enableQueryOptions(_query, _connection.getQueryOptions());
     _preparedStatement = new PreparedStatement(_session, _query);
   }
 
@@ -177,7 +177,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
       throws SQLException {
     validateState();
     try {
-      _resultSetGroup = _session.execute(_connection.enableQueryOptions(sql));
+      _resultSetGroup = _session.execute(DriverUtils.enableQueryOptions(sql, _connection.getQueryOptions()));
       if (_resultSetGroup.getResultSetCount() == 0) {
         _resultSet = PinotResultSet.empty();
         return _resultSet;

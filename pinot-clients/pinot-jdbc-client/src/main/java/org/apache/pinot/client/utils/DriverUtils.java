@@ -218,6 +218,17 @@ public class DriverUtils {
     return matcher.find();
   }
 
+  public static String enableQueryOptions(String sql, Map<String, Boolean> options) {
+    StringBuilder optionsBuilder = new StringBuilder();
+    for (Map.Entry<String, Boolean> optionEntry: options.entrySet()) {
+      if (optionEntry.getValue() && !sql.contains(optionEntry.getKey())) {
+        optionsBuilder.append(DriverUtils.createSetQueryOptionString(optionEntry.getKey()));
+      }
+    }
+    optionsBuilder.append(sql);
+    return optionsBuilder.toString();
+  }
+
   public static String createSetQueryOptionString(String queryOption) {
     return "SET " + queryOption + "=true;\n";
   }
