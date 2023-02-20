@@ -120,6 +120,9 @@ public class DictionaryIndexType
   public IndexDeclaration<DictionaryIndexConfig> deserializeSpreadConf(
       TableConfig tableConfig, Schema schema, String column) {
     IndexingConfig ic = tableConfig.getIndexingConfig();
+    if (ic == null) {
+      return IndexDeclaration.notDeclared(DictionaryIndexType.INSTANCE);
+    }
     boolean isNoDictionary = ic.getNoDictionaryColumns() != null && ic.getNoDictionaryColumns().contains(column);
     if (isNoDictionary) {
       return IndexDeclaration.declaredDisabled();
@@ -135,7 +138,12 @@ public class DictionaryIndexType
     boolean isVarLength = ic.getVarLengthDictionaryColumns() != null
         && ic.getVarLengthDictionaryColumns().contains(column);
 
-    return IndexDeclaration.declared(new DictionaryIndexConfig(isOnHeap, isVarLength));
+    DictionaryIndexConfig config = new DictionaryIndexConfig(isOnHeap, isVarLength);
+
+    if (ic.getOnHeapDictionaryColumns() != null || ic.getVarLengthDictionaryColumns() != null) {
+      return IndexDeclaration.declared(config);
+    }
+    return IndexDeclaration.notDeclared(config);
   }
 
   @Override

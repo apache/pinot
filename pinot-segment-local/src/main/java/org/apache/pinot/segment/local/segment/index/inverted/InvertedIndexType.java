@@ -87,6 +87,9 @@ public class InvertedIndexType
   @Override
   public IndexDeclaration<EmptyIndexConf> deserializeSpreadConf(TableConfig tableConfig, Schema schema, String column) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig == null) {
+      return IndexDeclaration.notDeclared(this);
+    }
     List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
     if (invertedIndexColumns == null) {
       return IndexDeclaration.notDeclared(this);

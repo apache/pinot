@@ -44,6 +44,7 @@ import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -81,12 +82,16 @@ public class JsonIndexType implements IndexType<JsonIndexConfig, JsonIndexReader
   @Override
   public IndexDeclaration<JsonIndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema,
       String column) {
-    Map<String, JsonIndexConfig> jsonFilterConfigs = tableConfig.getIndexingConfig().getJsonIndexConfigs();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig == null) {
+      return IndexDeclaration.notDeclared(this);
+    }
+    Map<String, JsonIndexConfig> jsonFilterConfigs = indexingConfig.getJsonIndexConfigs();
 
     if (jsonFilterConfigs != null && jsonFilterConfigs.containsKey(column)) {
       return IndexDeclaration.declared(jsonFilterConfigs.get(column));
     }
-    List<String> jsonIndexColumns = tableConfig.getIndexingConfig().getJsonIndexColumns();
+    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
     if (jsonIndexColumns == null) {
       return IndexDeclaration.notDeclared(this);
     }

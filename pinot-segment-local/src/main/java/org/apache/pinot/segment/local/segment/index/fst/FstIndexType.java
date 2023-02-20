@@ -108,7 +108,9 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
     if (!fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.FST)) {
       return IndexDeclaration.notDeclared(this);
     }
-    FSTType fstIndexType = tableConfig.getIndexingConfig().getFSTIndexType();
+    FSTType fstIndexType = tableConfig.getIndexingConfig() != null
+        ? tableConfig.getIndexingConfig().getFSTIndexType()
+        : null;
     FstIndexConfig conf = new FstIndexConfig(fstIndexType);
     return IndexDeclaration.declared(conf);
   }

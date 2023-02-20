@@ -47,6 +47,7 @@ import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -111,11 +112,15 @@ public class RangeIndexType implements IndexType<RangeIndexConfig, RangeIndexRea
   @Override
   public IndexDeclaration<RangeIndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema,
       String column) {
-    int rangeVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig == null) {
+      return IndexDeclaration.notDeclared(this);
+    }
+    int rangeVersion = indexingConfig.getRangeIndexVersion();
     if (rangeVersion == 0) {
       rangeVersion = DEFAULT_RANGE_INDEX_VERSION;
     }
-    List<String> rangeIndexColumns = tableConfig.getIndexingConfig().getRangeIndexColumns();
+    List<String> rangeIndexColumns = indexingConfig.getRangeIndexColumns();
     if (rangeIndexColumns == null) {
       return IndexDeclaration.notDeclared(this);
     }

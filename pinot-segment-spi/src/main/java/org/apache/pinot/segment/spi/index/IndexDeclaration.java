@@ -50,6 +50,14 @@ public class IndexDeclaration<C> {
     }
   }
 
+  public static <C> IndexDeclaration<C> notDeclared(C defaultConfig) {
+    return new IndexDeclaration<>(false, defaultConfig);
+  }
+
+  public static <C> IndexDeclaration<C> notDeclaredDisabled() {
+    return (IndexDeclaration<C>) DEFAULT_DISABLED;
+  }
+
   public static <C> IndexDeclaration<C> declaredDisabled() {
     return (IndexDeclaration<C>) DECLARED_DISABLED;
   }

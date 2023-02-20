@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -65,7 +66,11 @@ public class NullValueIndexType implements IndexType<EmptyIndexConf, NullValueVe
 
   @Override
   public IndexDeclaration<EmptyIndexConf> deserializeSpreadConf(TableConfig tableConfig, Schema schema, String column) {
-    return tableConfig.getIndexingConfig().isNullHandlingEnabled()
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig == null) {
+      return IndexDeclaration.notDeclared(this);
+    }
+    return indexingConfig.isNullHandlingEnabled()
         ? IndexDeclaration.declared(EmptyIndexConf.INSTANCE)
         : IndexDeclaration.notDeclared(this);
   }

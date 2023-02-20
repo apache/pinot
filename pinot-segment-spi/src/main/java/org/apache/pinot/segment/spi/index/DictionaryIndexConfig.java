@@ -20,6 +20,8 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
 import javax.annotation.Nullable;
 
 
@@ -31,7 +33,8 @@ public class DictionaryIndexConfig {
   private final boolean _useVarLengthDictionary;
 
   @JsonCreator
-  public DictionaryIndexConfig(boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
+  public DictionaryIndexConfig(@JsonProperty("onHeap") boolean onHeap,
+      @JsonProperty("useVarLengthDictionary") @Nullable Boolean useVarLengthDictionary) {
     _onHeap = onHeap;
     _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);
   }
@@ -42,5 +45,28 @@ public class DictionaryIndexConfig {
 
   public boolean getUseVarLengthDictionary() {
     return _useVarLengthDictionary;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    DictionaryIndexConfig that = (DictionaryIndexConfig) o;
+    return _onHeap == that._onHeap && _useVarLengthDictionary == that._useVarLengthDictionary;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_onHeap, _useVarLengthDictionary);
+  }
+
+  @Override
+  public String toString() {
+    return "DictionaryIndexConfig{" + "\"onHeap\":" + _onHeap + ", \"useVarLengthDictionary\":"
+        + _useVarLengthDictionary + "}";
   }
 }
