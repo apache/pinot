@@ -213,8 +213,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public OpChain next(long time, TimeUnit timeUnit) throws InterruptedException {
-    OpChain op = _ready.poll(time, timeUnit);
-    return op;
+    return _ready.poll(time, timeUnit);
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.executor;
 
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -69,6 +70,7 @@ public interface OpChainScheduler {
    *         given time.
    * @throws InterruptedException if the wait for a ready OpChain was interrupted.
    */
+  @Nullable
   OpChain next(long time, TimeUnit timeUnit)
       throws InterruptedException;
 
