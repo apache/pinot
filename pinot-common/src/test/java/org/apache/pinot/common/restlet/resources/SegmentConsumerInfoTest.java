@@ -20,13 +20,12 @@
 
 package org.apache.pinot.common.restlet.resources;
 
+import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.testng.annotations.Test;
-
-import java.util.Collections;
-import java.util.Map;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
