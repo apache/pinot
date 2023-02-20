@@ -176,6 +176,7 @@ public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
+  private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 10;
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
   private static final String API_REQUEST_ID_PREFIX = "api-";
@@ -3433,15 +3434,11 @@ public class PinotHelixResourceManager {
   public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId) {
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
-        // Fetch the segment lineage metadata
-        ZNRecord segmentLineageZNRecord =
-            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
-        Preconditions.checkState(segmentLineageZNRecord != null, "Failed to find segment lineage for table: %s",
+        // Fetch the segment lineage and look up the lineage entry based on the entry id.
+        SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+        Preconditions.checkState(segmentLineage != null, "Failed to find segment lineage for table: %s",
             tableNameWithType);
-        SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
-        int expectedVersion = segmentLineageZNRecord.getVersion();
 
-        // Look up the lineage entry based on the segment lineage entry id
         LineageEntry lineageEntry = segmentLineage.getLineageEntry(segmentLineageEntryId);
         Preconditions.checkState(lineageEntry != null, "Failed to find entry id: %s from segment lineage for table: %s",
             segmentLineageEntryId, tableNameWithType);
@@ -3474,13 +3471,12 @@ public class PinotHelixResourceManager {
         }
 
         // Update lineage entry
-        LineageEntry newLineageEntry =
+        LineageEntry lineageEntryToUpdate =
             new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsTo, LineageEntryState.COMPLETED,
                 System.currentTimeMillis());
-        segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
 
-        // Write back to the lineage entry
-        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+        if (writeLineageEntryWithTightLoop(tableNameWithType, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
+            _propertyStore)) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
@@ -3584,12 +3580,12 @@ public class PinotHelixResourceManager {
         }
 
         // Update segment lineage entry to 'REVERTED'
-        segmentLineage.updateLineageEntry(segmentLineageEntryId,
+        LineageEntry lineageEntryToUpdate =
             new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
-                System.currentTimeMillis()));
+                System.currentTimeMillis());
 
-        // Write back to the lineage entry
-        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+        if (writeLineageEntryWithTightLoop(tableNameWithType, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
+            _propertyStore)) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
@@ -3601,6 +3597,7 @@ public class PinotHelixResourceManager {
           }
           return true;
         } else {
+          LOGGER.warn("Failed to write segment lineage for table: {}", tableNameWithType);
           return false;
         }
       });
@@ -3614,6 +3611,46 @@ public class PinotHelixResourceManager {
     // Only successful attempt can reach here
     LOGGER.info("revertReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
         tableNameWithType, segmentLineageEntryId);
+  }
+
+  /**
+   * Update the lineage entry with the tight loop to increase the chance for successful ZK write.
+   *
+   * @param tableNameWithType table name with type
+   * @param lineageEntryId lineage entry id
+   * @param lineageEntryToUpdate lineage entry that needs to be updated
+   * @param lineageEntryToMatch lineage entry that needs to match with the entry from the newly fetched segment lineage.
+   * @param propertyStore property store
+   */
+  private boolean writeLineageEntryWithTightLoop(String tableNameWithType, String lineageEntryId,
+      LineageEntry lineageEntryToUpdate, LineageEntry lineageEntryToMatch,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    for (int i = 0; i < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; i++) {
+      // Fetch the segment lineage
+      ZNRecord segmentLineageToUpdateZNRecord =
+          SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore, tableNameWithType);
+      int expectedVersion = segmentLineageToUpdateZNRecord.getVersion();
+      SegmentLineage segmentLineageToUpdate = SegmentLineage.fromZNRecord(segmentLineageToUpdateZNRecord);
+      LineageEntry currentLineageEntry = segmentLineageToUpdate.getLineageEntry(lineageEntryId);
+
+      // If the lineage entry doesn't match with the previously fetched lineage, we need to fail the request.
+      if (!currentLineageEntry.equals(lineageEntryToMatch)) {
+        String errorMsg = String.format(
+            "Aborting the to update lineage entry since we find that the entry has been modified for table %s, "
+                + "entry id: %s", tableNameWithType, lineageEntryId);
+        LOGGER.error(errorMsg);
+        throw new RuntimeException(errorMsg);
+      }
+
+      // Update lineage entry
+      segmentLineageToUpdate.updateLineageEntry(lineageEntryId, lineageEntryToUpdate);
+
+      // Write back to the lineage entry
+      if (SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineageToUpdate, expectedVersion)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean waitForSegmentsBecomeOnline(String tableNameWithType, List<String> segmentsToCheck)
