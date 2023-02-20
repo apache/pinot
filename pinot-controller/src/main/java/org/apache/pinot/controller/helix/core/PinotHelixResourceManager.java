@@ -1926,6 +1926,9 @@ public class PinotHelixResourceManager {
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore, offlineTableName);
     LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
 
+    // Remove tier instance partitions
+
+
     // Remove segment lineage
     SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, offlineTableName);
     LOGGER.info("Deleting table {}: Removed segment lineage", offlineTableName);

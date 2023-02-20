@@ -555,6 +555,14 @@ public class TableRebalancer {
             tier.getName(), storage.getServerTag());
 
     if (tier.getInstanceAssignmentConfig() == null) {
+      LOGGER.info("Skipping fetching/computing instance partitions for tier {} for table: {}", tier.getName(),
+          tableConfig.getTableName());
+      if (!dryRun) {
+        String instancePartitionsName =
+            InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(), tier.getName());
+        LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
+        InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
+      }
       return defaultInstancePartitions;
     }
 
