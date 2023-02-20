@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +53,13 @@ public class SortOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
+
+  public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
+      PlanRequestContext context) {
+    this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema, context.getRequestId(),
+        context.getStageId());
+  }
 
   public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,

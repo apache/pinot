@@ -29,6 +29,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,11 @@ public class FilterOperator extends MultiStageOperator {
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
+
+  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
+      PlanRequestContext context) {
+    this(upstreamOperator, dataSchema, filter, context.getRequestId(), context.getStageId());
+  }
 
   public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
       long requestId, int stageId) {

@@ -30,6 +30,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,11 @@ public class TransformOperator extends MultiStageOperator {
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
+
+  public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
+      List<RexExpression> transforms, DataSchema upstreamDataSchema, PlanRequestContext context) {
+    this(upstreamOperator, resultSchema, transforms, upstreamDataSchema, context.getRequestId(), context.getStageId());
+  }
 
   public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema, long requestId, int stageId) {

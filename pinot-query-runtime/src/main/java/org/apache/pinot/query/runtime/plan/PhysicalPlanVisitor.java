@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.List;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -32,7 +30,6 @@ import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
-import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
@@ -63,11 +60,9 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   @Override
   public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
-    List<VirtualServer> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
     MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
-            node.getExchangeType(), context.getServer(),
-            context.getRequestId(), node.getSenderStageId(), node.getStageId(), context.getTimeoutMs());
+        new MailboxReceiveOperator(
+            node.getExchangeType(), node.getSenderStageId(), node.getStageId(), context);
     context.addReceivingMailboxes(mailboxReceiveOperator.getSendingMailbox());
     return mailboxReceiveOperator;
   }
@@ -75,17 +70,15 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   @Override
   public MultiStageOperator visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
-    return new MailboxSendOperator(context.getMailboxService(), nextOperator,
-        receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getServer(), context.getRequestId(), node.getStageId(), node.getReceiverStageId());
+    return new MailboxSendOperator(nextOperator, node.getExchangeType(), node.getPartitionKeySelector(),
+        node.getStageId(), node.getReceiverStageId(), context);
   }
 
   @Override
   public MultiStageOperator visitAggregate(AggregateNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
-        node.getGroupSet(), node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId);
+        node.getGroupSet(), node.getInputs().get(0).getDataSchema(), context);
   }
 
   @Override
@@ -97,8 +90,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   @Override
   public MultiStageOperator visitFilter(FilterNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition(), context.getRequestId(),
-        context.getStageId());
+    return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition(), context);
   }
 
   @Override
@@ -109,22 +101,21 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MultiStageOperator leftOperator = left.visit(this, context);
     MultiStageOperator rightOperator = right.visit(this, context);
 
-    return new HashJoinOperator(leftOperator, rightOperator, left.getDataSchema(), node, context.getRequestId(),
-        context.getStageId());
+    return new HashJoinOperator(leftOperator, rightOperator, left.getDataSchema(), node, context);
   }
 
   @Override
   public MultiStageOperator visitProject(ProjectNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(nextOperator, node.getDataSchema(), node.getProjects(),
-        node.getInputs().get(0).getDataSchema(), context.getRequestId(), context.getStageId());
+        node.getInputs().get(0).getDataSchema(), context);
   }
 
   @Override
   public MultiStageOperator visitSort(SortNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new SortOperator(nextOperator, node.getCollationKeys(), node.getCollationDirections(),
-        node.getFetch(), node.getOffset(), node.getDataSchema(), context.getRequestId(), context.getStageId());
+        node.getFetch(), node.getOffset(), node.getDataSchema(), context);
   }
 
   @Override
@@ -134,7 +125,6 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   @Override
   public MultiStageOperator visitValue(ValueNode node, PlanRequestContext context) {
-    return new LiteralValueOperator(node.getDataSchema(), node.getLiteralRows(), context.getRequestId(),
-        context.getStageId());
+    return new LiteralValueOperator(node.getDataSchema(), node.getLiteralRows(), context);
   }
 }

@@ -38,6 +38,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
@@ -75,6 +76,12 @@ public class AggregateOperator extends MultiStageOperator {
 
   private boolean _readyToConstruct;
   private boolean _hasReturnedAggregateBlock;
+
+  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
+      List<RexExpression> groupSet, DataSchema inputSchema, PlanRequestContext context) {
+    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS,
+        context.getRequestId(), context.getStageId());
+  }
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   // aggCalls has to be a list of FunctionCall and cannot be null
