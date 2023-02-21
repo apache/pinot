@@ -109,10 +109,17 @@ public class CalciteSqlParser {
 
   public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
       throws SqlCompilationException {
+    return compileToSqlNodeAndOptions(sql, true);
+  }
+
+  public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql, boolean isRemoveComments)
+      throws SqlCompilationException {
     long parseStartTimeNs = System.nanoTime();
 
     // Remove the comments from the query
-    sql = removeComments(sql);
+    if (isRemoveComments) {
+      sql = removeComments(sql);
+    }
 
     // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);

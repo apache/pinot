@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.stage;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -28,6 +29,10 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 public class AggregateNode extends AbstractStageNode {
+  public static final RelHint FINAL_STAGE_HINT = RelHint.builder(
+      PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE).build();
+  public static final RelHint INTERMEDIATE_STAGE_HINT = RelHint.builder(
+      PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE).build();
 
   private List<RelHint> _relHints;
   @ProtoProperties
@@ -45,6 +50,14 @@ public class AggregateNode extends AbstractStageNode {
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = groupSet;
     _relHints = relHints;
+  }
+
+  public static boolean isFinalStage(AggregateNode aggNode) {
+    return aggNode.getRelHints().contains(FINAL_STAGE_HINT);
+  }
+
+  public static boolean isIntermediateStage(AggregateNode aggNode) {
+    return aggNode.getRelHints().contains(INTERMEDIATE_STAGE_HINT);
   }
 
   public List<RexExpression> getAggCalls() {
