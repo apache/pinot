@@ -67,7 +67,6 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       TransferableBlock nextBlock = getNextBlock();
       _operatorStats.recordRow(1, nextBlock.getNumRows());
       _operatorStats.endTimer();
-      // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
         if (nextBlock.isSuccessfulEndOfStreamBlock()) {
           for (MultiStageOperator op : getChildOperators()) {

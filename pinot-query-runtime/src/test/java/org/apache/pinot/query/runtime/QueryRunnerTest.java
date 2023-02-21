@@ -163,14 +163,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
       throws Exception {
-    List<Object[]> resultRows = queryRunner(sql);
+    List<Object[]> resultRows = queryRunner(sql, null);
     Assert.assertEquals(resultRows.size(), expectedRows);
   }
 
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
-    List<Object[]> resultRows = queryRunner(sql);
+    List<Object[]> resultRows = queryRunner(sql, null);
     // query H2 for data
     List<Object[]> expectedRows = queryH2(sql);
     compareRowEquals(resultRows, expectedRows);
