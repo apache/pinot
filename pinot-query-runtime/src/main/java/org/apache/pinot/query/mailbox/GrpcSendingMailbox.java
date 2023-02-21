@@ -44,7 +44,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private final MailboxStatusStreamObserver _statusObserver;
 
   public GrpcSendingMailbox(String mailboxId, MailboxStatusStreamObserver statusObserver,
-      Supplier<StreamObserver<MailboxContent>> contentStreamObserverSupplier) {
+      Supplier<StreamObserver<MailboxContent>> contentStreamObserverSupplier, long deadlineMs) {
     _mailboxId = mailboxId;
     _mailboxContentStreamObserverSupplier = contentStreamObserverSupplier;
     _statusObserver = statusObserver;

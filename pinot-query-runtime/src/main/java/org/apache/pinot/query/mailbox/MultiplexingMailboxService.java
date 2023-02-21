@@ -72,11 +72,11 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   @Override
-  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     if (mailboxId.isLocal()) {
-      return _inMemoryMailboxService.getSendingMailbox(mailboxId);
+      return _inMemoryMailboxService.getSendingMailbox(mailboxId, -1);
     }
-    return _grpcMailboxService.getSendingMailbox(mailboxId);
+    return _grpcMailboxService.getSendingMailbox(mailboxId, -1);
   }
 
   @Override

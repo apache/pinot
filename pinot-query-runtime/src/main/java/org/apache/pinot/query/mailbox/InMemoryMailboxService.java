@@ -50,8 +50,7 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
             public void onRemoval(RemovalNotification<String, InMemoryReceivingMailbox> notification) {
               if (notification.wasEvicted()) {
                 if (!notification.getValue().isClaimed()) {
-                  String reason = String.format("Receiving mailbox=%s was never claimed", notification.getKey());
-                  notification.getValue().cancel(new RuntimeException(reason));
+                  notification.getValue().cancel();
                 }
               }
             }
@@ -88,7 +87,7 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return _mailboxPort;
   }
 
-  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
     // for now, we use an unbounded blocking queue as the means of communication between

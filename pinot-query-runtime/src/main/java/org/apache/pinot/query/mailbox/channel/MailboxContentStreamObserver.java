@@ -110,6 +110,10 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     return _isCompleted.get() && _receivingBuffer.isEmpty();
   }
 
+  public boolean isErrored() {
+    return _errorContent != null;
+  }
+
   @Override
   public void onNext(Mailbox.MailboxContent mailboxContent) {
     _mailboxId = JsonMailboxIdentifier.parse(mailboxContent.getMailboxId());

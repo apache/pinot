@@ -108,16 +108,17 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   /**
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
+   * @param deadlineMs
    */
   @Override
-  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     MailboxStatusStreamObserver statusStreamObserver = new MailboxStatusStreamObserver();
 
     GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), statusStreamObserver, () -> {
       ManagedChannel channel = getChannel(mailboxId.toString());
       PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
       return stub.open(statusStreamObserver);
-    });
+    }, deadlineMs);
     return mailbox;
   }
 

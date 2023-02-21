@@ -44,10 +44,10 @@ public abstract class BlockExchange {
 
   public static BlockExchange getExchange(MailboxService<TransferableBlock> mailboxService,
       List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector,
-      BlockSplitter splitter) {
+      BlockSplitter splitter, long deadlineMs) {
     List<SendingMailbox<TransferableBlock>> sendingMailboxes = new ArrayList<>();
     for (MailboxIdentifier mid : destinations) {
-      sendingMailboxes.add(mailboxService.getSendingMailbox(mid));
+      sendingMailboxes.add(mailboxService.getSendingMailbox(mid, -1));
     }
     switch (exchangeType) {
       case SINGLETON:

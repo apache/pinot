@@ -64,7 +64,8 @@ public class MailboxSendOperatorTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_exchangeFactory.build(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+    Mockito.when(_exchangeFactory.build(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
+        Mockito.anyLong()))
         .thenReturn(_exchange);
 
     Mockito.when(_server.getHostname()).thenReturn("mock");
@@ -80,12 +81,13 @@ public class MailboxSendOperatorTest {
 
   @Test
   public void shouldSwallowNoOpBlockFromUpstream() {
+    long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
         RelDistribution.Type.HASH_DISTRIBUTED, _selector,
         server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
             DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, 1, DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID,
-        new VirtualServerAddress(_server));
+        new VirtualServerAddress(_server), deadlineMs);
     Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
 
     // When:
@@ -98,12 +100,13 @@ public class MailboxSendOperatorTest {
 
   @Test
   public void shouldSendErrorBlock() {
+    long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
         RelDistribution.Type.HASH_DISTRIBUTED, _selector,
         server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
             DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, 1, DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID,
-        new VirtualServerAddress(_server));
+        new VirtualServerAddress(_server), deadlineMs);
     TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!"));
     Mockito.when(_input.nextBlock()).thenReturn(errorBlock);
 
@@ -117,12 +120,13 @@ public class MailboxSendOperatorTest {
 
   @Test
   public void shouldSendErrorBlockWhenInputThrows() {
+    long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
         RelDistribution.Type.HASH_DISTRIBUTED, _selector,
         server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
             DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, 1, DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID,
-        new VirtualServerAddress(_server));
+        new VirtualServerAddress(_server), deadlineMs);
     Mockito.when(_input.nextBlock()).thenThrow(new RuntimeException("foo!"));
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
 
@@ -137,12 +141,13 @@ public class MailboxSendOperatorTest {
 
   @Test
   public void shouldSendEosBlock() {
+    long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
         RelDistribution.Type.HASH_DISTRIBUTED, _selector,
         server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
             DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, 1, DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID,
-        new VirtualServerAddress(_server));
+        new VirtualServerAddress(_server), deadlineMs);
     TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
     Mockito.when(_input.nextBlock()).thenReturn(eosBlock);
 
@@ -156,12 +161,13 @@ public class MailboxSendOperatorTest {
 
   @Test
   public void shouldSendDataBlock() {
+    long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
         RelDistribution.Type.HASH_DISTRIBUTED, _selector,
         server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
             DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, 1, DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID,
-        new VirtualServerAddress(_server));
+        new VirtualServerAddress(_server), deadlineMs);
     TransferableBlock dataBlock = block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
     Mockito.when(_input.nextBlock()).thenReturn(dataBlock)
         .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());

@@ -161,6 +161,8 @@ public class QueryRunner {
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
@@ -185,14 +187,13 @@ public class QueryRunner {
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
               sendNode.getStageId(), _rootServer), receivingStageMetadata.getServerInstances(),
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _rootServer, requestId,
-          sendNode.getStageId(), sendNode.getReceiverStageId());
+          sendNode.getStageId(), sendNode.getReceiverStageId(), deadlineMs);
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
       mailboxSendOperator.toExplainString();
     } else {
-      long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
           new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs,

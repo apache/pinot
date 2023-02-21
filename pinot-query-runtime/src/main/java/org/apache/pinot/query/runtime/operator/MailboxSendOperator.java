@@ -59,7 +59,8 @@ public class MailboxSendOperator extends MultiStageOperator {
   @VisibleForTesting
   interface BlockExchangeFactory {
     BlockExchange build(MailboxService<TransferableBlock> mailboxService, List<MailboxIdentifier> destinations,
-        RelDistribution.Type exchange, KeySelector<Object[], Object[]> selector, BlockSplitter splitter);
+        RelDistribution.Type exchange, KeySelector<Object[], Object[]> selector, BlockSplitter splitter,
+        long deadlineMs);
   }
 
   @VisibleForTesting
@@ -70,10 +71,10 @@ public class MailboxSendOperator extends MultiStageOperator {
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      VirtualServerAddress sendingServer, long jobId, int senderStageId, int receiverStageId) {
+      VirtualServerAddress sendingServer, long jobId, int senderStageId, int receiverStageId, long deadlineMs) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
         server -> toMailboxId(server, jobId, senderStageId, receiverStageId, sendingServer), BlockExchange::getExchange,
-        jobId, senderStageId, receiverStageId, sendingServer);
+        jobId, senderStageId, receiverStageId, sendingServer, deadlineMs);
   }
 
   @VisibleForTesting
@@ -81,7 +82,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int senderStageId,
-      int receiverStageId, VirtualServerAddress serverAddress) {
+      int receiverStageId, VirtualServerAddress serverAddress, long deadlineMs) {
     super(jobId, senderStageId, serverAddress);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
@@ -111,7 +112,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
 
     BlockSplitter splitter = TransferableBlockUtils::splitBlock;
-    _exchange = blockExchangeFactory.build(mailboxService, receivingMailboxes, exchangeType, keySelector, splitter);
+    _exchange = blockExchangeFactory.build(mailboxService, receivingMailboxes, exchangeType, keySelector, splitter,
+        deadlineMs);
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
         String.format("Exchange type '%s' is not supported yet", exchangeType));

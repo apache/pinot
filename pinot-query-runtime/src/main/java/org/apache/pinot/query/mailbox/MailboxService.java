@@ -65,9 +65,10 @@ public interface MailboxService<T> {
    * Look up a sending mailbox by {@link MailboxIdentifier}.
    *
    * @param mailboxId mailbox identifier.
+   * @param deadlineMs
    * @return a sending mailbox.
    */
-  SendingMailbox<T> getSendingMailbox(MailboxIdentifier mailboxId);
+  SendingMailbox<T> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs);
 
   void releaseReceivingMailbox(MailboxIdentifier mailboxId);
 }

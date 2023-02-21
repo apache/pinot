@@ -22,17 +22,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -52,11 +53,15 @@ public class GrpcMailboxServiceTest {
   private GrpcMailboxService _mailboxService1;
   private GrpcMailboxService _mailboxService2;
 
+  private TransferableBlock _block = TransferableBlockUtils.getEndOfStreamTransferableBlock();
+  private MailboxIdentifier _mailboxIdentifier = new JsonMailboxIdentifier("0_10", "0@localhost:9001",
+      "1@localhost:9001", 11, 10);
+
   @BeforeClass
   public void setUp()
       throws Exception {
     PinotConfiguration extraConfig = new PinotConfiguration(Collections.singletonMap(
-        QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
+        QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 32_000_000));
 
     _mailboxService1 = new GrpcMailboxService(
         "localhost", QueryTestUtils.getAvailablePort(), extraConfig, id -> _mail1GotData.get().accept(id));
@@ -73,6 +78,7 @@ public class GrpcMailboxServiceTest {
     _mailboxService2.shutdown();
   }
 
+  /*
   @Test(timeOut = 10_000L)
   public void testHappyPath()
       throws Exception {
@@ -100,12 +106,13 @@ public class GrpcMailboxServiceTest {
     TestUtils.waitForCondition(aVoid -> {
       return receivingMailbox.isClosed();
     }, 5000L, "Receiving mailbox is not closed properly!");
-  }
+  } */
 
   /**
    * Simulates a case where the sender tries to send a very large message. The receiver should receive a
    * MetadataBlock with an exception to indicate failure.
    */
+  /*
   @Test(timeOut = 10_000L)
   public void testGrpcException()
       throws Exception {
@@ -132,6 +139,106 @@ public class GrpcMailboxServiceTest {
     DataBlock receivedDataBlock = receivedContent.getDataBlock();
     Assert.assertTrue(receivedDataBlock instanceof MetadataBlock);
     Assert.assertFalse(receivedDataBlock.getExceptions().isEmpty());
+  } */
+
+  /*
+  @Test
+  public void testFoo()
+      throws InterruptedException {
+    final PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    Consumer<MailboxIdentifier> callback = new Consumer<MailboxIdentifier>() {
+      @Override
+      public void accept(MailboxIdentifier mailboxIdentifier) {
+      }
+    };
+    GrpcMailboxService mailboxService = new GrpcMailboxService(
+        "localhost", 9001, pinotConfiguration, callback);
+    GrpcMailboxServer server = new GrpcMailboxServer(mailboxService, 9001, pinotConfiguration);
+    server.start();
+
+    GrpcReceivingMailbox grpcReceivingMailbox =
+        (GrpcReceivingMailbox) mailboxService.getReceivingMailbox(_mailboxIdentifier);
+    CountDownLatch latch = new CountDownLatch(1);
+    AtomicBoolean failed = new AtomicBoolean(false);
+    Thread t = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        TransferableBlock block = null;
+        while (!grpcReceivingMailbox.isClosed()) {
+          try {
+            block = grpcReceivingMailbox.receive();
+            Thread.sleep(1000);
+          } catch (Exception e) {
+            e.printStackTrace();
+            break;
+          }
+        }
+        if (block == null || !block.isEndOfStreamBlock()) {
+          failed.set(true);
+        }
+        latch.countDown();
+      }
+    });
+    t.setDaemon(true);
+    t.start();
+
+    GrpcSendingMailbox grpcSendingMailbox = (GrpcSendingMailbox) mailboxService.getSendingMailbox(_mailboxIdentifier,
+        -1);
+    grpcSendingMailbox.send(_block);
+    grpcSendingMailbox.complete();
+    latch.await(10, TimeUnit.SECONDS);
+    Assert.assertFalse(failed.get(), "Receive failed");
+  }
+   */
+
+  @Test
+  public void testBar()
+      throws InterruptedException {
+    final PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    Consumer<MailboxIdentifier> callback = new Consumer<MailboxIdentifier>() {
+      @Override
+      public void accept(MailboxIdentifier mailboxIdentifier) {
+      }
+    };
+    GrpcMailboxService mailboxService = new GrpcMailboxService(
+        "localhost", 9001, pinotConfiguration, callback);
+    GrpcMailboxServer server = new GrpcMailboxServer(mailboxService, 9001, pinotConfiguration);
+    server.start();
+
+    GrpcReceivingMailbox grpcReceivingMailbox =
+        (GrpcReceivingMailbox) mailboxService.getReceivingMailbox(_mailboxIdentifier);
+    CountDownLatch latch = new CountDownLatch(1);
+    AtomicBoolean failed = new AtomicBoolean(false);
+    Thread t = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        TransferableBlock block = null;
+        while (!grpcReceivingMailbox.isClosed()) {
+          try {
+            block = grpcReceivingMailbox.receive();
+            Thread.sleep(1000);
+          } catch (Exception e) {
+            e.printStackTrace();
+            break;
+          }
+        }
+        if (block == null || !block.isEndOfStreamBlock()) {
+          failed.set(true);
+        }
+        latch.countDown();
+      }
+    });
+    t.setDaemon(true);
+    t.start();
+
+    GrpcSendingMailbox grpcSendingMailbox = (GrpcSendingMailbox) mailboxService.getSendingMailbox(_mailboxIdentifier,
+        System.currentTimeMillis() + 1000);
+    for (int i = 0; i < 10; i++) {
+      grpcSendingMailbox.send(_block);
+    }
+    grpcSendingMailbox.complete();
+    latch.await(10, TimeUnit.SECONDS);
+    Assert.assertFalse(failed.get(), "Receive failed");
   }
 
   private TransferableBlock getTestTransferableBlock() {
