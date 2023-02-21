@@ -18,17 +18,22 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import io.grpc.ManagedChannel;
-import io.grpc.stub.StreamObserver;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
+import java.time.Duration;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,14 +54,27 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * </ul>
  */
 public class GrpcMailboxService implements MailboxService<TransferableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxService.class);
   // channel manager
+  private static final Duration DANGLING_RECEIVING_MAILBOX_EXPIRY = Duration.ofMinutes(2);
   private final ChannelManager _channelManager;
   private final String _hostname;
   private final int _mailboxPort;
 
   // maintaining a list of registered mailboxes.
-  private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
-      new ConcurrentHashMap<>();
+  private final Cache<String, GrpcReceivingMailbox> _receivingMailboxCache =
+      CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY.toMinutes(), TimeUnit.MINUTES)
+          .removalListener(new RemovalListener<String, GrpcReceivingMailbox>() {
+            @Override
+            public void onRemoval(RemovalNotification<String, GrpcReceivingMailbox> notification) {
+              if (notification.wasEvicted()) {
+                if (!notification.getValue().isClaimed()) {
+                  notification.getValue().cancel();
+                }
+              }
+            }
+          })
+          .build();
   private final Consumer<MailboxIdentifier> _gotMailCallback;
 
   public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig,
@@ -91,23 +109,40 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
+  @Override
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
-    ManagedChannel channel = getChannel(mailboxId.toString());
-    PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
-    CountDownLatch latch = new CountDownLatch(1);
-    StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver =
-        stub.open(new MailboxStatusStreamObserver(latch));
-    GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), mailboxContentStreamObserver, latch);
+    MailboxStatusStreamObserver statusStreamObserver = new MailboxStatusStreamObserver();
+
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), statusStreamObserver, () -> {
+      ManagedChannel channel = getChannel(mailboxId.toString());
+      PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
+      return stub.open(statusStreamObserver);
+    });
     return mailbox;
+  }
+
+  @Override
+  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
+    GrpcReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
+    if (receivingMailbox != null && !receivingMailbox.isClosed()) {
+      receivingMailbox.cancel();
+    }
+    _receivingMailboxCache.invalidate(mailboxId.toString());
   }
 
   /**
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
+  @Override
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(mailboxId.toString(),
-        (mId) -> new GrpcReceivingMailbox(mId, _gotMailCallback));
+    try {
+      return _receivingMailboxCache.get(mailboxId.toString(),
+          () -> new GrpcReceivingMailbox(mailboxId.toString(), _gotMailCallback));
+    } catch (ExecutionException e) {
+      LOGGER.error(String.format("Error getting receiving mailbox: %s", mailboxId), e);
+      throw new RuntimeException(e);
+    }
   }
 
   public ManagedChannel getChannel(String mailboxId) {

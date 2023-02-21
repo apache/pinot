@@ -19,21 +19,45 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
-import java.util.concurrent.BlockingQueue;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class InMemoryMailboxService implements MailboxService<TransferableBlock> {
   // channel manager
+  private static final Logger LOGGER = LoggerFactory.getLogger(InMemoryMailboxService.class);
+  private static final Duration DANGLING_RECEIVING_MAILBOX_EXPIRY = Duration.ofMinutes(5);
   private final String _hostname;
   private final int _mailboxPort;
   private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
 
-  private final ConcurrentHashMap<String, ReceivingMailbox> _receivingMailbox = new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, BlockingQueue> _mailboxQueue = new ConcurrentHashMap<>();
+  // maintaining a list of registered mailboxes.
+  private final Cache<String, InMemoryReceivingMailbox> _receivingMailboxCache =
+      CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY.toMinutes(), TimeUnit.MINUTES)
+          .removalListener(new RemovalListener<String, InMemoryReceivingMailbox>() {
+            @Override
+            public void onRemoval(RemovalNotification<String, InMemoryReceivingMailbox> notification) {
+              if (notification.wasEvicted()) {
+                if (!notification.getValue().isClaimed()) {
+                  String reason = String.format("Receiving mailbox=%s was never claimed", notification.getKey());
+                  notification.getValue().cancel(new RuntimeException(reason));
+                }
+              }
+            }
+          })
+          .build();
+  private final ConcurrentHashMap<String, InMemoryTransferStream> _transferStreamMap = new ConcurrentHashMap<>();
 
   public InMemoryMailboxService(String hostname, int mailboxPort,
       Consumer<MailboxIdentifier> receivedMailContentCallback) {
@@ -76,13 +100,25 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     // failure situations
     // TODO: when we implement flow control, we should swap this out with a bounded abstraction
     return new InMemorySendingMailbox(mailboxId.toString(),
-        _mailboxQueue.computeIfAbsent(mId, id -> new LinkedBlockingQueue<>()), getReceivedMailContentCallback());
+        _transferStreamMap.computeIfAbsent(mId, id -> new InMemoryTransferStream(mailboxId, this)),
+        getReceivedMailContentCallback());
+  }
+
+  @Override
+  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
+    _receivingMailboxCache.invalidate(mailboxId.toString());
   }
 
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    BlockingQueue mailboxQueue = _mailboxQueue.computeIfAbsent(mId, id -> new LinkedBlockingQueue<>());
-    return _receivingMailbox.computeIfAbsent(mId, id -> new InMemoryReceivingMailbox(mId, mailboxQueue));
+    InMemoryTransferStream transferStream = _transferStreamMap.computeIfAbsent(mId,
+        id -> new InMemoryTransferStream(mailboxId, this));
+    try {
+      return _receivingMailboxCache.get(mId, () -> new InMemoryReceivingMailbox(mId, transferStream));
+    } catch (ExecutionException e) {
+      LOGGER.error(String.format("Error getting in-memory receiving mailbox=%s", mailboxId), e);
+      throw new RuntimeException(e);
+    }
   }
 }

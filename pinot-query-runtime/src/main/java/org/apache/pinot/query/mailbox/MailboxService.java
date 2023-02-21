@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+
 /**
  * Mailbox service that handles transfer for mailbox contents.
  *
@@ -67,4 +68,6 @@ public interface MailboxService<T> {
    * @return a sending mailbox.
    */
   SendingMailbox<T> getSendingMailbox(MailboxIdentifier mailboxId);
+
+  void releaseReceivingMailbox(MailboxIdentifier mailboxId);
 }

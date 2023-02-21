@@ -18,34 +18,43 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxContentStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * GRPC implementation of the {@link ReceivingMailbox}.
  */
 public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcReceivingMailbox.class);
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
   private final String _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
   private final AtomicInteger _totalMsgReceived = new AtomicInteger(0);
+  private final AtomicBoolean _claimed = new AtomicBoolean(false);
 
   private MailboxContentStreamObserver _contentStreamObserver;
+  private StreamObserver<Mailbox.MailboxStatus> _statusStreamObserver;
 
   public GrpcReceivingMailbox(String mailboxId, Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = mailboxId;
@@ -53,9 +62,11 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     _initializationLatch = new CountDownLatch(1);
   }
 
-  public Consumer<MailboxIdentifier> init(MailboxContentStreamObserver streamObserver) {
+  public Consumer<MailboxIdentifier> init(MailboxContentStreamObserver streamObserver,
+      StreamObserver<Mailbox.MailboxStatus> statusStreamObserver) {
     if (_initializationLatch.getCount() > 0) {
       _contentStreamObserver = streamObserver;
+      _statusStreamObserver = statusStreamObserver;
       _initializationLatch.countDown();
     }
     return _gotMailCallback;
@@ -73,6 +84,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   @Override
   public TransferableBlock receive()
       throws Exception {
+    _claimed.set(true);
     if (!waitForInitialize()) {
       return null;
     }
@@ -92,7 +104,14 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   }
 
   @Override
-  public void cancel(Throwable e) {
+  public void cancel() {
+    if (isInitialized()) {
+      try {
+        _statusStreamObserver.onError(Status.CANCELLED.asRuntimeException());
+      } catch (Exception e) {
+        LOGGER.error("Error cancelling to sender", e);
+      }
+    }
   }
 
   private boolean waitForInitialize()
@@ -107,6 +126,10 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   @Override
   public String getMailboxId() {
     return _mailboxId;
+  }
+
+  public boolean isClaimed() {
+    return _claimed.get();
   }
 
   /**

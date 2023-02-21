@@ -19,15 +19,14 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
-import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
@@ -49,12 +48,20 @@ import static java.lang.Math.max;
  */
 public class MailboxContentStreamObserver implements StreamObserver<Mailbox.MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
+  private static final int DEFAULT_MAX_PENDING_MAILBOX_CONTENT = 5;
+  private static final long DEFAULT_QUEUE_POLL_TIMEOUT_MS = 120_000;
+  private static final Mailbox.MailboxContent DEFAULT_ERROR_MAILBOX_CONTENT;
 
-  private static Mailbox.MailboxContent createErrorContent(Throwable e)
-      throws IOException {
-    return Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
-            TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
-        .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
+  static {
+    try {
+      RuntimeException exception = new RuntimeException(
+          "Error creating error-content.. please file a bug in the apache/pinot repo");
+      DEFAULT_ERROR_MAILBOX_CONTENT = Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
+          TransferableBlockUtils.getErrorTransferableBlock(exception).getDataBlock().toBytes()))
+          .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private final GrpcMailboxService _mailboxService;
@@ -64,29 +71,10 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final BlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
-  private ReadWriteLock _bufferSizeLock = new ReentrantReadWriteLock();
-  @GuardedBy("bufferSizeLock")
   private int _maxBufferSize = 0;
-  private ReadWriteLock _errorLock = new ReentrantReadWriteLock();
-  @GuardedBy("_errorLock")
   private Mailbox.MailboxContent _errorContent = null;
   private JsonMailboxIdentifier _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
-
-  private void updateMaxBufferSize() {
-    _bufferSizeLock.writeLock().lock();
-    _maxBufferSize = max(_maxBufferSize, _receivingBuffer.size());
-    _bufferSizeLock.writeLock().unlock();
-  }
-
-  private int getMaxBufferSize() {
-    try {
-      _bufferSizeLock.readLock().lock();
-      return _maxBufferSize;
-    } finally {
-      _bufferSizeLock.readLock().unlock();
-    }
-  }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
       StreamObserver<Mailbox.MailboxStatus> responseObserver) {
@@ -97,9 +85,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
       StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
-    // TODO: Replace unbounded queue with bounded queue when we have backpressure in place.
-    // It is possible this will create high memory pressure since we have memory leak issues.
-    _receivingBuffer = new LinkedBlockingQueue();
+    _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_MAILBOX_CONTENT);
     _isEnabledFeedback = isEnabledFeedback;
   }
 
@@ -110,13 +96,8 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
    * to indicate when to call this method.
    */
   public Mailbox.MailboxContent poll() {
-    try {
-      _errorLock.readLock().lock();
-      if (_errorContent != null) {
-        return _errorContent;
-      }
-    } finally {
-      _errorLock.readLock().unlock();
+    if (_errorContent != null) {
+      return _errorContent;
     }
     if (isCompleted()) {
       return null;
@@ -134,26 +115,27 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     _mailboxId = JsonMailboxIdentifier.parse(mailboxContent.getMailboxId());
 
     GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
-    _gotMailCallback = receivingMailbox.init(this);
+    _gotMailCallback = receivingMailbox.init(this, _responseObserver);
+    if (_errorContent != null) {
+      // This should never happen because gRPC calls StreamObserver in a single-threaded fashion, and if error-content
+      // is not null then we would have already issued a onError which means gRPC will not call onNext again.
+      LOGGER.warn("onNext called even though already errored out");
+      return;
+    }
 
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
       // when the receiving end receives a message put it in the mailbox queue.
-      // TODO: pass a timeout to _receivingBuffer.
-      if (!_receivingBuffer.offer(mailboxContent)) {
-        // TODO: close the stream.
-        RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
-        LOGGER.error(e.getMessage());
-        try {
-          _errorLock.writeLock().lock();
-          _errorContent = createErrorContent(e);
-        } catch (IOException ioe) {
-          e = new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
-          LOGGER.error("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
+      try {
+        if (!_receivingBuffer.offer(mailboxContent, DEFAULT_QUEUE_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+          RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
           LOGGER.error(e.getMessage());
-          throw e;
-        } finally {
-          _errorLock.writeLock().unlock();
+          _errorContent = createErrorContent(e);
+          _responseObserver.onError(Status.CANCELLED.asRuntimeException());
         }
+      } catch (InterruptedException e) {
+        _errorContent = createErrorContent(e);
+        LOGGER.error("Interrupted while polling receivingBuffer", e);
+        _responseObserver.onError(Status.CANCELLED.asRuntimeException());
       }
       _gotMailCallback.accept(_mailboxId);
 
@@ -179,23 +161,28 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onError(Throwable e) {
-    try {
-      _errorLock.writeLock().lock();
-      _errorContent = createErrorContent(e);
-      _gotMailCallback.accept(_mailboxId);
-      throw new RuntimeException(e);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
-    } finally {
-      _errorLock.writeLock().unlock();
-      LOGGER.error("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
-    }
+    _errorContent = createErrorContent(e);
+    _gotMailCallback.accept(_mailboxId);
   }
 
   @Override
   public void onCompleted() {
     _isCompleted.set(true);
     _responseObserver.onCompleted();
-    LOGGER.debug("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
+  }
+
+  private static Mailbox.MailboxContent createErrorContent(Throwable e) {
+    try {
+      return Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
+          TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
+          .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
+    } catch (IOException ioException) {
+      LOGGER.error("Error creating error MailboxContent", ioException);
+      return DEFAULT_ERROR_MAILBOX_CONTENT;
+    }
+  }
+
+  private void updateMaxBufferSize() {
+    _maxBufferSize = max(_maxBufferSize, _receivingBuffer.size());
   }
 }

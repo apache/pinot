@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.concurrent.TimeUnit;
-
 
 /**
  * Mailbox is used to send and receive data.
@@ -51,8 +49,6 @@ public interface SendingMailbox<T> {
    * Complete delivery of the current mailbox.
    */
   void complete();
-
-  void waitForFinish(long timeout, TimeUnit unit) throws InterruptedException;
 
   void cancel(Throwable t);
 }

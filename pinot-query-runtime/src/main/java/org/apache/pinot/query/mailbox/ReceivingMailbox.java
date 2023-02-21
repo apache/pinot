@@ -55,5 +55,7 @@ public interface ReceivingMailbox<T> {
    */
   boolean isClosed();
 
-  void cancel(Throwable e);
+  void cancel();
+
+  boolean isClaimed();
 }

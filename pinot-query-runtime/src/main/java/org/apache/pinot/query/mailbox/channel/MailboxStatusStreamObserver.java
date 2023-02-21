@@ -38,10 +38,9 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
 
-  private CountDownLatch _finishLatch;
+  private final CountDownLatch _finishLatch = new CountDownLatch(1);
 
-  public MailboxStatusStreamObserver(CountDownLatch finishLatch) {
-    _finishLatch = finishLatch;
+  public MailboxStatusStreamObserver() {
   }
 
   @Override
@@ -60,12 +59,15 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   @Override
   public void onError(Throwable e) {
     _finishLatch.countDown();
-    LOGGER.error("Receiving error msg from grpc mailbox status stream:", e);
-    throw new RuntimeException(e);
+    LOGGER.error("Error in MailboxReceiver", e);
   }
 
   @Override
   public void onCompleted() {
     _finishLatch.countDown();
+  }
+
+  public boolean isFinished() {
+    return _finishLatch.getCount() == 0;
   }
 }

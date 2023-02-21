@@ -79,6 +79,15 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
     return _grpcMailboxService.getSendingMailbox(mailboxId);
   }
 
+  @Override
+  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
+    if (mailboxId.isLocal()) {
+      _inMemoryMailboxService.releaseReceivingMailbox(mailboxId);
+      return;
+    }
+    _grpcMailboxService.releaseReceivingMailbox(mailboxId);
+  }
+
   public static MultiplexingMailboxService newInstance(String hostname, int port,
       PinotConfiguration pinotConfiguration, Consumer<MailboxIdentifier> gotMailCallback) {
     return new MultiplexingMailboxService(new GrpcMailboxService(hostname, port, pinotConfiguration, gotMailCallback),
