@@ -138,7 +138,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
     _lock.lock();
     try {
       _aliveChains.put(operatorChain.getId(), operatorChain);
-      _ready.add(operatorChain);
+      _ready.offer(operatorChain);
     } finally {
       _lock.unlock();
     }

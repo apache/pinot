@@ -65,7 +65,7 @@ public class QueryServerEnclosure {
   private final InstanceDataManager _instanceDataManager;
   private final HelixManager _helixManager;
 
-  private QueryRunner _queryRunner;
+  private final QueryRunner _queryRunner;
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
     try {
