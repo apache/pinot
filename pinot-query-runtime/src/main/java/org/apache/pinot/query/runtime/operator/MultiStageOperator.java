@@ -47,7 +47,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   public MultiStageOperator(long requestId, int stageId, @Nullable VirtualServerAddress serverAddress) {
     _requestId = requestId;
     _stageId = stageId;
-    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStats = new OperatorStats(requestId, stageId, serverAddress, toExplainString());
     _serverAddress = serverAddress;
     _operatorStatsMap = new HashMap<>();
   }

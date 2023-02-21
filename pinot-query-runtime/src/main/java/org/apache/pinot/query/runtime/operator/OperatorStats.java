@@ -22,6 +22,7 @@ import com.google.common.base.Stopwatch;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 
@@ -31,6 +32,7 @@ public class OperatorStats {
   // TODO: add a operatorId for better tracking purpose.
   private final int _stageId;
   private final long _requestId;
+  private final VirtualServerAddress _serverAddress;
 
   private final String _operatorType;
 
@@ -38,9 +40,10 @@ public class OperatorStats {
   private int _numRows = 0;
   private Map<String, String> _executionStats;
 
-  public OperatorStats(long requestId, int stageId, String operatorType) {
+  public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress, String operatorType) {
     _stageId = stageId;
     _requestId = requestId;
+    _serverAddress = serverAddress;
     _operatorType = operatorType;
     _executionStats = new HashMap<>();
   }
@@ -82,15 +85,16 @@ public class OperatorStats {
     return _requestId;
   }
 
+  public VirtualServerAddress getServerAddress() {
+    return _serverAddress;
+  }
+
   public String getOperatorType() {
     return _operatorType;
   }
 
-  // TODO: Return the string as a JSON string.
   @Override
   public String toString() {
-    return String.format(
-        "OperatorStats[requestId: %s, stageId %s, type: %s] ExecutionWallTime: %sms, No. Rows: %s, No. Block: %s",
-        _requestId, _stageId, _operatorType, _executeStopwatch.elapsed(TimeUnit.MILLISECONDS), _numRows, _numBlock);
+    return OperatorUtils.operatorStatsToJson(this);
   }
 }

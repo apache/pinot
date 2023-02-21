@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -73,6 +74,9 @@ public class OperatorUtils {
       Map<String, Object> jsonOut = new HashMap<>();
       jsonOut.put("requestId", operatorStats.getRequestId());
       jsonOut.put("stageId", operatorStats.getStageId());
+      if (operatorStats.getServerAddress() != null) {
+        jsonOut.put("serverAddress", operatorStats.getServerAddress().toString());
+      }
       jsonOut.put("operatorType", operatorStats.getOperatorType());
       jsonOut.put("executionStats", operatorStats.getExecutionStats());
       return JsonUtils.objectToString(jsonOut);
@@ -87,9 +91,13 @@ public class OperatorUtils {
       JsonNode operatorStatsNode = JsonUtils.stringToJsonNode(json);
       long requestId = operatorStatsNode.get("requestId").asLong();
       int stageId = operatorStatsNode.get("stageId").asInt();
+      String serverAddressStr = operatorStatsNode.get("serverAddress").asText();
+      VirtualServerAddress serverAddress =
+          (serverAddressStr == null) ? null : VirtualServerAddress.parse(serverAddressStr);
       String operatorType = operatorStatsNode.get("operatorType").asText();
 
-      OperatorStats operatorStats = new OperatorStats(requestId, stageId, operatorType);
+      OperatorStats operatorStats =
+          new OperatorStats(requestId, stageId, serverAddress, operatorType);
       operatorStats.recordExecutionStats(
           JsonUtils.jsonNodeToObject(operatorStatsNode.get("executionStats"), new TypeReference<Map<String, String>>() {
           }));
