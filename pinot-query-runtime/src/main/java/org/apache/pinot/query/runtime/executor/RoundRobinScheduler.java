@@ -66,6 +66,19 @@ import org.slf4j.LoggerFactory;
  *                                   by MailboxReceiveOperator after the last poll. (2) When a sender has died or hasn't
  *                                   sent any data in the last _releaseTimeoutMs milliseconds.
  *
+ *                      |--------------( #yield() )---------|
+ *                      |                                   |
+ *                     \/                                   |
+ *   [ START ] --> [ READY ] -----------( #next() )--> [ RUNNING ]
+ *                     /\                                   |
+ *                     |                                    |
+ *         ( #seenMail() or #periodic())                    |
+ *                     |                                    |
+ *                [ AVAILABLE ] <------( #yield() )---------|
+ *                                                          |
+ *                                                          |
+ *   [ EXIT ] <-----------------( #deregistered() )---------|
+ *
  *   The OpChain is considered "alive" from the time it is registered until it is de-registered. Any reference to the
  *   OpChain or its related metadata is kept only while the OpChain is alive. The {@link #onDataAvailable} callback
  *   can be called before an OpChain was ever registered. In that case, this scheduler will simply ignore the callback,
