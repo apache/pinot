@@ -111,4 +111,28 @@ public class SegmentLineageTest {
     }
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 0);
   }
+
+  @Test
+  public void teatSegmentLineageEntryEquals() {
+    LineageEntry expectedLineageEntry =
+        new LineageEntry(Arrays.asList("seg1", "seg2"), Arrays.asList("seg3", "seg4"), LineageEntryState.IN_PROGRESS,
+            12345L);
+    LineageEntry actualLineageEntry =
+        new LineageEntry(Arrays.asList("seg1", "seg2"), Arrays.asList("seg3", "seg4"), LineageEntryState.IN_PROGRESS,
+            12345L);
+    Assert.assertEquals(actualLineageEntry, expectedLineageEntry);
+    actualLineageEntry =
+        new LineageEntry(Arrays.asList("seg1", "seg2"), Arrays.asList("seg3", "seg4"), LineageEntryState.IN_PROGRESS,
+            12346L);
+    Assert.assertNotEquals(actualLineageEntry, expectedLineageEntry);
+    actualLineageEntry =
+        new LineageEntry(Arrays.asList("seg1"), Arrays.asList("seg3", "seg4"), LineageEntryState.IN_PROGRESS, 12345L);
+    Assert.assertNotEquals(actualLineageEntry, expectedLineageEntry);
+    actualLineageEntry =
+        new LineageEntry(Arrays.asList("seg1"), Arrays.asList("seg3", "seg4"), LineageEntryState.COMPLETED, 12345L);
+    Assert.assertNotEquals(actualLineageEntry, expectedLineageEntry);
+    actualLineageEntry =
+        new LineageEntry(Arrays.asList("seg1"), Arrays.asList("seg3", "seg4"), LineageEntryState.REVERTED, 12345L);
+    Assert.assertNotEquals(actualLineageEntry, expectedLineageEntry);
+  }
 }

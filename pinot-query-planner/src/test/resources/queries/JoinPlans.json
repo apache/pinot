@@ -221,6 +221,21 @@
           "\n          LogicalTableScan(table=[[b]])",
           "\n"
         ]
+      },
+      {
+        "description": "Semi join with IN clause",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], col2=[$0])",
+          "\n  LogicalJoin(condition=[=($1, $4)], joinType=[semi])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
       }
     ]
   },

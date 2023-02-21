@@ -173,7 +173,12 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         }
 
         if (currentWindowRequests >= _rpsLimit) {
-          Thread.sleep(SLEEP_TIME_BETWEEN_REQUESTS);
+          try {
+            Thread.sleep(SLEEP_TIME_BETWEEN_REQUESTS);
+          } catch (InterruptedException e) {
+            LOGGER.debug("Sleep interrupted while rate limiting Kinesis requests", e);
+            break;
+          }
         }
       }
 
