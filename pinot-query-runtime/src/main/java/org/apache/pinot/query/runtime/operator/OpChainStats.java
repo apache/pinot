@@ -56,26 +56,47 @@ public class OpChainStats {
 
   public void executing() {
     startExecutionTimer();
-    if (_queuedStopwatch.isRunning()) {
-      _queuedStopwatch.stop();
-    }
+    safeStop(_queuedStopwatch);
   }
 
   public void queued() {
     _queuedCount.incrementAndGet();
-    if (!_queuedStopwatch.isRunning()) {
-      _queuedStopwatch.start();
-    }
-    if (_executeStopwatch.isRunning()) {
-      _executeStopwatch.stop();
-    }
+    safeStart(_queuedStopwatch);
+    safeStop(_executeStopwatch);
   }
 
   public void startExecutionTimer() {
     _exTimerStarted = true;
     _exTimer.get();
-    if (!_executeStopwatch.isRunning()) {
-      _executeStopwatch.start();
+    safeStart(_executeStopwatch);
+  }
+
+  /**
+   * Stopwatch has a pre-condition in the stop method which asserts that the stopwatch is not running. This avoids
+   * {@link IllegalStateException}.
+   */
+  private void safeStop(Stopwatch stopwatch) {
+    if (stopwatch.isRunning()) {
+      synchronized (stopwatch) {
+        if (stopwatch.isRunning()) {
+          stopwatch.stop();
+        }
+      }
+    }
+  }
+
+
+  /**
+   * Stopwatch has a pre-condition in the start method which asserts that the stopwatch is not running. This avoids
+   * {@link IllegalStateException}
+   */
+  private void safeStart(Stopwatch stopwatch) {
+    if (!stopwatch.isRunning()) {
+      synchronized (stopwatch) {
+        if (!stopwatch.isRunning()) {
+          stopwatch.start();
+        }
+      }
     }
   }
 
