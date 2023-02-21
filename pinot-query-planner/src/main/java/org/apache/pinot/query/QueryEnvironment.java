@@ -173,12 +173,12 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public QueryPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0);
+    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery, false), 0);
   }
 
   @VisibleForTesting
   public String explainQuery(String sqlQuery) {
-    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery, false));
   }
 
   // --------------------------------------------------------------------------
