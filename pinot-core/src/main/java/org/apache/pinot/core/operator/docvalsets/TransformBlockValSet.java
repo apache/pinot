@@ -81,7 +81,7 @@ public class TransformBlockValSet implements BlockValSet {
   public int[] getDictionaryIdsSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToIntValuesSV(_projectionBlock);
       }
       Pair<RoaringBitmap, int[]> result = _transformFunction.transformToDictIdsSVWithNull(_projectionBlock);
@@ -94,7 +94,7 @@ public class TransformBlockValSet implements BlockValSet {
   public int[] getIntValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToIntValuesSV(_projectionBlock);
       }
       Pair<RoaringBitmap, int[]> result = _transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
@@ -107,7 +107,7 @@ public class TransformBlockValSet implements BlockValSet {
   public long[] getLongValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.LONG, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToLongValuesSV(_projectionBlock);
       }
       Pair<RoaringBitmap, long[]> result = _transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
@@ -120,7 +120,7 @@ public class TransformBlockValSet implements BlockValSet {
   public float[] getFloatValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.FLOAT, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToFloatValuesSV(_projectionBlock);
       }
       Pair<RoaringBitmap, float[]> result = _transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
@@ -133,7 +133,7 @@ public class TransformBlockValSet implements BlockValSet {
   public double[] getDoubleValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.DOUBLE, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
       }
       Pair<RoaringBitmap, double[]> result = _transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
@@ -146,10 +146,11 @@ public class TransformBlockValSet implements BlockValSet {
   public BigDecimal[] getBigDecimalValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BIG_DECIMAL, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
       }
-      Pair<RoaringBitmap, BigDecimal[]> result = _transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
+      Pair<RoaringBitmap, BigDecimal[]> result =
+          _transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
       _nullBitmap = result.getLeft();
       return result.getRight();
     }
@@ -159,7 +160,7 @@ public class TransformBlockValSet implements BlockValSet {
   public String[] getStringValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.STRING, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToStringValuesSV(_projectionBlock);
       }
       Pair<RoaringBitmap, String[]> result = _transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
@@ -172,7 +173,7 @@ public class TransformBlockValSet implements BlockValSet {
   public byte[][] getBytesValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BYTES, true);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToBytesValuesSV(_projectionBlock);
       }
       Pair<RoaringBitmap, byte[][]> result = _transformFunction.transformToBytesValuesSVWithNull(_projectionBlock);
@@ -185,7 +186,7 @@ public class TransformBlockValSet implements BlockValSet {
   public int[][] getDictionaryIdsMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, false);
-      if(!_isNullHandlingEnabled) {
+      if (!_isNullHandlingEnabled) {
         return _transformFunction.transformToDictIdsMV(_projectionBlock);
       }
       Pair<RoaringBitmap, int[][]> result = _transformFunction.transformToDictIdsMVWithNull(_projectionBlock);

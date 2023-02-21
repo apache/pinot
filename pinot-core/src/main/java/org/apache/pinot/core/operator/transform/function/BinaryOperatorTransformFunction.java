@@ -126,6 +126,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       _intValuesSV = new int[length];
     }
     switch (_leftStoredType) {
+      case UNKNOWN:
       case INT:
         fillResultInt(projectionBlock, length);
         break;
@@ -156,6 +157,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillResultInt(ProjectionBlock projectionBlock, int length) {
     int[] leftIntValues = _leftTransformFunction.transformToIntValuesSV(projectionBlock);
     switch (_rightStoredType) {
+      case UNKNOWN:
       case INT:
         fillIntResultArray(projectionBlock, leftIntValues, length);
         break;
@@ -183,6 +185,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     long[] leftLongValues = _leftTransformFunction.transformToLongValuesSV(projectionBlock);
     switch (_rightStoredType) {
       case INT:
+      case UNKNOWN:
         fillIntResultArray(projectionBlock, leftLongValues, length);
         break;
       case LONG:
@@ -209,6 +212,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     float[] leftFloatValues = _leftTransformFunction.transformToFloatValuesSV(projectionBlock);
     switch (_rightStoredType) {
       case INT:
+      case UNKNOWN:
         fillIntResultArray(projectionBlock, leftFloatValues, length);
         break;
       case LONG:
@@ -235,6 +239,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     double[] leftDoubleValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
     switch (_rightStoredType) {
       case INT:
+      case UNKNOWN:
         fillIntResultArray(projectionBlock, leftDoubleValues, length);
         break;
       case LONG:
@@ -261,6 +266,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     BigDecimal[] leftBigDecimalValues = _leftTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
     switch (_rightStoredType) {
       case INT:
+      case UNKNOWN:
         fillIntResultArray(projectionBlock, leftBigDecimalValues, length);
         break;
       case LONG:

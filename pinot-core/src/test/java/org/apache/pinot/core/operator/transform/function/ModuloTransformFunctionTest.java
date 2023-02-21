@@ -49,8 +49,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("mod(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("mod(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -58,8 +57,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("mod(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("mod(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -75,9 +73,9 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpression(String
-        .format("mod(mod(mod(mod(mod(12,%s),%s),mod(mod(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
-            FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(
+        String.format("mod(mod(mod(mod(mod(12,%s),%s),mod(mod(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN,
+            DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {

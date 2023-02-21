@@ -51,7 +51,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
 
   @Override
   public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   @Override
@@ -72,6 +72,11 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
+  }
+
+  @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_floatValuesSV == null) {
@@ -86,6 +91,11 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       }
     }
     return _floatValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
   }
 
   @Override
@@ -106,6 +116,11 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
+  }
+
+  @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
@@ -120,6 +135,11 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       }
     }
     return _bigDecimalValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
   }
 
   @Override
@@ -139,5 +159,10 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       }
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
   }
 }

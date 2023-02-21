@@ -76,9 +76,14 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     // TODO: Support the right null behavior
-    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
+    return _transformFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   @Override

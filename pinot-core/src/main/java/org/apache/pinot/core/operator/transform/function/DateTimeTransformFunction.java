@@ -74,7 +74,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     return _timestampsFunction.getNullBitmap(projectionBlock);
   }
 
@@ -88,6 +88,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;
   }
+
   public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
     // TODO: Optimize the perf later.
     return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));

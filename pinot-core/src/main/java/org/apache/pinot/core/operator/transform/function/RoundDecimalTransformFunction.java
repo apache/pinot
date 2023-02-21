@@ -23,10 +23,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 //TODO: The function should ideally be named 'round'
@@ -75,12 +78,18 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
 
   private boolean isIntegralResultDatatype(TransformFunction transformFunction) {
     return transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.INT
-        || transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.LONG;
+        || transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.LONG
+        || transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.UNKNOWN;
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return _leftTransformFunction.getNullBitmap(projectionBlock);
   }
 
   @Override
@@ -92,14 +101,13 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.HALF_UP).doubleValue();
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] =
+            BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
       }
     } else {
       for (int i = 0; i < length; i++) {
@@ -107,5 +115,10 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
       }
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 }

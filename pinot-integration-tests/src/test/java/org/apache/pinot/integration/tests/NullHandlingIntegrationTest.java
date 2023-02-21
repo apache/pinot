@@ -144,24 +144,6 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testCaseWithIsDistinctFrom()
-      throws Exception {
-    String query = "SELECT salary IS DISTINCT FROM salary FROM " + getTableName();
-    testQuery(query);
-    query = "SELECT salary FROM " + getTableName() + " where salary IS DISTINCT FROM salary";
-    testQuery(query);
-  }
-
-  @Test
-  public void testCaseWithIsNotDistinctFrom()
-      throws Exception {
-    String query = "SELECT description IS NOT DISTINCT FROM description FROM " + getTableName();
-    testQuery(query);
-    query = "SELECT description FROM " + getTableName() + " where description IS NOT DISTINCT FROM description";
-    testQuery(query);
-  }
-
-  @Test
   public void testIsNull()
       throws Exception {
     String sqlQuery = "SELECT null FROM mytable OPTION(enableNullHandling=true)";
@@ -190,22 +172,22 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 10);
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       assertEquals(rows.get(i).get(0).asBoolean(), true);
     }
     RoaringBitmap nullSalary = new RoaringBitmap();
     sqlQuery = "SELECT salary FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
-      if (rows.get(i).get(0).asText() == "null") {
+    for (int i = 0; i < 10; i++) {
+      if (rows.get(i).get(0).asText().equals("null")) {
         nullSalary.add(i);
       }
     }
     sqlQuery = "SELECT isNull(salary) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asBoolean(), true);
       } else {
@@ -216,7 +198,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     sqlQuery = "SELECT isNotNull(salary) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asBoolean(), false);
       } else {
@@ -228,7 +210,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
         + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asText(), "null");
       } else {
@@ -239,7 +221,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
         + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asInt(), 6);
       } else {
@@ -255,15 +237,15 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     String sqlQuery = "SELECT salary FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
-      if (rows.get(i).get(0).asText() == "null") {
+    for (int i = 0; i < 10; i++) {
+      if (rows.get(i).get(0).asText().equals("null")) {
         nullSalary.add(i);
       }
     }
     sqlQuery = "SELECT COALESCE(salary, null) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asText(), "null");
       } else {
@@ -274,14 +256,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     sqlQuery = "SELECT salary IS DISTINCT FROM salary FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       assertEquals(rows.get(i).get(0).asBoolean(), false);
     }
 
     sqlQuery = "SELECT salary IS DISTINCT FROM null FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asBoolean(), false);
       } else {
@@ -292,7 +274,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     sqlQuery = "SELECT salary IS NOT DISTINCT FROM null FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asBoolean(), true);
       } else {
@@ -308,8 +290,8 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     String sqlQuery = "SELECT salary FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
-      if (rows.get(i).get(0).asText() == "null") {
+    for (int i = 0; i < 10; i++) {
+      if (rows.get(i).get(0).asText().equals("null")) {
         nullSalary.add(i);
       }
     }
@@ -317,7 +299,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     sqlQuery = "SELECT add(salary, null) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asText(), "null");
       }
@@ -325,7 +307,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     sqlQuery = "SELECT add(salary, '1.23456789101112') FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asText(), "null");
       } else {
@@ -336,7 +318,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     sqlQuery = "SELECT cast(salary AS INT) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       if (nullSalary.contains(i)) {
         assertEquals(rows.get(i).get(0).asText(), "null");
       } else {

@@ -128,6 +128,12 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return _resultMetadata;
   }
 
+  // TODO: Support right null behavior
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return null;
+  }
+
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
@@ -143,9 +149,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return transformTransformedValuesToIntValuesSV(projectionBlock);
   }
 
+  // TODO: Support right null behavior
   @Override
   public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   private int[] transformTransformedValuesToIntValuesSV(ProjectionBlock projectionBlock) {
@@ -188,6 +195,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       return _longValuesSV;
     }
     return transformTransformedValuesToLongValuesSV(projectionBlock);
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
   }
 
   private long[] transformTransformedValuesToLongValuesSV(ProjectionBlock projectionBlock) {
@@ -233,6 +245,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return transformTransformedValuesToFloatValuesSV(projectionBlock);
   }
 
+  @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
+  }
+
   private float[] transformTransformedValuesToFloatValuesSV(ProjectionBlock projectionBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
@@ -273,6 +290,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       return _doubleValuesSV;
     }
     return transformTransformedValuesToDoubleValuesSV(projectionBlock);
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 
   private double[] transformTransformedValuesToDoubleValuesSV(ProjectionBlock projectionBlock) {
@@ -317,6 +339,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return transformTransformedValuesToBigDecimalValuesSV(projectionBlock);
   }
 
+  @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
+  }
+
   private BigDecimal[] transformTransformedValuesToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
@@ -357,6 +384,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       return _stringValuesSV;
     }
     return transformTransformedValuesToStringValuesSV(projectionBlock);
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
   }
 
   private String[] transformTransformedValuesToStringValuesSV(ProjectionBlock projectionBlock) {
@@ -401,6 +433,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return transformTransformedValuesToIntValuesMV(projectionBlock);
   }
 
+  @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
+  }
+
   private int[][] transformTransformedValuesToIntValuesMV(ProjectionBlock projectionBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
@@ -438,6 +475,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       return _longValuesMV;
     }
     return transformTransformedValuesToLongValuesMV(projectionBlock);
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesMV(projectionBlock));
   }
 
   private long[][] transformTransformedValuesToLongValuesMV(ProjectionBlock projectionBlock) {
@@ -479,6 +521,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return transformTransformedValuesToFloatValuesMV(projectionBlock);
   }
 
+  @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesMV(projectionBlock));
+  }
+
   private float[][] transformTransformedValuesToFloatValuesMV(ProjectionBlock projectionBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
@@ -518,6 +565,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return transformTransformedToDoubleValuesMV(projectionBlock);
   }
 
+  @Override
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesMV(projectionBlock));
+  }
+
   private double[][] transformTransformedToDoubleValuesMV(ProjectionBlock projectionBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
@@ -555,6 +607,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       return _stringValuesMV;
     }
     return transformTransformedValuesToStringValuesMV(projectionBlock);
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesMV(projectionBlock));
   }
 
   private String[][] transformTransformedValuesToStringValuesMV(ProjectionBlock projectionBlock) {

@@ -26,10 +26,13 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -75,14 +78,19 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath =
-        JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
+    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
     super.init(arguments, dataSourceMap);
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
     return STRING_MV_NO_DICTIONARY_METADATA;
+  }
+
+  // TODO: Support right null behavior
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return null;
   }
 
   @Override
@@ -97,5 +105,10 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
       _stringValuesMV[i] = values.toArray(new String[0]);
     }
     return _stringValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(null, transformToStringValuesMV(projectionBlock));
   }
 }

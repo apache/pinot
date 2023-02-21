@@ -112,8 +112,7 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
         (arguments.size() >= 3) ? ((LiteralTransformFunction) arguments.get(2)).getStringLiteral().toUpperCase()
             : TimeUnit.MILLISECONDS.name();
     _inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
-    String timeZone =
-        arguments.size() >= 4 ? ((LiteralTransformFunction) arguments.get(3)).getStringLiteral() : UTC_TZ;
+    String timeZone = arguments.size() >= 4 ? ((LiteralTransformFunction) arguments.get(3)).getStringLiteral() : UTC_TZ;
     String outputTimeUnitStr =
         arguments.size() >= 5 ? ((LiteralTransformFunction) arguments.get(4)).getStringLiteral().toUpperCase()
             : inputTimeUnitStr;
@@ -131,7 +130,7 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     return _mainTransformFunction.getNullBitmap(projectionBlock);
   }
 

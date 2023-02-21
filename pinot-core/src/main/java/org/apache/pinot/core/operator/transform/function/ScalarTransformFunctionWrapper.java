@@ -155,6 +155,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
+  }
+
+  @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(projectionBlock);
@@ -171,6 +176,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       _floatValuesSV[i] = (float) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
     }
     return _floatValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
   }
 
   @Override
@@ -193,6 +203,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
+  }
+
+  @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
       return super.transformToBigDecimalValuesSV(projectionBlock);
@@ -209,6 +224,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       _bigDecimalValuesSV[i] = (BigDecimal) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
     }
     return _bigDecimalValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
   }
 
   @Override
@@ -233,6 +253,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
+  }
+
+  @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSV(projectionBlock);
@@ -249,6 +274,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       _bytesValuesSV[i] = (byte[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
     }
     return _bytesValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBytesValuesSV(projectionBlock));
   }
 
   @Override
@@ -271,6 +301,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
+  }
+
+  @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
@@ -287,6 +322,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       _longValuesMV[i] = (long[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
     }
     return _longValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesMV(projectionBlock));
   }
 
   @Override
@@ -309,6 +349,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesMV(projectionBlock));
+  }
+
+  @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
@@ -328,6 +373,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesMV(projectionBlock));
+  }
+
+  @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
@@ -344,6 +394,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       _stringValuesMV[i] = (String[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
     }
     return _stringValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesMV(projectionBlock));
   }
 
   /**

@@ -62,7 +62,7 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     return _mainTransformFunction.getNullBitmap(projectionBlock);
   }
 

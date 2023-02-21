@@ -245,8 +245,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
     return _resultMetadata;
   }
 
-  private static int[] getWhenConditions(TransformFunction whenStatement, ProjectionBlock projectionBlock, boolean nullHandlingEnabled){
-    if(!nullHandlingEnabled){
+  private static int[] getWhenConditions(TransformFunction whenStatement, ProjectionBlock projectionBlock,
+      boolean nullHandlingEnabled) {
+    if (!nullHandlingEnabled) {
       return whenStatement.transformToIntValuesSV(projectionBlock);
     }
     Pair<RoaringBitmap, int[]> result = whenStatement.transformToIntValuesSVWithNull(projectionBlock);
@@ -254,6 +255,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Preconditions.checkState(bitmap == null || bitmap.isEmpty(), "whenStatement cannot produce null output");
     return result.getRight();
   }
+
   /**
    * Evaluate the ProjectionBlock for the WHEN statements, returns an array with the
    * index(1 to N) of matched WHEN clause ordered by match priority, 0 means nothing
@@ -335,7 +337,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
         Pair<RoaringBitmap, int[]> result = _elseThenStatements.get(i).transformToIntValuesSVWithNull(projectionBlock);
         int[] intValues = result.getRight();
         if (_numSelections == 1) {
-          if(result.getLeft() != null) {
+          if (result.getLeft() != null) {
             bitmap.or(result.getLeft());
           }
           System.arraycopy(intValues, 0, _intValuesSV, 0, numDocs);
@@ -343,7 +345,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _intValuesSV[j] = intValues[j];
-              if(result.getLeft() != null && result.getLeft().contains(j)) {
+              if (result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -401,7 +403,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
             _elseThenStatements.get(i).transformToLongValuesSVWithNull(projectionBlock);
         long[] longValues = result.getRight();
         if (_numSelections == 1) {
-          if(result.getLeft() != null) {
+          if (result.getLeft() != null) {
             bitmap.or(result.getLeft());
           }
           System.arraycopy(longValues, 0, _longValuesSV, 0, numDocs);
@@ -409,7 +411,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _longValuesSV[j] = longValues[j];
-              if(result.getLeft() != null && result.getLeft().contains(j)) {
+              if (result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -450,7 +452,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<RoaringBitmap,float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSVWithNull(projectionBlock);
     }
@@ -467,7 +469,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
             _elseThenStatements.get(i).transformToFloatValuesSVWithNull(projectionBlock);
         float[] floatValues = result.getRight();
         if (_numSelections == 1) {
-          if(result.getLeft() != null) {
+          if (result.getLeft() != null) {
             bitmap.or(result.getLeft());
           }
           System.arraycopy(floatValues, 0, _floatValuesSV, 0, numDocs);
@@ -475,7 +477,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _floatValuesSV[j] = floatValues[j];
-              if(result.getLeft() != null && result.getLeft().contains(j)) {
+              if (result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -516,7 +518,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<RoaringBitmap,double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSVWithNull(projectionBlock);
     }
@@ -533,7 +535,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
             _elseThenStatements.get(i).transformToDoubleValuesSVWithNull(projectionBlock);
         double[] doubleValues = result.getRight();
         if (_numSelections == 1) {
-          if(result.getLeft() != null) {
+          if (result.getLeft() != null) {
             bitmap.or(result.getLeft());
           }
           System.arraycopy(doubleValues, 0, _doubleValuesSV, 0, numDocs);
@@ -541,7 +543,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _doubleValuesSV[j] = doubleValues[j];
-              if(result.getLeft() != null && result.getLeft().contains(j)) {
+              if (result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -582,7 +584,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<RoaringBitmap,BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
       return super.transformToBigDecimalValuesSVWithNull(projectionBlock);
     }
@@ -599,7 +601,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
             _elseThenStatements.get(i).transformToBigDecimalValuesSVWithNull(projectionBlock);
         BigDecimal[] bigDecimalValues = result.getRight();
         if (_numSelections == 1) {
-          if(result.getLeft() != null) {
+          if (result.getLeft() != null) {
             bitmap.or(result.getLeft());
           }
           System.arraycopy(bigDecimalValues, 0, _bigDecimalValuesSV, 0, numDocs);
@@ -607,7 +609,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _bigDecimalValuesSV[j] = bigDecimalValues[j];
-              if(result.getLeft() != null && result.getLeft().contains(j)) {
+              if (result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -648,7 +650,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<RoaringBitmap,String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSVWithNull(projectionBlock);
     }
@@ -665,7 +667,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
             _elseThenStatements.get(i).transformToStringValuesSVWithNull(projectionBlock);
         String[] stringValues = result.getRight();
         if (_numSelections == 1) {
-          if(result.getLeft() != null) {
+          if (result.getLeft() != null) {
             bitmap.or(result.getLeft());
           }
           System.arraycopy(stringValues, 0, _stringValuesSV, 0, numDocs);
@@ -673,7 +675,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _stringValuesSV[j] = stringValues[j];
-              if(result.getLeft() != null && result.getLeft().contains(j)) {
+              if (result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -713,7 +715,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     return _bytesValuesSV;
   }
 
-  public Pair<RoaringBitmap,byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock) {
+  public Pair<RoaringBitmap, byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSVWithNull(projectionBlock);
     }
@@ -730,7 +732,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
             _elseThenStatements.get(i).transformToBytesValuesSVWithNull(projectionBlock);
         byte[][] bytesValues = result.getRight();
         if (_numSelections == 1) {
-          if(result.getLeft() != null) {
+          if (result.getLeft() != null) {
             bitmap.or(result.getLeft());
           }
           System.arraycopy(bytesValues, 0, _bytesValuesSV, 0, numDocs);
@@ -738,7 +740,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
               _bytesValuesSV[j] = bytesValues[j];
-              if(result.getLeft() != null && result.getLeft().contains(j)) {
+              if (result.getLeft() != null && result.getLeft().contains(j)) {
                 bitmap.add(j);
               }
             }
@@ -752,7 +754,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   @Override
   public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     RoaringBitmap hasNull = super.getNullBitmap(projectionBlock);
-    if(hasNull == null || hasNull.isEmpty()){
+    if (hasNull == null || hasNull.isEmpty()) {
       return null;
     }
     // TODO: support returning null when there is no else and first when is evaluated to be false.
@@ -764,13 +766,13 @@ public class CaseTransformFunction extends BaseTransformFunction {
         TransformFunction transformFunction = _elseThenStatements.get(i);
         RoaringBitmap result = transformFunction.getNullBitmap(projectionBlock);
         if (_numSelections == 1) {
-          if(result != null) {
+          if (result != null) {
             bitmap.or(result);
           }
         } else {
           for (int j = 0; j < projectionBlock.getNumDocs(); j++) {
             if (selected[j] == i) {
-              if(result != null && result.contains(j)) {
+              if (result != null && result.contains(j)) {
                 bitmap.add(j);
               }
             }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -140,6 +141,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _intValuesSV = transformToIntValuesSV(projectionBlock);
+          break;
         case LONG:
           long[] longValues = transformToLongValuesSV(projectionBlock);
           ArrayCopyUtils.copy(longValues, _intValuesSV, length);
@@ -185,6 +189,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _longValuesSV = transformToLongValuesSV(projectionBlock);
+          break;
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _longValuesSV, length);
@@ -230,6 +237,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _floatValuesSV = transformToFloatValuesSV(projectionBlock);
+          break;
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _floatValuesSV, length);
@@ -275,6 +285,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _doubleValuesSV = transformToDoubleValuesSV(projectionBlock);
+          break;
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _doubleValuesSV, length);
@@ -320,6 +333,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _bigDecimalValuesSV = transformToBigDecimalValuesSV(projectionBlock);
+          break;
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _bigDecimalValuesSV, length);
@@ -369,6 +385,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _stringValuesSV = transformToStringValuesSV(projectionBlock);
+          break;
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _stringValuesSV, length);
@@ -418,6 +437,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _bytesValuesSV = transformToBytesValuesSV(projectionBlock);
+          break;
         case BIG_DECIMAL:
           BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _bytesValuesSV, length);
@@ -457,6 +479,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _intValuesMV = transformToIntValuesMV(projectionBlock);
+          break;
         case LONG:
           long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
           ArrayCopyUtils.copy(longValuesMV, _intValuesMV, length);
@@ -485,7 +510,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
   }
 
-
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
@@ -505,6 +529,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _longValuesMV = transformToLongValuesMV(projectionBlock);
+          break;
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _longValuesMV, length);
@@ -552,6 +579,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _floatValuesMV = transformToFloatValuesMV(projectionBlock);
+          break;
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _floatValuesMV, length);
@@ -599,6 +629,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
+        case UNKNOWN:
+          _doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
+          break;
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _doubleValuesMV, length);
@@ -645,6 +678,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType) {
+        case UNKNOWN:
+          _stringValuesMV = transformToStringValuesMV(projectionBlock);
+          break;
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _stringValuesMV, length);
@@ -689,7 +725,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _bytesValuesMV[i] = bytesValues;
       }
     } else {
-      assert getResultMetadata().getDataType().getStoredType() == DataType.STRING;
+      Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING
+          || getResultMetadata().getDataType().getStoredType() == DataType.UNKNOWN);
       String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
       ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
     }

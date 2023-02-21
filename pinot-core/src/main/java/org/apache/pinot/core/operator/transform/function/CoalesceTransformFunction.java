@@ -73,8 +73,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     }
     RoaringBitmap nullBitmap = new RoaringBitmap();
     nullBitmap.add(0L, length);
-    for(TransformFunction func: _transformFunctions){
-      if(nullBitmap.isEmpty()){
+    for (TransformFunction func : _transformFunctions) {
+      if (nullBitmap.isEmpty()) {
         return ImmutablePair.of(null, _intValuesSV);
       }
       Pair<RoaringBitmap, int[]> curResult = func.transformToIntValuesSVWithNull(projectionBlock);
@@ -84,7 +84,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (!curBitmap.contains(i)) {
           nullBitmap.remove(i);
           _intValuesSV[i] = curValues[i];
-        }});
+        }
+      });
     }
     return ImmutablePair.of(nullBitmap, _intValuesSV);
   }
@@ -100,8 +101,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     }
     RoaringBitmap nullBitmap = new RoaringBitmap();
     nullBitmap.add(0L, length);
-    for(TransformFunction func: _transformFunctions){
-      if(nullBitmap.isEmpty()){
+    for (TransformFunction func : _transformFunctions) {
+      if (nullBitmap.isEmpty()) {
         return ImmutablePair.of(null, _longValuesSV);
       }
       Pair<RoaringBitmap, long[]> curResult = func.transformToLongValuesSVWithNull(projectionBlock);
@@ -111,7 +112,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (!curBitmap.contains(i)) {
           nullBitmap.remove(i);
           _longValuesSV[i] = curValues[i];
-        }});
+        }
+      });
     }
     return ImmutablePair.of(nullBitmap, _longValuesSV);
   }
@@ -127,8 +129,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     }
     RoaringBitmap nullBitmap = new RoaringBitmap();
     nullBitmap.add(0L, length);
-    for(TransformFunction func: _transformFunctions){
-      if(nullBitmap.isEmpty()){
+    for (TransformFunction func : _transformFunctions) {
+      if (nullBitmap.isEmpty()) {
         return ImmutablePair.of(null, _floatValuesSV);
       }
       Pair<RoaringBitmap, float[]> curResult = func.transformToFloatValuesSVWithNull(projectionBlock);
@@ -138,7 +140,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (!curBitmap.contains(i)) {
           nullBitmap.remove(i);
           _floatValuesSV[i] = curValues[i];
-        }});
+        }
+      });
     }
     return ImmutablePair.of(nullBitmap, _floatValuesSV);
   }
@@ -154,8 +157,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     }
     RoaringBitmap nullBitmap = new RoaringBitmap();
     nullBitmap.add(0L, length);
-    for(TransformFunction func: _transformFunctions){
-      if(nullBitmap.isEmpty()){
+    for (TransformFunction func : _transformFunctions) {
+      if (nullBitmap.isEmpty()) {
         return ImmutablePair.of(null, _doubleValuesSV);
       }
       Pair<RoaringBitmap, double[]> curResult = func.transformToDoubleValuesSVWithNull(projectionBlock);
@@ -165,7 +168,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (!curBitmap.contains(i)) {
           nullBitmap.remove(i);
           _doubleValuesSV[i] = curValues[i];
-        }});
+        }
+      });
     }
     return ImmutablePair.of(nullBitmap, _doubleValuesSV);
   }
@@ -181,8 +185,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     }
     RoaringBitmap nullBitmap = new RoaringBitmap();
     nullBitmap.add(0L, length);
-    for(TransformFunction func: _transformFunctions){
-      if(nullBitmap.isEmpty()){
+    for (TransformFunction func : _transformFunctions) {
+      if (nullBitmap.isEmpty()) {
         return ImmutablePair.of(null, _bigDecimalValuesSV);
       }
       Pair<RoaringBitmap, BigDecimal[]> curResult = func.transformToBigDecimalValuesSVWithNull(projectionBlock);
@@ -192,7 +196,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (!curBitmap.contains(i)) {
           nullBitmap.remove(i);
           _bigDecimalValuesSV[i] = curValues[i];
-        }});
+        }
+      });
     }
     return ImmutablePair.of(nullBitmap, _bigDecimalValuesSV);
   }
@@ -208,8 +213,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     }
     RoaringBitmap nullBitmap = new RoaringBitmap();
     nullBitmap.add(0L, length);
-    for(TransformFunction func: _transformFunctions){
-      if(nullBitmap.isEmpty()){
+    for (TransformFunction func : _transformFunctions) {
+      if (nullBitmap.isEmpty()) {
         return ImmutablePair.of(null, _stringValuesSV);
       }
       Pair<RoaringBitmap, String[]> curResult = func.transformToStringValuesSVWithNull(projectionBlock);
@@ -219,7 +224,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (!curBitmap.contains(i)) {
           nullBitmap.remove(i);
           _stringValuesSV[i] = curValues[i];
-        }});
+        }
+      });
     }
     return ImmutablePair.of(nullBitmap, _stringValuesSV);
   }

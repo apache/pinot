@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.concurrent.Immutable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;

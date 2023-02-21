@@ -83,11 +83,6 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     super.init(arguments, dataSourceMap);
-    if (!(_leftTransformFunction instanceof IdentifierTransformFunction)
-        || !(_rightTransformFunction instanceof IdentifierTransformFunction)) {
-      throw new IllegalArgumentException("Only column names are supported in DistinctFrom transformation.");
-    }
-    super.init(arguments, dataSourceMap);
   }
 
   @Override
@@ -136,7 +131,7 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock){
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     return null;
   }
 }

@@ -116,7 +116,8 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Pair<RoaringBitmap, int[]> transformToDictIdsSVWithNull(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("transformToDictIdsSVWithNull is not supported for LiteralTransformFunction");
+    throw new UnsupportedOperationException(
+        "transformToDictIdsSVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
@@ -126,7 +127,8 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Pair<RoaringBitmap, int[][]> transformToDictIdsMVWithNull(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("transformToDictIdsMVWithNull is not supported for LiteralTransformFunction");
+    throw new UnsupportedOperationException(
+        "transformToDictIdsMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
@@ -283,7 +285,8 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("transformToLongValuesMVWithNull is not supported for LiteralTransformFunction");
+    throw new UnsupportedOperationException(
+        "transformToLongValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
@@ -293,7 +296,8 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("transformToFloatValuesMVWithNull is not supported for LiteralTransformFunction");
+    throw new UnsupportedOperationException(
+        "transformToFloatValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
@@ -303,7 +307,8 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("transformToDoubleValuesMVWithNull is not supported for LiteralTransformFunction");
+    throw new UnsupportedOperationException(
+        "transformToDoubleValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
@@ -313,7 +318,8 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("transformToStringValuesMVWithNull is not supported for LiteralTransformFunction");
+    throw new UnsupportedOperationException(
+        "transformToStringValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
@@ -323,13 +329,14 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Pair<RoaringBitmap, byte[][][]> transformToBytesValuesMVWithNull(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("transformToBytesValuesMVWithNull is not supported for LiteralTransformFunction");
+    throw new UnsupportedOperationException(
+        "transformToBytesValuesMVWithNull is not supported for LiteralTransformFunction");
   }
 
   @Override
   public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
     // Treat all unknown type values as null regardless of the value.
-    if(_dataType != DataType.UNKNOWN){
+    if (_dataType != DataType.UNKNOWN) {
       return null;
     }
     int length = projectionBlock.getNumDocs();

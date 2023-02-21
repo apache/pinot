@@ -156,6 +156,18 @@ public class GroovyTransformFunction extends BaseTransformFunction {
     return _resultMetadata;
   }
 
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (TransformFunction arg : _groovyArguments) {
+      RoaringBitmap argBitmap = arg.getNullBitmap(projectionBlock);
+      if (argBitmap != null) {
+        bitmap.or(argBitmap);
+      }
+    }
+    return bitmap;
+  }
+
   private void initFunctions() {
     for (int i = 0; i < _numGroovyArgs; i++) {
       BiFunction<Object, Integer, Object> getElementFunction;
@@ -242,7 +254,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
 
   @Override
   public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), _intValuesSV);
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
   }
 
   @Override
@@ -264,6 +276,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
+  }
+
+  @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_floatValuesSV == null) {
@@ -279,6 +296,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       _floatValuesSV[i] = (float) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
     return _floatValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
   }
 
   @Override
@@ -300,6 +322,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
+  }
+
+  @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
@@ -318,6 +345,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_stringValuesSV == null) {
@@ -333,6 +365,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       _stringValuesSV[i] = (String) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
   }
 
   @Override
@@ -361,6 +398,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
+  }
+
+  @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_longValuesMV == null) {
@@ -383,6 +425,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       }
     }
     return _longValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesMV(projectionBlock));
   }
 
   @Override
@@ -411,6 +458,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesMV(projectionBlock));
+  }
+
+  @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleValuesMV == null) {
@@ -436,6 +488,11 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesMV(projectionBlock));
+  }
+
+  @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     if (_stringValuesMV == null) {
       _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
@@ -458,5 +515,10 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       }
     }
     return _stringValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesMV(projectionBlock));
   }
 }

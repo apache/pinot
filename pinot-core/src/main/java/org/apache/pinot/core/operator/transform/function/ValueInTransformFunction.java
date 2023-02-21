@@ -39,11 +39,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class ValueInTransformFunction extends BaseTransformFunction {
@@ -103,6 +106,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return _mainTransformFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
   public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_dictIdSet == null) {
@@ -123,6 +131,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       _dictIds[i] = filterInts(_dictIdSet, unFilteredDictIds[i]);
     }
     return _dictIds;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[][]> transformToDictIdsMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDictIdsMV(projectionBlock));
   }
 
   @Override
@@ -148,6 +161,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
+  }
+
+  @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
@@ -167,6 +185,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       _longValuesMV[i] = filterLongs(_longValueSet, unFilteredLongValues[i]);
     }
     return _longValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesMV(projectionBlock));
   }
 
   @Override
@@ -192,6 +215,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesMV(projectionBlock));
+  }
+
+  @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
@@ -214,6 +242,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesMV(projectionBlock));
+  }
+
+  @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
@@ -227,6 +260,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       _stringValuesMV[i] = filterStrings(_stringValueSet, unFilteredStringValues[i]);
     }
     return _stringValuesMV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesMV(projectionBlock));
   }
 
   private static int[] filterInts(IntSet intSet, int[] source) {

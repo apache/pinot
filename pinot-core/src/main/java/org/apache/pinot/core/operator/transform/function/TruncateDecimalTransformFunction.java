@@ -23,10 +23,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class TruncateDecimalTransformFunction extends BaseTransformFunction {
@@ -82,6 +85,11 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return _leftTransformFunction.getNullBitmap(projectionBlock);
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleValuesSV == null) {
@@ -90,14 +98,13 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(_scale, RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.DOWN).doubleValue();
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] =
+            BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
       }
     } else {
       for (int i = 0; i < length; i++) {
@@ -105,5 +112,10 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
       }
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
   }
 }
