@@ -55,11 +55,6 @@ public class TransformOperator extends MultiStageOperator {
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
-      List<RexExpression> transforms, DataSchema upstreamDataSchema, long requestId, int stageId) {
-    this(upstreamOperator, resultSchema, transforms, upstreamDataSchema, requestId, stageId, null);
-  }
-
   public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema, List<RexExpression> transforms,
       DataSchema upstreamDataSchema, long requestId, int stageId, VirtualServerAddress serverAddress) {
     super(requestId, stageId, serverAddress);

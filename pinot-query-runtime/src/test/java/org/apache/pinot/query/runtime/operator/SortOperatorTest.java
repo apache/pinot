@@ -26,6 +26,7 @@ import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.mockito.Mock;
@@ -47,9 +48,13 @@ public class SortOperatorTest {
   @Mock
   private MultiStageOperator _input;
 
+  @Mock
+  private VirtualServerAddress _serverAddress;
+
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
   }
 
   @AfterMethod
@@ -64,7 +69,7 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
     Mockito.when(_input.nextBlock())
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
@@ -82,7 +87,7 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
     Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
 
@@ -99,7 +104,7 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
     Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
@@ -116,10 +121,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -139,10 +143,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(1);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"ignored", "sort"}, new DataSchema.ColumnDataType[]{INT, INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -162,10 +165,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{STRING});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{"b"}, new Object[]{"a"}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{"b"}, new Object[]{"a"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -185,10 +187,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.DESCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -208,10 +209,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 1, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 1, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -231,10 +231,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 1, 1, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 1, 1, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -255,8 +254,7 @@ public class SortOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op = new SortOperator(_input, collation, directions, 0, 0, schema, 1, 1, 2, null);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -275,10 +273,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, -1, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, -1, 0, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -296,10 +293,9 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
         .thenReturn(block(schema, new Object[]{1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
@@ -320,7 +316,7 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0, 1);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING, Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
     Mockito.when(_input.nextBlock())
         .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
@@ -344,7 +340,7 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0, 1);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING, Direction.DESCENDING);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
     Mockito.when(_input.nextBlock())
         .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
@@ -368,12 +364,10 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2);
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema, 1, 2, _serverAddress);
 
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(block(schema, new Object[]{1}))
+    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
+        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock()).thenReturn(block(schema, new Object[]{1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:

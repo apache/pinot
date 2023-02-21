@@ -41,11 +41,6 @@ public class LiteralValueOperator extends MultiStageOperator {
   private boolean _isLiteralBlockReturned;
 
   public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
-      long requestId, int stageId) {
-    this(dataSchema, rexLiteralRows, requestId, stageId, null);
-  }
-
-  public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
       long requestId, int stageId, VirtualServerAddress serverAddress) {
     super(requestId, stageId, serverAddress);
     _dataSchema = dataSchema;

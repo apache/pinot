@@ -56,11 +56,6 @@ public class FilterOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
 
   public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
-      long requestId, int stageId) {
-    this(upstreamOperator, dataSchema, filter, requestId, stageId, null);
-  }
-
-  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
       long requestId, int stageId, VirtualServerAddress serverAddress) {
     super(requestId, stageId, serverAddress);
     _upstreamOperator = upstreamOperator;

@@ -82,12 +82,6 @@ public class AggregateOperator extends MultiStageOperator {
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
   public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet, DataSchema inputSchema, long requestId, int stageId) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS, requestId,
-        stageId, null);
-  }
-
-  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
       List<RexExpression> groupSet, DataSchema inputSchema, long requestId, int stageId,
       VirtualServerAddress virtualServerAddress) {
     this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS, requestId,

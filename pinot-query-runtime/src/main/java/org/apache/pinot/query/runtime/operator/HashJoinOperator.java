@@ -89,11 +89,6 @@ public class HashJoinOperator extends MultiStageOperator {
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
   public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
-      DataSchema leftSchema, JoinNode node, long requestId, int stageId) {
-    this(leftTableOperator, rightTableOperator, leftSchema, node, requestId, stageId, null);
-  }
-
-  public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
       DataSchema leftSchema, JoinNode node, long requestId, int stageId, VirtualServerAddress serverAddress) {
     super(requestId, stageId, serverAddress);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),

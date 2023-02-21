@@ -68,11 +68,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private int _currentIndex;
 
   public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
-      long requestId, int stageId) {
-    this(baseResultBlock, dataSchema, requestId, stageId, null);
-  }
-
-  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
       long requestId, int stageId, VirtualServerAddress serverAddress) {
     super(requestId, stageId, serverAddress);
     _baseResultBlock = baseResultBlock;

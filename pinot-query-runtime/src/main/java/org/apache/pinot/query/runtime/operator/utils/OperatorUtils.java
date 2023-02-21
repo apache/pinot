@@ -74,9 +74,7 @@ public class OperatorUtils {
       Map<String, Object> jsonOut = new HashMap<>();
       jsonOut.put("requestId", operatorStats.getRequestId());
       jsonOut.put("stageId", operatorStats.getStageId());
-      if (operatorStats.getServerAddress() != null) {
-        jsonOut.put("serverAddress", operatorStats.getServerAddress().toString());
-      }
+      jsonOut.put("serverAddress", operatorStats.getServerAddress().toString());
       jsonOut.put("operatorType", operatorStats.getOperatorType());
       jsonOut.put("executionStats", operatorStats.getExecutionStats());
       return JsonUtils.objectToString(jsonOut);
@@ -92,8 +90,7 @@ public class OperatorUtils {
       long requestId = operatorStatsNode.get("requestId").asLong();
       int stageId = operatorStatsNode.get("stageId").asInt();
       String serverAddressStr = operatorStatsNode.get("serverAddress").asText();
-      VirtualServerAddress serverAddress =
-          (serverAddressStr == null) ? null : VirtualServerAddress.parse(serverAddressStr);
+      VirtualServerAddress serverAddress = VirtualServerAddress.parse(serverAddressStr);
       String operatorType = operatorStatsNode.get("operatorType").asText();
 
       OperatorStats operatorStats =
