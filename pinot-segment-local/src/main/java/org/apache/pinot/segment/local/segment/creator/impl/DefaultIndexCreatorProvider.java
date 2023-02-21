@@ -28,7 +28,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloo
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.NoOpForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
@@ -78,7 +77,7 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       // Dictionary disabled columns
       if (context.forwardIndexDisabled()) {
         // Forward index disabled columns
-        return new NoOpForwardIndexCreator(context.getFieldSpec().isSingleValueField());
+        return null;
       }
       boolean deriveNumDocsPerChunk =
           shouldDeriveNumDocsPerChunk(context.getFieldSpec().getName(), context.getColumnProperties());
@@ -98,7 +97,7 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       if (context.forwardIndexDisabled() && !context.isSorted()) {
         // Forward index disabled columns which aren't sorted
         // Sorted columns treat this option as a no-op
-        return new NoOpForwardIndexCreator(context.getFieldSpec().isSingleValueField());
+        return null;
       } else {
         // Forward index enabled columns
         if (context.getFieldSpec().isSingleValueField()) {

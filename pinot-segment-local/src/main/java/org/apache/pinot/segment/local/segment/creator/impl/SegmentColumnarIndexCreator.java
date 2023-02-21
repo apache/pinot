@@ -548,7 +548,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           // get dictID from dictionary
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
           // store the docID -> dictID mapping in forward index
-          forwardIndexCreator.putDictId(dictId);
+          if (forwardIndexCreator != null) {
+            forwardIndexCreator.putDictId(dictId);
+          }
           DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
           if (invertedIndexCreator != null) {
             // if inverted index enabled during segment creation,
@@ -566,44 +568,48 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               columnValueToIndex = FieldConfig.TEXT_INDEX_DEFAULT_RAW_VALUE;
             }
           }
-          switch (forwardIndexCreator.getValueType()) {
-            case INT:
-              forwardIndexCreator.putInt((int) columnValueToIndex);
-              break;
-            case LONG:
-              forwardIndexCreator.putLong((long) columnValueToIndex);
-              break;
-            case FLOAT:
-              forwardIndexCreator.putFloat((float) columnValueToIndex);
-              break;
-            case DOUBLE:
-              forwardIndexCreator.putDouble((double) columnValueToIndex);
-              break;
-            case BIG_DECIMAL:
-              forwardIndexCreator.putBigDecimal((BigDecimal) columnValueToIndex);
-              break;
-            case STRING:
-              forwardIndexCreator.putString((String) columnValueToIndex);
-              break;
-            case BYTES:
-              forwardIndexCreator.putBytes((byte[]) columnValueToIndex);
-              break;
-            case JSON:
-              if (columnValueToIndex instanceof String) {
+          if (forwardIndexCreator != null) {
+            switch (forwardIndexCreator.getValueType()) {
+              case INT:
+                forwardIndexCreator.putInt((int) columnValueToIndex);
+                break;
+              case LONG:
+                forwardIndexCreator.putLong((long) columnValueToIndex);
+                break;
+              case FLOAT:
+                forwardIndexCreator.putFloat((float) columnValueToIndex);
+                break;
+              case DOUBLE:
+                forwardIndexCreator.putDouble((double) columnValueToIndex);
+                break;
+              case BIG_DECIMAL:
+                forwardIndexCreator.putBigDecimal((BigDecimal) columnValueToIndex);
+                break;
+              case STRING:
                 forwardIndexCreator.putString((String) columnValueToIndex);
-              } else if (columnValueToIndex instanceof byte[]) {
+                break;
+              case BYTES:
                 forwardIndexCreator.putBytes((byte[]) columnValueToIndex);
-              }
-              break;
-            default:
-              throw new IllegalStateException();
+                break;
+              case JSON:
+                if (columnValueToIndex instanceof String) {
+                  forwardIndexCreator.putString((String) columnValueToIndex);
+                } else if (columnValueToIndex instanceof byte[]) {
+                  forwardIndexCreator.putBytes((byte[]) columnValueToIndex);
+                }
+                break;
+              default:
+                throw new IllegalStateException();
+            }
           }
         }
       } else {
         if (dictionaryCreator != null) {
           //dictionary encoded
           int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
-          forwardIndexCreator.putDictIdMV(dictIds);
+          if (forwardIndexCreator != null) {
+            forwardIndexCreator.putDictIdMV(dictIds);
+          }
           DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
           if (invertedIndexCreator != null) {
             invertedIndexCreator.add(dictIds, dictIds.length);
@@ -611,74 +617,76 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } else {
           // for text index on raw columns, check the config to determine if actual raw value should
           // be stored or not
-          if (textIndexCreator != null && !shouldStoreRawValueForTextIndex(columnName)) {
-            Object value = _columnProperties.get(columnName).get(FieldConfig.TEXT_INDEX_RAW_VALUE);
-            if (value == null) {
-              value = FieldConfig.TEXT_INDEX_DEFAULT_RAW_VALUE;
-            }
-            if (forwardIndexCreator.getValueType().getStoredType() == DataType.STRING) {
-              columnValueToIndex = new String[]{String.valueOf(value)};
-            } else if (forwardIndexCreator.getValueType().getStoredType() == DataType.BYTES) {
-              columnValueToIndex = new byte[][]{String.valueOf(value).getBytes(UTF_8)};
-            } else {
-              throw new RuntimeException("Text Index is only supported for STRING and BYTES stored type");
-            }
-          }
-          Object[] values = (Object[]) columnValueToIndex;
-          int length = values.length;
-          switch (forwardIndexCreator.getValueType()) {
-            case INT:
-              int[] ints = new int[length];
-              for (int i = 0; i < length; i++) {
-                ints[i] = (Integer) values[i];
+          if (forwardIndexCreator != null) {
+            if (textIndexCreator != null && !shouldStoreRawValueForTextIndex(columnName)) {
+              Object value = _columnProperties.get(columnName).get(FieldConfig.TEXT_INDEX_RAW_VALUE);
+              if (value == null) {
+                value = FieldConfig.TEXT_INDEX_DEFAULT_RAW_VALUE;
               }
-              forwardIndexCreator.putIntMV(ints);
-              break;
-            case LONG:
-              long[] longs = new long[length];
-              for (int i = 0; i < length; i++) {
-                longs[i] = (Long) values[i];
-              }
-              forwardIndexCreator.putLongMV(longs);
-              break;
-            case FLOAT:
-              float[] floats = new float[length];
-              for (int i = 0; i < length; i++) {
-                floats[i] = (Float) values[i];
-              }
-              forwardIndexCreator.putFloatMV(floats);
-              break;
-            case DOUBLE:
-              double[] doubles = new double[length];
-              for (int i = 0; i < length; i++) {
-                doubles[i] = (Double) values[i];
-              }
-              forwardIndexCreator.putDoubleMV(doubles);
-              break;
-            case STRING:
-              if (values instanceof String[]) {
-                forwardIndexCreator.putStringMV((String[]) values);
+              if (forwardIndexCreator.getValueType().getStoredType() == DataType.STRING) {
+                columnValueToIndex = new String[]{String.valueOf(value)};
+              } else if (forwardIndexCreator.getValueType().getStoredType() == DataType.BYTES) {
+                columnValueToIndex = new byte[][]{String.valueOf(value).getBytes(UTF_8)};
               } else {
-                String[] strings = new String[length];
-                for (int i = 0; i < length; i++) {
-                  strings[i] = (String) values[i];
-                }
-                forwardIndexCreator.putStringMV(strings);
+                throw new RuntimeException("Text Index is only supported for STRING and BYTES stored type");
               }
-              break;
-            case BYTES:
-              if (values instanceof byte[][]) {
-                forwardIndexCreator.putBytesMV((byte[][]) values);
-              } else {
-                byte[][] bytesArray = new byte[length][];
+            }
+            Object[] values = (Object[]) columnValueToIndex;
+            int length = values.length;
+            switch (forwardIndexCreator.getValueType()) {
+              case INT:
+                int[] ints = new int[length];
                 for (int i = 0; i < length; i++) {
-                  bytesArray[i] = (byte[]) values[i];
+                  ints[i] = (Integer) values[i];
                 }
-                forwardIndexCreator.putBytesMV(bytesArray);
-              }
-              break;
-            default:
-              throw new IllegalStateException();
+                forwardIndexCreator.putIntMV(ints);
+                break;
+              case LONG:
+                long[] longs = new long[length];
+                for (int i = 0; i < length; i++) {
+                  longs[i] = (Long) values[i];
+                }
+                forwardIndexCreator.putLongMV(longs);
+                break;
+              case FLOAT:
+                float[] floats = new float[length];
+                for (int i = 0; i < length; i++) {
+                  floats[i] = (Float) values[i];
+                }
+                forwardIndexCreator.putFloatMV(floats);
+                break;
+              case DOUBLE:
+                double[] doubles = new double[length];
+                for (int i = 0; i < length; i++) {
+                  doubles[i] = (Double) values[i];
+                }
+                forwardIndexCreator.putDoubleMV(doubles);
+                break;
+              case STRING:
+                if (values instanceof String[]) {
+                  forwardIndexCreator.putStringMV((String[]) values);
+                } else {
+                  String[] strings = new String[length];
+                  for (int i = 0; i < length; i++) {
+                    strings[i] = (String) values[i];
+                  }
+                  forwardIndexCreator.putStringMV(strings);
+                }
+                break;
+              case BYTES:
+                if (values instanceof byte[][]) {
+                  forwardIndexCreator.putBytesMV((byte[][]) values);
+                } else {
+                  byte[][] bytesArray = new byte[length][];
+                  for (int i = 0; i < length; i++) {
+                    bytesArray[i] = (byte[]) values[i];
+                  }
+                  forwardIndexCreator.putBytesMV(bytesArray);
+                }
+                break;
+              default:
+                throw new IllegalStateException();
+            }
           }
         }
       }
