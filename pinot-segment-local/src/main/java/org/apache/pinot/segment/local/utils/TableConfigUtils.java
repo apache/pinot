@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -100,6 +101,9 @@ public final class TableConfigUtils {
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
       EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.COUNT);
+  private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
+      ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+          RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -557,8 +561,7 @@ public final class TableConfigUtils {
         "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
     Preconditions.checkState(tableConfig.getRoutingConfig() != null
-            && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
-            tableConfig.getRoutingConfig().getInstanceSelectorType()),
+            && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
@@ -1147,5 +1150,10 @@ public final class TableConfigUtils {
       }
     }
     return false;
+  }
+
+  private static boolean isRoutingStrategyAllowedForUpsert(@Nonnull RoutingConfig routingConfig) {
+    String instanceSelectorType = routingConfig.getInstanceSelectorType();
+    return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
   }
 }

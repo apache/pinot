@@ -74,7 +74,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
@@ -214,8 +213,6 @@ public class PinotTaskRestletResource {
           String tableNameWithType) {
     try {
       return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
-    } catch (NoTaskMetadataException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     } catch (JsonProcessingException e) {
       throw new ControllerApplicationException(LOGGER, String
           .format("Failed to format task metadata into Json for task type: %s from table: %s", taskType,
