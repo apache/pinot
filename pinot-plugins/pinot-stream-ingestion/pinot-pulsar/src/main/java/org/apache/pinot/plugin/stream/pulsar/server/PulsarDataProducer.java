@@ -32,6 +32,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Pulsar data producer class
+ *
+ * TODO: Improve the current implementation that creates the producer object for each `produce()` call.
+ *
+ */
 public class PulsarDataProducer implements StreamDataProducer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarDataProducer.class);
@@ -48,25 +54,24 @@ public class PulsarDataProducer implements StreamDataProducer {
   public void init(Properties props) {
     String brokerServiceUrl = props.getProperty(BROKER_SERVICE_URL);
     Preconditions.checkNotNull(brokerServiceUrl, "broker service url must be configured.");
-
     ClientBuilder clientBuilder = PulsarClient.builder().serviceUrl(brokerServiceUrl);
 
     String token = props.getProperty(TOKEN);
     if (StringUtils.isNotEmpty(token)) {
-      try {
-        _pulsarClient = clientBuilder.authentication(AuthenticationFactory.token(token)).build();
-      } catch (PulsarClientException e) {
-        throw new IllegalArgumentException("Failed to create pulsar client");
-      }
+      clientBuilder.authentication(AuthenticationFactory.token(token));
+    }
+
+    try {
+      _pulsarClient = clientBuilder.build();
+    } catch (PulsarClientException e) {
+      throw new IllegalArgumentException("Failed to create pulsar client", e);
     }
   }
 
   @Override
   public void produce(String topic, byte[] payload) {
-    try {
-      Producer<byte[]> producer = _pulsarClient.newProducer().topic(topic).create();
+    try (Producer<byte[]> producer = _pulsarClient.newProducer().topic(topic).create()) {
       producer.send(payload);
-      producer.close();
     } catch (PulsarClientException e) {
       LOGGER.error("Failed to produce message for topic: " + topic, e);
     }
@@ -74,11 +79,8 @@ public class PulsarDataProducer implements StreamDataProducer {
 
   @Override
   public void produce(String topic, byte[] key, byte[] payload) {
-    try {
-      Producer<byte[]> producer = _pulsarClient.newProducer().topic(topic).create();
+    try (Producer<byte[]> producer = _pulsarClient.newProducer().topic(topic).create()) {
       producer.newMessage().key(Base64.getEncoder().encodeToString(key)).value(payload).send();
-      producer.send(payload);
-      producer.close();
     } catch (PulsarClientException e) {
       LOGGER.error("Failed to produce message for topic: " + topic, e);
     }
