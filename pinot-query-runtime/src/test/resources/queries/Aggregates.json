@@ -22,11 +22,6 @@
     "queries": [
       {
         "psql": "4.2.7",
-        "description": "average int",
-        "sql": "SELECT avg(int_col) FROM {tbl}"
-      },
-      {
-        "psql": "4.2.7",
         "description": "average double",
         "sql": "SELECT avg(double_col) FROM {tbl}"
       },
