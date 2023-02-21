@@ -133,8 +133,9 @@ public class PinotPreparedStatementTest {
         new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = pinotConnection.prepareStatement(BASIC_TEST_QUERY);
     preparedStatement.executeQuery();
-    String expectedSql = DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING) + BASIC_TEST_QUERY;
-    Assert.assertEquals(expectedSql, _dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()));
+    String expectedSql =
+        DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING, true) + BASIC_TEST_QUERY;
+    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()), expectedSql);
   }
 
   @Test
@@ -146,7 +147,8 @@ public class PinotPreparedStatementTest {
         new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = pinotConnection.prepareStatement("");
     preparedStatement.executeQuery(BASIC_TEST_QUERY);
-    String expectedSql = DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING) + BASIC_TEST_QUERY;
-    Assert.assertEquals(expectedSql, _dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()));
+    String expectedSql =
+        DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING, true) + BASIC_TEST_QUERY;
+    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()), expectedSql);
   }
 }

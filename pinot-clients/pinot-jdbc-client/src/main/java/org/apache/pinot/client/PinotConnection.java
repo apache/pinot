@@ -48,7 +48,7 @@ public class PinotConnection extends AbstractBaseConnection {
   private boolean _closed;
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
-  private final Map<String, Boolean> _queryOptions = new HashMap<String, Boolean>();
+  private final Map<String, Object> _queryOptions = new HashMap<String, Object>();
 
   public static final String BROKER_LIST = "brokers";
 
@@ -75,15 +75,47 @@ public class PinotConnection extends AbstractBaseConnection {
     _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
 
     for (String possibleQueryOption: POSSIBLE_QUERY_OPTIONS) {
-      _queryOptions.put(possibleQueryOption, Boolean.parseBoolean(properties.getProperty(possibleQueryOption)));
+      Object property = properties.getProperty(possibleQueryOption);
+      if (property != null) {
+        _queryOptions.put(possibleQueryOption, parseOptionValue(property));
+      }
     }
+  }
+
+  private Object parseOptionValue(Object value) {
+    if (value instanceof String) {
+      String str = (String) value;
+
+      try {
+        Long numVal = Long.valueOf(str);
+        if (numVal != null) {
+            return numVal;
+        }
+      } catch (NumberFormatException e) {
+      }
+
+      try {
+          Double numVal = Double.valueOf(str);
+          if (numVal != null) {
+              return numVal;
+          }
+      } catch (NumberFormatException e) {
+      }
+
+      Boolean boolVal = Boolean.valueOf(str.toLowerCase());
+      if (boolVal != null) {
+          return boolVal;
+      }
+    }
+
+    return value;
   }
 
   public org.apache.pinot.client.Connection getSession() {
     return _session;
   }
 
-  public Map<String, Boolean> getQueryOptions() {
+  public Map<String, Object> getQueryOptions() {
     return _queryOptions;
   }
 
