@@ -73,7 +73,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       VirtualServerAddress sendingServer, long jobId, int senderStageId, int receiverStageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
         server -> toMailboxId(server, jobId, senderStageId, receiverStageId, sendingServer), BlockExchange::getExchange,
-        jobId, senderStageId, receiverStageId);
+        jobId, senderStageId, receiverStageId, sendingServer);
   }
 
   @VisibleForTesting
@@ -81,8 +81,8 @@ public class MailboxSendOperator extends MultiStageOperator {
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int senderStageId,
-      int receiverStageId) {
-    super(jobId, senderStageId);
+      int receiverStageId, VirtualServerAddress serverAddress) {
+    super(jobId, senderStageId, serverAddress);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
     List<MailboxIdentifier> receivingMailboxes;

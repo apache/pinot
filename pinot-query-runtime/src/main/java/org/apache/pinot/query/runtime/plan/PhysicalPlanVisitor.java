@@ -85,8 +85,8 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   @Override
   public MultiStageOperator visitAggregate(AggregateNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
-        node.getGroupSet(), node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId);
+    return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(), node.getGroupSet(),
+        node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId, context.getServer());
   }
 
   @Override
@@ -99,7 +99,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   public MultiStageOperator visitFilter(FilterNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition(), context.getRequestId(),
-        context.getStageId());
+        context.getStageId(), context.getServer());
   }
 
   @Override
@@ -111,21 +111,21 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MultiStageOperator rightOperator = right.visit(this, context);
 
     return new HashJoinOperator(leftOperator, rightOperator, left.getDataSchema(), node, context.getRequestId(),
-        context.getStageId());
+        context.getStageId(), context.getServer());
   }
 
   @Override
   public MultiStageOperator visitProject(ProjectNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(nextOperator, node.getDataSchema(), node.getProjects(),
-        node.getInputs().get(0).getDataSchema(), context.getRequestId(), context.getStageId());
+        node.getInputs().get(0).getDataSchema(), context.getRequestId(), context.getStageId(), context.getServer());
   }
 
   @Override
   public MultiStageOperator visitSort(SortNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new SortOperator(nextOperator, node.getCollationKeys(), node.getCollationDirections(),
-        node.getFetch(), node.getOffset(), node.getDataSchema(), context.getRequestId(), context.getStageId());
+    return new SortOperator(nextOperator, node.getCollationKeys(), node.getCollationDirections(), node.getFetch(),
+        node.getOffset(), node.getDataSchema(), context.getRequestId(), context.getStageId(), context.getServer());
   }
 
   @Override
@@ -136,6 +136,6 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   @Override
   public MultiStageOperator visitValue(ValueNode node, PlanRequestContext context) {
     return new LiteralValueOperator(node.getDataSchema(), node.getLiteralRows(), context.getRequestId(),
-        context.getStageId());
+        context.getStageId(), context.getServer());
   }
 }

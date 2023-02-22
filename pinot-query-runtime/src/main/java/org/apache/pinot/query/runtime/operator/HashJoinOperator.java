@@ -35,6 +35,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
@@ -88,8 +89,8 @@ public class HashJoinOperator extends MultiStageOperator {
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
   public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
-      DataSchema leftSchema, JoinNode node, long requestId, int stageId) {
-    super(requestId, stageId);
+      DataSchema leftSchema, JoinNode node, long requestId, int stageId, VirtualServerAddress serverAddress) {
+    super(requestId, stageId, serverAddress);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();

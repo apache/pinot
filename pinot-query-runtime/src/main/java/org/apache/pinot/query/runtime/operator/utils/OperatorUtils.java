@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -31,6 +32,10 @@ import org.slf4j.LoggerFactory;
 
 
 public class OperatorUtils {
+  public static final String NUM_BLOCKS = "numBlocks";
+  public static final String NUM_ROWS = "numRows";
+  public static final String THREAD_EXECUTION_TIME = "threadExecutionTime";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(OperatorUtils.class);
   private static final Map<String, String> OPERATOR_TOKEN_MAPPING = new HashMap<>();
 
@@ -69,6 +74,7 @@ public class OperatorUtils {
       Map<String, Object> jsonOut = new HashMap<>();
       jsonOut.put("requestId", operatorStats.getRequestId());
       jsonOut.put("stageId", operatorStats.getStageId());
+      jsonOut.put("serverAddress", operatorStats.getServerAddress().toString());
       jsonOut.put("operatorType", operatorStats.getOperatorType());
       jsonOut.put("executionStats", operatorStats.getExecutionStats());
       return JsonUtils.objectToString(jsonOut);
@@ -83,9 +89,12 @@ public class OperatorUtils {
       JsonNode operatorStatsNode = JsonUtils.stringToJsonNode(json);
       long requestId = operatorStatsNode.get("requestId").asLong();
       int stageId = operatorStatsNode.get("stageId").asInt();
+      String serverAddressStr = operatorStatsNode.get("serverAddress").asText();
+      VirtualServerAddress serverAddress = VirtualServerAddress.parse(serverAddressStr);
       String operatorType = operatorStatsNode.get("operatorType").asText();
 
-      OperatorStats operatorStats = new OperatorStats(requestId, stageId, operatorType);
+      OperatorStats operatorStats =
+          new OperatorStats(requestId, stageId, serverAddress, operatorType);
       operatorStats.recordExecutionStats(
           JsonUtils.jsonNodeToObject(operatorStatsNode.get("executionStats"), new TypeReference<Map<String, String>>() {
           }));
