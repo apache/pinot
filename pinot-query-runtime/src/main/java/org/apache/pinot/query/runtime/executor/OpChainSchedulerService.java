@@ -82,18 +82,16 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
             }
 
             if (!result.isEndOfStreamBlock()) {
+              // TODO: There should be a waiting-for-data state in OpChainStats.
+              operatorChain.getStats().queued();
               _scheduler.yield(operatorChain);
-            } else {
+            } else if (result.isEndOfStreamBlock()) {
               isFinished = true;
-              if (result.isErrorBlock()) {
-                operatorChain.getRoot().toExplainString();
-                LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
-                    result.getDataBlock().getExceptions());
-              } else {
-                operatorChain.getRoot().toExplainString();
-                operatorChain.getStats().setOperatorStatsMap(result.getResultMetadata());
-                LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
-              }
+              LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+                  result.getDataBlock().getExceptions());
+            } else {
+              operatorChain.getStats().setOperatorStatsMap(result.getResultMetadata());
+              LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
             }
           } catch (Exception e) {
             LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
@@ -116,17 +114,13 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    * @param operatorChain the chain to register
    */
   public final void register(OpChain operatorChain) {
+    operatorChain.getStats().queued();
     _scheduler.register(operatorChain);
     LOGGER.debug("({}): Scheduler is now handling operator chain listening to mailboxes {}. "
             + "There are a total of {} chains awaiting execution.",
         operatorChain,
         operatorChain.getReceivingMailbox(),
         _scheduler.size());
-
-    // we want to track the time that it takes from registering
-    // an operator chain to when it completes, so make sure to
-    // start the timer here
-    operatorChain.getStats().startExecutionTimer();
   }
 
   /**

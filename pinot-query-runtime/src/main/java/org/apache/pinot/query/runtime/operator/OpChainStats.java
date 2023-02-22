@@ -26,12 +26,14 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 
 /**
  * {@code OpChainStats} tracks execution statistics for {@link OpChain}s.
  */
+@NotThreadSafe
 public class OpChainStats {
 
   // use memoized supplier so that the timing doesn't start until the
@@ -56,47 +58,18 @@ public class OpChainStats {
 
   public void executing() {
     startExecutionTimer();
-    safeStop(_queuedStopwatch);
+    if (_queuedStopwatch.isRunning()) {
+      _queuedStopwatch.stop();
+    }
   }
 
   public void queued() {
     _queuedCount.incrementAndGet();
-    safeStart(_queuedStopwatch);
-    safeStop(_executeStopwatch);
-  }
-
-  public void startExecutionTimer() {
-    _exTimerStarted = true;
-    _exTimer.get();
-    safeStart(_executeStopwatch);
-  }
-
-  /**
-   * Stopwatch has a pre-condition in the stop method which asserts that the stopwatch is not running. This avoids
-   * {@link IllegalStateException}.
-   */
-  private void safeStop(Stopwatch stopwatch) {
-    if (stopwatch.isRunning()) {
-      synchronized (stopwatch) {
-        if (stopwatch.isRunning()) {
-          stopwatch.stop();
-        }
-      }
+    if (!_queuedStopwatch.isRunning()) {
+      _queuedStopwatch.start();
     }
-  }
-
-
-  /**
-   * Stopwatch has a pre-condition in the start method which asserts that the stopwatch is not running. This avoids
-   * {@link IllegalStateException}
-   */
-  private void safeStart(Stopwatch stopwatch) {
-    if (!stopwatch.isRunning()) {
-      synchronized (stopwatch) {
-        if (!stopwatch.isRunning()) {
-          stopwatch.start();
-        }
-      }
+    if (_executeStopwatch.isRunning()) {
+      _executeStopwatch.stop();
     }
   }
 
@@ -106,6 +79,14 @@ public class OpChainStats {
 
   public void setOperatorStatsMap(Map<String, OperatorStats> operatorStatsMap) {
     _operatorStatsMap = operatorStatsMap;
+  }
+
+  private void startExecutionTimer() {
+    _exTimerStarted = true;
+    _exTimer.get();
+    if (!_executeStopwatch.isRunning()) {
+      _executeStopwatch.start();
+    }
   }
 
   @Override
