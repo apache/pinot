@@ -16,14 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.exception;
+package org.apache.calcite.rel.hint;
 
-public class NoTaskMetadataException extends RuntimeException {
-  public NoTaskMetadataException(String message) {
-    super(message);
+/**
+ * Default hint strategy set for Pinot query.
+ */
+public class PinotHintStrategyTable {
+  public static final String INTERNAL_AGG_INTERMEDIATE_STAGE = "aggIntermediateStage";
+  public static final String INTERNAL_AGG_FINAL_STAGE = "aggFinalStage";
+
+  private PinotHintStrategyTable() {
+    // do not instantiate.
   }
 
-  public NoTaskMetadataException(String message, Throwable cause) {
-    super(message, cause);
-  }
+  public static final HintStrategyTable PINOT_HINT_STRATEGY_TABLE = HintStrategyTable.builder()
+      .hintStrategy(INTERNAL_AGG_INTERMEDIATE_STAGE, HintPredicates.AGGREGATE)
+      .hintStrategy(INTERNAL_AGG_FINAL_STAGE, HintPredicates.AGGREGATE)
+      .build();
 }

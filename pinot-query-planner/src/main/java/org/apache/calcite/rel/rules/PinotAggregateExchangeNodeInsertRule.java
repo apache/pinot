@@ -46,7 +46,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.ImmutableIntList;
-import org.apache.pinot.query.planner.hints.PinotRelationalHints;
+import org.apache.pinot.query.planner.stage.AggregateNode;
 
 
 /**
@@ -83,8 +83,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     }
     if (call.rel(0) instanceof Aggregate) {
       Aggregate agg = call.rel(0);
-      return !agg.getHints().contains(PinotRelationalHints.AGG_LEAF_STAGE)
-          && !agg.getHints().contains(PinotRelationalHints.AGG_INTERMEDIATE_STAGE);
+      return !agg.getHints().contains(AggregateNode.INTERMEDIATE_STAGE_HINT)
+          && !agg.getHints().contains(AggregateNode.FINAL_STAGE_HINT);
     }
     return false;
   }
@@ -104,7 +104,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // 1. attach leaf agg RelHint to original agg.
     ImmutableList<RelHint> newLeafAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(PinotRelationalHints.AGG_LEAF_STAGE).build();
+        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(AggregateNode.INTERMEDIATE_STAGE_HINT).build();
     Aggregate newLeafAgg =
         new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
             oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
@@ -150,7 +150,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
     ImmutableList<RelHint> newIntermediateAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(PinotRelationalHints.AGG_INTERMEDIATE_STAGE).build();
+        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(AggregateNode.FINAL_STAGE_HINT).build();
     ImmutableBitSet groupSet = ImmutableBitSet.range(nGroups);
     relBuilder.aggregate(
         relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)),

@@ -61,7 +61,6 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
@@ -110,9 +109,6 @@ public class CalciteSqlParser {
   public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
       throws SqlCompilationException {
     long parseStartTimeNs = System.nanoTime();
-
-    // Remove the comments from the query
-    sql = removeComments(sql);
 
     // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
@@ -494,103 +490,6 @@ public class CalciteSqlParser {
     return options;
   }
 
-  /**
-   * Removes comments from the query.
-   * NOTE: Comment indicator within single quotes (literal) and double quotes (identifier) are ignored.
-   */
-  @VisibleForTesting
-  static String removeComments(String sql) {
-    boolean openSingleQuote = false;
-    boolean openDoubleQuote = false;
-    boolean commented = false;
-    boolean singleLineCommented = false;
-    boolean multiLineCommented = false;
-    int commentStartIndex = -1;
-    List<Pairs.IntPair> commentedParts = new ArrayList<>();
-
-    int length = sql.length();
-    int index = 0;
-    while (index < length) {
-      switch (sql.charAt(index)) {
-        case '\'':
-          if (!commented && !openDoubleQuote) {
-            openSingleQuote = !openSingleQuote;
-          }
-          break;
-        case '"':
-          if (!commented && !openSingleQuote) {
-            openDoubleQuote = !openDoubleQuote;
-          }
-          break;
-        case '-':
-          // Single line comment start indicator: --
-          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
-              && sql.charAt(index + 1) == '-') {
-            commented = true;
-            singleLineCommented = true;
-            commentStartIndex = index;
-            index++;
-          }
-          break;
-        case '\n':
-          // Single line comment end indicator: \n
-          if (singleLineCommented) {
-            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 1));
-            commented = false;
-            singleLineCommented = false;
-            commentStartIndex = -1;
-          }
-          break;
-        case '/':
-          // Multi-line comment start indicator: /*
-          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
-              && sql.charAt(index + 1) == '*') {
-            commented = true;
-            multiLineCommented = true;
-            commentStartIndex = index;
-            index++;
-          }
-          break;
-        case '*':
-          // Multi-line comment end indicator: */
-          if (multiLineCommented && index < length - 1 && sql.charAt(index + 1) == '/') {
-            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 2));
-            commented = false;
-            multiLineCommented = false;
-            commentStartIndex = -1;
-            index++;
-          }
-          break;
-        default:
-          break;
-      }
-      index++;
-    }
-
-    if (commentedParts.isEmpty()) {
-      if (singleLineCommented) {
-        return sql.substring(0, commentStartIndex);
-      } else {
-        return sql;
-      }
-    } else {
-      StringBuilder stringBuilder = new StringBuilder();
-      int startIndex = 0;
-      for (Pairs.IntPair commentedPart : commentedParts) {
-        stringBuilder.append(sql, startIndex, commentedPart.getLeft()).append(' ');
-        startIndex = commentedPart.getRight();
-      }
-      if (startIndex < length) {
-        if (singleLineCommented) {
-          stringBuilder.append(sql, startIndex, commentStartIndex);
-        } else {
-          stringBuilder.append(sql, startIndex, length);
-        }
-      }
-      return stringBuilder.toString();
-    }
-  }
-
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
     List<Expression> selectExpr = new ArrayList<>();
     selectExpr.add(convertDistinctAndSelectListToFunctionExpression(selectList));
@@ -713,15 +612,16 @@ public class CalciteSqlParser {
         SqlNode elseOperand = caseSqlNode.getElseOperand();
         Expression caseFuncExpr = RequestUtils.getFunctionExpression("case");
         Preconditions.checkState(whenOperands.size() == thenOperands.size());
-        for (int i = 0; i < whenOperands.size(); i++) {
-          SqlNode whenSqlNode = whenOperands.get(i);
+        // TODO: convert this to new format once 0.13 is released
+        for (SqlNode whenSqlNode : whenOperands.getList()) {
           Expression whenExpression = toExpression(whenSqlNode);
           if (isAggregateExpression(whenExpression)) {
             throw new SqlCompilationException(
                 "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
           }
           caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
-          SqlNode thenSqlNode = thenOperands.get(i);
+        }
+        for (SqlNode thenSqlNode : thenOperands.getList()) {
           Expression thenExpression = toExpression(thenSqlNode);
           if (isAggregateExpression(thenExpression)) {
             throw new SqlCompilationException(
