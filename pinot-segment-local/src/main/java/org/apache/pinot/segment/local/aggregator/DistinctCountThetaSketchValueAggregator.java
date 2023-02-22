@@ -31,7 +31,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Sketch> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
-  Union _union;
+  private final Union _union;
 
   public DistinctCountThetaSketchValueAggregator() {
     // TODO: Handle configurable nominal entries for StarTreeBuilder
