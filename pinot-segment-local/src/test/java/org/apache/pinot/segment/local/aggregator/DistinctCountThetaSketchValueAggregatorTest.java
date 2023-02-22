@@ -24,7 +24,6 @@ import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
