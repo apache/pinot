@@ -25,36 +25,46 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
   private final Consumer<MailboxIdentifier> _gotMailCallback;
-  private final String _mailboxId;
+  private final JsonMailboxIdentifier _mailboxId;
 
   // TODO: changed to 2-way communication channel.
   private InMemoryTransferStream _transferStream;
 
   public InMemorySendingMailbox(String mailboxId, InMemoryTransferStream transferStream,
       Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxId = mailboxId;
+    _mailboxId = JsonMailboxIdentifier.parse(mailboxId);
     _transferStream = transferStream;
     _gotMailCallback = gotMailCallback;
   }
 
   @Override
-  public void open() {
-  }
-
-  @Override
   public String getMailboxId() {
-    return _mailboxId;
+    return _mailboxId.toString();
   }
 
   @Override
   public void send(TransferableBlock data)
       throws UnsupportedOperationException {
-    _transferStream.offer(data);
-    _gotMailCallback.accept(JsonMailboxIdentifier.parse(_mailboxId));
+    if (!_transferStream.isInitialized()) {
+      _transferStream.initialize();
+    }
+    _transferStream.send(data);
+    _gotMailCallback.accept(_mailboxId);
   }
 
   @Override
   public void complete() {
+    _transferStream.complete();
+  }
+
+  @Override
+  public boolean isInitialized() {
+    return _transferStream.isInitialized();
+  }
+
+  @Override
+  public boolean isClosed() {
+    return _transferStream.isInitialized() && _transferStream.isCompleted();
   }
 
   @Override

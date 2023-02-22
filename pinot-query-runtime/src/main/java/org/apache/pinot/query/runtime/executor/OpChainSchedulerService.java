@@ -68,6 +68,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
         @Override
         public void runJob() {
           boolean isFinished = false;
+          boolean returnedErrorBlock = false;
           Throwable thrown = null;
           try {
             LOGGER.trace("({}): Executing", operatorChain);

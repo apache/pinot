@@ -94,4 +94,11 @@ public abstract class BlockExchange {
   }
 
   protected abstract void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block);
+
+  public void close() {
+    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+      if (sendingMailbox.isInitialized() && !sendingMailbox.isClosed()) {
+      }
+    }
+  }
 }

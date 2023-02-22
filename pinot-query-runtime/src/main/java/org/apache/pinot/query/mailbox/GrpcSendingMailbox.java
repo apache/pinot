@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,12 +31,15 @@ import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * GRPC implementation of the {@link SendingMailbox}.
  */
 public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
   private final String _mailboxId;
   private final AtomicBoolean _initialized = new AtomicBoolean(false);
 
@@ -48,14 +52,12 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     _mailboxId = mailboxId;
     _mailboxContentStreamObserverSupplier = contentStreamObserverSupplier;
     _statusObserver = statusObserver;
-    _initialized.set(false);
   }
 
   @Override
   public void send(TransferableBlock block)
-      throws UnsupportedOperationException {
+      throws Exception {
     if (!_initialized.get()) {
-      // initialization is special
       open();
     }
     if (_statusObserver.isFinished()) {
@@ -73,12 +75,22 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   }
 
   @Override
-  public void open() {
-    _mailboxContentStreamObserver = _mailboxContentStreamObserverSupplier.get();
-    // send a begin-of-stream message.
-    _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder().setMailboxId(_mailboxId)
-        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true").build());
-    _initialized.set(true);
+  public boolean isInitialized() {
+    return _initialized.get();
+  }
+
+  @Override
+  public boolean isClosed() {
+    return _initialized.get() && _statusObserver.isFinished();
+  }
+
+  @Override
+  public void cancel(Throwable t) {
+    if (isInitialized() && !isClosed()) {
+      LOGGER.warn("Grpc Sending Mailbox={} cancelling stream", _mailboxId);
+      _mailboxContentStreamObserver.onError(Status.fromThrowable(
+          new RuntimeException("Cancelled by the caller")).asRuntimeException());
+    }
   }
 
   @Override
@@ -86,8 +98,12 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     return _mailboxId;
   }
 
-  @Override
-  public void cancel(Throwable t) {
+  private void open() {
+    _mailboxContentStreamObserver = _mailboxContentStreamObserverSupplier.get();
+    _initialized.set(true);
+    // send a begin-of-stream message.
+    _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder().setMailboxId(_mailboxId)
+        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true").build());
   }
 
   private MailboxContent toMailboxContent(DataBlock dataBlock) {

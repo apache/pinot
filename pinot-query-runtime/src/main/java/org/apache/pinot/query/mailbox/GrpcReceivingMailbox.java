@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
@@ -51,7 +50,6 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   private Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
   private final AtomicInteger _totalMsgReceived = new AtomicInteger(0);
-  private final AtomicBoolean _claimed = new AtomicBoolean(false);
 
   private MailboxContentStreamObserver _contentStreamObserver;
   private StreamObserver<Mailbox.MailboxStatus> _statusStreamObserver;
@@ -82,9 +80,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
    * </p>
    */
   @Override
-  public TransferableBlock receive()
-      throws Exception {
-    _claimed.set(true);
+  public TransferableBlock receive() throws Exception {
     if (!waitForInitialize()) {
       return null;
     }
@@ -95,7 +91,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
 
   @Override
   public boolean isInitialized() {
-    return _initializationLatch.getCount() <= 0;
+    return _initializationLatch.getCount() == 0;
   }
 
   @Override
@@ -126,10 +122,6 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   @Override
   public String getMailboxId() {
     return _mailboxId;
-  }
-
-  public boolean isClaimed() {
-    return _claimed.get();
   }
 
   /**

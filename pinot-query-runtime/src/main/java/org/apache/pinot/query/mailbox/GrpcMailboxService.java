@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
 public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxService.class);
   // channel manager
-  private static final Duration DANGLING_RECEIVING_MAILBOX_EXPIRY = Duration.ofMinutes(2);
+  private static final Duration DANGLING_RECEIVING_MAILBOX_EXPIRY = Duration.ofMinutes(5);
   private final ChannelManager _channelManager;
   private final String _hostname;
   private final int _mailboxPort;
@@ -68,9 +68,9 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
             @Override
             public void onRemoval(RemovalNotification<String, GrpcReceivingMailbox> notification) {
               if (notification.wasEvicted()) {
-                if (!notification.getValue().isClaimed()) {
-                  notification.getValue().cancel();
-                }
+                // This means that this mailbox hasn't been polled in a while, so cancel it to ensure all resources
+                // are released
+                notification.getValue().cancel();
               }
             }
           })

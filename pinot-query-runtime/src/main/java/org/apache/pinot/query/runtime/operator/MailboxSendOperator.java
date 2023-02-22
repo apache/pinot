@@ -156,6 +156,11 @@ public class MailboxSendOperator extends MultiStageOperator {
     return transferableBlock;
   }
 
+  @Override
+  public void close() {
+    super.close();
+  }
+
   private static JsonMailboxIdentifier toMailboxId(
       VirtualServer destination, long jobId, int senderStageId, int receiverStageId, VirtualServerAddress sender) {
     return new JsonMailboxIdentifier(

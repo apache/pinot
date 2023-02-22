@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private final String _mailboxId;
-  private final AtomicBoolean _isClaimed = new AtomicBoolean(false);
   private final InMemoryTransferStream _transferStream;
   private volatile boolean _closed;
 
@@ -43,7 +41,9 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
   @Override
   public TransferableBlock receive()
       throws Exception {
-    _isClaimed.set(true);
+    if (!_transferStream.waitForInitialize()) {
+      return null;
+    }
     TransferableBlock block = _transferStream.poll();
 
     if (block == null) {
@@ -59,6 +59,7 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
 
   @Override
   public boolean isInitialized() {
+    _transferStream.isInitialized();
     return true;
   }
 
@@ -69,10 +70,6 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
 
   @Override
   public void cancel() {
-  }
-
-  @Override
-  public boolean isClaimed() {
-    return _isClaimed.get();
+    _transferStream.cancel();
   }
 }
