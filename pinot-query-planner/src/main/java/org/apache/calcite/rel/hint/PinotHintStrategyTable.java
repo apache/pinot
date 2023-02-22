@@ -16,19 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.hints;
-
-import org.apache.calcite.rel.hint.RelHint;
-
+package org.apache.calcite.rel.hint;
 
 /**
- * Provide certain relational hint to query planner for better optimization.
+ * Default hint strategy set for Pinot query.
  */
-public class PinotRelationalHints {
-  public static final RelHint AGG_INTERMEDIATE_STAGE = RelHint.builder("AGG_INTERMEDIATE_STAGE").build();
-  public static final RelHint AGG_LEAF_STAGE = RelHint.builder("AGG_LEAF_STAGE").build();
+public class PinotHintStrategyTable {
+  public static final String INTERNAL_AGG_INTERMEDIATE_STAGE = "aggIntermediateStage";
+  public static final String INTERNAL_AGG_FINAL_STAGE = "aggFinalStage";
 
-  private PinotRelationalHints() {
+  private PinotHintStrategyTable() {
     // do not instantiate.
   }
+
+  public static final HintStrategyTable PINOT_HINT_STRATEGY_TABLE = HintStrategyTable.builder()
+      .hintStrategy(INTERNAL_AGG_INTERMEDIATE_STAGE, HintPredicates.AGGREGATE)
+      .hintStrategy(INTERNAL_AGG_FINAL_STAGE, HintPredicates.AGGREGATE)
+      .build();
 }

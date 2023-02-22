@@ -866,15 +866,11 @@ public class CalciteSqlCompilerTest {
     testRemoveComments("select * from myTable--hello\n", "select * from myTable");
     testRemoveComments("select * from--hello\nmyTable", "select * from myTable");
     testRemoveComments("select * from/*hello*/myTable", "select * from myTable");
-    // Multi-line comment must have end indicator
-    testRemoveComments("select * from myTable/*hello", "select * from myTable/*hello");
     testRemoveComments("select * from myTable--", "select * from myTable");
     testRemoveComments("select * from myTable--\n", "select * from myTable");
     testRemoveComments("select * from--\nmyTable", "select * from myTable");
     testRemoveComments("select * from/**/myTable", "select * from myTable");
-    // End indicator itself has no effect
     testRemoveComments("select * from\nmyTable", "select * from\nmyTable");
-    testRemoveComments("select * from*/myTable", "select * from*/myTable");
 
     // Mix of single line and multi-line comment indicators
     testRemoveComments("select * from myTable--hello--world", "select * from myTable");
@@ -906,7 +902,9 @@ public class CalciteSqlCompilerTest {
   }
 
   private void testRemoveComments(String sqlWithComments, String expectedSqlWithoutComments) {
-    Assert.assertEquals(CalciteSqlParser.removeComments(sqlWithComments).trim(), expectedSqlWithoutComments.trim());
+    PinotQuery commentedResult = CalciteSqlParser.compileToPinotQuery(sqlWithComments);
+    PinotQuery expectedResult = CalciteSqlParser.compileToPinotQuery(expectedSqlWithoutComments);
+    Assert.assertEquals(commentedResult, expectedResult);
   }
 
   @Test

@@ -35,6 +35,7 @@ import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.hint.HintStrategyTable;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
@@ -238,6 +239,6 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
 
   private HintStrategyTable getHintStrategyTable() {
-    return HintStrategyTable.builder().build();
+    return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
   }
 }
