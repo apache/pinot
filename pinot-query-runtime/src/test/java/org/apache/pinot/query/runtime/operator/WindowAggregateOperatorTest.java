@@ -91,7 +91,7 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testShouldHandleEndOfStreamBlockWithNoOtherInputs() {
+  public void testShouldHandleEmptyBlockWithNoOtherInputs() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
@@ -110,7 +110,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Mockito.verify(_input, Mockito.times(1)).nextBlock();
-    Assert.assertTrue(block.isEndOfStreamBlock(), "EOS blocks should propagate");
+    Assert.assertEquals(block.getContainer(), Collections.emptyList(), "Empty blocks should propagate");
   }
 
   @Test

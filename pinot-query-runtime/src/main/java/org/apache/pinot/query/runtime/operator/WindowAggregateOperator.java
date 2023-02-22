@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -228,7 +229,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
     _hasReturnedWindowAggregateBlock = true;
     if (rows.size() == 0) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return new TransferableBlock(Collections.emptyList(), _resultSchema, DataBlock.Type.ROW);
     } else {
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
