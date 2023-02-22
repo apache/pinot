@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.stage;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -50,6 +51,8 @@ public class AggregateNode extends AbstractStageNode {
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = groupSet;
     _relHints = relHints;
+    Preconditions.checkState(!(isFinalStage(this) && isIntermediateStage(this)),
+        "Unable to compile aggregation with both hints for final and intermediate agg type.");
   }
 
   public static boolean isFinalStage(AggregateNode aggNode) {
