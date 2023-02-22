@@ -1760,15 +1760,16 @@ public class PinotHelixResourceManager {
     }
 
     // Process and persist tier config instancePartitions
-    if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
+    if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())
+        && tableConfig.getInstanceAssignmentConfigMap() != null) {
       for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
-        if (tierConfig.getInstanceAssignmentConfig() != null) {
+        if (tableConfig.getInstanceAssignmentConfigMap().containsKey(tierConfig.getName())) {
           if (override || InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
               InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierConfig.getName()))
               == null) {
             InstancePartitions instancePartitions =
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
-                    tierConfig.getInstanceAssignmentConfig());
+                    tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
             InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
           }
         }

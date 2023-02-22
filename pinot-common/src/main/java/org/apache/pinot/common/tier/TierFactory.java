@@ -63,6 +63,6 @@ public final class TierFactory {
       throw new IllegalStateException("Unsupported storageType: " + storageSelectorType);
     }
 
-    return new Tier(tierConfig.getName(), segmentSelector, storageSelector, tierConfig.getInstanceAssignmentConfig());
+    return new Tier(tierConfig.getName(), segmentSelector, storageSelector);
   }
 }

@@ -114,7 +114,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false));
     offlineTableConfig.setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.OFFLINE, offlineInstanceAssignmentConfig));
+        Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(offlineTableConfig);
 
     // OFFLINE instance partitions should be generated
@@ -132,7 +132,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
         new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false));
     realtimeTableConfig.setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, consumingInstanceAssignmentConfig));
+        Collections.singletonMap(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
 
     // CONSUMING instance partitions should be generated
@@ -152,9 +152,9 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
 
     // Use OFFLINE instance assignment config as the COMPLETED instance assignment config
     realtimeTableConfig.setInstanceAssignmentConfigMap(
-        new TreeMap<InstancePartitionsType, InstanceAssignmentConfig>() {{
-          put(InstancePartitionsType.CONSUMING, consumingInstanceAssignmentConfig);
-          put(InstancePartitionsType.COMPLETED, offlineInstanceAssignmentConfig);
+        new TreeMap<String, InstanceAssignmentConfig>() {{
+          put(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig);
+          put(InstancePartitionsType.COMPLETED.toString(), offlineInstanceAssignmentConfig);
         }});
     _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
 

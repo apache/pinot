@@ -554,7 +554,8 @@ public class TableRebalancer {
         InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig.getTableName(),
             tier.getName(), storage.getServerTag());
 
-    if (tier.getInstanceAssignmentConfig() == null) {
+    if (tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
+        .containsKey(tier.getName())) {
       LOGGER.info("Skipping fetching/computing instance partitions for tier {} for table: {}", tier.getName(),
           tableConfig.getTableName());
       if (!dryRun) {
@@ -578,7 +579,7 @@ public class TableRebalancer {
       InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
       InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(tier.getName(),
           _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
-          existingInstancePartitions, tier.getInstanceAssignmentConfig());
+          existingInstancePartitions, tableConfig.getInstanceAssignmentConfigMap().get(tier.getName()));
       if (!dryRun) {
         LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
         InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);

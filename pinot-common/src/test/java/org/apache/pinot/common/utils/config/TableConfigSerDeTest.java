@@ -212,7 +212,7 @@ public class TableConfigSerDeTest {
               new InstanceConstraintConfig(Arrays.asList("constraint1", "constraint2")),
               new InstanceReplicaGroupPartitionConfig(true, 0, 3, 5, 0, 0, false));
       TableConfig tableConfig = tableConfigBuilder.setInstanceAssignmentConfigMap(
-          Collections.singletonMap(InstancePartitionsType.OFFLINE, instanceAssignmentConfig)).build();
+          Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig)).build();
 
       checkInstanceAssignmentConfig(tableConfig);
 
@@ -304,11 +304,11 @@ public class TableConfigSerDeTest {
       // With tier config
       List<TierConfig> tierConfigList = Lists.newArrayList(
           new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
-              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierA_tag_OFFLINE", null, null, null),
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierA_tag_OFFLINE", null, null),
           new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null, null),
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null),
           new TierConfig("tier0", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0"),
-              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null, null));
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null));
       TableConfig tableConfig = tableConfigBuilder.setTierConfigList(tierConfigList).build();
 
       checkTierConfigList(tableConfig);
@@ -488,12 +488,12 @@ public class TableConfigSerDeTest {
   }
 
   private void checkInstanceAssignmentConfig(TableConfig tableConfig) {
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        tableConfig.getInstanceAssignmentConfigMap();
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     assertNotNull(instanceAssignmentConfigMap);
     assertEquals(instanceAssignmentConfigMap.size(), 1);
-    assertTrue(instanceAssignmentConfigMap.containsKey(InstancePartitionsType.OFFLINE));
-    InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE);
+    assertTrue(instanceAssignmentConfigMap.containsKey(InstancePartitionsType.OFFLINE.toString()));
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
 
     InstanceTagPoolConfig tagPoolConfig = instanceAssignmentConfig.getTagPoolConfig();
     assertEquals(tagPoolConfig.getTag(), "tenant_OFFLINE");

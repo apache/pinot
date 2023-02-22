@@ -85,15 +85,13 @@ public class PinotInstanceAssignmentRestletResource {
   @ApiOperation(value = "Get the instance partitions")
   public Map<String, InstancePartitions> getInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable
-          InstancePartitionsType instancePartitionsType,
-      @ApiParam(value = "Include tier", defaultValue = "false") @QueryParam("includeTier") boolean includeTier) {
+      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|Name of the tier") @QueryParam("type") @Nullable String type) {
     Map<String, InstancePartitions> instancePartitionsMap = new TreeMap<>();
 
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
-      if (instancePartitionsType == InstancePartitionsType.OFFLINE || instancePartitionsType == null) {
+      if (InstancePartitionsType.OFFLINE.toString().equals(type) || type == null) {
         InstancePartitions offlineInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
@@ -103,15 +101,15 @@ public class PinotInstanceAssignmentRestletResource {
       }
     }
     if (tableType != TableType.OFFLINE) {
-      if (instancePartitionsType == InstancePartitionsType.CONSUMING || instancePartitionsType == null) {
-        InstancePartitions consumingInstancePartitions = InstancePartitionsUtils
-            .fetchInstancePartitions(_resourceManager.getPropertyStore(),
+      if (InstancePartitionsType.CONSUMING.toString().equals(type) || type == null) {
+        InstancePartitions consumingInstancePartitions =
+            InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
         if (consumingInstancePartitions != null) {
           instancePartitionsMap.put(InstancePartitionsType.CONSUMING.toString(), consumingInstancePartitions);
         }
       }
-      if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
+      if (InstancePartitionsType.COMPLETED.toString().equals(type) || type == null) {
         InstancePartitions completedInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
@@ -121,33 +119,31 @@ public class PinotInstanceAssignmentRestletResource {
       }
     }
 
-    if (includeTier) {
-      TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
-      if (realtimeTableConfig != null && CollectionUtils.isNotEmpty(realtimeTableConfig.getTierConfigsList())) {
-        for (TierConfig tierConfig : realtimeTableConfig.getTierConfigsList()) {
-          if (tierConfig.getInstanceAssignmentConfig() != null) {
-            InstancePartitions instancePartitions =
-                InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
-                    InstancePartitionsUtils.getInstancePartitonNameForTier(realtimeTableConfig.getTableName(),
-                        tierConfig.getName()));
-            if (instancePartitions != null) {
-              instancePartitionsMap.put(tierConfig.getName(), instancePartitions);
-            }
+    TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
+    if (realtimeTableConfig != null && CollectionUtils.isNotEmpty(realtimeTableConfig.getTierConfigsList())) {
+      for (TierConfig tierConfig : realtimeTableConfig.getTierConfigsList()) {
+        if (type == null || type.equals(tierConfig.getName())) {
+          InstancePartitions instancePartitions =
+              InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
+                  InstancePartitionsUtils.getInstancePartitonNameForTier(realtimeTableConfig.getTableName(),
+                      tierConfig.getName()));
+          if (instancePartitions != null) {
+            instancePartitionsMap.put(tierConfig.getName(), instancePartitions);
           }
         }
       }
+    }
 
-      TableConfig offlineTableConfig = _resourceManager.getOfflineTableConfig(tableName);
-      if (offlineTableConfig != null && CollectionUtils.isNotEmpty(offlineTableConfig.getTierConfigsList())) {
-        for (TierConfig tierConfig : offlineTableConfig.getTierConfigsList()) {
-          if (tierConfig.getInstanceAssignmentConfig() != null) {
-            InstancePartitions instancePartitions =
-                InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
-                    InstancePartitionsUtils.getInstancePartitonNameForTier(offlineTableConfig.getTableName(),
-                        tierConfig.getName()));
-            if (instancePartitions != null) {
-              instancePartitionsMap.put(tierConfig.getName(), instancePartitions);
-            }
+    TableConfig offlineTableConfig = _resourceManager.getOfflineTableConfig(tableName);
+    if (offlineTableConfig != null && CollectionUtils.isNotEmpty(offlineTableConfig.getTierConfigsList())) {
+      for (TierConfig tierConfig : offlineTableConfig.getTierConfigsList()) {
+        if (type == null || type.equals(tierConfig.getName())) {
+          InstancePartitions instancePartitions =
+              InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
+                  InstancePartitionsUtils.getInstancePartitonNameForTier(realtimeTableConfig.getTableName(),
+                      tierConfig.getName()));
+          if (instancePartitions != null) {
+            instancePartitionsMap.put(tierConfig.getName(), instancePartitions);
           }
         }
       }
@@ -168,22 +164,18 @@ public class PinotInstanceAssignmentRestletResource {
   @ApiOperation(value = "Assign server instances to a table")
   public Map<String, InstancePartitions> assignInstances(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable
-          InstancePartitionsType instancePartitionsType,
-      @ApiParam(value = "Whether to assign tier instances") @DefaultValue("false") @QueryParam("includeTier")
-          boolean includeTier,
+      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|Name of tier") @QueryParam("type") @Nullable String type,
       @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun) {
     Map<String, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType != TableType.REALTIME && (instancePartitionsType == InstancePartitionsType.OFFLINE
-        || instancePartitionsType == null)) {
+    if (tableType != TableType.REALTIME && (InstancePartitionsType.OFFLINE.toString().equals(type) || type == null)) {
       TableConfig offlineTableConfig = _resourceManager.getOfflineTableConfig(tableName);
       if (offlineTableConfig != null) {
         try {
-          if (InstanceAssignmentConfigUtils
-              .allowInstanceAssignment(offlineTableConfig, InstancePartitionsType.OFFLINE)) {
+          if (InstanceAssignmentConfigUtils.allowInstanceAssignment(offlineTableConfig,
+              InstancePartitionsType.OFFLINE)) {
             assignInstancesForInstancePartitionsType(instancePartitionsMap, offlineTableConfig, instanceConfigs,
                 InstancePartitionsType.OFFLINE);
           }
@@ -196,20 +188,20 @@ public class PinotInstanceAssignmentRestletResource {
         }
       }
     }
-    if (tableType != TableType.OFFLINE && instancePartitionsType != InstancePartitionsType.OFFLINE) {
+    if (tableType != TableType.OFFLINE && !InstancePartitionsType.OFFLINE.toString().equals(type)) {
       TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
       if (realtimeTableConfig != null) {
         try {
-          if (instancePartitionsType == InstancePartitionsType.CONSUMING || instancePartitionsType == null) {
-            if (InstanceAssignmentConfigUtils
-                .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.CONSUMING)) {
+          if (InstancePartitionsType.CONSUMING.toString().equals(type) || type == null) {
+            if (InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig,
+                InstancePartitionsType.CONSUMING)) {
               assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
                   InstancePartitionsType.CONSUMING);
             }
           }
-          if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
-            if (InstanceAssignmentConfigUtils
-                .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.COMPLETED)) {
+          if (InstancePartitionsType.COMPLETED.toString().equals(type) || type == null) {
+            if (InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig,
+                InstancePartitionsType.COMPLETED)) {
               assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
                   InstancePartitionsType.COMPLETED);
             }
@@ -224,16 +216,14 @@ public class PinotInstanceAssignmentRestletResource {
       }
     }
 
-    if (includeTier) {
-      TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
-      if (realtimeTableConfig != null) {
-        assignInstancesForTier(instancePartitionsMap, realtimeTableConfig, instanceConfigs);
-      }
+    TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
+    if (realtimeTableConfig != null) {
+      assignInstancesForTier(instancePartitionsMap, realtimeTableConfig, instanceConfigs, type);
+    }
 
-      TableConfig offlineTableConfig = _resourceManager.getOfflineTableConfig(tableName);
-      if (offlineTableConfig != null) {
-        assignInstancesForTier(instancePartitionsMap, offlineTableConfig, instanceConfigs);
-      }
+    TableConfig offlineTableConfig = _resourceManager.getOfflineTableConfig(tableName);
+    if (offlineTableConfig != null) {
+      assignInstancesForTier(instancePartitionsMap, offlineTableConfig, instanceConfigs, type);
     }
 
     if (instancePartitionsMap.isEmpty()) {
@@ -277,17 +267,19 @@ public class PinotInstanceAssignmentRestletResource {
   }
 
   private void assignInstancesForTier(Map<String, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
-      List<InstanceConfig> instanceConfigs) {
-    if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
+      List<InstanceConfig> instanceConfigs, String tierName) {
+    if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())
+        && tableConfig.getInstanceAssignmentConfigMap() != null) {
       for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
-        if (tierConfig.getInstanceAssignmentConfig() != null) {
+        if ((tierConfig.getName().equals(tierName) || tierName == null)
+            && tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()) != null) {
           InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
               _resourceManager.getHelixZkManager().getHelixPropertyStore(),
               InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(), tierConfig.getName()));
 
           instancePartitionsMap.put(tierConfig.getName(),
               new InstanceAssignmentDriver(tableConfig).assignInstances(tierConfig.getName(), instanceConfigs,
-                  existingInstancePartitions, tierConfig.getInstanceAssignmentConfig()));
+                  existingInstancePartitions, tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName())));
         }
       }
     }
@@ -412,15 +404,14 @@ public class PinotInstanceAssignmentRestletResource {
   @ApiOperation(value = "Replace an instance in the instance partitions")
   public Map<String, InstancePartitions> replaceInstance(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable
-          InstancePartitionsType instancePartitionsType,
+      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|Name of the tier") @QueryParam("type") @Nullable
+          String type,
       @ApiParam(value = "Old instance to be replaced", required = true) @QueryParam("oldInstanceId")
           String oldInstanceId,
       @ApiParam(value = "New instance to replace with", required = true) @QueryParam("newInstanceId")
-          String newInstanceId,
-      @ApiParam(value = "Include tier", defaultValue = "false") @QueryParam("includeTier") boolean includeTier) {
+          String newInstanceId) {
     Map<String, InstancePartitions> instancePartitionsMap =
-        getInstancePartitions(tableName, instancePartitionsType, includeTier);
+        getInstancePartitions(tableName, type);
     Iterator<InstancePartitions> iterator = instancePartitionsMap.values().iterator();
     while (iterator.hasNext()) {
       InstancePartitions instancePartitions = iterator.next();
