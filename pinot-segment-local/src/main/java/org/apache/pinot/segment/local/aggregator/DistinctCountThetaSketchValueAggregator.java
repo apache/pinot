@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.util.Arrays;
+import java.util.stream.StreamSupport;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.Union;
@@ -33,6 +35,9 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   private final Union _union;
 
+  // This changes a lot similar to the Bitmap aggregator
+  private int _maxByteSize;
+
   public DistinctCountThetaSketchValueAggregator() {
     // TODO: Handle configurable nominal entries for StarTreeBuilder
     _union = Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
@@ -47,9 +52,6 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   public DataType getAggregatedValueType() {
     return AGGREGATED_VALUE_TYPE;
   }
-
-  // This changes a lot similar to the Bitmap aggregator
-  private int _maxByteSize;
 
   // Utility method to create a theta sketch with one item in it
   private Sketch singleItemSketch(Object rawValue) {
@@ -67,10 +69,40 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
       sketch.update((Double) rawValue);
     } else if (rawValue instanceof Float) {
       sketch.update((Float) rawValue);
+    } else if (rawValue instanceof Object[]) {
+      addObjectsToSketch((Object[]) rawValue, sketch);
     } else {
-      sketch.update(rawValue.hashCode());
+      throw new IllegalStateException(
+          "Unsupported data type for Theta Sketch aggregation: " + rawValue.getClass().getName());
     }
     return sketch.compact();
+  }
+
+  private void addObjectsToSketch(Object[] rawValues, UpdateSketch updateSketch) {
+    if (rawValues instanceof String[]) {
+      for (String s : (String[]) rawValues) {
+        updateSketch.update(s);
+      }
+    } else if (rawValues instanceof Integer[]) {
+      for (Integer i : (Integer[]) rawValues) {
+        updateSketch.update(i);
+      }
+    } else if (rawValues instanceof Long[]) {
+      for (Long l : (Long[]) rawValues) {
+        updateSketch.update(l);
+      }
+    } else if (rawValues instanceof Double[]) {
+      for (Double d : (Double[]) rawValues) {
+        updateSketch.update(d);
+      }
+    } else if (rawValues instanceof Float[]) {
+      for (Float f : (Float[]) rawValues) {
+        updateSketch.update(f);
+      }
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for Theta Sketch aggregation: " + rawValues.getClass().getName());
+    }
   }
 
   // Utility method to merge two sketches
@@ -78,13 +110,25 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
     return _union.union(left, right);
   }
 
+  // Utility method to make an empty sketch
+  private Sketch empty() {
+    // TODO: Handle configurable nominal entries for StarTreeBuilder
+    return Sketches.updateSketchBuilder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
+        .build().compact();
+  }
+
   @Override
   public Sketch getInitialAggregatedValue(Object rawValue) {
     Sketch initialValue;
-    if (rawValue instanceof byte[]) {
+    if (rawValue instanceof byte[]) { // Serialized Sketch
       byte[] bytes = (byte[]) rawValue;
       initialValue = deserializeAggregatedValue(bytes);
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
+    } else if (rawValue instanceof byte[][]) { // Multiple Serialized Sketches
+      byte[][] serializedSketches = (byte[][]) rawValue;
+      initialValue = StreamSupport.stream(Arrays.stream(serializedSketches).spliterator(), false)
+          .map(this::deserializeAggregatedValue).reduce(this::union).orElseGet(this::empty);
+      _maxByteSize = Math.max(_maxByteSize, initialValue.getCurrentBytes());
     } else {
       initialValue = singleItemSketch(rawValue);
       _maxByteSize = Math.max(_maxByteSize, initialValue.getCurrentBytes());

@@ -24,9 +24,11 @@ import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class DistinctCountThetaSketchValueAggregatorTest {
@@ -48,6 +50,17 @@ public class DistinctCountThetaSketchValueAggregatorTest {
 
     // and should update the max size
     assertEquals(agg.getMaxAggregatedValueByteSize(), result.getCurrentBytes());
+  }
+
+  @Test
+  public void initialShouldParseMultiValueSketches() {
+    UpdateSketch input1 = Sketches.updateSketchBuilder().build();
+    input1.update("hello");
+    UpdateSketch input2 = Sketches.updateSketchBuilder().build();
+    input2.update("world");
+    DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
+    byte[][] bytes = {agg.serializeAggregatedValue(input1), agg.serializeAggregatedValue(input2)};
+    assertEquals(agg.getInitialAggregatedValue(bytes).getEstimate(), 2.0);
   }
 
   @Test
@@ -106,5 +119,48 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     // and should update the max size
     assertEquals(agg.getMaxAggregatedValueByteSize(), 32 // may change in future versions of datasketches
     );
+  }
+
+  @Test
+  public void applyRawValueShouldSupportMultiValue() {
+    UpdateSketch input1 = Sketches.updateSketchBuilder().build();
+    input1.update("hello");
+    Sketch result1 = input1.compact();
+    DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
+    String[] strings = {"hello", "world", "this", "is", "some", "strings"};
+    Sketch result = agg.applyRawValue(result1, (Object) strings);
+
+    assertEquals(result.getEstimate(), 6.0);
+
+    // and should update the max size
+    assertEquals(agg.getMaxAggregatedValueByteSize(), 64 // may change in future versions of datasketches
+    );
+  }
+
+  @Test
+  public void getInitialValueShouldSupportDifferentTypes() {
+    DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
+    assertEquals(agg.getInitialAggregatedValue(12345).getEstimate(), 1.0);
+    assertEquals(agg.getInitialAggregatedValue(12345L).getEstimate(), 1.0);
+    assertEquals(agg.getInitialAggregatedValue(12.345f).getEstimate(), 1.0);
+    assertEquals(agg.getInitialAggregatedValue(12.345d).getEstimate(), 1.0);
+    assertThrows(() -> agg.getInitialAggregatedValue(new Object()));
+  }
+
+  @Test
+  public void getInitialValueShouldSupportMultiValueTypes() {
+    DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
+    Integer[] ints = {12345};
+    assertEquals(agg.getInitialAggregatedValue(ints).getEstimate(), 1.0);
+    Long[] longs = {12345L};
+    assertEquals(agg.getInitialAggregatedValue(longs).getEstimate(), 1.0);
+    Float[] floats = {12.345f};
+    assertEquals(agg.getInitialAggregatedValue(floats).getEstimate(), 1.0);
+    Double[] doubles = {12.345d};
+    assertEquals(agg.getInitialAggregatedValue(doubles).getEstimate(), 1.0);
+    Object[] objects = {new Object()};
+    assertThrows(() -> agg.getInitialAggregatedValue(objects));
+    byte[][] zeroSketches = {};
+    assertEquals(agg.getInitialAggregatedValue(zeroSketches).getEstimate(), 0.0);
   }
 }
