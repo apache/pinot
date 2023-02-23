@@ -40,6 +40,10 @@ public class ValueAggregatorFactory {
         return new MaxValueAggregator(dataType);
       case SUM:
         return new SumValueAggregator(dataType);
+      case DISTINCTCOUNTRAWHLL:
+        return new DistinctCountRawHLLAggregator();
+      case DISTINCTCOUNTRAWTHETASKETCH:
+        return new DistinctCountRawThetaSketchAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
