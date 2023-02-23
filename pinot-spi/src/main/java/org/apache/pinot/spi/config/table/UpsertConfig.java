@@ -74,6 +74,10 @@ public class UpsertConfig extends BaseJsonConfig {
     return _mode;
   }
 
+  public void setMode(Mode mode) {
+    _mode = mode;
+  }
+
   public HashFunction getHashFunction() {
     return _hashFunction;
   }
