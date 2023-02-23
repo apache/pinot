@@ -34,17 +34,19 @@ public class PlanRequestContext {
   protected final long _requestId;
   protected final int _stageId;
   private final long _timeoutMs;
+  private final long _deadlineMs;
   protected final VirtualServerAddress _server;
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
 
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
+      long timeoutMs, long deadlineMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _timeoutMs = timeoutMs;
+    _deadlineMs = deadlineMs;
     _server = server;
     _metadataMap = metadataMap;
   }
@@ -59,6 +61,10 @@ public class PlanRequestContext {
 
   public long getTimeoutMs() {
     return _timeoutMs;
+  }
+
+  public long getDeadlineMs() {
+    return _deadlineMs;
   }
 
   public VirtualServerAddress getServer() {

@@ -19,7 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.Supplier;
 import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -28,16 +28,14 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final JsonMailboxIdentifier _mailboxId;
 
-  private Function<Long, InMemoryTransferStream> _transferStreamProvider;
+  private Supplier<InMemoryTransferStream> _transferStreamProvider;
   private InMemoryTransferStream _transferStream;
-  private long _deadlineMs;
 
-  public InMemorySendingMailbox(String mailboxId, Function<Long, InMemoryTransferStream> transferStreamProvider,
-      Consumer<MailboxIdentifier> gotMailCallback, long deadlineMs) {
+  public InMemorySendingMailbox(String mailboxId, Supplier<InMemoryTransferStream> transferStreamProvider,
+      Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = JsonMailboxIdentifier.parse(mailboxId);
     _transferStreamProvider = transferStreamProvider;
     _gotMailCallback = gotMailCallback;
-    _deadlineMs = deadlineMs;
   }
 
   @Override
@@ -56,7 +54,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   }
 
   @Override
-  public void complete() {
+  public void complete() throws Exception {
     _transferStream.complete();
   }
 
@@ -79,7 +77,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   private void initialize() {
     if (_transferStream == null) {
-      _transferStream = _transferStreamProvider.apply(_deadlineMs);
+      _transferStream = _transferStreamProvider.get();
     }
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * GRPC implementation of the {@link SendingMailbox}.
+ * gRPC implementation of the {@link SendingMailbox}. The gRPC stream is created on the first call to {@link #send}.
  */
 public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
@@ -62,17 +63,15 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     if (!_initialized.get()) {
       open();
     }
-    if (_statusObserver.isFinished()) {
-      // If server has already finished, the stream is already closed
-      // TODO: Stop processing if receiver has already hung-up.
-      return;
-    }
+    Preconditions.checkState(!_statusObserver.isFinished(),
+        "Called send when stream is already closed for mailbox=" + _mailboxId);
     MailboxContent data = toMailboxContent(block.getDataBlock());
     _mailboxContentStreamObserver.onNext(data);
   }
 
   @Override
-  public void complete() {
+  public void complete()
+      throws Exception {
     _mailboxContentStreamObserver.onCompleted();
   }
 
@@ -81,6 +80,11 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     return _initialized.get();
   }
 
+  /**
+   * As required by {@link SendingMailbox#isClosed()}, we return true only if this mailbox is done sending all the
+   * data and has released all underlying resources. To check whether all resources have been released, i.e. the
+   * underlying gRPC stream has been closed, we use {@link MailboxStatusStreamObserver#isFinished()}.
+   */
   @Override
   public boolean isClosed() {
     return _initialized.get() && _statusObserver.isFinished();
@@ -89,12 +93,14 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   @Override
   public void cancel(Throwable t) {
     if (_initialized.get() && !_statusObserver.isFinished()) {
-      LOGGER.warn("Grpc Sending Mailbox={} cancelling stream", _mailboxId);
+      LOGGER.warn("GrpcSendingMailbox={} cancelling stream", _mailboxId);
       try {
         _mailboxContentStreamObserver.onError(Status.fromThrowable(
             new RuntimeException("Cancelled by the caller")).asRuntimeException());
       } catch (Exception e) {
-        LOGGER.error("Unexpected error issuing onError to MailboxContentStreamObserver", e);
+        // TODO: This can happen if the statusObserver was finished since the check in the if-condition above. We
+        //  don't necessarily need to log this, but logging as warn for now to see how frequent this is.
+        LOGGER.info("Unexpected error issuing onError to MailboxContentStreamObserver", e);
       }
     }
   }
@@ -105,7 +111,6 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   }
 
   private void open() {
-    LOGGER.info("deadline={} time-remaining={}", _deadlineMs, System.currentTimeMillis() - _deadlineMs);
     _mailboxContentStreamObserver = _mailboxContentStreamObserverSupplier.apply(_deadlineMs);
     _initialized.set(true);
     // send a begin-of-stream message.

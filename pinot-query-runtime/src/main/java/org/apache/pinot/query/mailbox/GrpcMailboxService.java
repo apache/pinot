@@ -38,21 +38,17 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * GRPC-based implementation of {@link MailboxService}.
+ * GRPC-based implementation of {@link MailboxService}. Note that there can be cases where the ReceivingMailbox
+ * and/or the underlying connection can be leaked:
  *
- * <p>It maintains a collection of connected mailbox servers and clients to remote hosts. All indexed by the
- * mailboxID in the format of: <code>"jobId:partitionKey:senderHost:senderPort:receiverHost:receiverPort"</code>
+ * <ol>
+ *   <li>When the OpChain corresponding to the receiver was never registered.</li>
+ *   <li>When the receiving OpChain exited before data was sent for the first time by the sender.</li>
+ * </ol>
  *
- * <p>Connections are established/initiated from the sender side and only tier-down from the sender side as well.
- * In the event of exception or timed out, the connection is cloased based on a mutually agreed upon timeout period
- * after the last successful message sent/received.
- *
- * <p>Noted that:
- * <ul>
- *   <li>the latter part of the mailboxID consist of the channelID.</li>
- *   <li>the job_id should be uniquely identifying a send/receving pair, for example if one bundle job requires
- *   to open 2 mailboxes, they should use {job_id}_1 and {job_id}_2 to distinguish the 2 different mailbox.</li>
- * </ul>
+ * To handle these cases, we store the {@link ReceivingMailbox} entries in a time-expiring cache. If there was a
+ * leak, the entry would be evicted, and in that case we also issue a cancel to ensure the underlying stream is also
+ * released.
  */
 public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxService.class);
@@ -62,15 +58,16 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   private final String _hostname;
   private final int _mailboxPort;
 
-  // maintaining a list of registered mailboxes.
+  // We use a cache to ensure that the receiving mailbox and the underlying gRPC stream are not leaked in the cases
+  // where the corresponding OpChain is either never registered or died before the sender sent data for the first time.
   private final Cache<String, GrpcReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY.toMinutes(), TimeUnit.MINUTES)
           .removalListener(new RemovalListener<String, GrpcReceivingMailbox>() {
             @Override
             public void onRemoval(RemovalNotification<String, GrpcReceivingMailbox> notification) {
               if (notification.wasEvicted()) {
-                // This means that this mailbox hasn't been polled in a while, so cancel it to ensure all resources
-                // are released
+                // TODO: This should be tied with query deadline, but for that we need to know the query deadline
+                //  when the GrpcReceivingMailbox is initialized in MailboxContentStreamObserver.
                 LOGGER.info("Removing dangling GrpcReceivingMailbox: {}", notification.getKey());
                 notification.getValue().cancel();
               }
@@ -108,9 +105,7 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   }
 
   /**
-   * Register a mailbox, mailbox needs to be registered before use.
-   * @param mailboxId the id of the mailbox.
-   * @param deadlineMs
+   * {@inheritDoc}
    */
   @Override
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
@@ -127,8 +122,7 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   }
 
   /**
-   * Register a mailbox, mailbox needs to be registered before use.
-   * @param mailboxId the id of the mailbox.
+   * {@inheritDoc} See {@link GrpcMailboxService} for details on the design.
    */
   @Override
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
@@ -141,12 +135,26 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Nullable
   @Override
   public ReceivingMailbox<TransferableBlock> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId) {
     return _receivingMailboxCache.getIfPresent(mailboxId.toString());
   }
 
+  /**
+   * If there's a cached receiving mailbox and it isn't closed (i.e. query didn't finish successfully), then this
+   * calls a cancel to ensure that the underlying gRPC stream is closed. After that the receiving mailbox is removed
+   * from the cache.
+   * <p>
+   *   Also refer to the definition in the interface:
+   * </p>
+   * <p>
+   *   {@inheritDoc}
+   * </p>
+   */
   @Override
   public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
     GrpcReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
@@ -156,7 +164,7 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
     _receivingMailboxCache.invalidate(mailboxId.toString());
   }
 
-  public ManagedChannel getChannel(String mailboxId) {
+  private ManagedChannel getChannel(String mailboxId) {
     return _channelManager.getChannel(Utils.constructChannelId(mailboxId));
   }
 

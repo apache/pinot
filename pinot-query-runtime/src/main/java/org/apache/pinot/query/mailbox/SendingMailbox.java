@@ -35,9 +35,9 @@ public interface SendingMailbox<T> {
   String getMailboxId();
 
   /**
-   * Send a single unit of data to a receiver. Note that SendingMailbox are required to acquire resources lazily in a
-   * {@link #send} call. They should <b>not</b> acquire any resources when they are created. Sender may choose to
-   * throw if there was an error sending the data.
+   * Send a single unit of data to a receiver. Note that SendingMailbox are required to acquire resources lazily in
+   * this call and they should <b>not</b> acquire any resources when they are created. This method should throw if there
+   * was an error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
   void send(T data)
       throws Exception;
@@ -54,7 +54,8 @@ public interface SendingMailbox<T> {
    * {@link #cancel} which can allow callers to force release the underlying resources.
    * </p>
    */
-  void complete();
+  void complete()
+      throws Exception;
 
   /**
    * A SendingMailbox is considered initialized after it has acquired a reference to the underlying channel that will

@@ -33,18 +33,27 @@ public class InMemoryTransferStream {
   private MailboxIdentifier _mailboxId;
   private BlockingQueue<TransferableBlock> _queue;
   private InMemoryMailboxService _mailboxService;
+  private final long _deadlineMs;
   private boolean _receivingMailboxInitialized = false;
   private boolean _isCancelled = false;
   private boolean _isCompleted = false;
 
-  public InMemoryTransferStream(MailboxIdentifier mailboxId, InMemoryMailboxService mailboxService) {
+  public InMemoryTransferStream(MailboxIdentifier mailboxId, InMemoryMailboxService mailboxService, long deadlineMs) {
     _mailboxId = mailboxId;
     _queue = new LinkedBlockingQueue<>();
     _mailboxService = mailboxService;
+    _deadlineMs = deadlineMs;
   }
 
   public void send(TransferableBlock block) {
     Preconditions.checkState(!isCancelled(), "Tried to send on a cancelled InMemory stream");
+    // TODO: Deadline check can be more efficient.
+    // While, in most cases the receiver would have anyways called cancel, for expensive queries it is possible that
+    // the receiver may have hung-up before it could get a reference to the stream. This can happen if the sending
+    // OpChain was running an expensive operation (like a large hash-join).
+    long currentTime = System.currentTimeMillis();
+    Preconditions.checkState(currentTime < _deadlineMs,
+        String.format("Deadline exceeded by %s ms", currentTime - _deadlineMs));
     if (!_receivingMailboxInitialized) {
       InMemoryReceivingMailbox receivingMailbox =
           (InMemoryReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);

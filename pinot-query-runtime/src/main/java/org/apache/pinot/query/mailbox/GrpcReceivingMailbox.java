@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -41,15 +40,16 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * GRPC implementation of the {@link ReceivingMailbox}.
+ * GRPC implementation of the {@link ReceivingMailbox}. This mailbox doesn't hold any resources upon creation.
+ * Instead an explicit {@link #init} call is made when the sender sends the first data-block which attaches
+ * references to the {@link StreamObserver} to this mailbox.
  */
 public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcReceivingMailbox.class);
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
   private final String _mailboxId;
-  private Consumer<MailboxIdentifier> _gotMailCallback;
+  private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
-  private final AtomicInteger _totalMsgReceived = new AtomicInteger(0);
 
   private MailboxContentStreamObserver _contentStreamObserver;
   private StreamObserver<Mailbox.MailboxStatus> _statusStreamObserver;
@@ -79,13 +79,13 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
    *  2. If the received block from the sender is a data-block with 0 rows.
    * </p>
    */
+  @Nullable
   @Override
   public TransferableBlock receive() throws Exception {
     if (!waitForInitialize()) {
       return null;
     }
     MailboxContent mailboxContent = _contentStreamObserver.poll();
-    _totalMsgReceived.incrementAndGet();
     return mailboxContent == null ? null : fromMailboxContent(mailboxContent);
   }
 
@@ -105,8 +105,9 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
       try {
         _statusStreamObserver.onError(Status.CANCELLED.asRuntimeException());
       } catch (Exception e) {
-        // TODO: This can happen if the call is already closed.
-        LOGGER.info("Error cancelling to sender", e);
+        // TODO: This can happen if the call is already closed. Consider removing this log altogether or find a way
+        //  to check if the stream is already closed.
+        LOGGER.info("Tried to cancel receiving mailbox", e);
       }
     }
   }

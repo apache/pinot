@@ -35,14 +35,12 @@ import org.slf4j.LoggerFactory;
 
 
 public class InMemoryMailboxService implements MailboxService<TransferableBlock> {
-  // channel manager
   private static final Logger LOGGER = LoggerFactory.getLogger(InMemoryMailboxService.class);
   private static final Duration DANGLING_RECEIVING_MAILBOX_EXPIRY = Duration.ofMinutes(5);
   private final String _hostname;
   private final int _mailboxPort;
   private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
 
-  // maintaining a list of registered mailboxes.
   private final Cache<String, InMemoryReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY.toMinutes(), TimeUnit.MINUTES)
           .removalListener(new RemovalListener<String, InMemoryReceivingMailbox>() {
@@ -50,6 +48,8 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
             public void onRemoval(RemovalNotification<String, InMemoryReceivingMailbox> notification) {
               if (notification.wasEvicted()) {
                 LOGGER.info("Evicting dangling InMemoryReceivingMailbox: {}", notification.getKey());
+                // TODO: This should be tied to the query deadline. Unlike GrpcMailboxService, the change here is
+                //  simpler.
                 notification.getValue().cancel();
               }
             }
@@ -88,8 +88,9 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   @Override
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    return new InMemorySendingMailbox(mailboxId.toString(), (x) -> new InMemoryTransferStream(mailboxId, this),
-        getReceivedMailContentCallback(), deadlineMs);
+    return new InMemorySendingMailbox(mailboxId.toString(),
+        () -> new InMemoryTransferStream(mailboxId, this, deadlineMs),
+        getReceivedMailContentCallback());
   }
 
   @Override
