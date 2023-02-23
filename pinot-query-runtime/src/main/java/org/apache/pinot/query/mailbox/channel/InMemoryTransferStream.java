@@ -33,22 +33,25 @@ public class InMemoryTransferStream {
   private MailboxIdentifier _mailboxId;
   private BlockingQueue<TransferableBlock> _queue;
   private InMemoryMailboxService _mailboxService;
-  private boolean _isCancelled;
+  private boolean _receivingMailboxInitialized = false;
+  private boolean _isCancelled = false;
   private boolean _isCompleted = false;
 
   public InMemoryTransferStream(MailboxIdentifier mailboxId, InMemoryMailboxService mailboxService) {
     _mailboxId = mailboxId;
     _queue = new LinkedBlockingQueue<>();
     _mailboxService = mailboxService;
-    _isCancelled = false;
   }
 
   public void send(TransferableBlock block) {
     Preconditions.checkState(!isCancelled(), "Tried to send on a cancelled InMemory stream");
+    if (!_receivingMailboxInitialized) {
+      InMemoryReceivingMailbox receivingMailbox =
+          (InMemoryReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
+      receivingMailbox.init(this);
+      _receivingMailboxInitialized = true;
+    }
     _queue.offer(block);
-    InMemoryReceivingMailbox receivingMailbox =
-        (InMemoryReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
-    receivingMailbox.init(this);
   }
 
   @Nullable
