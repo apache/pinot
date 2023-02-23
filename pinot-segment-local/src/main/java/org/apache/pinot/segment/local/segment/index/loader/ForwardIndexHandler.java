@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
@@ -137,12 +136,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
                 false);
             if (columnMetadata.hasDictionary()) {
               if (!segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
-                throw new IOException(String.format("Dictionary should still exist after rebuilding forward index "
-                        + "for dictionary column: %s", column));
+                throw new IllegalStateException(String.format("Dictionary should still exist after rebuilding "
+                    + "forward index for dictionary column: %s", column));
               }
             } else {
               if (segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
-                throw new IOException(
+                throw new IllegalStateException(
                     String.format("Dictionary should not exist after rebuilding forward index for raw column: %s",
                         column));
               }
@@ -153,7 +152,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             if (newForwardIndexDisabledColumns.contains(column)) {
               removeDictionaryFromForwardIndexDisabledColumn(column, segmentWriter);
               if (segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
-                throw new IOException(
+                throw new IllegalStateException(
                     String.format("Dictionary should not exist after disabling dictionary for column: %s", column));
               }
             } else {
@@ -163,7 +162,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           case ENABLE_DICTIONARY:
             createDictBasedForwardIndex(column, segmentWriter, indexCreatorProvider);
             if (!segmentWriter.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX)) {
-              throw new IOException(String.format("Forward index was not created for column: %s", column));
+              throw new IllegalStateException(String.format("Forward index was not created for column: %s", column));
             }
             break;
           case CHANGE_RAW_INDEX_COMPRESSION_TYPE:

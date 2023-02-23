@@ -223,8 +223,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       // Initialize forward index creator
       ChunkCompressionType chunkCompressionType =
           dictEnabledColumn ? null : getColumnCompressionType(segmentCreationSpec, fieldSpec);
-      _forwardIndexCreatorMap.put(columnName, _indexCreatorProvider.newForwardIndexCreator(
-          context.forForwardIndex(chunkCompressionType, segmentCreationSpec.getColumnProperties())));
+      // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
+      _forwardIndexCreatorMap.put(columnName, (forwardIndexDisabled && !columnIndexCreationInfo.isSorted())
+          ? null : _indexCreatorProvider.newForwardIndexCreator(
+              context.forForwardIndex(chunkCompressionType, segmentCreationSpec.getColumnProperties())));
 
       // Initialize inverted index creator; skip creating inverted index if sorted
       if (invertedIndexColumns.contains(columnName) && !columnIndexCreationInfo.isSorted()) {

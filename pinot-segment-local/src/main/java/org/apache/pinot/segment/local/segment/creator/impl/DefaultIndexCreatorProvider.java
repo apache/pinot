@@ -75,10 +75,6 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       throws Exception {
     if (!context.hasDictionary()) {
       // Dictionary disabled columns
-      if (context.forwardIndexDisabled()) {
-        // Forward index disabled columns
-        return null;
-      }
       boolean deriveNumDocsPerChunk =
           shouldDeriveNumDocsPerChunk(context.getFieldSpec().getName(), context.getColumnProperties());
       int writerVersion = getRawIndexWriterVersion(context.getFieldSpec().getName(), context.getColumnProperties());
@@ -94,24 +90,17 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       }
     } else {
       // Dictionary enabled columns
-      if (context.forwardIndexDisabled() && !context.isSorted()) {
-        // Forward index disabled columns which aren't sorted
-        // Sorted columns treat this option as a no-op
-        return null;
-      } else {
-        // Forward index enabled columns
-        if (context.getFieldSpec().isSingleValueField()) {
-          if (context.isSorted()) {
-            return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-                context.getCardinality());
-          } else {
-            return new SingleValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-                context.getCardinality(), context.getTotalDocs());
-          }
+      if (context.getFieldSpec().isSingleValueField()) {
+        if (context.isSorted()) {
+          return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+              context.getCardinality());
         } else {
-          return new MultiValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-              context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
+          return new SingleValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+              context.getCardinality(), context.getTotalDocs());
         }
+      } else {
+        return new MultiValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+            context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
       }
     }
   }
