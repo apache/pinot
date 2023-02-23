@@ -85,11 +85,12 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
               // TODO: There should be a waiting-for-data state in OpChainStats.
               operatorChain.getStats().queued();
               _scheduler.yield(operatorChain);
-            } else if (result.isEndOfStreamBlock()) {
+            } else if (result.isErrorBlock()) {
               isFinished = true;
               LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
                   result.getDataBlock().getExceptions());
             } else {
+              isFinished = true;
               operatorChain.getStats().setOperatorStatsMap(result.getResultMetadata());
               LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
             }
