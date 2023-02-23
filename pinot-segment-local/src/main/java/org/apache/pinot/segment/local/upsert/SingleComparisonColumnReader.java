@@ -24,7 +24,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 @SuppressWarnings("rawtypes")
-public class SingleComparisonColumnReader implements ComparisonColumnReader {
+public class SingleComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
   private final PinotSegmentColumnReader _comparisonColumnReader;
 
   public SingleComparisonColumnReader(IndexSegment segment, String comparisonColumn) {

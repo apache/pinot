@@ -19,26 +19,26 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
 @SuppressWarnings("rawtypes")
-public class MultiComparisonColumnReader implements ComparisonColumnReader {
+public class MultiComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
   private final Map<String, PinotSegmentColumnReader> _comparisonColumnReaders;
 
   public MultiComparisonColumnReader(IndexSegment segment, List<String> comparisonColumns) {
-    _comparisonColumnReaders = new HashMap<>();
+    _comparisonColumnReaders = new TreeMap<>();
     for (String comparisonColumn : comparisonColumns) {
       _comparisonColumnReaders.put(comparisonColumn, new PinotSegmentColumnReader(segment, comparisonColumn));
     }
   }
 
   public Comparable getComparisonValue(int docId) {
-    Map<String, Comparable> comparisonColumns = new HashMap<>();
+    Map<String, Comparable> comparisonColumns = new TreeMap<>();
 
     for (String comparisonColumnName : _comparisonColumnReaders.keySet()) {
       PinotSegmentColumnReader columnReader = _comparisonColumnReaders.get(comparisonColumnName);

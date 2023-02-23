@@ -68,8 +68,7 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
     return comparisonResult;
   }
 
-  private static Map<String, Comparable> merge(@Nullable Map<String, Comparable> current,
-      @Nonnull Map<String, Comparable> next) {
+  public static Map<String, Comparable> merge(Map<String, Comparable> current, Map<String, Comparable> next) {
     // merge the values of this new row with the comparison values from any previous upsert. This should only be
     // called in the case where next.compareTo(current) >= 0
     if (current == null) {

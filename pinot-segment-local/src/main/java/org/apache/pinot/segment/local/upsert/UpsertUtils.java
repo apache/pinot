@@ -151,4 +151,9 @@ public class UpsertUtils {
     Object value = columnReader.getValue(docId);
     return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
   }
+
+
+  public interface ComparisonColumnReader extends Closeable {
+    Comparable getComparisonValue(int docId);
+  }
 }
