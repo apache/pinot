@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -49,9 +50,13 @@ public class AggregateOperatorTest {
   @Mock
   private MultiStageOperator _input;
 
+  @Mock
+  private VirtualServerAddress _serverAddress;
+
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
   }
 
   @AfterMethod
@@ -71,7 +76,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
-    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2);
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2, _serverAddress);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build
@@ -91,7 +96,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
-    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2);
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2, _serverAddress);
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -113,7 +118,7 @@ public class AggregateOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
-    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2);
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2, _serverAddress);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
@@ -136,7 +141,7 @@ public class AggregateOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
-    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2);
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2, _serverAddress);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -161,7 +166,7 @@ public class AggregateOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
-    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2);
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2, _serverAddress);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -193,7 +198,8 @@ public class AggregateOperatorTest {
     Mockito.when(merger.initialize(Mockito.any(), Mockito.any())).thenReturn(1d);
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(_input, outSchema, calls, group, inSchema, ImmutableMap.of("SUM", cdt -> merger), 1, 2);
+        new AggregateOperator(_input, outSchema, calls, group, inSchema, ImmutableMap.of("SUM", cdt -> merger), 1, 2,
+            _serverAddress);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock(); // (output result)
@@ -215,7 +221,7 @@ public class AggregateOperatorTest {
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     AggregateOperator sum0GroupBy1 =
         new AggregateOperator(upstreamOperator, OperatorTestUtil.getDataSchema(OperatorTestUtil.OP_1),
-            Arrays.asList(agg), Arrays.asList(new RexExpression.InputRef(1)), inSchema, 1, 2);
+            Arrays.asList(agg), Arrays.asList(new RexExpression.InputRef(1)), inSchema, 1, 2, _serverAddress);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     while (result.isNoOpBlock()) {
       result = sum0GroupBy1.getNextBlock();
@@ -238,7 +244,7 @@ public class AggregateOperatorTest {
     DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
 
     // When:
-    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2);
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2, _serverAddress);
   }
 
   @Test
@@ -255,7 +261,7 @@ public class AggregateOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
-    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2);
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group, inSchema, 1, 2, _serverAddress);
 
     // When:
     TransferableBlock block = operator.nextBlock();
