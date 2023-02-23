@@ -21,17 +21,17 @@ package org.apache.pinot.core.segment.processing.aggregator;
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 
-import static org.apache.pinot.core.common.ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 
 
 public class DistinctCountRawHLLAggregator implements ValueAggregator {
   @Override
   public Object aggregate(Object value1, Object value2) {
     try {
-      HyperLogLog first = HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value1);
-      HyperLogLog second = HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value2);
+      HyperLogLog first = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value1);
+      HyperLogLog second = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value2);
       first.addAll(second);
-      return HYPER_LOG_LOG_SER_DE.serialize(first);
+      return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(first);
     } catch (CardinalityMergeException e) {
       throw new RuntimeException(e);
     }

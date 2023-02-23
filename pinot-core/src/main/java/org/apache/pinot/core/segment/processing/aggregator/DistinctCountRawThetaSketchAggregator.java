@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
 import org.apache.pinot.spi.utils.CommonConstants;
 
-import static org.apache.pinot.core.common.ObjectSerDeUtils.DATA_SKETCH_SER_DE;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 
 
 public class DistinctCountRawThetaSketchAggregator implements ValueAggregator {
@@ -35,7 +36,9 @@ public class DistinctCountRawThetaSketchAggregator implements ValueAggregator {
 
   @Override
   public Object aggregate(Object value1, Object value2) {
-    return DATA_SKETCH_SER_DE.serialize(
-        _union.union(DATA_SKETCH_SER_DE.deserialize((byte[]) value1), DATA_SKETCH_SER_DE.deserialize((byte[]) value2)));
+    Sketch first = ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize((byte[]) value1);
+    Sketch second = ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize((byte[]) value2);
+    Sketch result = _union.union(first, second);
+    return ObjectSerDeUtils.DATA_SKETCH_SER_DE.serialize(result);
   }
 }
