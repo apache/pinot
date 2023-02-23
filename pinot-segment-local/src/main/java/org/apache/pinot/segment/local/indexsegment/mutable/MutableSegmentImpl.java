@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -63,7 +64,6 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.ComparisonColumns;
-import org.apache.pinot.segment.local.upsert.ComparisonValue;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
@@ -572,18 +572,25 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private RecordInfo multiComparisonRecordInfo(PrimaryKey primaryKey, int docId, GenericRow row) {
-    Map<String, ComparisonValue> comparisonColumns = new HashMap<>();
-
     for (String columnName : _upsertComparisonColumns) {
       Object comparisonValue = row.getValue(columnName);
 
       Preconditions.checkState(comparisonValue instanceof Comparable,
           "Upsert comparison column: %s must be comparable", columnName);
 
-      comparisonColumns.put(columnName,
-          new ComparisonValue((Comparable) comparisonValue, row.isNullValue(columnName)));
+      if (row.isNullValue(columnName)) {
+        // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
+        // columns are mutually exclusive
+        continue;
+      }
+
+      Map<String, Comparable> comparisonColumns = new TreeMap<>();
+      comparisonColumns.put(columnName, (Comparable) comparisonValue);
+      return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
     }
-    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
+
+    // All comparison columns were null.
+    return new RecordInfo(primaryKey, docId, new ComparisonColumns(Collections.emptyMap()));
   }
 
   private void updateDictionary(GenericRow row) {

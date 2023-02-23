@@ -38,14 +38,13 @@ public class MultiComparisonColumnReader implements ComparisonColumnReader {
   }
 
   public Comparable getComparisonValue(int docId) {
-    Map<String, ComparisonValue> comparisonColumns = new HashMap<>();
+    Map<String, Comparable> comparisonColumns = new HashMap<>();
 
     for (String comparisonColumnName : _comparisonColumnReaders.keySet()) {
       PinotSegmentColumnReader columnReader = _comparisonColumnReaders.get(comparisonColumnName);
       Comparable comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
 
-      comparisonColumns.put(comparisonColumnName,
-          new ComparisonValue(comparisonValue, columnReader.isNull(docId)));
+      comparisonColumns.put(comparisonColumnName, comparisonValue);
     }
     return new ComparisonColumns(comparisonColumns);
   }

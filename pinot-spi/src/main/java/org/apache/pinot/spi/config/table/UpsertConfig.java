@@ -65,28 +65,6 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Custom configs for upsert metadata manager")
   private Map<String, String> _metadataManagerConfigs;
 
-  @Deprecated
-  public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
-      @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
-      @JsonProperty("defaultPartialUpsertStrategy") @Nullable Strategy defaultPartialUpsertStrategy,
-      @JsonProperty("comparisonColumns") @Nullable List<String> comparisonColumns,
-      @JsonProperty("hashFunction") @Nullable HashFunction hashFunction) {
-    Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
-    _mode = mode;
-
-    if (mode == Mode.PARTIAL) {
-      _partialUpsertStrategies = partialUpsertStrategies != null ? partialUpsertStrategies : new HashMap<>();
-      _defaultPartialUpsertStrategy =
-          defaultPartialUpsertStrategy != null ? defaultPartialUpsertStrategy : Strategy.OVERWRITE;
-    } else {
-      _partialUpsertStrategies = null;
-      _defaultPartialUpsertStrategy = null;
-    }
-
-    _comparisonColumns = comparisonColumns;
-    _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
-  }
-
   public UpsertConfig(Mode mode) {
     _mode = mode;
   }
