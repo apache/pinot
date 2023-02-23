@@ -46,10 +46,10 @@ import org.apache.pinot.spi.config.table.TableType
 private[pinot] object PinotSplitter extends Logging {
 
   def generatePinotSplits(
-                           query: ScanQuery,
-                           routingTable: Map[TableType, Map[String, List[String]]],
-                           instanceInfoReader: String => InstanceInfo,
-                           readParameters: PinotDataSourceReadOptions): List[PinotSplit] = {
+      query: ScanQuery,
+      routingTable: Map[TableType, Map[String, List[String]]],
+      instanceInfoReader: String => InstanceInfo,
+      readParameters: PinotDataSourceReadOptions): List[PinotSplit] = {
     routingTable.flatMap {
       case (tableType, serversToSegments) =>
         serversToSegments
@@ -67,11 +67,11 @@ private[pinot] object PinotSplitter extends Logging {
   }
 
   private def createPinotSplitsFromSubSplits(
-                                              tableType: TableType,
-                                              query: ScanQuery,
-                                              instanceInfo: InstanceInfo,
-                                              segments: List[String],
-                                              segmentsPerSplit: Int): Iterator[PinotSplit] = {
+      tableType: TableType,
+      query: ScanQuery,
+      instanceInfo: InstanceInfo,
+      segments: List[String],
+      segmentsPerSplit: Int): Iterator[PinotSplit] = {
     val maxSegmentCount = Math.min(segments.size, segmentsPerSplit)
     segments.grouped(maxSegmentCount).map { subSegments =>
       val serverAndSegments = {
@@ -87,8 +87,8 @@ private[pinot] object PinotSplitter extends Logging {
 }
 
 private[pinot] case class PinotSplit(
-                                      query: ScanQuery,
-                                      serverAndSegments: PinotServerAndSegments)
+    query: ScanQuery,
+    serverAndSegments: PinotServerAndSegments)
 
 private[pinot] case class PinotServerAndSegments(
     serverHost: String,
