@@ -143,9 +143,6 @@ public class MailboxSendOperator extends MultiStageOperator {
         transferableBlock = _dataTableBlockBaseOperator.nextBlock();
       }
     } catch (final Exception e) {
-      // ideally, MailboxSendOperator doesn't ever throw an exception because
-      // it will just get swallowed, in this scenario at least we can forward
-      // any upstream exceptions as an error  block
       transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       try {
         _exchange.send(transferableBlock);
@@ -159,6 +156,13 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Override
   public void close() {
     super.close();
+    _exchange.close();
+  }
+
+  @Override
+  public void cancel(Throwable t) {
+    super.cancel(t);
+    _exchange.cancel(t);
   }
 
   private static JsonMailboxIdentifier toMailboxId(

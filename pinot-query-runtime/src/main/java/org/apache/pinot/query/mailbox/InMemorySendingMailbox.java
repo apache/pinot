@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.base.Preconditions;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -27,14 +29,16 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final JsonMailboxIdentifier _mailboxId;
 
-  // TODO: changed to 2-way communication channel.
+  private Function<Long, InMemoryTransferStream> _transferStreamProvider;
   private InMemoryTransferStream _transferStream;
+  private long _deadlineMs;
 
-  public InMemorySendingMailbox(String mailboxId, InMemoryTransferStream transferStream,
-      Consumer<MailboxIdentifier> gotMailCallback) {
+  public InMemorySendingMailbox(String mailboxId, Function<Long, InMemoryTransferStream> transferStreamProvider,
+      Consumer<MailboxIdentifier> gotMailCallback, long deadlineMs) {
     _mailboxId = JsonMailboxIdentifier.parse(mailboxId);
-    _transferStream = transferStream;
+    _transferStreamProvider = transferStreamProvider;
     _gotMailCallback = gotMailCallback;
+    _deadlineMs = deadlineMs;
   }
 
   @Override
@@ -44,10 +48,11 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   @Override
   public void send(TransferableBlock data)
-      throws UnsupportedOperationException {
-    if (!_transferStream.isInitialized()) {
-      _transferStream.initialize();
+      throws Exception {
+    if (!isInitialized()) {
+      initialize();
     }
+    Preconditions.checkState(!_transferStream.isCancelled(), "Cannot send since stream has already been cancelled");
     _transferStream.send(data);
     _gotMailCallback.accept(_mailboxId);
   }
@@ -59,7 +64,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   @Override
   public boolean isInitialized() {
-    return _transferStream.isInitialized();
+    return _transferStream != null;
   }
 
   @Override
@@ -69,5 +74,14 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   @Override
   public void cancel(Throwable t) {
+    if (isInitialized() && !_transferStream.isCancelled()) {
+      _transferStream.cancel();
+    }
+  }
+
+  private void initialize() {
+    if (_transferStream == null) {
+      _transferStream = _transferStreamProvider.apply(_deadlineMs);
+    }
   }
 }

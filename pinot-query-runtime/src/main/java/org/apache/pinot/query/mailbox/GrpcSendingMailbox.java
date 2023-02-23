@@ -23,7 +23,7 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox;
@@ -44,14 +44,16 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private final AtomicBoolean _initialized = new AtomicBoolean(false);
 
   private StreamObserver<MailboxContent> _mailboxContentStreamObserver;
-  private final Supplier<StreamObserver<MailboxContent>> _mailboxContentStreamObserverSupplier;
+  private final Function<Long, StreamObserver<MailboxContent>> _mailboxContentStreamObserverSupplier;
   private final MailboxStatusStreamObserver _statusObserver;
+  private final long _deadlineMs;
 
   public GrpcSendingMailbox(String mailboxId, MailboxStatusStreamObserver statusObserver,
-      Supplier<StreamObserver<MailboxContent>> contentStreamObserverSupplier, long deadlineMs) {
+      Function<Long, StreamObserver<MailboxContent>> contentStreamObserverSupplier, long deadlineMs) {
     _mailboxId = mailboxId;
     _mailboxContentStreamObserverSupplier = contentStreamObserverSupplier;
     _statusObserver = statusObserver;
+    _deadlineMs = deadlineMs;
   }
 
   @Override
@@ -88,8 +90,12 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   public void cancel(Throwable t) {
     if (isInitialized() && !isClosed()) {
       LOGGER.warn("Grpc Sending Mailbox={} cancelling stream", _mailboxId);
-      _mailboxContentStreamObserver.onError(Status.fromThrowable(
-          new RuntimeException("Cancelled by the caller")).asRuntimeException());
+      try {
+        _mailboxContentStreamObserver.onError(Status.fromThrowable(
+            new RuntimeException("Cancelled by the caller")).asRuntimeException());
+      } catch (Exception e) {
+        LOGGER.error("Unexpected error issuing onError to MailboxContentStreamObserver", e);
+      }
     }
   }
 
@@ -99,7 +105,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   }
 
   private void open() {
-    _mailboxContentStreamObserver = _mailboxContentStreamObserverSupplier.get();
+    _mailboxContentStreamObserver = _mailboxContentStreamObserverSupplier.apply(_deadlineMs);
     _initialized.set(true);
     // send a begin-of-stream message.
     _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder().setMailboxId(_mailboxId)

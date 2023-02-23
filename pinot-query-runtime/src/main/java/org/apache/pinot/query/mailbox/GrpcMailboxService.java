@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
@@ -70,6 +71,7 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
               if (notification.wasEvicted()) {
                 // This means that this mailbox hasn't been polled in a while, so cancel it to ensure all resources
                 // are released
+                LOGGER.info("Removing dangling GrpcReceivingMailbox: {}", notification.getKey());
                 notification.getValue().cancel();
               }
             }
@@ -114,21 +116,14 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     MailboxStatusStreamObserver statusStreamObserver = new MailboxStatusStreamObserver();
 
-    GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), statusStreamObserver, () -> {
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), statusStreamObserver, (deadline) -> {
       ManagedChannel channel = getChannel(mailboxId.toString());
-      PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
+      PinotMailboxGrpc.PinotMailboxStub stub =
+          PinotMailboxGrpc.newStub(channel)
+              .withDeadlineAfter(Math.max(0L, deadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
       return stub.open(statusStreamObserver);
     }, deadlineMs);
     return mailbox;
-  }
-
-  @Override
-  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
-    GrpcReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
-    if (receivingMailbox != null && !receivingMailbox.isClosed()) {
-      receivingMailbox.cancel();
-    }
-    _receivingMailboxCache.invalidate(mailboxId.toString());
   }
 
   /**
@@ -144,6 +139,21 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
       LOGGER.error(String.format("Error getting receiving mailbox: %s", mailboxId), e);
       throw new RuntimeException(e);
     }
+  }
+
+  @Nullable
+  @Override
+  public ReceivingMailbox<TransferableBlock> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId) {
+    return _receivingMailboxCache.getIfPresent(mailboxId.toString());
+  }
+
+  @Override
+  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
+    GrpcReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
+    if (receivingMailbox != null && !receivingMailbox.isClosed()) {
+      receivingMailbox.cancel();
+    }
+    _receivingMailboxCache.invalidate(mailboxId.toString());
   }
 
   public ManagedChannel getChannel(String mailboxId) {

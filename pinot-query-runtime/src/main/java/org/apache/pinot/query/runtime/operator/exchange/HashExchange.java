@@ -43,7 +43,8 @@ class HashExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
+  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+      throws Exception {
     List<Object[]>[] destIdxToRows = new List[destinations.size()];
     for (Object[] row : block.getContainer()) {
       int partition = _keySelector.computeHash(row) % destinations.size();

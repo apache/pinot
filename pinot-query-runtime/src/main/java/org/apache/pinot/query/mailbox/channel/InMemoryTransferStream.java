@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.InMemoryMailboxService;
+import org.apache.pinot.query.mailbox.InMemoryReceivingMailbox;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -45,12 +47,16 @@ public class InMemoryTransferStream {
   }
 
   public void send(TransferableBlock block) {
+    Preconditions.checkState(_initialized.getCount() == 0, "Expected InMemoryTransferStream to be initialized");
     _queue.offer(block);
+    InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
+    receivingMailbox.init(this);
   }
 
   @Nullable
   public TransferableBlock poll()
       throws InterruptedException {
+    Preconditions.checkState(!_isCancelled, "poll failed since InMemoryTransferStream is cancelled");
     return _queue.poll();
   }
 
@@ -64,6 +70,8 @@ public class InMemoryTransferStream {
 
   public void cancel() {
     _isCancelled = true;
+    // Eagerly lose references to the underlying data.
+    _queue.clear();
   }
 
   public boolean isInitialized() {
@@ -72,6 +80,10 @@ public class InMemoryTransferStream {
 
   public boolean isCompleted() {
     return _isCompleted;
+  }
+
+  public boolean isCancelled() {
+    return _isCancelled;
   }
 
   public void initialize() {

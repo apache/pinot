@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -69,6 +70,15 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
       return _inMemoryMailboxService.getReceivingMailbox(mailboxId);
     }
     return _grpcMailboxService.getReceivingMailbox(mailboxId);
+  }
+
+  @Nullable
+  @Override
+  public ReceivingMailbox<TransferableBlock> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId) {
+    if (mailboxId.isLocal()) {
+      return _inMemoryMailboxService.getReceivingMailboxIfPresent(mailboxId);
+    }
+    return _grpcMailboxService.getReceivingMailboxIfPresent(mailboxId);
   }
 
   @Override

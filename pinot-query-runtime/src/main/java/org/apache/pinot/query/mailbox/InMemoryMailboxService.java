@@ -24,10 +24,10 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.slf4j.Logger;
@@ -49,14 +49,11 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
             @Override
             public void onRemoval(RemovalNotification<String, InMemoryReceivingMailbox> notification) {
               if (notification.wasEvicted()) {
-                if (!notification.getValue().isClaimed()) {
-                  notification.getValue().cancel();
-                }
+                notification.getValue().cancel();
               }
             }
           })
           .build();
-  private final ConcurrentHashMap<String, InMemoryTransferStream> _transferStreamMap = new ConcurrentHashMap<>();
 
   public InMemoryMailboxService(String hostname, int mailboxPort,
       Consumer<MailboxIdentifier> receivedMailContentCallback) {
@@ -87,37 +84,33 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return _mailboxPort;
   }
 
+  @Override
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
+    return new InMemorySendingMailbox(mailboxId.toString(), (x) -> new InMemoryTransferStream(mailboxId, this),
+        getReceivedMailContentCallback(), deadlineMs);
+  }
+
+  @Override
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
+    Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    // for now, we use an unbounded blocking queue as the means of communication between
-    // in memory mailboxes - the reason for this is that unless we implement flow control,
-    // blocks will sit in memory either way (blocking the sender from sending doesn't prevent
-    // more blocks from being generated from upstream). on the other hand, having a capacity
-    // for the queue causes the sending thread to occupy a task pool thread and prevents other
-    // threads (most importantly, the receiving thread) from running - which can cause unnecessary
-    // failure situations
-    // TODO: when we implement flow control, we should swap this out with a bounded abstraction
-    return new InMemorySendingMailbox(mailboxId.toString(),
-        _transferStreamMap.computeIfAbsent(mId, id -> new InMemoryTransferStream(mailboxId, this)),
-        getReceivedMailContentCallback());
+    try {
+      return _receivingMailboxCache.get(mId, () -> new InMemoryReceivingMailbox(mId));
+    } catch (ExecutionException e) {
+      LOGGER.error(String.format("Error getting in-memory receiving mailbox=%s", mailboxId), e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Nullable
+  @Override
+  public ReceivingMailbox<TransferableBlock> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId) {
+    return _receivingMailboxCache.getIfPresent(mailboxId.toString());
   }
 
   @Override
   public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
     _receivingMailboxCache.invalidate(mailboxId.toString());
-  }
-
-  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    String mId = mailboxId.toString();
-    InMemoryTransferStream transferStream = _transferStreamMap.computeIfAbsent(mId,
-        id -> new InMemoryTransferStream(mailboxId, this));
-    try {
-      return _receivingMailboxCache.get(mId, () -> new InMemoryReceivingMailbox(mId, transferStream));
-    } catch (ExecutionException e) {
-      LOGGER.error(String.format("Error getting in-memory receiving mailbox=%s", mailboxId), e);
-      throw new RuntimeException(e);
-    }
   }
 }

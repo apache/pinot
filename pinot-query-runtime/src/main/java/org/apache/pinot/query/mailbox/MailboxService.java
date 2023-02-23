@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import javax.annotation.Nullable;
+
 
 /**
  * Mailbox service that handles transfer for mailbox contents.
@@ -61,6 +63,11 @@ public interface MailboxService<T> {
    */
   ReceivingMailbox<T> getReceivingMailbox(MailboxIdentifier mailboxId);
 
+  @Nullable
+  ReceivingMailbox<T> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId);
+
+  void releaseReceivingMailbox(MailboxIdentifier mailboxId);
+
   /**
    * Look up a sending mailbox by {@link MailboxIdentifier}.
    *
@@ -69,6 +76,4 @@ public interface MailboxService<T> {
    * @return a sending mailbox.
    */
   SendingMailbox<T> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs);
-
-  void releaseReceivingMailbox(MailboxIdentifier mailboxId);
 }

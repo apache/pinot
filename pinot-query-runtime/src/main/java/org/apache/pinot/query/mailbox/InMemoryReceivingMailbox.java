@@ -18,30 +18,31 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private final String _mailboxId;
-  private final InMemoryTransferStream _transferStream;
-  private volatile boolean _closed;
+  private InMemoryTransferStream _transferStream;
+  private final CountDownLatch _readyLatch = new CountDownLatch(1);
+  private volatile boolean _closed = false;
 
-  public InMemoryReceivingMailbox(String mailboxId, InMemoryTransferStream transferStream) {
+  public InMemoryReceivingMailbox(String mailboxId) {
     _mailboxId = mailboxId;
-    _transferStream = transferStream;
-    _closed = false;
   }
 
-  @Override
-  public String getMailboxId() {
-    return _mailboxId;
+  public void init(InMemoryTransferStream transferStream) {
+    _transferStream = transferStream;
+    _readyLatch.countDown();
   }
 
   @Override
   public TransferableBlock receive()
       throws Exception {
-    if (!_transferStream.waitForInitialize()) {
+    if (!_readyLatch.await(100, TimeUnit.MILLISECONDS)) {
       return null;
     }
     TransferableBlock block = _transferStream.poll();
@@ -59,17 +60,23 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
 
   @Override
   public boolean isInitialized() {
-    _transferStream.isInitialized();
-    return true;
+    return _readyLatch.getCount() == 0;
   }
 
   @Override
   public boolean isClosed() {
-    return _closed && _transferStream.size() == 0;
+    return _closed;
   }
 
   @Override
   public void cancel() {
-    _transferStream.cancel();
+    if (_transferStream != null) {
+      _transferStream.cancel();
+    }
+  }
+
+  @Override
+  public String getMailboxId() {
+    return _mailboxId;
   }
 }
