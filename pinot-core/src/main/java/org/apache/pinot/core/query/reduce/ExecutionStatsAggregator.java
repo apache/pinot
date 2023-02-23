@@ -30,13 +30,16 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
+  private final List<String> _operatorIds = new ArrayList<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final boolean _enableTrace;
 
@@ -66,6 +69,9 @@ public class ExecutionStatsAggregator {
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private boolean _numGroupsLimitReached = false;
+  private int _numBlocks = 0;
+  private int _numRows = 0;
+  private long _threadExecutionTime = 0;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -81,6 +87,18 @@ public class ExecutionStatsAggregator {
     if (_enableTrace) {
       _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
     }
+
+    String tableName = metadata.getOrDefault("tableNames", "");
+
+    TableType tableType;
+
+    if (routingInstance != null) {
+      tableType = routingInstance.getTableType();
+    } else {
+      tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    }
+
+    _operatorIds.add(metadata.getOrDefault("operatorId", ""));
 
     // Reduce on exceptions.
     for (int key : exceptions.keySet()) {
@@ -141,8 +159,8 @@ public class ExecutionStatsAggregator {
     }
 
     String threadCpuTimeNsString = metadata.get(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName());
-    if (routingInstance != null && threadCpuTimeNsString != null) {
-      if (routingInstance.getTableType() == TableType.OFFLINE) {
+    if (tableType != null && threadCpuTimeNsString != null) {
+      if (tableType == TableType.OFFLINE) {
         _offlineThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
       } else {
         _realtimeThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
@@ -151,8 +169,8 @@ public class ExecutionStatsAggregator {
 
     String systemActivitiesCpuTimeNsString =
         metadata.get(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName());
-    if (routingInstance != null && systemActivitiesCpuTimeNsString != null) {
-      if (routingInstance.getTableType() == TableType.OFFLINE) {
+    if (tableType != null && systemActivitiesCpuTimeNsString != null) {
+      if (tableType == TableType.OFFLINE) {
         _offlineSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
       } else {
         _realtimeSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
@@ -161,8 +179,8 @@ public class ExecutionStatsAggregator {
 
     String responseSerializationCpuTimeNsString =
         metadata.get(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
-    if (routingInstance != null && responseSerializationCpuTimeNsString != null) {
-      if (routingInstance.getTableType() == TableType.OFFLINE) {
+    if (tableType != null && responseSerializationCpuTimeNsString != null) {
+      if (tableType== TableType.OFFLINE) {
         _offlineResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
       } else {
         _realtimeResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
@@ -200,6 +218,22 @@ public class ExecutionStatsAggregator {
     }
     _numGroupsLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
+
+
+    String numBlocksString = metadata.get("numBlocks");
+    if (numBlocksString != null) {
+      _numBlocks += Long.parseLong(numBlocksString);
+    }
+
+    String numRowsString = metadata.get("numRows");
+    if (numBlocksString != null) {
+      _numRows += Long.parseLong(numRowsString);
+    }
+
+    String threadExecutionTimeString = metadata.get("threadExecutionTime");
+    if (threadExecutionTimeString != null) {
+      _threadExecutionTime += Long.parseLong(threadExecutionTimeString);
+    }
   }
 
   public void setStats(BrokerResponseNative brokerResponseNative) {
@@ -248,6 +282,85 @@ public class ExecutionStatsAggregator {
     }
     brokerResponseNative.setNumConsumingSegmentsProcessed(_numConsumingSegmentsProcessed);
     brokerResponseNative.setNumConsumingSegmentsMatched(_numConsumingSegmentsMatched);
+
+    // Update broker metrics.
+    if (brokerMetrics != null && rawTableName != null) {
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, _numDocsScanned);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+          _numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+          _numEntriesScannedPostFilter);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_THREAD_CPU_TIME_NS, _offlineThreadCpuTimeNs,
+          TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS, _realtimeThreadCpuTimeNs,
+          TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_SYSTEM_ACTIVITIES_CPU_TIME_NS,
+          _offlineSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_SYSTEM_ACTIVITIES_CPU_TIME_NS,
+          _realtimeSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_RESPONSE_SER_CPU_TIME_NS,
+          _offlineResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_RESPONSE_SER_CPU_TIME_NS,
+          _realtimeResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_TOTAL_CPU_TIME_NS, _offlineTotalCpuTimeNs,
+          TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_TOTAL_CPU_TIME_NS, _realtimeTotalCpuTimeNs,
+          TimeUnit.NANOSECONDS);
+
+      if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
+        brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
+            System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
+      }
+    }
+  }
+
+  public void setStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
+      @Nullable BrokerMetrics brokerMetrics) {
+    // set exception
+    List<QueryProcessingException> processingExceptions = brokerResponseStats.getProcessingExceptions();
+    processingExceptions.addAll(_processingExceptions);
+
+    // add all trace.
+    if (_enableTrace) {
+      brokerResponseStats.getTraceInfo().putAll(_traceInfo);
+    }
+
+    // Set execution statistics.
+    brokerResponseStats.setNumDocsScanned(_numDocsScanned);
+    brokerResponseStats.setNumEntriesScannedInFilter(_numEntriesScannedInFilter);
+    brokerResponseStats.setNumEntriesScannedPostFilter(_numEntriesScannedPostFilter);
+    brokerResponseStats.setNumSegmentsQueried(_numSegmentsQueried);
+    brokerResponseStats.setNumSegmentsProcessed(_numSegmentsProcessed);
+    brokerResponseStats.setNumSegmentsMatched(_numSegmentsMatched);
+    brokerResponseStats.setTotalDocs(_numTotalDocs);
+    brokerResponseStats.setNumGroupsLimitReached(_numGroupsLimitReached);
+    brokerResponseStats.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
+    brokerResponseStats.setRealtimeThreadCpuTimeNs(_realtimeThreadCpuTimeNs);
+    brokerResponseStats.setOfflineSystemActivitiesCpuTimeNs(_offlineSystemActivitiesCpuTimeNs);
+    brokerResponseStats.setRealtimeSystemActivitiesCpuTimeNs(_realtimeSystemActivitiesCpuTimeNs);
+    brokerResponseStats.setOfflineResponseSerializationCpuTimeNs(_offlineResponseSerializationCpuTimeNs);
+    brokerResponseStats.setRealtimeResponseSerializationCpuTimeNs(_realtimeResponseSerializationCpuTimeNs);
+    brokerResponseStats.setOfflineTotalCpuTimeNs(_offlineTotalCpuTimeNs);
+    brokerResponseStats.setRealtimeTotalCpuTimeNs(_realtimeTotalCpuTimeNs);
+    brokerResponseStats.setNumSegmentsPrunedByServer(_numSegmentsPrunedByServer);
+    brokerResponseStats.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
+    brokerResponseStats.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);
+    brokerResponseStats.setNumSegmentsPrunedByValue(_numSegmentsPrunedByValue);
+    brokerResponseStats.setExplainPlanNumEmptyFilterSegments(_explainPlanNumEmptyFilterSegments);
+    brokerResponseStats.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
+    if (_numConsumingSegmentsQueried > 0) {
+      brokerResponseStats.setNumConsumingSegmentsQueried(_numConsumingSegmentsQueried);
+    }
+    if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
+      brokerResponseStats.setMinConsumingFreshnessTimeMs(_minConsumingFreshnessTimeMs);
+    }
+    brokerResponseStats.setNumConsumingSegmentsProcessed(_numConsumingSegmentsProcessed);
+    brokerResponseStats.setNumConsumingSegmentsMatched(_numConsumingSegmentsMatched);
+
+    brokerResponseStats.setNumBlocks(_numBlocks);
+    brokerResponseStats.setNumRows(_numRows);
+    brokerResponseStats.setThreadExecutionTime(_threadExecutionTime);
+    brokerResponseStats.setOperatorIds(_operatorIds);
 
     // Update broker metrics.
     if (brokerMetrics != null && rawTableName != null) {

@@ -65,14 +65,18 @@ public class OperatorStats {
     _numRows += numRows;
   }
 
+  public void recordSingleStat(String key, String stat) {
+    _executionStats.put(key, stat);
+  }
+
   public void recordExecutionStats(Map<String, String> executionStats) {
-    _executionStats = executionStats;
+    _executionStats.putAll(executionStats);
   }
 
   public Map<String, String> getExecutionStats() {
-    _executionStats.put(OperatorUtils.NUM_BLOCKS, String.valueOf(_numBlock));
-    _executionStats.put(OperatorUtils.NUM_ROWS, String.valueOf(_numRows));
-    _executionStats.put(OperatorUtils.THREAD_EXECUTION_TIME,
+    _executionStats.putIfAbsent(OperatorUtils.NUM_BLOCKS, String.valueOf(_numBlock));
+    _executionStats.putIfAbsent(OperatorUtils.NUM_ROWS, String.valueOf(_numRows));
+    _executionStats.putIfAbsent(OperatorUtils.THREAD_EXECUTION_TIME,
         String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
     return _executionStats;
   }

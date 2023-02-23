@@ -74,6 +74,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
           }
 
           if (!_operatorStats.getExecutionStats().isEmpty()) {
+            _operatorStats.recordSingleStat("operatorId", _operatorId);
             _operatorStatsMap.put(_operatorId, _operatorStats);
           }
           return TransferableBlockUtils.getEndOfStreamTransferableBlock(
