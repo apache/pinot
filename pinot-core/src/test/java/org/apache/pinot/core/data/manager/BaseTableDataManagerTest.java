@@ -794,7 +794,7 @@ public class BaseTableDataManagerTest {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Collections.singletonList(new TierConfig(tierName, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "3d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
-            Collections.singletonMap("dataDir", dataDir.getAbsolutePath()), null))).build();
+            Collections.singletonMap("dataDir", dataDir.getAbsolutePath())))).build();
   }
 
   private static URI mockRemoteCopy() throws IOException, URISyntaxException {
