@@ -20,8 +20,6 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.Map;
 import java.util.TreeMap;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
