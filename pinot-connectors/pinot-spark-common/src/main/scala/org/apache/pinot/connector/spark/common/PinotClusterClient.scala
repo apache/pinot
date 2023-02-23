@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.connector.spark.common
 
+import java.net.{URI, URLEncoder}
 import io.circe.Decoder
 import io.circe.generic.auto._
 import org.apache.pinot.connector.spark.common.query.ScanQuery
@@ -25,7 +26,6 @@ import org.apache.pinot.spi.config.table.TableType
 import org.apache.pinot.spi.data.Schema
 import org.apache.pinot.spi.utils.builder.TableNameBuilder
 
-import java.net.{URI, URLEncoder}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -58,6 +58,7 @@ private[pinot] object PinotClusterClient extends Logging {
 
   /**
    * Get available broker urls(host:port) for given table.
+   * This method is used when if broker instances not defined in the datasource options.
    */
   def getBrokerInstances(controllerUrl: String, tableName: String): List[String] = {
     Try {
@@ -91,6 +92,8 @@ private[pinot] object PinotClusterClient extends Logging {
 
   /**
    * Get time boundary info of specified table.
+   * This method is used when table is hybrid to ensure that the overlap
+   * between realtime and offline segment data is queried exactly once.
    *
    * @return time boundary info if table exist and segments push type is 'append' or None otherwise
    */

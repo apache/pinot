@@ -27,7 +27,7 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
 
   test("Spark DataSourceOptions should be converted to the PinotDataSourceReadOptions") {
     val options = Map(
-      "table" -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
       PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "hybrid",
       PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
       PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
@@ -56,14 +56,14 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
   test("Method should throw exception if `tableType` option is missing or wrong") {
     // missing
     val missingOption = Map(
-      "table" -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
       PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
       PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000"
     )
 
     // wrong input
     val wrongOption = Map(
-      "table" -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
       PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offlinee",
       PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
       PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000"

@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.connector.spark.common
 
+import java.net.URI
+
 import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.methods.{HttpUriRequest, RequestBuilder}
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.util.EntityUtils
-
-import java.net.URI
 
 /**
  * Helper Http methods to get metadata information from Pinot controller/broker.

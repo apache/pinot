@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.connector.spark.datasource.query
 
-import org.apache.spark.sql.sources._
-
 import java.sql.{Date, Timestamp}
+
+import org.apache.spark.sql.sources._
 
 /**
  * Helper methods to find valid filters, and convert spark filters to SQL where clause.
@@ -83,7 +83,7 @@ private[pinot] object FilterPushDown {
 
   private def compileFilter(filter: Filter): Option[String] = {
     val whereCondition = filter match {
-    case EqualTo(attr, value) => s"$attr = ${compileValue(value)}"
+      case EqualTo(attr, value) => s"$attr = ${compileValue(value)}"
       case EqualNullSafe(attr, value) =>
         s"NOT ($attr != ${compileValue(value)} OR $attr IS NULL OR " +
           s"${compileValue(value)} IS NULL) OR " +

@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.connector.spark.common
 
+import java.util
+
 import org.apache.pinot.spi.config.table.TableType
 
 import scala.util.Random
-import java.util
 
 /**
  * To create serializable datasource reader options from spark datasource options.
