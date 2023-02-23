@@ -45,11 +45,11 @@ public class MultiplexingMailboxServiceTest {
     Mockito.doReturn(1000).when(grpcMailboxService).getMailboxPort();
     Mockito.doReturn(1000).when(inMemoryMailboxService).getMailboxPort();
     Mockito.doReturn(Mockito.mock(InMemorySendingMailbox.class)).when(inMemoryMailboxService).getSendingMailbox(
-        Mockito.any(), -1);
+        Mockito.any(), Mockito.anyLong());
     Mockito.doReturn(Mockito.mock(InMemoryReceivingMailbox.class)).when(inMemoryMailboxService).getReceivingMailbox(
         Mockito.any());
     Mockito.doReturn(Mockito.mock(GrpcSendingMailbox.class)).when(grpcMailboxService).getSendingMailbox(
-        Mockito.any(), -1);
+        Mockito.any(), Mockito.anyLong());
     Mockito.doReturn(Mockito.mock(GrpcReceivingMailbox.class)).when(grpcMailboxService).getReceivingMailbox(
         Mockito.any());
 

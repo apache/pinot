@@ -40,13 +40,15 @@ public class InMemoryMailboxServiceTest {
   @Test
   public void testHappyPath()
       throws Exception {
+    long deadlineMs = System.currentTimeMillis() + 10_000;
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
     final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
         "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 0, 0),
         DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
     InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
         mailboxId);
-    InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId, -1);
+    InMemorySendingMailbox sendingMailbox =
+        (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId, deadlineMs);
 
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < NUM_ENTRIES; i++) {
@@ -77,6 +79,7 @@ public class InMemoryMailboxServiceTest {
    */
   @Test
   public void testNonLocalMailboxId() {
+    long deadlineMs = System.currentTimeMillis() + 10_000;
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
     final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
         "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 1, 0),
@@ -92,7 +95,7 @@ public class InMemoryMailboxServiceTest {
 
     // Test getSendingMailbox
     try {
-      mailboxService.getSendingMailbox(mailboxId, -1);
+      mailboxService.getSendingMailbox(mailboxId, deadlineMs);
       Assert.fail("Method call above should have failed");
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("non-local transport"));
