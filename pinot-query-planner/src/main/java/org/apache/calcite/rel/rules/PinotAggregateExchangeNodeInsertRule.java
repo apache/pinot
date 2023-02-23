@@ -98,7 +98,6 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * Split the AGG into 2 stages, both with the same AGG type,
    * Pinot internal stage optimization can use the info of the input data type to infer whether it should generate
    * the "intermediate-stage AGG operator" or a "leaf-stage AGG operator"
-   *
    * @see org.apache.pinot.core.query.aggregation.function.AggregationFunction
    *
    * @param call the {@link RelOptRuleCall} on match.
@@ -191,8 +190,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     final SqlAggFunction oldAggregation = oldCall.getAggregation();
     final SqlKind aggKind = oldAggregation.getKind();
     // Check only the supported AGG functions are provided.
-    Preconditions.checkState(SUPPORTED_AGG_KIND.contains(aggKind),
-        "Unsupported SQL aggregation " + "kind: {}. Only splittable aggregation functions are supported!", aggKind);
+    Preconditions.checkState(SUPPORTED_AGG_KIND.contains(aggKind), "Unsupported SQL aggregation "
+        + "kind: {}. Only splittable aggregation functions are supported!", aggKind);
 
     AggregateCall newCall;
     if (isLeafStageAggregationPresent) {
@@ -253,7 +252,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     LogicalExchange exchange = LogicalExchange.create(project, RelDistributions.hash(newAggGroupByColumns));
 
     // 3. Create an intermediate stage aggregation.
-    RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, exchange, false, newAggArgColumns, newAggGroupByColumns);
+    RelNode newAggNode =
+        makeNewIntermediateAgg(call, oldAggRel, exchange, false, newAggArgColumns, newAggGroupByColumns);
 
     call.transformTo(newAggNode);
   }
