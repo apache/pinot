@@ -131,6 +131,7 @@ public class PinotUpsertRestletResource {
     int bytesPerValue = 60;
     List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
     if (comparisonColumns != null) {
+      int bytesPerTreeMapNode = 84;  // object header, key, value, children, and flags
       bytesPerValue = 52;
       for (String columnName : comparisonColumns) {
         FieldSpec.DataType dt = schema.getFieldSpecFor(columnName).getDataType();
@@ -138,8 +139,15 @@ public class PinotUpsertRestletResource {
           String msg = "Not support data types for the comparison column";
           throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
         } else {
-          bytesPerValue += dt.size();
+          if (comparisonColumns.size() == 1) {
+            bytesPerKey += dt.size();
+          } else {
+            bytesPerValue += bytesPerTreeMapNode + columnName.getBytes().length + dt.size();
+          }
         }
+      }
+      if (comparisonColumns.size() > 1) {
+        bytesPerValue += 32;  // ComparisonColumns Object header + map reference
       }
     }
 
