@@ -36,8 +36,11 @@ public class FunctionInvoker {
   private final PinotDataType[] _parameterTypes;
   private final Object _instance;
 
+  private final boolean _isNullIntorelant;
+
   public FunctionInvoker(FunctionInfo functionInfo) {
     _method = functionInfo.getMethod();
+    _isNullIntorelant = functionInfo.isNullIntolerant();
     Class<?>[] parameterClasses = _method.getParameterTypes();
     int numParameters = parameterClasses.length;
     _parameterClasses = new Class<?>[numParameters];
@@ -122,7 +125,14 @@ public class FunctionInvoker {
    * Invoke the function with the given arguments. The arguments should match the parameter classes. Use
    * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
    */
-  public Object invoke(Object[] arguments) {
+  public Object invoke(Object[] arguments, boolean ignoreNull) {
+    if(_isNullIntorelant){
+      for(Object arg: arguments){
+        if(arg == null){
+          return null;
+        }
+      }
+    }
     try {
       return _method.invoke(_instance, arguments);
     } catch (Exception e) {

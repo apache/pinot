@@ -122,6 +122,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     return matchingDocIds;
   }
 
+  // TODO: Add null support.
   private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
     int numDocs = projectionBlock.getNumDocs();
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();

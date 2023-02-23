@@ -189,9 +189,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
-        case UNKNOWN:
-          _longValuesSV = transformToLongValuesSV(projectionBlock);
-          break;
+//        case UNKNOWN:
+//          _longValuesSV = transformToLongValuesSV(projectionBlock);
+//          break;
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _longValuesSV, length);

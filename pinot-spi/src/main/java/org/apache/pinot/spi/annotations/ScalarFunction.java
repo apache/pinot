@@ -53,5 +53,7 @@ public @interface ScalarFunction {
   // Whether the scalar function expects and can handle null arguments.
   boolean nullableParameters() default false;
 
+  boolean isNullIntorelant() default true;
+
   boolean isPlaceholder() default false;
 }

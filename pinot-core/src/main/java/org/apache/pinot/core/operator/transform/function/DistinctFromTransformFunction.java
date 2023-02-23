@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -45,16 +44,6 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   // Result value to save when two values are not distinct.
   // 0 for isDistinct, 1 for isNotDistinct
   private final int _notDistinctResult;
-
-  /**
-   * Returns a bit map of corresponding column.
-   * Returns null by default if null option is disabled.
-   */
-  @Nullable
-  private static RoaringBitmap getNullBitMap(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
-    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    return projectionBlock.getBlockValueSet(columnName).getNullBitmap();
-  }
 
   /**
    * Returns true when bitmap is null (null option is disabled) or bitmap is empty.
@@ -92,7 +81,37 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("DistinctFrom is not supported when enableNullHandling is set to false");
+    RoaringBitmap leftNull = _leftTransformFunction.getNullBitmap(projectionBlock);
+    RoaringBitmap rightNull = _rightTransformFunction.getNullBitmap(projectionBlock);
+
+    super.transformToIntValuesSV(projectionBlock);
+
+    // Both sides are not null.
+    if (isEmpty(leftNull) && isEmpty(rightNull)) {
+      return _intValuesSV;
+    }
+
+    // Left side is not null.
+    if (isEmpty(leftNull)) {
+      // Mark right null rows as distinct.
+      rightNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+      return _intValuesSV;
+    }
+
+    // Right side is not null.
+    if (isEmpty(rightNull)) {
+      // Mark left null rows as distinct.
+      leftNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+      return _intValuesSV;
+    }
+    // TODO: Skip transform eval when both sides are null.
+    RoaringBitmap xorNull = RoaringBitmap.xor(leftNull, rightNull);
+    // For rows that with one null and one not null, mark them as distinct
+    xorNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+    RoaringBitmap andNull = RoaringBitmap.and(leftNull, rightNull);
+    // For rows that are both null, mark them as not distinct.
+    andNull.forEach((IntConsumer) i -> _intValuesSV[i] = _notDistinctResult);
+    return _intValuesSV;
   }
 
   @Override
@@ -119,6 +138,7 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
     if (isEmpty(rightNull)) {
       // Mark left null rows as distinct.
       leftNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+      return ImmutablePair.of(null, _intValuesSV);
     }
     // TODO: Skip transform eval when both sides are null.
     RoaringBitmap xorNull = RoaringBitmap.xor(leftNull, rightNull);

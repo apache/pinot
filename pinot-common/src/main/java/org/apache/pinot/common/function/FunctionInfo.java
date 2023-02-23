@@ -26,10 +26,13 @@ public class FunctionInfo {
   private final Class<?> _clazz;
   private final boolean _nullableParameters;
 
-  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
+  private final boolean _isNullIntolerant;
+
+  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters, boolean isNullIntolerant) {
     _method = method;
     _clazz = clazz;
     _nullableParameters = nullableParameters;
+    _isNullIntolerant = isNullIntolerant;
   }
 
   public Method getMethod() {
@@ -42,5 +45,9 @@ public class FunctionInfo {
 
   public boolean hasNullableParameters() {
     return _nullableParameters;
+  }
+
+  public boolean isNullIntolerant() {
+    return _isNullIntolerant;
   }
 }

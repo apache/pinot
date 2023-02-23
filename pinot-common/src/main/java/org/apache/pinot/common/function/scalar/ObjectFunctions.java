@@ -27,17 +27,17 @@ public class ObjectFunctions {
   private ObjectFunctions() {
   }
 
-  @ScalarFunction(nullableParameters = true, names = {"isNull", "is_null"})
+  @ScalarFunction(nullableParameters = true, names = {"isNull", "is_null"}, isNullIntorelant = false)
   public static boolean isNull(@Nullable Object obj) {
     return obj == null;
   }
 
-  @ScalarFunction(nullableParameters = true, names = {"isNotNull", "is_not_null"})
+  @ScalarFunction(nullableParameters = true, names = {"isNotNull", "is_not_null"}, isNullIntorelant = false)
   public static boolean isNotNull(@Nullable Object obj) {
     return !isNull(obj);
   }
 
-  @ScalarFunction(nullableParameters = true, names = {"isDistinctFrom", "is_distinct_from"})
+  @ScalarFunction(nullableParameters = true, names = {"isDistinctFrom", "is_distinct_from"}, isNullIntorelant = false)
   public static boolean isDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
     if (obj1 == null && obj2 == null) {
       return false;
@@ -48,7 +48,8 @@ public class ObjectFunctions {
     return !obj1.equals(obj2);
   }
 
-  @ScalarFunction(nullableParameters = true, names = {"isNotDistinctFrom", "is_not_distinct_from"})
+  @ScalarFunction(nullableParameters = true, names = {"isNotDistinctFrom", "is_not_distinct_from"}, isNullIntorelant
+      = false)
   public static boolean isNotDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
     return !isDistinctFrom(obj1, obj2);
   }
@@ -59,26 +60,26 @@ public class ObjectFunctions {
   }
 
   @Nullable
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, isNullIntorelant = false)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2) {
     return coalesceVar(obj1, obj2);
   }
 
   @Nullable
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, isNullIntorelant = false)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3) {
     return coalesceVar(obj1, obj2, obj3);
   }
 
   @Nullable
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, isNullIntorelant = false)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
       @Nullable Object obj4) {
     return coalesceVar(obj1, obj2, obj3, obj4);
   }
 
   @Nullable
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, isNullIntorelant = false)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
       @Nullable Object obj4, @Nullable Object obj5) {
     return coalesceVar(obj1, obj2, obj3, obj4, obj5);
@@ -94,28 +95,28 @@ public class ObjectFunctions {
     return null;
   }
 
-  @ScalarFunction
+  @ScalarFunction (isNullIntorelant = false)
   public static Object caseWhen(boolean c1, Object o1, Object oe) {
     return caseWhenVar(c1, o1, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction (isNullIntorelant = false)
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction (isNullIntorelant = false)
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction (isNullIntorelant = false)
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, boolean c4,
       Object o4, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, oe);
   }
 
-  @ScalarFunction
+  @ScalarFunction (isNullIntorelant = false)
   public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, boolean c4,
       Object o4, boolean c5, Object o5, Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, oe);

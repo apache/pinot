@@ -281,7 +281,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+    if (_dataType != DataType.INT) {
+      return super.transformToIntValuesSV(projectionBlock);
+    }
+    return getIntTransformResults(projectionBlock).getRight();
   }
 
   @Override
@@ -294,7 +297,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+    if (_dataType != DataType.LONG) {
+      return super.transformToLongValuesSV(projectionBlock);
+    }
+    return getLongTransformResults(projectionBlock).getRight();
   }
 
   @Override
@@ -307,7 +313,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+    if (_dataType != DataType.FLOAT) {
+      return super.transformToFloatValuesSV(projectionBlock);
+    }
+    return getFloatTransformResults(projectionBlock).getRight();
   }
 
   @Override
@@ -320,7 +329,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+    if (_dataType != DataType.DOUBLE) {
+      return super.transformToDoubleValuesSV(projectionBlock);
+    }
+    return getDoubleTransformResults(projectionBlock).getRight();
   }
 
   @Override
@@ -333,7 +345,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+    if (_dataType != DataType.BIG_DECIMAL) {
+      return super.transformToBigDecimalValuesSV(projectionBlock);
+    }
+    return getBigDecimalTransformResults(projectionBlock).getRight();
   }
 
   @Override
@@ -346,7 +361,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("Coalesce is not supported when enableNullHandling is set to false");
+    if (_dataType != DataType.STRING) {
+      return super.transformToStringValuesSV(projectionBlock);
+    }
+    return getStringTransformResults(projectionBlock).getRight();
   }
 
   @Override

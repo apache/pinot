@@ -60,7 +60,7 @@ public class FunctionOperand extends TransformOperand {
     for (int i = 0; i < _childOperandList.size(); i++) {
       _reusableOperandHolder[i] = _childOperandList.get(i).apply(row);
     }
-    return _functionInvoker.invoke(_reusableOperandHolder);
+    return _functionInvoker.invoke(_reusableOperandHolder, false);
   }
 
   private static String computeColumnName(String functionName, List<TransformOperand> childOperands) {

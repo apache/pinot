@@ -162,7 +162,6 @@ public class LiteralTransformFunction implements TransformFunction {
       longResult = new long[numDocs];
       if (_dataType != DataType.TIMESTAMP) {
         if (_longLiteral != 0) {
-          // TODO: Handle null literal
           Arrays.fill(longResult, _longLiteral);
         }
       } else {

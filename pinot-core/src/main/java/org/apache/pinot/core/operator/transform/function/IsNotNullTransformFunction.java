@@ -54,11 +54,6 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException("IsNotNull is not supported when enableNullHandling is set to false");
-  }
-
-  @Override
-  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
@@ -66,11 +61,16 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
     RoaringBitmap bitmap = _transformFunction.getNullBitmap(projectionBlock);
     if (bitmap == null) {
       Arrays.fill(_intValuesSV, 1);
-      return ImmutablePair.of(null, _intValuesSV);
+      return _intValuesSV;
     }
     bitmap.flip(0L, numDocs);
     bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 1);
-    return ImmutablePair.of(null, _intValuesSV);
+    return _intValuesSV;
+  }
+
+  @Override
+  public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
+    return ImmutablePair.of(null, transformToIntValuesSV(projectionBlock));
   }
 
   @Override

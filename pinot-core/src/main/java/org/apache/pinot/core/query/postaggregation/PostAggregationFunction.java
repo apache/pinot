@@ -88,7 +88,7 @@ public class PostAggregationFunction {
         arguments[i] = parameterType.convert(arguments[i], argumentType);
       }
     }
-    Object result = _functionInvoker.invoke(arguments);
+    Object result = _functionInvoker.invoke(arguments, false);
     return _resultType == ColumnDataType.STRING ? result.toString() : result;
   }
 }

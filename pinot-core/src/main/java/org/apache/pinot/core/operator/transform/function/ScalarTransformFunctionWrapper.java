@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -94,8 +95,28 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     for (int i = 0; i < numArguments; i++) {
       TransformFunction transformFunction = arguments.get(i);
       if (transformFunction instanceof LiteralTransformFunction) {
-        String literal = ((LiteralTransformFunction) transformFunction).getStringLiteral();
-        _scalarArguments[i] = parameterTypes[i].convert(literal, PinotDataType.STRING);
+        LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) transformFunction;
+        switch (literalTransformFunction.getResultMetadata().getDataType()) {
+          case UNKNOWN:
+            _scalarArguments[i] = null;
+            break;
+          case BOOLEAN:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getBooleanLiteral(), PinotDataType.BOOLEAN);
+            break;
+          case DOUBLE:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getDoubleLiteral(), PinotDataType.DOUBLE);
+            break;
+          case BIG_DECIMAL:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getBigDecimalLiteral(), PinotDataType.BIG_DECIMAL);
+            break;
+          default:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getStringLiteral(), PinotDataType.STRING);
+            break;
+        }
       } else {
         _nonLiteralIndices[_numNonLiteralArguments] = i;
         _nonLiteralFunctions[_numNonLiteralArguments] = transformFunction;
@@ -125,14 +146,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _intValuesSV[i] = (int) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _functionInvoker.invoke(_scalarArguments, true);
+      if (result != null) {
+        _intValuesSV[i] = (int) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      }
     }
     return _intValuesSV;
   }
 
   @Override
   public Pair<RoaringBitmap, int[]> transformToIntValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesSV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
+      return super.transformToIntValuesSVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    RoaringBitmap bitmap = new RoaringBitmap();
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[length];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _functionInvoker.invoke(_scalarArguments, false);
+      if (result != null) {
+        _intValuesSV[i] = (int) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _intValuesSV);
   }
 
   @Override
@@ -149,14 +193,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _longValuesSV[i] = (long) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _longValuesSV[i] = (long) result;
+      }
     }
     return _longValuesSV;
   }
 
   @Override
   public Pair<RoaringBitmap, long[]> transformToLongValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesSV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
+      return super.transformToLongValuesSVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_longValuesSV == null) {
+      _longValuesSV = new long[length];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _longValuesSV[i] = (long) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _longValuesSV);
   }
 
   @Override
@@ -173,14 +240,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _floatValuesSV[i] = (float) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _floatValuesSV[i] = (float) result;
+      }
     }
     return _floatValuesSV;
   }
 
   @Override
   public Pair<RoaringBitmap, float[]> transformToFloatValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesSV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
+      return super.transformToFloatValuesSVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_floatValuesSV == null) {
+      _floatValuesSV = new float[length];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _floatValuesSV[i] = (float) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _floatValuesSV);
   }
 
   @Override
@@ -197,14 +287,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _doubleValuesSV[i] = (double) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _doubleValuesSV[i] = (double) result;
+      }
     }
     return _doubleValuesSV;
   }
 
   @Override
   public Pair<RoaringBitmap, double[]> transformToDoubleValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesSV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
+      return super.transformToDoubleValuesSVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[length];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result == null) {
+        bitmap.add(i);
+      } else {
+        _doubleValuesSV[i] = (double) result;
+      }
+    }
+    return ImmutablePair.of(bitmap, _doubleValuesSV);
   }
 
   @Override
@@ -221,14 +334,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _bigDecimalValuesSV[i] = (BigDecimal) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _bigDecimalValuesSV[i] = (BigDecimal) result;
+      }
     }
     return _bigDecimalValuesSV;
   }
 
   @Override
   public Pair<RoaringBitmap, BigDecimal[]> transformToBigDecimalValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBigDecimalValuesSV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
+      return super.transformToBigDecimalValuesSVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null) {
+      _bigDecimalValuesSV = new BigDecimal[length];
+    }
+    RoaringBitmap bitmap = new RoaringBitmap();
+    getNonLiteralValuesWithNull(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _bigDecimalValuesSV[i] = (BigDecimal) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _bigDecimalValuesSV);
   }
 
   @Override
@@ -245,16 +381,39 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      Object result = _functionInvoker.invoke(_scalarArguments);
-      _stringValuesSV[i] =
-          _resultType == PinotDataType.STRING ? result.toString() : (String) _resultType.toInternal(result);
+      Object result = _functionInvoker.invoke(_scalarArguments, true);
+      if (result != null) {
+        _stringValuesSV[i] =
+            _resultType == PinotDataType.STRING ? result.toString() : (String) _resultType.toInternal(result);
+      }
     }
     return _stringValuesSV;
   }
 
   @Override
   public Pair<RoaringBitmap, String[]> transformToStringValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesSV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
+      return super.transformToStringValuesSVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_stringValuesSV == null) {
+      _stringValuesSV = new String[length];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _functionInvoker.invoke(_scalarArguments, false);
+      if (result != null) {
+        _stringValuesSV[i] =
+            _resultType == PinotDataType.STRING ? result.toString() : (String) _resultType.toInternal(result);
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _stringValuesSV);
   }
 
   @Override
@@ -271,14 +430,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _bytesValuesSV[i] = (byte[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _bytesValuesSV[i] = (byte[]) result;
+      }
     }
     return _bytesValuesSV;
   }
 
   @Override
   public Pair<RoaringBitmap, byte[][]> transformToBytesValuesSVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToBytesValuesSV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
+      return super.transformToBytesValuesSVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_bytesValuesSV == null) {
+      _bytesValuesSV = new byte[length][];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _bytesValuesSV[i] = (byte[]) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _bytesValuesSV);
   }
 
   @Override
@@ -295,14 +477,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _intValuesMV[i] = (int[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _intValuesMV[i] = (int[]) result;
+      }
     }
     return _intValuesMV;
   }
 
   @Override
   public Pair<RoaringBitmap, int[][]> transformToIntValuesMVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToIntValuesMV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
+      return super.transformToIntValuesMVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_intValuesMV == null) {
+      _intValuesMV = new int[length][];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _intValuesMV[i] = (int[]) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _intValuesMV);
   }
 
   @Override
@@ -319,14 +524,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _longValuesMV[i] = (long[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _longValuesMV[i] = (long[]) result;
+      }
     }
     return _longValuesMV;
   }
 
   @Override
   public Pair<RoaringBitmap, long[][]> transformToLongValuesMVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToLongValuesMV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
+      return super.transformToLongValuesMVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_longValuesMV == null) {
+      _longValuesMV = new long[length][];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _longValuesMV[i] = (long[]) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _longValuesMV);
   }
 
   @Override
@@ -343,14 +571,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _floatValuesMV[i] = (float[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _floatValuesMV[i] = (float[]) result;
+      }
     }
     return _floatValuesMV;
   }
 
   @Override
   public Pair<RoaringBitmap, float[][]> transformToFloatValuesMVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToFloatValuesMV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
+      return super.transformToFloatValuesMVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_floatValuesMV == null) {
+      _floatValuesMV = new float[length][];
+    }
+    RoaringBitmap bitmap = new RoaringBitmap();
+    getNonLiteralValuesWithNull(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _floatValuesMV[i] = (float[]) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _floatValuesMV);
   }
 
   @Override
@@ -367,14 +618,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _doubleValuesMV[i] = (double[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _doubleValuesMV[i] = (double[]) result;
+      }
     }
     return _doubleValuesMV;
   }
 
   @Override
   public Pair<RoaringBitmap, double[][]> transformToDoubleValuesMVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToDoubleValuesMV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
+      return super.transformToDoubleValuesMVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_doubleValuesMV == null) {
+      _doubleValuesMV = new double[length][];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _doubleValuesMV[i] = (double[]) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _doubleValuesMV);
   }
 
   @Override
@@ -391,14 +665,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _stringValuesMV[i] = (String[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, true));
+      if (result != null) {
+        _stringValuesMV[i] = (String[]) result;
+      }
     }
     return _stringValuesMV;
   }
 
   @Override
   public Pair<RoaringBitmap, String[][]> transformToStringValuesMVWithNull(ProjectionBlock projectionBlock) {
-    return ImmutablePair.of(getNullBitmap(projectionBlock), transformToStringValuesMV(projectionBlock));
+    if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
+      return super.transformToStringValuesMVWithNull(projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    if (_stringValuesMV == null) {
+      _stringValuesMV = new String[length][];
+    }
+    getNonLiteralValuesWithNull(projectionBlock);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments, false));
+      if (result != null) {
+        _stringValuesMV[i] = (String[]) result;
+      } else {
+        bitmap.add(i);
+      }
+    }
+    return ImmutablePair.of(bitmap, _stringValuesMV);
   }
 
   /**
@@ -468,6 +765,118 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           break;
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
+      }
+    }
+  }
+
+  /**
+   * Helper method to fetch values for the non-literal transform functions based on the parameter types.
+   */
+  private void getNonLiteralValuesWithNull(ProjectionBlock projectionBlock) {
+    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+    for (int i = 0; i < _numNonLiteralArguments; i++) {
+      PinotDataType parameterType = parameterTypes[_nonLiteralIndices[i]];
+      TransformFunction transformFunction = _nonLiteralFunctions[i];
+      RoaringBitmap bitmap = null;
+      switch (parameterType) {
+        case INTEGER:
+          Pair<RoaringBitmap, int[]> intResult = transformFunction.transformToIntValuesSVWithNull(projectionBlock);
+          _nonLiteralValues[i] = ArrayUtils.toObject(intResult.getRight());
+          bitmap = intResult.getLeft();
+          break;
+        case LONG:
+          Pair<RoaringBitmap, long[]> longResult = transformFunction.transformToLongValuesSVWithNull(projectionBlock);
+          _nonLiteralValues[i] = ArrayUtils.toObject(longResult.getRight());
+          bitmap = longResult.getLeft();
+          break;
+        case FLOAT:
+          Pair<RoaringBitmap, float[]> floatResult =
+              transformFunction.transformToFloatValuesSVWithNull(projectionBlock);
+          _nonLiteralValues[i] = ArrayUtils.toObject(floatResult.getRight());
+          bitmap = floatResult.getLeft();
+          break;
+        case DOUBLE:
+          Pair<RoaringBitmap, double[]> doubleResult =
+              transformFunction.transformToDoubleValuesSVWithNull(projectionBlock);
+          _nonLiteralValues[i] = ArrayUtils.toObject(doubleResult.getRight());
+          bitmap = doubleResult.getLeft();
+          break;
+        case BIG_DECIMAL:
+          Pair<RoaringBitmap, BigDecimal[]> bigdecimalResult =
+              transformFunction.transformToBigDecimalValuesSVWithNull(projectionBlock);
+          _nonLiteralValues[i] = bigdecimalResult.getRight();
+          bitmap = bigdecimalResult.getLeft();
+          break;
+        case BOOLEAN: {
+          Pair<RoaringBitmap, int[]> boolResult = transformFunction.transformToIntValuesSVWithNull(projectionBlock);
+          int numValues = boolResult.getRight().length;
+          Boolean[] booleanValues = new Boolean[numValues];
+          for (int j = 0; j < numValues; j++) {
+            booleanValues[j] = boolResult.getValue()[j] == 1;
+          }
+          _nonLiteralValues[i] = booleanValues;
+          bitmap = boolResult.getLeft();
+          break;
+        }
+        case TIMESTAMP: {
+          Pair<RoaringBitmap, long[]> timeResult = transformFunction.transformToLongValuesSVWithNull(projectionBlock);
+          int numValues = timeResult.getRight().length;
+          Timestamp[] timestampValues = new Timestamp[numValues];
+          for (int j = 0; j < numValues; j++) {
+            timestampValues[j] = new Timestamp(timeResult.getRight()[j]);
+          }
+          _nonLiteralValues[i] = timestampValues;
+          bitmap = timeResult.getLeft();
+          break;
+        }
+        case STRING:
+          Pair<RoaringBitmap, String[]> stringResult =
+              transformFunction.transformToStringValuesSVWithNull(projectionBlock);
+          _nonLiteralValues[i] = stringResult.getRight();
+          bitmap = stringResult.getLeft();
+          break;
+        case BYTES:
+          Pair<RoaringBitmap, byte[][]> byteResult =
+              transformFunction.transformToBytesValuesSVWithNull(projectionBlock);
+          _nonLiteralValues[i] = byteResult.getRight();
+          bitmap = byteResult.getLeft();
+          break;
+        case PRIMITIVE_INT_ARRAY:
+          Pair<RoaringBitmap, int[][]> intMVResult = transformFunction.transformToIntValuesMVWithNull(projectionBlock);
+          _nonLiteralValues[i] = intMVResult.getRight();
+          bitmap = intMVResult.getLeft();
+          break;
+        case PRIMITIVE_LONG_ARRAY:
+          Pair<RoaringBitmap, long[][]> longMVResult =
+              transformFunction.transformToLongValuesMVWithNull(projectionBlock);
+          _nonLiteralValues[i] = longMVResult.getRight();
+          bitmap = longMVResult.getLeft();
+          break;
+        case PRIMITIVE_FLOAT_ARRAY:
+          Pair<RoaringBitmap, float[][]> floatMVResult =
+              transformFunction.transformToFloatValuesMVWithNull(projectionBlock);
+          _nonLiteralValues[i] = floatMVResult.getRight();
+          bitmap = floatMVResult.getLeft();
+          break;
+        case PRIMITIVE_DOUBLE_ARRAY:
+          Pair<RoaringBitmap, double[][]> doubleMVResult =
+              transformFunction.transformToDoubleValuesMVWithNull(projectionBlock);
+          _nonLiteralValues[i] = doubleMVResult.getRight();
+          bitmap = doubleMVResult.getLeft();
+          break;
+        case STRING_ARRAY:
+          Pair<RoaringBitmap, String[][]> stringMVResult =
+              transformFunction.transformToStringValuesMVWithNull(projectionBlock);
+          _nonLiteralValues[i] = stringMVResult.getRight();
+          bitmap = stringMVResult.getLeft();
+          break;
+        default:
+          throw new IllegalStateException("Unsupported parameter type: " + parameterType);
+      }
+      if (bitmap != null) {
+        bitmap.forEach((IntConsumer) (j) -> {
+          _nonLiteralValues[j] = null;
+        });
       }
     }
   }

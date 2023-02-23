@@ -250,10 +250,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     if (!nullHandlingEnabled) {
       return whenStatement.transformToIntValuesSV(projectionBlock);
     }
-    Pair<RoaringBitmap, int[]> result = whenStatement.transformToIntValuesSVWithNull(projectionBlock);
-    RoaringBitmap bitmap = result.getLeft();
-    Preconditions.checkState(bitmap == null || bitmap.isEmpty(), "whenStatement cannot produce null output");
-    return result.getRight();
+    int[] result = whenStatement.transformToIntValuesSV(projectionBlock);
+    return result;
   }
 
   /**

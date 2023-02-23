@@ -223,12 +223,16 @@ public class NullHandlingTransformFunctionTest {
 
   protected void testTransformFunction(ExpressionContext expression, boolean[] expectedValues)
       throws Exception {
-    int[] intValues = getTransformFunctionInstance(expression).transformToIntValuesSV(_projectionBlock);
-    long[] longValues = getTransformFunctionInstance(expression).transformToLongValuesSV(_projectionBlock);
-    float[] floatValues = getTransformFunctionInstance(expression).transformToFloatValuesSV(_projectionBlock);
-    double[] doubleValues = getTransformFunctionInstance(expression).transformToDoubleValuesSV(_projectionBlock);
+    int[] intValues =
+        getTransformFunctionInstance(expression).transformToIntValuesSVWithNull(_projectionBlock).getRight();
+    long[] longValues =
+        getTransformFunctionInstance(expression).transformToLongValuesSVWithNull(_projectionBlock).getRight();
+    float[] floatValues =
+        getTransformFunctionInstance(expression).transformToFloatValuesSVWithNull(_projectionBlock).getRight();
+    double[] doubleValues =
+        getTransformFunctionInstance(expression).transformToDoubleValuesSVWithNull(_projectionBlock).getRight();
     BigDecimal[] bigDecimalValues =
-        getTransformFunctionInstance(expression).transformToBigDecimalValuesSV(_projectionBlock);
+        getTransformFunctionInstance(expression).transformToBigDecimalValuesSVWithNull(_projectionBlock).getRight();
     // TODO: Support implicit cast from BOOLEAN to STRING
 //    String[] stringValues = getTransformFunctionInstance(expression).transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {

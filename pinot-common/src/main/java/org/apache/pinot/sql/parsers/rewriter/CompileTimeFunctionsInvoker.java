@@ -36,25 +36,25 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
     for (int i = 0; i < pinotQuery.getSelectListSize(); i++) {
-      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getSelectList().get(i));
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getSelectList().get(i), false);
       pinotQuery.getSelectList().set(i, expression);
     }
     for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
-      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getGroupByList().get(i));
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getGroupByList().get(i), false);
       pinotQuery.getGroupByList().set(i, expression);
     }
     for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
-      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getOrderByList().get(i));
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getOrderByList().get(i),false);
       pinotQuery.getOrderByList().set(i, expression);
     }
-    Expression filterExpression = invokeCompileTimeFunctionExpression(pinotQuery.getFilterExpression());
+    Expression filterExpression = invokeCompileTimeFunctionExpression(pinotQuery.getFilterExpression(), true);
     pinotQuery.setFilterExpression(filterExpression);
-    Expression havingExpression = invokeCompileTimeFunctionExpression(pinotQuery.getHavingExpression());
+    Expression havingExpression = invokeCompileTimeFunctionExpression(pinotQuery.getHavingExpression(), true);
     pinotQuery.setHavingExpression(havingExpression);
     return pinotQuery;
   }
 
-  protected static Expression invokeCompileTimeFunctionExpression(@Nullable Expression expression) {
+  protected static Expression invokeCompileTimeFunctionExpression(@Nullable Expression expression, boolean ignoreNull) {
     if (expression == null || expression.getFunctionCall() == null) {
       return expression;
     }
@@ -63,7 +63,7 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     int numOperands = operands.size();
     boolean compilable = true;
     for (int i = 0; i < numOperands; i++) {
-      Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
+      Expression operand = invokeCompileTimeFunctionExpression(operands.get(i), false);
       if (operand.getLiteral() == null) {
         compilable = false;
       }
@@ -85,8 +85,11 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
         try {
           FunctionInvoker invoker = new FunctionInvoker(functionInfo);
           invoker.convertTypes(arguments);
-          Object result = invoker.invoke(arguments);
-          return RequestUtils.getLiteralExpression(result);
+          Object result = invoker.invoke(arguments, ignoreNull);
+          if(!ignoreNull) {
+            return RequestUtils.getLiteralExpression(result);
+          }
+          return RequestUtils.getLiteralExpression(false);
         } catch (Exception e) {
           throw new SqlCompilationException(
               "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: "

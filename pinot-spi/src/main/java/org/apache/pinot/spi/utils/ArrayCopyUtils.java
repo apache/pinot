@@ -23,6 +23,7 @@ import java.sql.Timestamp;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+
 /**
  * The class <code>ArrayCopyUtils</code> provides methods to copy values across arrays of different types.
  */
@@ -232,49 +233,65 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = Double.valueOf(src[i]).intValue();
+      if (src[i] != "null") {
+        dest[i] = Double.valueOf(src[i]).intValue();
+      }
     }
   }
 
   public static void copy(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = new BigDecimal(src[i]).longValue();
+      if (src[i] != "null") {
+        dest[i] = new BigDecimal(src[i]).longValue();
+      }
     }
   }
 
   public static void copy(String[] src, float[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = Float.parseFloat(src[i]);
+      if (src[i] != "null") {
+        dest[i] = Float.parseFloat(src[i]);
+      }
     }
   }
 
   public static void copy(String[] src, double[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = Double.parseDouble(src[i]);
+      if (src[i] != "null") {
+        dest[i] = Double.parseDouble(src[i]);
+      }
     }
   }
 
   public static void copy(String[] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = new BigDecimal(src[i]);
+      if (src[i] != "null") {
+        dest[i] = new BigDecimal(src[i]);
+      }
     }
   }
 
   public static void copyToBoolean(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = BooleanUtils.toInt(src[i]);
+      if (src[i] != "null") {
+        dest[i] = BooleanUtils.toInt(src[i]);
+      }
     }
   }
 
   public static void copyToTimestamp(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
+      if (src[i] != "null") {
+        dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
+      }
     }
   }
 
   public static void copy(String[] src, byte[][] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = src[i].getBytes(UTF_8);
+      if (src[i] != "null") {
+        dest[i] = src[i].getBytes(UTF_8);
+      }
     }
   }
 

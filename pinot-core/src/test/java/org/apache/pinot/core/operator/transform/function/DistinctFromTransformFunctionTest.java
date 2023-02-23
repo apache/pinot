@@ -148,13 +148,18 @@ public class DistinctFromTransformFunctionTest {
   protected void testTransformFunction(ExpressionContext expression, boolean[] expectedValues,
       ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
       throws Exception {
-    int[] intValues = getTransformFunctionInstance(expression, dataSourceMap).transformToIntValuesSV(projectionBlock);
+    int[] intValues =
+        getTransformFunctionInstance(expression, dataSourceMap).transformToIntValuesSVWithNull(projectionBlock)
+            .getRight();
     long[] longValues =
-        getTransformFunctionInstance(expression, dataSourceMap).transformToLongValuesSV(projectionBlock);
+        getTransformFunctionInstance(expression, dataSourceMap).transformToLongValuesSVWithNull(projectionBlock)
+            .getRight();
     float[] floatValues =
-        getTransformFunctionInstance(expression, dataSourceMap).transformToFloatValuesSV(projectionBlock);
+        getTransformFunctionInstance(expression, dataSourceMap).transformToFloatValuesSVWithNull(projectionBlock)
+            .getRight();
     double[] doubleValues =
-        getTransformFunctionInstance(expression, dataSourceMap).transformToDoubleValuesSV(projectionBlock);
+        getTransformFunctionInstance(expression, dataSourceMap).transformToDoubleValuesSVWithNull(projectionBlock)
+            .getRight();
     // TODO: Support implicit cast from BOOLEAN to STRING
 //    String[] stringValues =
 //        getTransformFunctionInstance(expression, dataSourceMap).transformToStringValuesSV(projectionBlock);
@@ -276,23 +281,6 @@ public class DistinctFromTransformFunctionTest {
         _disableNullDataSourceMap);
     testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _disableNullProjectionBlock,
         _disableNullDataSourceMap);
-  }
-
-  // Test that non-column-names appear in one side of the operator.
-  @Test
-  public void testIllegalColumnName()
-      throws Exception {
-    ExpressionContext isDistinctFromExpression =
-        RequestContextUtils.getExpression(String.format(IS_DISTINCT_FROM_EXPR, _intSVValues[0], INT_SV_NULL_COLUMN));
-    ExpressionContext isNotDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format(IS_NOT_DISTINCT_FROM_EXPR, _intSVValues[0], INT_SV_NULL_COLUMN));
-
-    Assert.assertThrows(RuntimeException.class, () -> {
-      TransformFunctionFactory.get(isDistinctFromExpression, _enableNullDataSourceMap);
-    });
-    Assert.assertThrows(RuntimeException.class, () -> {
-      TransformFunctionFactory.get(isNotDistinctFromExpression, _enableNullDataSourceMap);
-    });
   }
 
   // Test that more than 2 arguments appear for the operator.

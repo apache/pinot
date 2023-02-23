@@ -72,10 +72,12 @@ public class FunctionRegistry {
         boolean nullableParameters = scalarFunction.nullableParameters();
         if (scalarFunctionNames.length > 0) {
           for (String name : scalarFunctionNames) {
-            FunctionRegistry.registerFunction(name, method, nullableParameters, scalarFunction.isPlaceholder());
+            FunctionRegistry.registerFunction(name, method, nullableParameters, scalarFunction.isPlaceholder(),
+                scalarFunction.isNullIntorelant());
           }
         } else {
-          FunctionRegistry.registerFunction(method, nullableParameters, scalarFunction.isPlaceholder());
+          FunctionRegistry.registerFunction(method, nullableParameters, scalarFunction.isPlaceholder(),
+              scalarFunction.isNullIntorelant());
         }
       }
     }
@@ -94,23 +96,26 @@ public class FunctionRegistry {
   /**
    * Registers a method with the name of the method.
    */
-  public static void registerFunction(Method method, boolean nullableParameters, boolean isPlaceholder) {
-    registerFunction(method.getName(), method, nullableParameters, isPlaceholder);
+  public static void registerFunction(Method method, boolean nullableParameters, boolean isPlaceholder,
+      boolean isNullIntorelant) {
+    registerFunction(method.getName(), method, nullableParameters, isPlaceholder, isNullIntorelant);
   }
 
   /**
    * Registers a method with the given function name.
    */
   public static void registerFunction(String functionName, Method method, boolean nullableParameters,
-      boolean isPlaceholder) {
+      boolean isPlaceholder, boolean isNullIntorelant) {
     if (!isPlaceholder) {
-      registerFunctionInfoMap(functionName, method, nullableParameters);
+      registerFunctionInfoMap(functionName, method, nullableParameters, isNullIntorelant);
     }
     registerCalciteNamedFunctionMap(functionName, method, nullableParameters);
   }
 
-  private static void registerFunctionInfoMap(String functionName, Method method, boolean nullableParameters) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
+  private static void registerFunctionInfoMap(String functionName, Method method, boolean nullableParameters,
+      boolean isNullIntorelant) {
+    FunctionInfo functionInfo =
+        new FunctionInfo(method, method.getDeclaringClass(), nullableParameters, isNullIntorelant);
     String canonicalName = canonicalize(functionName);
     Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
     FunctionInfo existFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
