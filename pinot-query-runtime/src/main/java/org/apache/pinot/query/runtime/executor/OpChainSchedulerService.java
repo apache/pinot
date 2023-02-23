@@ -81,17 +81,19 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
               result = operatorChain.getRoot().nextBlock();
             }
 
-            if (!result.isEndOfStreamBlock()) {
+            if (result.isNoOpBlock()) {
               // TODO: There should be a waiting-for-data state in OpChainStats.
               operatorChain.getStats().queued();
               _scheduler.yield(operatorChain);
-            } else if (result.isEndOfStreamBlock()) {
-              isFinished = true;
-              LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
-                  result.getDataBlock().getExceptions());
             } else {
-              operatorChain.getStats().setOperatorStatsMap(result.getResultMetadata());
-              LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+              isFinished = true;
+              if (result.isErrorBlock()) {
+                LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+                    result.getDataBlock().getExceptions());
+              } else {
+                operatorChain.getStats().setOperatorStatsMap(result.getResultMetadata());
+                LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+              }
             }
           } catch (Exception e) {
             LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
@@ -100,6 +102,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
             if (isFinished) {
               closeOpChain(operatorChain);
             } else if (thrown != null) {
+              // TODO: It would make sense to cancel OpChains if they returned an error-block.
               cancelOpChain(operatorChain, thrown);
             }
           }

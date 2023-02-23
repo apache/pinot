@@ -144,6 +144,7 @@ public class OpChainSchedulerServiceTest {
     OpChain opChain = getChain(_operatorA);
     CountDownLatch latch = new CountDownLatch(3);
     AtomicBoolean returnedOpChain = new AtomicBoolean(false);
+    Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenAnswer(inv -> {
       latch.countDown();
       if (latch.getCount() == 0 && returnedOpChain.compareAndSet(false, true)) {
@@ -160,7 +161,7 @@ public class OpChainSchedulerServiceTest {
   }
 
   @Test
-  public void shouldCallCloseOnOperators()
+  public void shouldCallCloseOnOperatorsThatFinishSuccessfully()
       throws InterruptedException {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
@@ -180,6 +181,30 @@ public class OpChainSchedulerServiceTest {
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
     scheduler.stopAsync().awaitTerminated();
   }
+
+  @Test
+  public void shouldCallCloseOnOperatorsThatReturnErrorBlock()
+      throws InterruptedException {
+    initExecutor(1);
+    OpChain opChain = getChain(_operatorA);
+    Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
+    OpChainSchedulerService scheduler = new OpChainSchedulerService(_scheduler, _executor);
+
+    CountDownLatch latch = new CountDownLatch(1);
+    Mockito.when(_operatorA.nextBlock()).thenReturn(
+        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("foo")));
+    Mockito.doAnswer(inv -> {
+      latch.countDown();
+      return null;
+    }).when(_operatorA).close();
+
+    scheduler.startAsync().awaitRunning();
+    scheduler.register(opChain);
+
+    Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
+    scheduler.stopAsync().awaitTerminated();
+  }
+
 
   @Test
   public void shouldCallCancelOnOpChainsThatThrow()
