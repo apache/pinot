@@ -572,7 +572,11 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private RecordInfo multiComparisonRecordInfo(PrimaryKey primaryKey, int docId, GenericRow row) {
+    Comparable[] comparisonColumns = new Comparable[_upsertComparisonColumns.size()];
+
+    int i = -1;
     for (String columnName : _upsertComparisonColumns) {
+      i++;
       Object comparisonValue = row.getValue(columnName);
 
       Preconditions.checkState(comparisonValue instanceof Comparable,
@@ -581,16 +585,13 @@ public class MutableSegmentImpl implements MutableSegment {
       if (row.isNullValue(columnName)) {
         // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
         // columns are mutually exclusive
+        comparisonColumns[i] = null;
         continue;
       }
 
-      Map<String, Comparable> comparisonColumns = new TreeMap<>();
-      comparisonColumns.put(columnName, (Comparable) comparisonValue);
-      return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
+      comparisonColumns[i] = (Comparable) comparisonValue;
     }
-
-    // All comparison columns were null.
-    return new RecordInfo(primaryKey, docId, new ComparisonColumns(Collections.emptyMap()));
+    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
   }
 
   private void updateDictionary(GenericRow row) {

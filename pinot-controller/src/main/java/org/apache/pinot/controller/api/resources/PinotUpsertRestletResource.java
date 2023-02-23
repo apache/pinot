@@ -131,7 +131,7 @@ public class PinotUpsertRestletResource {
     int bytesPerValue = 60;
     List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
     if (comparisonColumns != null) {
-      int bytesPerTreeMapNode = 84;  // object header, key, value, children, and flags
+      int bytesPerArrayElem = 8;  // object ref
       bytesPerValue = 52;
       for (String columnName : comparisonColumns) {
         FieldSpec.DataType dt = schema.getFieldSpecFor(columnName).getDataType();
@@ -142,12 +142,12 @@ public class PinotUpsertRestletResource {
           if (comparisonColumns.size() == 1) {
             bytesPerKey += dt.size();
           } else {
-            bytesPerValue += bytesPerTreeMapNode + columnName.getBytes().length + dt.size();
+            bytesPerValue += bytesPerArrayElem + dt.size();
           }
         }
       }
       if (comparisonColumns.size() > 1) {
-        bytesPerValue += 32;  // ComparisonColumns Object header + map reference
+        bytesPerValue += 48;  // array overhead
       }
     }
 
