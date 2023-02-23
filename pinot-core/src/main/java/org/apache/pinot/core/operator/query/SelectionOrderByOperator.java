@@ -72,6 +72,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
   private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final boolean _nullHandlingEnabled;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   private final List<ExpressionContext> _expressions;
@@ -87,6 +88,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
     _transformOperator = transformOperator;
@@ -262,7 +264,8 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
-    TransformOperator transformOperator = new TransformOperator(projectionOperator, nonOrderByExpressions);
+    TransformOperator transformOperator =
+        new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 
     // Fill the non-order-by expression values
     int numNonOrderByExpressions = nonOrderByExpressions.size();
