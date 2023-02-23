@@ -141,7 +141,7 @@ public class UpsertConfig extends BaseJsonConfig {
    * in undefined behaviour. Typically, one comparisonColumn is allocated per distinct producer application of data
    * in the case where there are multiple producers sinking to the same table.
    */
-  public void setComparisonColumn(List<String> comparisonColumns) {
+  public void setComparisonColumns(List<String> comparisonColumns) {
     _comparisonColumns = comparisonColumns;
   }
 
