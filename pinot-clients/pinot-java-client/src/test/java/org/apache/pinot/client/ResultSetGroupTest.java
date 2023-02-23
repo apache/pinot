@@ -21,7 +21,7 @@ package org.apache.pinot.client;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.Properties;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -165,7 +165,7 @@ public class ResultSetGroupTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
         throws PinotClientException {
       return null;
     }
@@ -177,7 +177,7 @@ public class ResultSetGroupTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
         throws PinotClientException {
       return null;
     }

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.client;
 
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 
 
 /**
@@ -72,7 +72,7 @@ public class PreparedStatement {
    *
    * @return The query results
    */
-  public Future<ResultSetGroup> executeAsync() {
+  public CompletableFuture<ResultSetGroup> executeAsync() {
     return _connection.executeAsync(fillStatementWithParameters());
   }
 
