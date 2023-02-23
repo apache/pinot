@@ -75,6 +75,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private Mailbox.MailboxContent _errorContent = null;
   private JsonMailboxIdentifier _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
+  private boolean _streamFinished = false;
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
       StreamObserver<Mailbox.MailboxStatus> responseObserver) {
@@ -99,19 +100,11 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     if (_errorContent != null) {
       return _errorContent;
     }
-    if (isCompleted()) {
+    if (hasConsumedAllData()) {
       return null;
     }
 
     return _receivingBuffer.poll();
-  }
-
-  public boolean isCompleted() {
-    return _isCompleted.get() && _receivingBuffer.isEmpty();
-  }
-
-  public boolean isErrored() {
-    return _errorContent != null;
   }
 
   @Override
@@ -166,13 +159,23 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   @Override
   public void onError(Throwable e) {
     _errorContent = createErrorContent(e);
+    _streamFinished = true;
     _gotMailCallback.accept(_mailboxId);
   }
 
   @Override
   public void onCompleted() {
     _isCompleted.set(true);
+    _streamFinished = true;
     _responseObserver.onCompleted();
+  }
+
+  public boolean hasConsumedAllData() {
+    return _isCompleted.get() && _receivingBuffer.isEmpty();
+  }
+
+  public boolean hasStreamFinished() {
+    return _streamFinished;
   }
 
   private static Mailbox.MailboxContent createErrorContent(Throwable e) {

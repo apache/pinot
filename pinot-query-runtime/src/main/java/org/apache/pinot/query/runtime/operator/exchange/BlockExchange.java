@@ -50,7 +50,7 @@ public abstract class BlockExchange {
       BlockSplitter splitter, long deadlineMs) {
     List<SendingMailbox<TransferableBlock>> sendingMailboxes = new ArrayList<>();
     for (MailboxIdentifier mid : destinations) {
-      sendingMailboxes.add(mailboxService.getSendingMailbox(mid, -1));
+      sendingMailboxes.add(mailboxService.getSendingMailbox(mid, deadlineMs));
     }
     switch (exchangeType) {
       case SINGLETON:

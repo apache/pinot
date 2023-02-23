@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import com.google.common.base.Preconditions;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
@@ -52,7 +51,6 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
     if (!isInitialized()) {
       initialize();
     }
-    Preconditions.checkState(!_transferStream.isCancelled(), "Cannot send since stream has already been cancelled");
     _transferStream.send(data);
     _gotMailCallback.accept(_mailboxId);
   }
@@ -69,7 +67,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   @Override
   public boolean isClosed() {
-    return _transferStream.isInitialized() && _transferStream.isCompleted();
+    return _transferStream != null && _transferStream.isCompleted();
   }
 
   @Override

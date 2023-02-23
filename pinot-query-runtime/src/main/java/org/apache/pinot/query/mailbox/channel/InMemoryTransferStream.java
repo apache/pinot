@@ -20,9 +20,7 @@ package org.apache.pinot.query.mailbox.channel;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.InMemoryMailboxService;
 import org.apache.pinot.query.mailbox.InMemoryReceivingMailbox;
@@ -35,7 +33,6 @@ public class InMemoryTransferStream {
   private MailboxIdentifier _mailboxId;
   private BlockingQueue<TransferableBlock> _queue;
   private InMemoryMailboxService _mailboxService;
-  private CountDownLatch _initialized = new CountDownLatch(1);
   private boolean _isCancelled;
   private boolean _isCompleted = false;
 
@@ -47,9 +44,10 @@ public class InMemoryTransferStream {
   }
 
   public void send(TransferableBlock block) {
-    Preconditions.checkState(_initialized.getCount() == 0, "Expected InMemoryTransferStream to be initialized");
+    Preconditions.checkState(!isCancelled(), "Tried to send on a cancelled InMemory stream");
     _queue.offer(block);
-    InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
+    InMemoryReceivingMailbox receivingMailbox =
+        (InMemoryReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
     receivingMailbox.init(this);
   }
 
@@ -74,24 +72,11 @@ public class InMemoryTransferStream {
     _queue.clear();
   }
 
-  public boolean isInitialized() {
-    return _initialized.getCount() == 0;
-  }
-
   public boolean isCompleted() {
     return _isCompleted;
   }
 
   public boolean isCancelled() {
     return _isCancelled;
-  }
-
-  public void initialize() {
-    _initialized.countDown();
-  }
-
-  public boolean waitForInitialize()
-      throws InterruptedException {
-    return _initialized.await(100, TimeUnit.MILLISECONDS);
   }
 }

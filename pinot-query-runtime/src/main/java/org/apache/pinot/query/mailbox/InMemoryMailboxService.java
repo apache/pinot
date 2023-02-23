@@ -49,6 +49,7 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
             @Override
             public void onRemoval(RemovalNotification<String, InMemoryReceivingMailbox> notification) {
               if (notification.wasEvicted()) {
+                LOGGER.info("Evicting dangling InMemoryReceivingMailbox: {}", notification.getKey());
                 notification.getValue().cancel();
               }
             }

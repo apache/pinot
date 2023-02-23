@@ -193,7 +193,7 @@ public class GrpcMailboxServiceTest {
 
   @Test
   public void testBar()
-      throws InterruptedException {
+      throws Exception {
     final PinotConfiguration pinotConfiguration = new PinotConfiguration();
     Consumer<MailboxIdentifier> callback = new Consumer<MailboxIdentifier>() {
       @Override

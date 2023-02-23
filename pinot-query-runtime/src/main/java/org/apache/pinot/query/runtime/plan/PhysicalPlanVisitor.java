@@ -78,9 +78,10 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   public MultiStageOperator visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
+    long deadlineMs = System.currentTimeMillis() + context.getTimeoutMs();
     return new MailboxSendOperator(context.getMailboxService(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getServer(), context.getRequestId(), node.getStageId(), node.getReceiverStageId(), -1);
+        context.getServer(), context.getRequestId(), node.getStageId(), node.getReceiverStageId(), deadlineMs);
   }
 
   @Override

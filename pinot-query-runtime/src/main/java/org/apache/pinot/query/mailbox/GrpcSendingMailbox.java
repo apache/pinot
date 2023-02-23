@@ -88,7 +88,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
 
   @Override
   public void cancel(Throwable t) {
-    if (isInitialized() && !isClosed()) {
+    if (_initialized.get() && !_statusObserver.isFinished()) {
       LOGGER.warn("Grpc Sending Mailbox={} cancelling stream", _mailboxId);
       try {
         _mailboxContentStreamObserver.onError(Status.fromThrowable(
@@ -105,6 +105,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   }
 
   private void open() {
+    LOGGER.info("deadline={} time-remaining={}", _deadlineMs, System.currentTimeMillis() - _deadlineMs);
     _mailboxContentStreamObserver = _mailboxContentStreamObserverSupplier.apply(_deadlineMs);
     _initialized.set(true);
     // send a begin-of-stream message.

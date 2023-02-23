@@ -80,7 +80,8 @@ public class MailboxSendOperatorTest {
   }
 
   @Test
-  public void shouldSwallowNoOpBlockFromUpstream() {
+  public void shouldSwallowNoOpBlockFromUpstream()
+      throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
@@ -99,7 +100,8 @@ public class MailboxSendOperatorTest {
   }
 
   @Test
-  public void shouldSendErrorBlock() {
+  public void shouldSendErrorBlock()
+      throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
@@ -119,7 +121,8 @@ public class MailboxSendOperatorTest {
   }
 
   @Test
-  public void shouldSendErrorBlockWhenInputThrows() {
+  public void shouldSendErrorBlockWhenInputThrows()
+      throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
@@ -140,7 +143,8 @@ public class MailboxSendOperatorTest {
   }
 
   @Test
-  public void shouldSendEosBlock() {
+  public void shouldSendEosBlock()
+      throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),
@@ -160,7 +164,8 @@ public class MailboxSendOperatorTest {
   }
 
   @Test
-  public void shouldSendDataBlock() {
+  public void shouldSendDataBlock()
+      throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(_mailboxService, _input, ImmutableList.of(_server),

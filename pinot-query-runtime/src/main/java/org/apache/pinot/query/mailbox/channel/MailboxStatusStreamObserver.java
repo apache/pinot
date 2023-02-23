@@ -59,7 +59,7 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   @Override
   public void onError(Throwable e) {
     _finishLatch.countDown();
-    LOGGER.error("Error in MailboxReceiver", e);
+    LOGGER.error("[mailbox] Server returned onError", e);
   }
 
   @Override

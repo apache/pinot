@@ -96,7 +96,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
 
   @Override
   public boolean isClosed() {
-    return isInitialized() && _contentStreamObserver.isCompleted();
+    return isInitialized() && _contentStreamObserver.hasConsumedAllData();
   }
 
   @Override
@@ -105,7 +105,8 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
       try {
         _statusStreamObserver.onError(Status.CANCELLED.asRuntimeException());
       } catch (Exception e) {
-        LOGGER.error("Error cancelling to sender", e);
+        // TODO: This can happen if the call is already closed.
+        LOGGER.info("Error cancelling to sender", e);
       }
     }
   }
