@@ -21,7 +21,6 @@ package org.apache.pinot.client;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
@@ -178,8 +177,7 @@ public class Connection {
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query for statement: " + query);
     }
-    return _transport.executeQueryAsync(brokerHostPort, query).thenApply(ResultSetGroup::new)
-                     .orTimeout(60000L, TimeUnit.MILLISECONDS);
+    return _transport.executeQueryAsync(brokerHostPort, query).thenApply(ResultSetGroup::new);
   }
 
   @Nullable

@@ -67,7 +67,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
-    _httpClient = Dsl.asyncHttpClient();
+    _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(_brokerReadTimeout));
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
@@ -83,7 +83,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
+    builder.setRequestTimeout(_brokerReadTimeout)
+        .setReadTimeout(connectionTimeouts.getReadTimeoutMs())
         .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
         .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
         .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
@@ -104,7 +105,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       builder.setSslContext(sslContext);
     }
 
-    builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
+    builder.setRequestTimeout(_brokerReadTimeout)
+        .setReadTimeout(connectionTimeouts.getReadTimeoutMs())
         .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
         .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
         .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
@@ -151,7 +153,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
         } catch (JsonProcessingException e) {
           throw new CompletionException(e);
         }
-      }).orTimeout(_brokerReadTimeout, TimeUnit.MILLISECONDS);
+      });
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
