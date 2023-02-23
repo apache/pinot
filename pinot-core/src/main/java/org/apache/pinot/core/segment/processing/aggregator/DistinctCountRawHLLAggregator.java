@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 
 

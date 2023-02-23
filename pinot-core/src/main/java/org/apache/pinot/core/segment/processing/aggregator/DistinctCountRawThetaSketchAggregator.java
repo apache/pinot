@@ -20,9 +20,8 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
-import org.apache.pinot.spi.utils.CommonConstants;
-
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class DistinctCountRawThetaSketchAggregator implements ValueAggregator {
