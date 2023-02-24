@@ -405,9 +405,15 @@ public class GreedyShuffleRewriteVisitor
     }
     TableConfig offlineTableConfig = _tableCache.getTableConfig(
         TableNameBuilder.OFFLINE.tableNameWithType(tableNameFromQuery));
-    if (offlineTableConfig != null) {
+    TableConfig realtimeTableConfig = _tableCache.getTableConfig(
+        TableNameBuilder.REALTIME.tableNameWithType(tableNameFromQuery));
+    if (offlineTableConfig != null && realtimeTableConfig != null) {
+      // TODO: We don't necessarily need to disable colocation for hybrid tables. Instead we can do some checks on
+      //  the segment partition config to ensure they are the same.
+      return null;
+    } else if (offlineTableConfig != null) {
       return offlineTableConfig;
     }
-    return _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableNameFromQuery));
+    return realtimeTableConfig;
   }
 }
