@@ -32,13 +32,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @JsonPropertyOrder({
-    "exceptions", "numBlocks", "numRows", "threadExecutionTime", "numServersQueried", "numServersResponded",
+    "exceptions", "numBlocks", "numRows", "operatorExecutionTime", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
     "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
     "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
     "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
-    "realtimeTotalCpuTimeNs", "traceInfo", "operatorIds"
+    "realtimeTotalCpuTimeNs", "traceInfo", "operatorIds", "tableNames"
 })
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class BrokerResponseStats {
@@ -76,13 +76,16 @@ public class BrokerResponseStats {
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private int _numRowsResultSet = 0;
+
+  // V2 Engine Stats
   private int _numBlocks = 0;
   private int _numRows = 0;
-  private long _threadExecutionTime = 0;
+  private long _operatorExecutionTimeMs = 0;
+  private List<String> _operatorIds = new ArrayList<>();
+  private List<String> _tableNames = new ArrayList<>();
 
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-  private List<String> _operatorIds = new ArrayList<>();
 
   @JsonProperty("offlineSystemActivitiesCpuTimeNs")
 
@@ -472,14 +475,14 @@ public class BrokerResponseStats {
     _numRows = numRows;
   }
 
-  @JsonProperty("threadExecutionTime")
-  public long getThreadExecutionTime() {
-    return _threadExecutionTime;
+  @JsonProperty("operatorExecutionTimeMs")
+  public long getOperatorExecutionTimeMs() {
+    return _operatorExecutionTimeMs;
   }
 
-  @JsonProperty("threadExecutionTime")
-  public void setThreadExecutionTime(long threadExecutionTime) {
-    _threadExecutionTime = threadExecutionTime;
+  @JsonProperty("operatorExecutionTimeMs")
+  public void setOperatorExecutionTimeMs(long operatorExecutionTimeMs) {
+    _operatorExecutionTimeMs = operatorExecutionTimeMs;
   }
 
   @JsonProperty("traceInfo")
@@ -521,5 +524,15 @@ public class BrokerResponseStats {
   @JsonProperty("operatorIds")
   public void setOperatorIds(List<String> operatorIds) {
     _operatorIds = operatorIds;
+  }
+
+  @JsonProperty("tableNames")
+  public List<String> getTableNames() {
+    return _tableNames;
+  }
+
+  @JsonProperty("tableNames")
+  public void setTableNames(List<String> tableNames) {
+    _tableNames = tableNames;
   }
 }

@@ -19,11 +19,15 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongConsumer;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -40,6 +44,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private final List<String> _operatorIds = new ArrayList<>();
+  private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final boolean _enableTrace;
 
@@ -71,7 +76,7 @@ public class ExecutionStatsAggregator {
   private boolean _numGroupsLimitReached = false;
   private int _numBlocks = 0;
   private int _numRows = 0;
-  private long _threadExecutionTime = 0;
+  private long _operatorExecutionTime = 0;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -88,17 +93,31 @@ public class ExecutionStatsAggregator {
       _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
     }
 
-    String tableName = metadata.getOrDefault("tableNames", "");
+    String tableNamesStr = metadata.get(DataTable.MetadataKey.TABLE.getName());
+    String tableName = null;
 
-    TableType tableType;
+    if (tableNamesStr != null) {
+      List<String> tableNames = Arrays.stream(tableNamesStr.split("::")).collect(Collectors.toList());
+      _tableNames.addAll(tableNames);
 
-    if (routingInstance != null) {
-      tableType = routingInstance.getTableType();
-    } else {
-      tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      //TODO: Decide a strategy to split stageLevel stats across tables for brokerMetrics
+      // assigning everything to the first table only for now
+      tableName = tableNames.get(0);
     }
 
-    _operatorIds.add(metadata.getOrDefault("operatorId", ""));
+    TableType tableType = null;
+    if (routingInstance != null) {
+      tableType = routingInstance.getTableType();
+    } else if (tableName != null) {
+      tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    } else {
+      tableType = null;
+    }
+
+    String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
+    if (operatorId != null) {
+      _operatorIds.add(operatorId);
+    }
 
     // Reduce on exceptions.
     for (int key : exceptions.keySet()) {
@@ -220,19 +239,19 @@ public class ExecutionStatsAggregator {
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
 
 
-    String numBlocksString = metadata.get("numBlocks");
+    String numBlocksString = metadata.get(DataTable.MetadataKey.NUM_BLOCKS.getName());
     if (numBlocksString != null) {
       _numBlocks += Long.parseLong(numBlocksString);
     }
 
-    String numRowsString = metadata.get("numRows");
+    String numRowsString = metadata.get(DataTable.MetadataKey.NUM_ROWS.getName());
     if (numBlocksString != null) {
       _numRows += Long.parseLong(numRowsString);
     }
 
-    String threadExecutionTimeString = metadata.get("threadExecutionTime");
-    if (threadExecutionTimeString != null) {
-      _threadExecutionTime += Long.parseLong(threadExecutionTimeString);
+    String operatorExecutionTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName());
+    if (operatorExecutionTimeString != null) {
+      _operatorExecutionTime += Long.parseLong(operatorExecutionTimeString);
     }
   }
 
@@ -359,8 +378,9 @@ public class ExecutionStatsAggregator {
 
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
-    brokerResponseStats.setThreadExecutionTime(_threadExecutionTime);
+    brokerResponseStats.setOperatorExecutionTimeMs(_operatorExecutionTime);
     brokerResponseStats.setOperatorIds(_operatorIds);
+    brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
 
     // Update broker metrics.
     if (brokerMetrics != null && rawTableName != null) {

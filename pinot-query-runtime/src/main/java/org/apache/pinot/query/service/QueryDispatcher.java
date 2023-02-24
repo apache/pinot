@@ -32,6 +32,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -158,8 +159,8 @@ public class QueryDispatcher {
             if (queryPlan != null) {
               StageMetadata operatorStageMetadata = queryPlan.getStageMetadataMap().get(operatorStats.getStageId());
               if (!operatorStageMetadata.getScannedTables().isEmpty()) {
-                operatorStats.recordSingleStat(OperatorUtils.TABLE_NAMES,
-                    Joiner.on("_").join(operatorStageMetadata.getScannedTables()));
+                operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(),
+                    Joiner.on("::").join(operatorStageMetadata.getScannedTables()));
               }
             }
             rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());

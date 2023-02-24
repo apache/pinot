@@ -202,6 +202,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
       List<String> tableNames = queryPlan.getStageMetadataMap().get(entry.getKey()).getScannedTables();
       if (tableNames.size() > 0) {
+        //TODO: Only using first table to assign broker metrics
+        // find a way to split metrics in case of multiple table
         String rawTableName = TableNameBuilder.extractRawTableName(tableNames.get(0));
         entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
       } else {
@@ -210,6 +212,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
 
+    System.out.println(brokerResponse.toJsonString());
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     return brokerResponse;
