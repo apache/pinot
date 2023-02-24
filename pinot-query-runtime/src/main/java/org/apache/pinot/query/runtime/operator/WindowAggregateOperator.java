@@ -21,9 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,7 +39,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +55,9 @@ import org.slf4j.LoggerFactory;
  *
  * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
  * will output as many rows as input rows.
+ *
+ * Note: This class performs aggregation over the double value of input.
+ * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  *
  * TODO:
  *     1. Add support for OVER() clause with ORDER BY only or PARTITION BY ORDER BY
@@ -75,7 +76,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final List<RexExpression> _constants;
   private final DataSchema _resultSchema;
-  private final WindowAccumulator[] _windowAccumulators;
+  private final AggregationUtils.Accumulator[] _windowAccumulators;
   private final Map<Key, List<Object[]>> _partitionRows;
 
   private TransferableBlock _upstreamErrorBlock;
@@ -90,7 +91,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       int upperBound, boolean isRows, List<RexExpression> constants, DataSchema resultSchema, DataSchema inputSchema,
       long requestId, int stageId, VirtualServerAddress virtualServerAddress) {
     this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
-        upperBound, isRows, constants, resultSchema, inputSchema, WindowAccumulator.WINDOW_MERGERS,
+        upperBound, isRows, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
         requestId, stageId, virtualServerAddress);
   }
 
@@ -99,7 +100,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, boolean isRows, List<RexExpression> constants, DataSchema resultSchema, DataSchema inputSchema,
-      Map<String, Function<DataSchema.ColumnDataType, WindowMerger>> mergers, long requestId, int stageId,
+      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, long requestId, int stageId,
       VirtualServerAddress virtualServerAddress) {
     super(requestId, stageId, virtualServerAddress);
 
@@ -128,14 +129,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     // TODO: Not all window functions (e.g. ROW_NUMBER, LAG, etc) need aggregations. Such functions should be handled
     //       differently.
-    _windowAccumulators = new WindowAccumulator[_aggCalls.size()];
+    _windowAccumulators = new AggregationUtils.Accumulator[_aggCalls.size()];
     for (int i = 0; i < _aggCalls.size(); i++) {
       RexExpression.FunctionCall agg = _aggCalls.get(i);
       String functionName = agg.getFunctionName();
       if (!mergers.containsKey(functionName)) {
         throw new IllegalStateException("Unexpected value: " + functionName);
       }
-      _windowAccumulators[i] = new WindowAccumulator(agg, mergers, functionName, inputSchema);
+      _windowAccumulators[i] = new AggregationUtils.Accumulator(agg, mergers, functionName, inputSchema);
     }
 
     _partitionRows = new HashMap<>();
@@ -222,14 +223,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
         Object[] row = new Object[existingRow.length + _aggCalls.size()];
         System.arraycopy(existingRow, 0, row, 0, existingRow.length);
         for (int i = 0; i < _windowAccumulators.length; i++) {
-          row[i + existingRow.length] = _windowAccumulators[i]._results.get(partitionKey);
+          row[i + existingRow.length] = _windowAccumulators[i].getResults().get(partitionKey);
         }
         rows.add(row);
       }
     }
     _hasReturnedWindowAggregateBlock = true;
     if (rows.size() == 0) {
-      return new TransferableBlock(Collections.emptyList(), _resultSchema, DataBlock.Type.ROW);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
@@ -254,7 +255,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       for (Object[] row : container) {
         _numRows++;
         // TODO: Revisit the aggregation logic once ORDER BY inside OVER() support is added
-        Key key = extractRowKey(row, _groupSet);
+        Key key = AggregationUtils.extractRowKey(row, _groupSet);
         _partitionRows.putIfAbsent(key, new ArrayList<>());
         _partitionRows.get(key).add(row);
         for (int i = 0; i < _aggCalls.size(); i++) {
@@ -266,17 +267,15 @@ public class WindowAggregateOperator extends MultiStageOperator {
     return false;
   }
 
-  private static Key extractRowKey(Object[] row, List<RexExpression> groupSet) {
-    Object[] keyElements = new Object[groupSet.size()];
-    for (int i = 0; i < groupSet.size(); i++) {
-      keyElements[i] = row[((RexExpression.InputRef) groupSet.get(i)).getIndex()];
-    }
-    return new Key(keyElements);
-  }
-
+  /**
+   * Contains all the ORDER BY key related information such as the keys, direction, and null direction
+   */
   private static class OrderSetInfo {
+    // List of order keys
     final List<RexExpression> _orderSet;
+    // List of order direction for each key
     final List<RelFieldCollation.Direction> _orderSetDirection;
+    // List of null direction for each key
     final List<RelFieldCollation.NullDirection> _orderSetNullDirection;
 
     OrderSetInfo(List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
@@ -299,9 +298,16 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
   }
 
+  /**
+   * Defines the Frame to be used for the window query. The 'lowerBound' and 'upperBound' indicate the frame
+   * boundaries to be used. Whereas, 'isRows' is used to differentiate between RANGE and ROWS type frames.
+   */
   private static class WindowFrame {
+    // The lower bound of the frame. Set to Integer.MIN_VALUE if UNBOUNDED PRECEDING
     final int _lowerBound;
+    // The lower bound of the frame. Set to Integer.MAX_VALUE if UNBOUNDED FOLLOWING. Set to 0 if CURRENT ROW
     final int _upperBound;
+    // Set to 'true' for ROWS type frames, otherwise set to 'false'
     final boolean _isRows;
 
     WindowFrame(int lowerBound, int upperBound, boolean isRows) {
@@ -332,105 +338,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     int getUpperBound() {
       return _upperBound;
-    }
-  }
-
-  private static Object mergeSum(Object left, Object right) {
-    return ((Number) left).doubleValue() + ((Number) right).doubleValue();
-  }
-
-  private static Object mergeMin(Object left, Object right) {
-    return Math.min(((Number) left).doubleValue(), ((Number) right).doubleValue());
-  }
-
-  private static Object mergeMax(Object left, Object right) {
-    return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
-  }
-
-  private static class MergeCount implements WindowMerger {
-
-    @Override
-    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
-      return other == null ? 0 : 1d;
-    }
-
-    @Override
-    public Object merge(Object left, Object ignored) {
-      // TODO: COUNT(*) doesn't need to parse right object until we support NULL
-      return ((Number) left).doubleValue() + 1;
-    }
-  }
-
-  interface WindowMerger {
-    /**
-     * Initializes the merger based on the first input
-     */
-    default Object initialize(Object other, DataSchema.ColumnDataType dataType) {
-      return other == null ? ((Number) dataType.getNullPlaceholder()).doubleValue() : ((Number) other).doubleValue();
-    }
-
-    /**
-     * Merges the existing aggregate (the result of {@link #initialize(Object, DataSchema.ColumnDataType)}) with
-     * the new value coming in (which may be an aggregate in and of itself).
-     */
-    Object merge(Object agg, Object value);
-  }
-
-  private static class WindowAccumulator {
-    private static final Map<String, Function<DataSchema.ColumnDataType, WindowMerger>> WINDOW_MERGERS =
-        ImmutableMap.<String, Function<DataSchema.ColumnDataType, WindowMerger>>builder()
-            .put("SUM", cdt -> WindowAggregateOperator::mergeSum)
-            .put("$SUM", cdt -> WindowAggregateOperator::mergeSum)
-            .put("$SUM0", cdt -> WindowAggregateOperator::mergeSum)
-            .put("MIN", cdt -> WindowAggregateOperator::mergeMin)
-            .put("$MIN", cdt -> WindowAggregateOperator::mergeMin)
-            .put("$MIN0", cdt -> WindowAggregateOperator::mergeMin)
-            .put("MAX", cdt -> WindowAggregateOperator::mergeMax)
-            .put("$MAX", cdt -> WindowAggregateOperator::mergeMax)
-            .put("$MAX0", cdt -> WindowAggregateOperator::mergeMax)
-            .put("COUNT", cdt -> new MergeCount())
-            .build();
-
-    final int _inputRef;
-    final Object _literal;
-    final Map<Key, Object> _results = new HashMap<>();
-    final WindowMerger _windowMerger;
-    final DataSchema.ColumnDataType _dataType;
-
-    WindowAccumulator(RexExpression.FunctionCall aggCall, Map<String,
-        Function<DataSchema.ColumnDataType, WindowMerger>> merger, String functionName, DataSchema inputSchema) {
-      // The aggregate function operand should either be a InputRef or a Literal
-      RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
-      if (rexExpression instanceof RexExpression.InputRef) {
-        _inputRef = ((RexExpression.InputRef) rexExpression).getIndex();
-        _literal = null;
-        _dataType = inputSchema.getColumnDataType(_inputRef);
-      } else {
-        _inputRef = -1;
-        _literal = ((RexExpression.Literal) rexExpression).getValue();
-        _dataType = DataSchema.ColumnDataType.fromDataType(rexExpression.getDataType(), true);
-      }
-      _windowMerger = merger.get(functionName).apply(_dataType);
-    }
-
-    void accumulate(Key key, Object[] row) {
-      Object currentRes = _results.get(key);
-      Object value = _inputRef == -1 ? _literal : row[_inputRef];
-
-      if (currentRes == null) {
-        _results.put(key, _windowMerger.initialize(value, _dataType));
-      } else {
-        Object mergedResult = _windowMerger.merge(currentRes, value);
-        _results.put(key, mergedResult);
-      }
-    }
-
-    private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
-      List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
-      Preconditions.checkState(functionOperands.size() < 2,
-          "Aggregate window functions cannot have more than one operand");
-      return functionOperands.size() > 0 ? functionOperands.get(0)
-          : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
     }
   }
 }

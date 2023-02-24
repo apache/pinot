@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -91,7 +92,7 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testShouldHandleEmptyBlockWithNoOtherInputs() {
+  public void testShouldHandleEndOfStreamBlockWithNoOtherInputs() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
@@ -110,7 +111,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Mockito.verify(_input, Mockito.times(1)).nextBlock();
-    Assert.assertEquals(block.getContainer(), Collections.emptyList(), "Empty blocks should propagate");
+    Assert.assertTrue(block.isEndOfStreamBlock(), "EOS blocks should propagate");
   }
 
   @Test
@@ -141,6 +142,43 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
+  public void testShouldHandleUpstreamNoOpBlocksWhileConstructingMultipleRows() {
+    // Given:
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
+    Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
+        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 2}))
+        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 2}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"},
+        new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    WindowAggregateOperator operator = new WindowAggregateOperator(_input, group, Collections.emptyList(),
+        Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, false,
+        Collections.emptyList(), outSchema, inSchema, 1, 2, _serverAddress);
+
+    // When:
+    TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
+    TransferableBlock block2 = operator.nextBlock(); // build when reading NoOp block
+    TransferableBlock block3 = operator.nextBlock(); // return when reading EOS block
+    TransferableBlock block4 = operator.nextBlock(); // EOS block
+
+    // Then:
+    Mockito.verify(_input, Mockito.times(6)).nextBlock();
+    Assert.assertTrue(block1.isNoOpBlock());
+    Assert.assertTrue(block2.isNoOpBlock());
+    Assert.assertEquals(block3.getContainer().size(), 3);
+    Assert.assertEquals(block3.getContainer().get(0), new Object[]{1, 1, 3.0});
+    Assert.assertEquals(block3.getContainer().get(1), new Object[]{1, 2, 3.0});
+    Assert.assertEquals(block3.getContainer().get(2), new Object[]{2, 2, 2});
+    Assert.assertTrue(block4.isEndOfStreamBlock());
+  }
+
+  @Test
   public void testShouldWindowAggregateOverSingleInputBlock() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
@@ -163,7 +201,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1.0},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -193,7 +231,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1.0},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -220,7 +258,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1.0},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -249,7 +287,7 @@ public class WindowAggregateOperatorTest {
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     // second value is 1 (the literal) instead of 3 (the col val)
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 3, 42.0},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 3, 42},
         "Expected three columns (original two columns, agg literal value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -266,7 +304,7 @@ public class WindowAggregateOperatorTest {
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    WindowAggregateOperator.WindowMerger merger = Mockito.mock(WindowAggregateOperator.WindowMerger.class);
+    AggregationUtils.Merger merger = Mockito.mock(AggregationUtils.Merger.class);
     Mockito.when(merger.merge(Mockito.any(), Mockito.any())).thenReturn(12d);
     Mockito.when(merger.initialize(Mockito.any(), Mockito.any())).thenReturn(1d);
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"},
@@ -312,7 +350,7 @@ public class WindowAggregateOperatorTest {
       result = sum0PartitionBy1.getNextBlock();
     }
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 1.0}, new Object[]{2, "BB", 5.0},
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 1}, new Object[]{2, "BB", 5.0},
         new Object[]{3, "BB", 5.0});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
@@ -442,7 +480,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, "foo", 2.0},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, "foo", 2},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -494,8 +532,11 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    // TODO: it is necessary to produce two values here, the operator only throws on second
+    // (see the comment in WindowAggregate operator)
     Mockito.when(_input.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "metallica"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "pink floyd"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"},

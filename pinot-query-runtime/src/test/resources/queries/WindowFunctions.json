@@ -189,6 +189,13 @@
         "outputs": []
       },
       {
+        "description": "Single empty OVER() with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
+        "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER() as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
+        "outputs": [
+          [0]
+        ]
+      },
+      {
         "description": "Single empty OVER() with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER() FROM {tbl} WHERE string_col IN ('b', 'c')",
         "outputs": [
@@ -461,6 +468,13 @@
         "description": "Multiple empty OVER()s with select col and filter that matches no rows",
         "sql": "SELECT string_col, COUNT(bool_col) OVER(), MIN(double_col) OVER() FROM {tbl} WHERE string_col = 'a' AND bool_col != false AND int_col > 200",
         "outputs": []
+      },
+      {
+        "description": "Multiple empty OVER()s with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
+        "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER() as count, MIN(double_col) OVER() as min FROM {tbl} WHERE string_col = 'a' AND bool_col != false AND int_col > 200)",
+        "outputs": [
+          [0]
+        ]
       },
       {
         "description": "Multiple empty OVER()s with select col and filter",
@@ -829,6 +843,13 @@
         "description": "Single OVER(PARTITION BY) with select col and filter that matches no rows",
         "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col) FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200",
         "outputs": []
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
+        "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col) as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
+        "outputs": [
+          [0]
+        ]
       },
       {
         "description": "Single OVER(PARTITION BY) with select col and filter",
