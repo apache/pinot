@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Function;
 import java.io.File;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -304,16 +305,8 @@ public class StreamOp extends BaseOp {
 
   private void waitForDocsLoaded(String tableName, long targetDocs, long timeoutMs) {
     LOGGER.info("Wait Doc to load ...");
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          return fetchExistingTotalDocs(tableName) == targetDocs;
-        } catch (Exception e) {
-          return null;
-        }
-      }
-    }, 100L, timeoutMs, "Failed to load " + targetDocs + " documents", true);
+    TestUtils.waitForCondition(
+        () -> fetchExistingTotalDocs(tableName) == targetDocs, 100L, timeoutMs,
+        "Failed to load " + targetDocs + " documents", true, Duration.ofSeconds(1));
   }
 }
