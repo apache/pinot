@@ -19,13 +19,21 @@
 package org.apache.pinot.query.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
@@ -38,6 +46,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
+import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -61,10 +70,15 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
+  private static final long DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS = 100;
+  private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
 
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
+  private final ExecutorService _executorService;
 
   public QueryDispatcher() {
+    _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
+        new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
@@ -88,6 +102,9 @@ public class QueryDispatcher {
   public int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
+    Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+    BlockingQueue<AsyncResponse> callbacks = new LinkedBlockingQueue<>();
+    int dispatchCalls = 0;
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
       int stageId = stage.getKey();
       // stage rooting at a mailbox receive node means reduce stage.
@@ -99,26 +116,41 @@ public class QueryDispatcher {
           String host = serverInstance.getHostname();
           int servicePort = serverInstance.getQueryServicePort();
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
-          Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
-                  QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
-              .putAllMetadata(queryOptions).build());
-
-          if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
-            throw new RuntimeException(
-                String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,
-                    serverInstance, response));
+          dispatchCalls++;
+          _executorService.submit(() -> {
+            client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
+                QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
+                .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
+                .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
+                .putAllMetadata(queryOptions).build(), stageId, serverInstance, deadline, callbacks::offer);
+          });
+        }
+      }
+    }
+    for (int i = 0; i < dispatchCalls; i++) {
+      AsyncResponse resp;
+      while (!deadline.isExpired()) {
+        resp = callbacks.poll(DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        if (resp != null) {
+          if (resp.getThrowable() != null) {
+            throw new RuntimeException(String.format("Error dispatching query to server=%s stage=%s",
+                resp._virtualServer, resp._stageId), resp.getThrowable());
+          } else {
+            Worker.QueryResponse response = resp.getQueryResponse();
+            if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
+              throw new RuntimeException(
+                  String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", resp.getStageId(),
+                      resp.getVirtualServer(), response));
+            }
+            break;
           }
         }
       }
     }
+    if (deadline.isExpired()) {
+      throw new RuntimeException("Timed out waiting for response of async query-dispatch");
+    }
     return reduceStageId;
-  }
-
-  private DispatchClient getOrCreateDispatchClient(String host, int port) {
-    String key = String.format("%s_%d", host, port);
-    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(host, port));
   }
 
   public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
@@ -228,23 +260,94 @@ public class QueryDispatcher {
 
   public void shutdown() {
     for (DispatchClient dispatchClient : _dispatchClientMap.values()) {
-      dispatchClient._managedChannel.shutdown();
+      dispatchClient._channel.shutdown();
     }
     _dispatchClientMap.clear();
   }
 
+  @VisibleForTesting
+  DispatchClient getOrCreateDispatchClient(String host, int port) {
+    String key = String.format("%s_%d", host, port);
+    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(host, port));
+  }
+
   public static class DispatchClient {
-    private final PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub _blockingStub;
-    private final ManagedChannel _managedChannel;
+    private ManagedChannel _channel;
+    private PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
     public DispatchClient(String host, int port) {
-      ManagedChannelBuilder managedChannelBuilder = ManagedChannelBuilder.forAddress(host, port).usePlaintext();
-      _managedChannel = managedChannelBuilder.build();
-      _blockingStub = PinotQueryWorkerGrpc.newBlockingStub(_managedChannel);
+      _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+      _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
     }
 
-    public Worker.QueryResponse submit(Worker.QueryRequest request) {
-      return _blockingStub.submit(request);
+    public void submit(Worker.QueryRequest request, int stageId, VirtualServer virtualServer,
+        Deadline deadline, Consumer<AsyncResponse> callback) {
+      try {
+        _dispatchStub.withDeadline(deadline).submit(request, new DispatchObserver(stageId, virtualServer, callback));
+      } catch (Exception e) {
+        callback.accept(new AsyncResponse(virtualServer, stageId, Worker.QueryResponse.getDefaultInstance(), e));
+      }
+    }
+  }
+
+
+  static class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
+    private int _stageId;
+    private VirtualServer _virtualServer;
+    private Consumer<AsyncResponse> _callback;
+    private Worker.QueryResponse _queryResponse;
+
+    public DispatchObserver(int stageId, VirtualServer virtualServer, Consumer<AsyncResponse> callback) {
+      _stageId = stageId;
+      _virtualServer = virtualServer;
+      _callback = callback;
+    }
+
+    @Override
+    public void onNext(Worker.QueryResponse queryResponse) {
+      _queryResponse = queryResponse;
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+      _callback.accept(new AsyncResponse(
+          _virtualServer, _stageId, Worker.QueryResponse.getDefaultInstance(), throwable));
+    }
+
+    @Override
+    public void onCompleted() {
+      _callback.accept(new AsyncResponse(_virtualServer, _stageId, _queryResponse, null));
+    }
+  }
+
+  static class AsyncResponse {
+    private final VirtualServer _virtualServer;
+    private final int _stageId;
+    private final Worker.QueryResponse _queryResponse;
+    private final Throwable _throwable;
+
+    public AsyncResponse(VirtualServer virtualServer, int stageId, Worker.QueryResponse queryResponse,
+        Throwable throwable) {
+      _virtualServer = virtualServer;
+      _stageId = stageId;
+      _queryResponse = queryResponse;
+      _throwable = throwable;
+    }
+
+    public VirtualServer getVirtualServer() {
+      return _virtualServer;
+    }
+
+    public int getStageId() {
+      return _stageId;
+    }
+
+    public Worker.QueryResponse getQueryResponse() {
+      return _queryResponse;
+    }
+
+    public Throwable getThrowable() {
+      return _throwable;
     }
   }
 }
