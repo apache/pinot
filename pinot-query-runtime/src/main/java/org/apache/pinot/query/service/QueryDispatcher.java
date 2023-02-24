@@ -153,6 +153,7 @@ public class QueryDispatcher {
             LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
                 OperatorUtils.operatorStatsToJson(entry.getValue()));
             OperatorStats operatorStats = entry.getValue();
+            ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
             ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
             if (queryPlan != null) {
               StageMetadata operatorStageMetadata = queryPlan.getStageMetadataMap().get(operatorStats.getStageId());
@@ -161,6 +162,7 @@ public class QueryDispatcher {
                     Joiner.on("_").join(operatorStageMetadata.getScannedTables()));
               }
             }
+            rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
           }
         }

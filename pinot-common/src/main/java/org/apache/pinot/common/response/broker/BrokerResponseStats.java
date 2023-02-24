@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -14,13 +32,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @JsonPropertyOrder({
-    "exceptions", "numBlocks", "numRows", "threadExecutionTime", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
-    "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
-    "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
-    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "traceInfo", "operatorIds"
+    "exceptions", "numBlocks", "numRows", "threadExecutionTime", "numServersQueried", "numServersResponded",
+    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
+    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
+    "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
+    "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
+    "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
+    "realtimeTotalCpuTimeNs", "traceInfo", "operatorIds"
 })
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class BrokerResponseStats {
@@ -67,181 +85,181 @@ public class BrokerResponseStats {
   private List<String> _operatorIds = new ArrayList<>();
 
   @JsonProperty("offlineSystemActivitiesCpuTimeNs")
-  
+
   public long getOfflineSystemActivitiesCpuTimeNs() {
     return _offlineSystemActivitiesCpuTimeNs;
   }
 
   @JsonProperty("offlineSystemActivitiesCpuTimeNs")
-  
+
   public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
     _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
   }
 
   @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
-  
+
   public long getRealtimeSystemActivitiesCpuTimeNs() {
     return _realtimeSystemActivitiesCpuTimeNs;
   }
 
   @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
-  
+
   public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
     _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
   }
 
   @JsonProperty("offlineThreadCpuTimeNs")
-  
+
   public long getOfflineThreadCpuTimeNs() {
     return _offlineThreadCpuTimeNs;
   }
 
   @JsonProperty("offlineThreadCpuTimeNs")
-  
+
   public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
     _offlineThreadCpuTimeNs = timeUsedMs;
   }
 
   @JsonProperty("realtimeThreadCpuTimeNs")
-  
+
   public long getRealtimeThreadCpuTimeNs() {
     return _realtimeThreadCpuTimeNs;
   }
 
   @JsonProperty("realtimeThreadCpuTimeNs")
-  
+
   public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
     _realtimeThreadCpuTimeNs = timeUsedMs;
   }
 
   @JsonProperty("offlineResponseSerializationCpuTimeNs")
-  
+
   public long getOfflineResponseSerializationCpuTimeNs() {
     return _offlineResponseSerializationCpuTimeNs;
   }
 
   @JsonProperty("offlineResponseSerializationCpuTimeNs")
-  
+
   public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
     _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
   }
 
   @JsonProperty("realtimeResponseSerializationCpuTimeNs")
-  
+
   public long getRealtimeResponseSerializationCpuTimeNs() {
     return _realtimeResponseSerializationCpuTimeNs;
   }
 
   @JsonProperty("realtimeResponseSerializationCpuTimeNs")
-  
+
   public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
     _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
   }
 
   @JsonProperty("offlineTotalCpuTimeNs")
-  
+
   public long getOfflineTotalCpuTimeNs() {
     return _offlineTotalCpuTimeNs;
   }
 
   @JsonProperty("offlineTotalCpuTimeNs")
-  
+
   public void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs) {
     _offlineTotalCpuTimeNs = offlineTotalCpuTimeNs;
   }
 
   @JsonProperty("realtimeTotalCpuTimeNs")
-  
+
   public long getRealtimeTotalCpuTimeNs() {
     return _realtimeTotalCpuTimeNs;
   }
 
   @JsonProperty("realtimeTotalCpuTimeNs")
-  
+
   public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
     _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
   }
 
   @JsonProperty("numSegmentsPrunedByBroker")
-  
+
   public long getNumSegmentsPrunedByBroker() {
     return _numSegmentsPrunedByBroker;
   }
 
   @JsonProperty("numSegmentsPrunedByBroker")
-  
+
   public void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker) {
     _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
   }
 
   @JsonProperty("numSegmentsPrunedByServer")
-  
+
   public long getNumSegmentsPrunedByServer() {
     return _numSegmentsPrunedByServer;
   }
 
   @JsonProperty("numSegmentsPrunedByServer")
-  
+
   public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
     _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
   }
 
   @JsonProperty("numSegmentsPrunedInvalid")
-  
+
   public long getNumSegmentsPrunedInvalid() {
     return _numSegmentsPrunedInvalid;
   }
 
   @JsonProperty("numSegmentsPrunedInvalid")
-  
+
   public void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid) {
     _numSegmentsPrunedInvalid = numSegmentsPrunedInvalid;
   }
 
   @JsonProperty("numSegmentsPrunedByLimit")
-  
+
   public long getNumSegmentsPrunedByLimit() {
     return _numSegmentsPrunedByLimit;
   }
 
   @JsonProperty("numSegmentsPrunedByLimit")
-  
+
   public void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit) {
     _numSegmentsPrunedByLimit = numSegmentsPrunedByLimit;
   }
 
   @JsonProperty("numSegmentsPrunedByValue")
-  
+
   public long getNumSegmentsPrunedByValue() {
     return _numSegmentsPrunedByValue;
   }
 
   @JsonProperty("numSegmentsPrunedByValue")
-  
+
   public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
     _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
   }
 
   @JsonProperty("explainPlanNumEmptyFilterSegments")
-  
+
   public long getExplainPlanNumEmptyFilterSegments() {
     return _explainPlanNumEmptyFilterSegments;
   }
 
   @JsonProperty("explainPlanNumEmptyFilterSegments")
-  
+
   public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
     _explainPlanNumEmptyFilterSegments = explainPlanNumEmptyFilterSegments;
   }
 
   @JsonProperty("explainPlanNumMatchAllFilterSegments")
-  
+
   public long getExplainPlanNumMatchAllFilterSegments() {
     return _explainPlanNumMatchAllFilterSegments;
   }
 
   @JsonProperty("explainPlanNumMatchAllFilterSegments")
-  
+
   public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
     _explainPlanNumMatchAllFilterSegments = explainPlanNumMatchAllFilterSegments;
   }
@@ -257,25 +275,25 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numServersQueried")
-  
+
   public int getNumServersQueried() {
     return _numServersQueried;
   }
 
   @JsonProperty("numServersQueried")
-  
+
   public void setNumServersQueried(int numServersQueried) {
     _numServersQueried = numServersQueried;
   }
 
   @JsonProperty("numServersResponded")
-  
+
   public int getNumServersResponded() {
     return _numServersResponded;
   }
 
   @JsonProperty("numServersResponded")
-  
+
   public void setNumServersResponded(int numServersResponded) {
     _numServersResponded = numServersResponded;
   }
@@ -291,7 +309,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numEntriesScannedInFilter")
-  
+
   public long getNumEntriesScannedInFilter() {
     return _numEntriesScannedInFilter;
   }
@@ -302,7 +320,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numEntriesScannedPostFilter")
-  
+
   public long getNumEntriesScannedPostFilter() {
     return _numEntriesScannedPostFilter;
   }
@@ -313,7 +331,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numSegmentsQueried")
-  
+
   public long getNumSegmentsQueried() {
     return _numSegmentsQueried;
   }
@@ -324,7 +342,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numSegmentsProcessed")
-  
+
   public long getNumSegmentsProcessed() {
     return _numSegmentsProcessed;
   }
@@ -335,7 +353,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numSegmentsMatched")
-  
+
   public long getNumSegmentsMatched() {
     return _numSegmentsMatched;
   }
@@ -346,7 +364,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numConsumingSegmentsQueried")
-  
+
   public long getNumConsumingSegmentsQueried() {
     return _numConsumingSegmentsQueried;
   }
@@ -357,17 +375,18 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numConsumingSegmentsProcessed")
-  
+
   public long getNumConsumingSegmentsProcessed() {
     return _numConsumingSegmentsProcessed;
   }
+
   @JsonProperty("numConsumingSegmentsProcessed")
   public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
     _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
   }
 
   @JsonProperty("numConsumingSegmentsMatched")
-  
+
   public long getNumConsumingSegmentsMatched() {
     return _numConsumingSegmentsMatched;
   }
@@ -378,7 +397,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
-  
+
   public long getMinConsumingFreshnessTimeMs() {
     return _minConsumingFreshnessTimeMs;
   }
@@ -389,7 +408,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("totalDocs")
-  
+
   public long getTotalDocs() {
     return _totalDocs;
   }
@@ -400,7 +419,7 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("numGroupsLimitReached")
-  
+
   public boolean isNumGroupsLimitReached() {
     return _numGroupsLimitReached;
   }
@@ -416,19 +435,19 @@ public class BrokerResponseStats {
   }
 
   @JsonProperty("timeUsedMs")
-  
+
   public void setTimeUsedMs(long timeUsedMs) {
     _timeUsedMs = timeUsedMs;
   }
 
   @JsonProperty("numRowsResultSet")
-  
+
   public int getNumRowsResultSet() {
     return _numRowsResultSet;
   }
 
   @JsonProperty("numRowsResultSet")
-  
+
   public void setNumRowsResultSet(int numRowsResultSet) {
     _numRowsResultSet = numRowsResultSet;
   }
@@ -473,7 +492,6 @@ public class BrokerResponseStats {
     _traceInfo = traceInfo;
   }
 
-  
   public String toJsonString()
       throws IOException {
     return JsonUtils.objectToString(this);

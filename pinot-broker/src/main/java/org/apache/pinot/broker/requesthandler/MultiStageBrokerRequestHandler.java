@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.swagger.models.auth.In;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -176,7 +175,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(false));
     }
 
-    ExecutionStatsAggregator executionStatsAggregator = new ExecutionStatsAggregator(false);
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
           sqlNodeAndOptions.getOptions(), stageIdStatsMap);
@@ -194,13 +192,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
 
-    for(Map.Entry<Integer, ExecutionStatsAggregator> entry: stageIdStatsMap.entrySet()) {
+    for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
+      if (entry.getKey() == 0) {
+        // Root stats are aggregated and added separately to broker response for backward compatibility
+        entry.getValue().setStats(brokerResponse);
+        continue;
+      }
+
       BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
       List<String> tableNames = queryPlan.getStageMetadataMap().get(entry.getKey()).getScannedTables();
       if (tableNames.size() > 0) {
-        entry.getValue().setStats(TableNameBuilder.extractRawTableName(tableNames.get(0)), brokerResponseStats, _brokerMetrics);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNames.get(0));
+        entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
       } else {
-        entry.getValue().setStats(null, brokerResponseStats, null);
+        entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
       }
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }

@@ -180,7 +180,7 @@ public class ExecutionStatsAggregator {
     String responseSerializationCpuTimeNsString =
         metadata.get(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
     if (tableType != null && responseSerializationCpuTimeNsString != null) {
-      if (tableType== TableType.OFFLINE) {
+      if (tableType == TableType.OFFLINE) {
         _offlineResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
       } else {
         _realtimeResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
@@ -314,7 +314,7 @@ public class ExecutionStatsAggregator {
     }
   }
 
-  public void setStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
+  public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
       @Nullable BrokerMetrics brokerMetrics) {
     // set exception
     List<QueryProcessingException> processingExceptions = brokerResponseStats.getProcessingExceptions();
