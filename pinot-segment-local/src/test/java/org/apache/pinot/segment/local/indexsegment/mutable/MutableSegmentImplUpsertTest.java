@@ -58,7 +58,7 @@ public class MutableSegmentImplUpsertTest {
     UpsertConfig upsertConfigWithHash = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfigWithHash.setPartialUpsertStrategies(new HashMap<>());
     upsertConfigWithHash.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
-    upsertConfigWithHash.setComparisonColumn(Arrays.asList("secondsSinceEpoch", "otherComparisonColumn"));
+    upsertConfigWithHash.setComparisonColumns(Arrays.asList("secondsSinceEpoch", "otherComparisonColumn"));
     upsertConfigWithHash.setHashFunction(hashFunction);
     return upsertConfigWithHash;
   }

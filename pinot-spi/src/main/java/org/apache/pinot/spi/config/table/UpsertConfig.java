@@ -145,6 +145,10 @@ public class UpsertConfig extends BaseJsonConfig {
     _comparisonColumns = comparisonColumns;
   }
 
+  public void setComparisonColumn(List<String> comparisonColumns) {
+    _comparisonColumns = comparisonColumns;
+  }
+
   public void setComparisonColumn(String comparisonColumn) {
     _comparisonColumns = Collections.singletonList(comparisonColumn);
   }
