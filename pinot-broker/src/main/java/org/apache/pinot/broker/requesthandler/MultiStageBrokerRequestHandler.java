@@ -212,7 +212,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
 
-    System.out.println(brokerResponse.toJsonString());
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     return brokerResponse;
