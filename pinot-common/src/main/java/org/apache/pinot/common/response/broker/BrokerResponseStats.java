@@ -32,7 +32,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @JsonPropertyOrder({
-    "exceptions", "numBlocks", "numRows", "operatorExecutionTime", "numServersQueried", "numServersResponded",
+    "exceptions", "numBlocks", "numRows", "stageExecutionTimeMs", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
     "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
@@ -80,7 +80,7 @@ public class BrokerResponseStats {
   // V2 Engine Stats
   private int _numBlocks = 0;
   private int _numRows = 0;
-  private long _operatorExecutionTimeMs = 0;
+  private long _stageExecutionTimeMs = 0;
   private List<String> _operatorIds = new ArrayList<>();
   private List<String> _tableNames = new ArrayList<>();
 
@@ -475,14 +475,14 @@ public class BrokerResponseStats {
     _numRows = numRows;
   }
 
-  @JsonProperty("operatorExecutionTimeMs")
-  public long getOperatorExecutionTimeMs() {
-    return _operatorExecutionTimeMs;
+  @JsonProperty("stageExecutionTimeMs")
+  public long getStageExecutionTimeMs() {
+    return _stageExecutionTimeMs;
   }
 
-  @JsonProperty("operatorExecutionTimeMs")
-  public void setOperatorExecutionTimeMs(long operatorExecutionTimeMs) {
-    _operatorExecutionTimeMs = operatorExecutionTimeMs;
+  @JsonProperty("stageExecutionTimeMs")
+  public void setStageExecutionTimeMs(long stageExecutionTimeMs) {
+    _stageExecutionTimeMs = stageExecutionTimeMs;
   }
 
   @JsonProperty("traceInfo")

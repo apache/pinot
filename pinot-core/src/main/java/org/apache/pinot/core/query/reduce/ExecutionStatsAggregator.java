@@ -76,7 +76,7 @@ public class ExecutionStatsAggregator {
   private boolean _numGroupsLimitReached = false;
   private int _numBlocks = 0;
   private int _numRows = 0;
-  private long _operatorExecutionTime = 0;
+  private long _stageExecutionTimeMs = 0;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -251,7 +251,7 @@ public class ExecutionStatsAggregator {
 
     String operatorExecutionTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName());
     if (operatorExecutionTimeString != null) {
-      _operatorExecutionTime += Long.parseLong(operatorExecutionTimeString);
+      _stageExecutionTimeMs += Long.parseLong(operatorExecutionTimeString);
     }
   }
 
@@ -378,7 +378,7 @@ public class ExecutionStatsAggregator {
 
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
-    brokerResponseStats.setOperatorExecutionTimeMs(_operatorExecutionTime);
+    brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
     brokerResponseStats.setOperatorIds(_operatorIds);
     brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
 
