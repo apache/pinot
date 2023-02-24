@@ -49,6 +49,8 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -253,10 +255,9 @@ public class GreedyShuffleRewriteVisitor
 
   @Override
   public Set<ColocationKey> visitTableScan(TableScanNode node, GreedyShuffleRewriteContext context) {
-    TableConfig tableConfig =
-        _tableCache.getTableConfig(node.getTableName());
+    TableConfig tableConfig = getTableConfig(node.getTableName());
     if (tableConfig == null) {
-      LOGGER.warn("Couldn't find tableConfig for {}", node.getTableName());
+      LOGGER.warn("Couldn't find tableConfig for {}. Skipping colocation for this node.", node.getTableName());
       return new HashSet<>();
     }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -395,5 +396,18 @@ public class GreedyShuffleRewriteVisitor
       return false;
     }
     return leftPKey.getHashAlgorithm().equals(rightPKey.getHashAlgorithm());
+  }
+
+  private TableConfig getTableConfig(String tableNameFromQuery) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameFromQuery);
+    if (tableType != null) {
+      return _tableCache.getTableConfig(tableNameFromQuery);
+    }
+    TableConfig offlineTableConfig = _tableCache.getTableConfig(
+        TableNameBuilder.OFFLINE.tableNameWithType(tableNameFromQuery));
+    if (offlineTableConfig != null) {
+      return offlineTableConfig;
+    }
+    return _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableNameFromQuery));
   }
 }
