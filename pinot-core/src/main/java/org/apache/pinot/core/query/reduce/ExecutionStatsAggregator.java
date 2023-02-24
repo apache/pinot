@@ -335,82 +335,13 @@ public class ExecutionStatsAggregator {
 
   public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
       @Nullable BrokerMetrics brokerMetrics) {
-    // set exception
-    List<QueryProcessingException> processingExceptions = brokerResponseStats.getProcessingExceptions();
-    processingExceptions.addAll(_processingExceptions);
-
-    // add all trace.
-    if (_enableTrace) {
-      brokerResponseStats.getTraceInfo().putAll(_traceInfo);
-    }
-
-    // Set execution statistics.
-    brokerResponseStats.setNumDocsScanned(_numDocsScanned);
-    brokerResponseStats.setNumEntriesScannedInFilter(_numEntriesScannedInFilter);
-    brokerResponseStats.setNumEntriesScannedPostFilter(_numEntriesScannedPostFilter);
-    brokerResponseStats.setNumSegmentsQueried(_numSegmentsQueried);
-    brokerResponseStats.setNumSegmentsProcessed(_numSegmentsProcessed);
-    brokerResponseStats.setNumSegmentsMatched(_numSegmentsMatched);
-    brokerResponseStats.setTotalDocs(_numTotalDocs);
-    brokerResponseStats.setNumGroupsLimitReached(_numGroupsLimitReached);
-    brokerResponseStats.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
-    brokerResponseStats.setRealtimeThreadCpuTimeNs(_realtimeThreadCpuTimeNs);
-    brokerResponseStats.setOfflineSystemActivitiesCpuTimeNs(_offlineSystemActivitiesCpuTimeNs);
-    brokerResponseStats.setRealtimeSystemActivitiesCpuTimeNs(_realtimeSystemActivitiesCpuTimeNs);
-    brokerResponseStats.setOfflineResponseSerializationCpuTimeNs(_offlineResponseSerializationCpuTimeNs);
-    brokerResponseStats.setRealtimeResponseSerializationCpuTimeNs(_realtimeResponseSerializationCpuTimeNs);
-    brokerResponseStats.setOfflineTotalCpuTimeNs(_offlineTotalCpuTimeNs);
-    brokerResponseStats.setRealtimeTotalCpuTimeNs(_realtimeTotalCpuTimeNs);
-    brokerResponseStats.setNumSegmentsPrunedByServer(_numSegmentsPrunedByServer);
-    brokerResponseStats.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
-    brokerResponseStats.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);
-    brokerResponseStats.setNumSegmentsPrunedByValue(_numSegmentsPrunedByValue);
-    brokerResponseStats.setExplainPlanNumEmptyFilterSegments(_explainPlanNumEmptyFilterSegments);
-    brokerResponseStats.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
-    if (_numConsumingSegmentsQueried > 0) {
-      brokerResponseStats.setNumConsumingSegmentsQueried(_numConsumingSegmentsQueried);
-    }
-    if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
-      brokerResponseStats.setMinConsumingFreshnessTimeMs(_minConsumingFreshnessTimeMs);
-    }
-    brokerResponseStats.setNumConsumingSegmentsProcessed(_numConsumingSegmentsProcessed);
-    brokerResponseStats.setNumConsumingSegmentsMatched(_numConsumingSegmentsMatched);
+    setStats(rawTableName, brokerResponseStats, brokerMetrics);
 
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
     brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
     brokerResponseStats.setOperatorIds(_operatorIds);
     brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
-
-    // Update broker metrics.
-    if (brokerMetrics != null && rawTableName != null) {
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, _numDocsScanned);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
-          _numEntriesScannedInFilter);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
-          _numEntriesScannedPostFilter);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_THREAD_CPU_TIME_NS, _offlineThreadCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS, _realtimeThreadCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_SYSTEM_ACTIVITIES_CPU_TIME_NS,
-          _offlineSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_SYSTEM_ACTIVITIES_CPU_TIME_NS,
-          _realtimeSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_RESPONSE_SER_CPU_TIME_NS,
-          _offlineResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_RESPONSE_SER_CPU_TIME_NS,
-          _realtimeResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_TOTAL_CPU_TIME_NS, _offlineTotalCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_TOTAL_CPU_TIME_NS, _realtimeTotalCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-
-      if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
-        brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
-            System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
-      }
-    }
   }
 
   private void withNotNullLongMetadata(Map<String, String> metadata, DataTable.MetadataKey key, LongConsumer consumer) {
