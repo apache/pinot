@@ -50,6 +50,6 @@ public interface PinotClientTransport<METRICS> {
    * @return underlying client metrics if any
    */
   default METRICS getClientMetrics() {
-    return null;
+    throw new UnsupportedOperationException("No useful client metrics available");
   }
 }
