@@ -30,6 +30,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -50,7 +51,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -170,10 +171,11 @@ public class PinotQueryResource {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
-    // Get brokers, only DEFAULT tenant is supported for now.
-    // TODO: implement logic that only allows executing query where all accessed tables are within the same tenant.
-    List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
-        TagNameUtils.DEFAULT_TENANT_NAME));
+    ObjectNode requestJson = getRequestJson(query, "false", queryOptions);
+    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJson);
+    List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+
+    List<String> instanceIds = getCommonInstances(tableNames);
     if (instanceIds.isEmpty()) {
       return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
     }
@@ -224,6 +226,31 @@ public class PinotQueryResource {
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+  }
+
+  // get list of common broker instances for a given set of tables
+  private List<String> getCommonInstances(List<String> tableNames) {
+    boolean firstTable = true;
+    Set<String> brokerInstanceList = new HashSet<>();
+    for (String tableName : tableNames) {
+      String rawTableName = TableNameBuilder.extractRawTableName(_pinotHelixResourceManager
+              .getActualTableName(tableName));
+      List<String> tableBrokerInstances;
+      try {
+        tableBrokerInstances = _pinotHelixResourceManager.getLiveBrokersForTable(rawTableName);
+      } catch (TableNotFoundException e) {
+        LOGGER.debug("No table found: ", e);
+        return new ArrayList<>();
+      }
+      if (firstTable) {
+        brokerInstanceList = new HashSet<>(tableBrokerInstances);
+        firstTable = false;
+      } else {
+        brokerInstanceList = tableBrokerInstances.stream().distinct().filter(brokerInstanceList::contains)
+                .collect(Collectors.toSet());
+      }
+    }
+    return new ArrayList<>(brokerInstanceList);
   }
 
   private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,

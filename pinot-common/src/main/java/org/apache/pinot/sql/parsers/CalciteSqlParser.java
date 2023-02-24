@@ -135,6 +135,24 @@ public class CalciteSqlParser {
     }
   }
 
+  public static List<String> extractTableNamesFromNode(SqlNode sqlNode) {
+    List<String> tableNames = new ArrayList<>();
+    if (sqlNode instanceof SqlSelect) {
+      SqlNode fromNode = ((SqlSelect) sqlNode).getFrom();
+      tableNames.addAll(((SqlIdentifier) fromNode).names);
+      tableNames.addAll(extractTableNamesFromNode(((SqlSelect) sqlNode).getWhere()));
+    } else if (sqlNode instanceof SqlBasicCall) {
+      for (SqlNode node: ((SqlBasicCall) sqlNode).getOperandList()) {
+        tableNames.addAll(extractTableNamesFromNode(node));
+      }
+    } else if (sqlNode instanceof SqlOrderBy) {
+      for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
+        tableNames.addAll(extractTableNamesFromNode(node));
+      }
+    }
+    return tableNames;
+  }
+
   @VisibleForTesting
   static SqlNodeAndOptions extractSqlNodeAndOptions(String sql, SqlNodeList sqlNodeList) {
     PinotSqlType sqlType = null;
