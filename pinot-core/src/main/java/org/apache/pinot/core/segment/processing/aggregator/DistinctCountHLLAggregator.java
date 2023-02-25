@@ -23,7 +23,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 
 
-public class DistinctCountRawHLLAggregator implements ValueAggregator {
+public class DistinctCountHLLAggregator implements ValueAggregator {
   @Override
   public Object aggregate(Object value1, Object value2) {
     try {
