@@ -24,11 +24,11 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountRawThetaSketchAggregator implements ValueAggregator {
+public class DistinctCountThetaSketchAggregator implements ValueAggregator {
 
   private final Union _union;
 
-  public DistinctCountRawThetaSketchAggregator() {
+  public DistinctCountThetaSketchAggregator() {
     // TODO: Handle configurable nominal entries
     _union = Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
   }
