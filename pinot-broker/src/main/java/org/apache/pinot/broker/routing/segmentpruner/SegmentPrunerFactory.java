@@ -49,6 +49,7 @@ public class SegmentPrunerFactory {
   public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<SegmentPruner> segmentPruners = new ArrayList<>();
+    segmentPruners.add(new SegmentNameSegmentPruner());
     boolean needsEmptySegment = TableConfigUtils.needsEmptySegmentPruner(tableConfig);
     if (needsEmptySegment) {
       // Add EmptySegmentPruner if needed
@@ -144,6 +145,11 @@ public class SegmentPrunerFactory {
     List<SegmentPruner> sortedPruners = new ArrayList<>();
     for (SegmentPruner pruner : pruners) {
       if (pruner instanceof EmptySegmentPruner) {
+        sortedPruners.add(pruner);
+      }
+    }
+    for (SegmentPruner pruner : pruners) {
+      if (pruner instanceof SegmentNameSegmentPruner) {
         sortedPruners.add(pruner);
       }
     }
