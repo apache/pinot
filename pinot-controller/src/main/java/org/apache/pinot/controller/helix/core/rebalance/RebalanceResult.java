@@ -33,21 +33,58 @@ public class RebalanceResult {
   private final Map<InstancePartitionsType, InstancePartitions> _instanceAssignment;
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
+  private final String _rebalanceId;
+  private final Long _startTimestamp;
+  private Long _finishTimestamp;
+
+  public RebalanceResult(@JsonProperty(value = "status", required = true) Status status,
+      @JsonProperty(value = "description", required = true) String description,
+      @JsonProperty("instanceAssignment") @Nullable Map<InstancePartitionsType, InstancePartitions> instanceAssignment,
+      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment, @JsonProperty(value = "rebalanceId", required = true) String rebalanceId, @JsonProperty(value = "startTimestamp", required = true) Long startTimestamp) {
+    _status = status;
+    _description = description;
+    _instanceAssignment = instanceAssignment;
+    _segmentAssignment = segmentAssignment;
+    _rebalanceId = rebalanceId;
+    _startTimestamp = startTimestamp;
+  }
 
   @JsonCreator
   public RebalanceResult(@JsonProperty(value = "status", required = true) Status status,
       @JsonProperty(value = "description", required = true) String description,
       @JsonProperty("instanceAssignment") @Nullable Map<InstancePartitionsType, InstancePartitions> instanceAssignment,
-      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment) {
+      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment, @JsonProperty(value = "rebalanceId", required = true) String rebalanceId, @JsonProperty(value = "startTimestamp", required = true) Long startTimestamp, @JsonProperty(value = "finishTimestamp", required = true) Long finishTimestamp) {
     _status = status;
     _description = description;
     _instanceAssignment = instanceAssignment;
     _segmentAssignment = segmentAssignment;
+    _rebalanceId = rebalanceId;
+    _startTimestamp = startTimestamp;
+    _finishTimestamp = finishTimestamp;
   }
 
   @JsonProperty
   public Status getStatus() {
     return _status;
+  }
+
+  @JsonProperty
+  public String getRebalanceId() {
+    return _rebalanceId;
+  }
+
+  @JsonProperty
+  public Long getStartTimestamp() {
+    return _startTimestamp;
+  }
+
+  @JsonProperty
+  public Long getFinishTimestamp() {
+    return _finishTimestamp;
+  }
+
+  public void setFinishTimestamp(Long timestamp) {
+    _finishTimestamp = timestamp;
   }
 
   @JsonProperty
@@ -66,6 +103,6 @@ public class RebalanceResult {
   }
 
   public enum Status {
-    NO_OP, DONE, FAILED, IN_PROGRESS
+    NO_OP, DONE, FAILED, IN_PROGRESS, STARTED
   }
 }

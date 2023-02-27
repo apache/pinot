@@ -619,6 +619,24 @@ public class PinotTableRestletResource {
     }
   }
 
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.UPDATE)
+  @Path("/rebalanceStatus/{jobId}")
+  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
+      notes = "Rebalances a table (reassign instances and segments for a table)")
+  public RebalanceResult rebalanceStatus(@ApiParam(value = "Rebalance Job Id", required = true) @PathParam("jobId") String jobId)
+      throws JsonProcessingException {
+    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(jobId);
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
+          Response.Status.NOT_FOUND);
+    }
+    RebalanceResult rebalanceResult =
+        JsonUtils.stringToObject(controllerJobZKMetadata.get("rebalanceResult"), RebalanceResult.class);
+    return rebalanceResult;
+  }
+
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
@@ -670,25 +688,25 @@ public class PinotTableRestletResource {
     try {
       if (dryRun || downtime) {
         // For dry-run or rebalance with downtime, directly return the rebalance result as it should return immediately
-        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver);
+        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver, rebalanceJobId);
       } else {
         // Make a dry-run first to get the target assignment
         rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
-        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver);
+        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver, rebalanceJobId);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, false);
           _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver);
+              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver, rebalanceJobId);
             } catch (Throwable t) {
               LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
             }
           });
           return new RebalanceResult(RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
-              dryRunResult.getSegmentAssignment());
+              dryRunResult.getSegmentAssignment(), rebalanceJobId, System.currentTimeMillis());
         } else {
           // If dry-run failed or is no-op, return the dry-run result
           return dryRunResult;

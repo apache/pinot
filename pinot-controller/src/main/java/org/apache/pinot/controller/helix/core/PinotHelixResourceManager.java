@@ -3097,7 +3097,7 @@ public class PinotHelixResourceManager {
         "Instance: " + instanceName + (enableInstance ? " enable" : " disable") + " failed, timeout");
   }
 
-  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig, TableRebalanceObserver rebalanceObserver)
+  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig, TableRebalanceObserver rebalanceObserver, String rebalanceId)
       throws TableNotFoundException {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig == null) {
@@ -3105,7 +3105,7 @@ public class PinotHelixResourceManager {
     }
     TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager);
     tableRebalancer.registerObserver(rebalanceObserver);
-    return tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceId);
   }
 
   /**

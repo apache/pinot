@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -52,6 +53,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -205,8 +207,13 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       //       migrating segment to new tier when the hosting server is in the server pool configured for that tier.
       updateTargetTier(tableNameWithType);
 
-      RebalanceResult rebalance =
-          new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager()).rebalance(tableConfig, rebalanceConfig);
+      String rebalanceId = UUID.randomUUID().toString();
+      ZkBasedTableRebalanceObserver rebalanceObserver =
+          new ZkBasedTableRebalanceObserver(rebalanceId, _pinotHelixResourceManager);
+
+      TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
+      tableRebalancer.registerObserver(rebalanceObserver);
+      RebalanceResult rebalance = tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceId);
       switch (rebalance.getStatus()) {
         case NO_OP:
           LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);

@@ -1,13 +1,16 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.utils.JsonUtils;
+
 
 public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
-  private String _rebalanceJobId;
-  private PinotHelixResourceManager _pinotHelixResourceManager;
+  private final String _rebalanceJobId;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public ZkBasedTableRebalanceObserver(String rebalanceJobId, PinotHelixResourceManager pinotHelixResourceManager) {
     _rebalanceJobId = rebalanceJobId;
@@ -18,12 +21,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   public void onNext(RebalanceResult rebalanceResult) {
     //update in ZK
     Map<String, String> jobMetadata = new HashMap<>();
-    jobMetadata.put("status", rebalanceResult.getStatus().toString());
-    jobMetadata.put("description", rebalanceResult.getDescription());
-    jobMetadata.put("instanceAssignment", rebalanceResult.getInstanceAssignment().toString());
-    jobMetadata.put("segmentAssignment", rebalanceResult.getSegmentAssignment().toString());
-    jobMetadata.put("lastUpdated", String.valueOf(System.currentTimeMillis()));
-    _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata);
+    try {
+      jobMetadata.put("rebalanceResult", JsonUtils.objectToString(rebalanceResult));
+      jobMetadata.put("lastUpdatedAt", String.valueOf(System.currentTimeMillis()));
+      _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata);
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+    }
   }
 
   @Override
