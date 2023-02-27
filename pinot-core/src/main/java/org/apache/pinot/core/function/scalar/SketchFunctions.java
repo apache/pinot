@@ -32,7 +32,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * The functions can be used as UDFs in Query when added in the FunctionRegistry.
  * @ScalarFunction annotation is used with each method for the registration
  *
- * These are intended to be used during ingestion to create sketches from raw data, which can be rolled up later.
+ * Note these will just make sketches that contain a single item, these are intended to be used during ingestion to
+ * create sketches from raw data, which can be rolled up later.
  *
  * Note this is defined in pinot-core rather than pinot-common because pinot-core has dependencies on
  * datasketches/clearspring analytics.
@@ -63,10 +64,19 @@ public class SketchFunctions {
    */
   @ScalarFunction(nullableParameters = true)
   public static byte[] distinctCountRawThetaSketch(Object input) {
-    // TODO make nominal entries configurable
-    UpdateSketch sketch =
-        Sketches.updateSketchBuilder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES)
-            .build();
+    return distinctCountRawThetaSketch(input, CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES);
+  }
+
+  /**
+   * Create a Theta Sketch containing the input, with a configured nominal entries
+   *
+   * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
+   * @param nominalEntries number of nominal entries the sketch is configured to keep
+   * @return serialized theta sketch as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] distinctCountRawThetaSketch(Object input, int nominalEntries) {
+    UpdateSketch sketch = Sketches.updateSketchBuilder().setNominalEntries(nominalEntries).build();
     if (input instanceof String) {
       sketch.update((String) input);
     } else if (input instanceof Long) {
@@ -93,8 +103,19 @@ public class SketchFunctions {
    */
   @ScalarFunction(nullableParameters = true)
   public static byte[] distinctCountRawHLL(Object input) {
-    // TODO make log2m configurable
-    HyperLogLog hll = new HyperLogLog.Builder(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M).build();
+    return distinctCountRawHLL(input, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
+  }
+
+  /**
+   * Create a HyperLogLog containing the input, with a configurable log2m
+   *
+   * @param input an Object we want to insert into the HLL, may be null to return an empty HLL
+   * @param log2m the log2m value for the created HyperLogLog
+   * @return serialized HLL as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] distinctCountRawHLL(Object input, int log2m) {
+    HyperLogLog hll = new HyperLogLog(log2m);
     if (input != null) {
       hll.offer(input);
     }
