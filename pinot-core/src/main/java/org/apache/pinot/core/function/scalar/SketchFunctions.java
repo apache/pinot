@@ -39,6 +39,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * datasketches/clearspring analytics.
  *
  * Example usage:
+ *
  * {
  *   "transformConfigs": [
  *     {
@@ -46,8 +47,16 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *       "transformFunction": "DistinctCountRawThetaSketch(playerID)"
  *     },
  *     {
+ *       "columnName": "players",
+ *       "transformFunction": "DistinctCountRawThetaSketch(playerID, 1024)"
+ *     },
+ *     {
  *       "columnName": "names",
  *       "transformFunction": "DistinctCountRawHLL(playerName)"
+ *     },
+ *     {
+ *       "columnName": "names",
+ *       "transformFunction": "DistinctCountRawHLL(playerName, 8)"
  *     }
  *   ]
  * }
