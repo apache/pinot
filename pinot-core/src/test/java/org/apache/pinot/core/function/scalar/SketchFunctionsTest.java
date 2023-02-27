@@ -39,11 +39,11 @@ public class SketchFunctionsTest {
   @Test
   public void testThetaSketchCreation() {
     for (Object i : _inputs) {
-      Assert.assertEquals(thetaEstimate(SketchFunctions.distinctCountRawThetaSketch(i)), 1.0);
-      Assert.assertEquals(thetaEstimate(SketchFunctions.distinctCountRawThetaSketch(i, 1024)), 1.0);
+      Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(i)), 1.0);
+      Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(i, 1024)), 1.0);
     }
-    Assert.assertEquals(thetaEstimate(SketchFunctions.distinctCountRawThetaSketch(null)), 0.0);
-    Assert.assertEquals(thetaEstimate(SketchFunctions.distinctCountRawThetaSketch(null, 1024)), 0.0);
+    Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null)), 0.0);
+    Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null, 1024)), 0.0);
   }
 
   private long hllEstimate(byte[] bytes) {
@@ -53,10 +53,10 @@ public class SketchFunctionsTest {
   @Test
   public void hllCreation() {
     for (Object i : _inputs) {
-      Assert.assertEquals(hllEstimate(SketchFunctions.distinctCountRawHLL(i)), 1);
-      Assert.assertEquals(hllEstimate(SketchFunctions.distinctCountRawHLL(i, 8)), 1);
+      Assert.assertEquals(hllEstimate(SketchFunctions.toHLL(i)), 1);
+      Assert.assertEquals(hllEstimate(SketchFunctions.toHLL(i, 8)), 1);
     }
-    Assert.assertEquals(hllEstimate(SketchFunctions.distinctCountRawHLL(null)), 0);
-    Assert.assertEquals(hllEstimate(SketchFunctions.distinctCountRawHLL(null, 8)), 0);
+    Assert.assertEquals(hllEstimate(SketchFunctions.toHLL(null)), 0);
+    Assert.assertEquals(hllEstimate(SketchFunctions.toHLL(null, 8)), 0);
   }
 }

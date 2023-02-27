@@ -20,6 +20,7 @@ package org.apache.pinot.core.function.scalar;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.math.BigDecimal;
+import javax.annotation.Nullable;
 import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -44,19 +45,19 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *   "transformConfigs": [
  *     {
  *       "columnName": "players",
- *       "transformFunction": "DistinctCountRawThetaSketch(playerID)"
+ *       "transformFunction": "toThetaSketch(playerID)"
  *     },
  *     {
  *       "columnName": "players",
- *       "transformFunction": "DistinctCountRawThetaSketch(playerID, 1024)"
+ *       "transformFunction": "toThetaSketch(playerID, 1024)"
  *     },
  *     {
  *       "columnName": "names",
- *       "transformFunction": "DistinctCountRawHLL(playerName)"
+ *       "transformFunction": "toHLL(playerName)"
  *     },
  *     {
  *       "columnName": "names",
- *       "transformFunction": "DistinctCountRawHLL(playerName, 8)"
+ *       "transformFunction": "toHLL(playerName, 8)"
  *     }
  *   ]
  * }
@@ -72,8 +73,8 @@ public class SketchFunctions {
    * @return serialized theta sketch as bytes
    */
   @ScalarFunction(nullableParameters = true)
-  public static byte[] distinctCountRawThetaSketch(Object input) {
-    return distinctCountRawThetaSketch(input, CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES);
+  public static byte[] toThetaSketch(@Nullable Object input) {
+    return toThetaSketch(input, CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES);
   }
 
   /**
@@ -84,20 +85,20 @@ public class SketchFunctions {
    * @return serialized theta sketch as bytes
    */
   @ScalarFunction(nullableParameters = true)
-  public static byte[] distinctCountRawThetaSketch(Object input, int nominalEntries) {
+  public static byte[] toThetaSketch(@Nullable Object input, int nominalEntries) {
     UpdateSketch sketch = Sketches.updateSketchBuilder().setNominalEntries(nominalEntries).build();
-    if (input instanceof String) {
-      sketch.update((String) input);
+    if (input instanceof Integer) {
+      sketch.update((Integer) input);
     } else if (input instanceof Long) {
       sketch.update((Long) input);
-    } else if (input instanceof Integer) {
-      sketch.update((Integer) input);
-    } else if (input instanceof BigDecimal) {
-      sketch.update(((BigDecimal) input).toString());
     } else if (input instanceof Float) {
       sketch.update((Float) input);
     } else if (input instanceof Double) {
       sketch.update((Double) input);
+    } else if (input instanceof BigDecimal) {
+      sketch.update(((BigDecimal) input).toString());
+    } else if (input instanceof String) {
+      sketch.update((String) input);
     } else if (input instanceof byte[]) {
       sketch.update((byte[]) input);
     }
@@ -111,8 +112,8 @@ public class SketchFunctions {
    * @return serialized HLL as bytes
    */
   @ScalarFunction(nullableParameters = true)
-  public static byte[] distinctCountRawHLL(Object input) {
-    return distinctCountRawHLL(input, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
+  public static byte[] toHLL(@Nullable Object input) {
+    return toHLL(input, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
   }
 
   /**
@@ -123,7 +124,7 @@ public class SketchFunctions {
    * @return serialized HLL as bytes
    */
   @ScalarFunction(nullableParameters = true)
-  public static byte[] distinctCountRawHLL(Object input, int log2m) {
+  public static byte[] toHLL(@Nullable Object input, int log2m) {
     HyperLogLog hll = new HyperLogLog(log2m);
     if (input != null) {
       hll.offer(input);
