@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.plan.PlanNode;
@@ -83,6 +84,12 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
    */
   public void release() {
     _indexSegment.release(_fetchContext);
+  }
+
+  @Override
+  public void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
+    materializeChildOperator();
+    acquire();
   }
 
   @Override

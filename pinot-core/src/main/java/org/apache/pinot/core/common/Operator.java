@@ -48,6 +48,9 @@ public interface Operator<T extends Block> {
   @Nullable
   String toExplainString();
 
+  default void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
+  }
+
   /**
    * Returns the index segment associated with the operator.
    */
