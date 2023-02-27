@@ -171,8 +171,7 @@ public class PinotQueryResource {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
-    ObjectNode requestJson = getRequestJson(query, "false", queryOptions);
-    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJson);
+    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
     List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
 
     List<String> instanceIds = getCommonInstances(tableNames);
@@ -231,26 +230,24 @@ public class PinotQueryResource {
   // get list of common broker instances for a given set of tables
   private List<String> getCommonInstances(List<String> tableNames) {
     boolean firstTable = true;
-    Set<String> brokerInstanceList = new HashSet<>();
+    Set<String> brokerInstances = new HashSet<>();
     for (String tableName : tableNames) {
-      String rawTableName = TableNameBuilder.extractRawTableName(_pinotHelixResourceManager
-              .getActualTableName(tableName));
       List<String> tableBrokerInstances;
       try {
-        tableBrokerInstances = _pinotHelixResourceManager.getLiveBrokersForTable(rawTableName);
+        tableBrokerInstances = _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
       } catch (TableNotFoundException e) {
         LOGGER.debug("No table found: ", e);
         return new ArrayList<>();
       }
       if (firstTable) {
-        brokerInstanceList = new HashSet<>(tableBrokerInstances);
+        brokerInstances = new HashSet<>(tableBrokerInstances);
         firstTable = false;
       } else {
-        brokerInstanceList = tableBrokerInstances.stream().distinct().filter(brokerInstanceList::contains)
+        brokerInstances = tableBrokerInstances.stream().distinct().filter(brokerInstances::contains)
                 .collect(Collectors.toSet());
       }
     }
-    return new ArrayList<>(brokerInstanceList);
+    return new ArrayList<>(brokerInstances);
   }
 
   private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,

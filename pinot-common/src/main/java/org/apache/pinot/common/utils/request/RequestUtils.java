@@ -48,6 +48,14 @@ public class RequestUtils {
   private RequestUtils() {
   }
 
+  public static SqlNodeAndOptions parseQuery(String query)
+          throws SqlCompilationException {
+    long parserStartTimeNs = System.nanoTime();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parserStartTimeNs);
+    return sqlNodeAndOptions;
+  }
+
   public static SqlNodeAndOptions parseQuery(String query, JsonNode request)
       throws SqlCompilationException {
     long parserStartTimeNs = System.nanoTime();

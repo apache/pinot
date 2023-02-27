@@ -32,6 +32,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.ParseException;
@@ -3008,6 +3009,15 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
     Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getStringValue(), "pst");
+  }
+
+  @Test
+  public void testExtractTableNamesFromNode() {
+    String query = "Select * from tbl1 where condition1 = filter1";
+    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 1);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
   }
 
   private static SqlNodeAndOptions testSqlWithCustomSqlParser(String sqlString) {
