@@ -22,7 +22,7 @@ import React from 'react';
 import ReactDiffViewer, {DiffMethod} from 'react-diff-viewer';
 import { map, isEqual, findIndex, findLast } from 'lodash';
 import app_state from '../app_state';
-import { DISPLAY_SEGMENT_STATUS, SEGMENT_STATUS } from 'Models';
+import {DISPLAY_SEGMENT_STATUS, SEGMENT_STATUS, TableData} from 'Models';
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -47,13 +47,13 @@ const sortArray = function (sortingArr, keyName, ascendingFlag) {
   });
 };
 
-const tableFormat = (data) => {
+const tableFormat = (data: TableData): Array<{ [key: string]: any }> => {
   const rows = data.records;
   const header = data.columns;
 
-  const results = [];
+  const results: Array<{ [key: string]: any }> = [];
   rows.forEach((singleRow) => {
-    const obj = {};
+    const obj: { [key: string]: any } = {};
     singleRow.forEach((val: any, index: number) => {
       obj[header[index]+app_state.columnNameSeparator+index] = val;
     });

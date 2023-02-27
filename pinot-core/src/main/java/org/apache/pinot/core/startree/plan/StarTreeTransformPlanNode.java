@@ -35,12 +35,14 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeTransformPlanNode implements PlanNode {
+  private final QueryContext _queryContext;
   private final List<ExpressionContext> _groupByExpressions;
   private final StarTreeProjectionPlanNode _starTreeProjectionPlanNode;
 
   public StarTreeTransformPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap) {
+    _queryContext = queryContext;
     Set<String> projectionColumns = new HashSet<>();
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
@@ -67,6 +69,6 @@ public class StarTreeTransformPlanNode implements PlanNode {
     // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
     //       - They are all columns (not functions or constants), where no transform is required
     //       - We never call TransformOperator.getResultMetadata() or TransformOperator.getDictionary() on them
-    return new TransformOperator(_starTreeProjectionPlanNode.run(), _groupByExpressions);
+    return new TransformOperator(_queryContext, _starTreeProjectionPlanNode.run(), _groupByExpressions);
   }
 }

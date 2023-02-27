@@ -214,19 +214,25 @@ public class OpChainSchedulerServiceTest {
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
     OpChainSchedulerService scheduler = new OpChainSchedulerService(_scheduler, _executor);
 
-    CountDownLatch latch = new CountDownLatch(1);
+    CountDownLatch cancelLatch = new CountDownLatch(1);
+    CountDownLatch deregisterLatch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenThrow(new RuntimeException("foo"));
     Mockito.doAnswer(inv -> {
-      latch.countDown();
+      cancelLatch.countDown();
       return null;
     }).when(_operatorA).cancel(Mockito.any());
+    Mockito.doAnswer(inv -> {
+      deregisterLatch.countDown();
+      return null;
+    }).when(_scheduler).deregister(Mockito.same(opChain));
 
     scheduler.startAsync().awaitRunning();
     scheduler.register(opChain);
 
-    Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
-    scheduler.stopAsync().awaitTerminated();
+    Assert.assertTrue(cancelLatch.await(10, TimeUnit.SECONDS), "expected OpChain to be cancelled");
+    Assert.assertTrue(deregisterLatch.await(10, TimeUnit.SECONDS), "expected OpChain to be deregistered");
     Mockito.verify(_operatorA, Mockito.times(1)).cancel(Mockito.any());
     Mockito.verify(_scheduler, Mockito.times(1)).deregister(Mockito.any());
+    scheduler.stopAsync().awaitTerminated();
   }
 }
