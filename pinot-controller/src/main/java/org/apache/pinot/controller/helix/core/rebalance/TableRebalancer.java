@@ -130,10 +130,11 @@ public class TableRebalancer {
 
   public RebalanceResult rebalance(TableConfig tableConfig, Configuration rebalanceConfig, String rebalanceId) {
     long startTimeMs = System.currentTimeMillis();
-    rebalanceConfig.setProperty("dryRun", true);
+    boolean dryRun = rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN);
+    rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
     RebalanceResult rebalanceResult = rebalance(tableConfig, rebalanceConfig, rebalanceId, startTimeMs);
     _rebalanceObservers.forEach(o -> o.onNext(new RebalanceResult(RebalanceResult.Status.IN_PROGRESS, rebalanceResult.getDescription(), rebalanceResult.getInstanceAssignment(), rebalanceResult.getSegmentAssignment(), rebalanceId, startTimeMs)));
-    rebalanceConfig.setProperty("dryRun", false);
+    rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
     return rebalance(tableConfig, rebalanceConfig, rebalanceId, startTimeMs);
   }
 
