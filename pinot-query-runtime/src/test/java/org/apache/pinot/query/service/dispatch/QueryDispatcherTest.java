@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.service;
+package org.apache.pinot.query.service.dispatch;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +28,7 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.service.QueryServer;
 import org.testng.annotations.Test;
 
 
@@ -43,7 +44,7 @@ public class QueryDispatcherTest extends QueryTestSet {
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
-  private QueryDispatcher.DispatchClient _dispatchClient;
+  private DispatchClient _dispatchClient;
 
   @Test
   public void addTests() {
