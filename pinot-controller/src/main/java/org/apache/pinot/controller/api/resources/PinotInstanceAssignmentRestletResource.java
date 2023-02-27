@@ -356,19 +356,21 @@ public class PinotInstanceAssignmentRestletResource {
   @ApiOperation(value = "Remove the instance partitions")
   public SuccessResponse removeInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable
-          InstancePartitionsType instancePartitionsType) {
+      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|Name of the tier") @QueryParam("type") @Nullable
+          String instancePartitionsType) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType != TableType.REALTIME && (instancePartitionsType == InstancePartitionsType.OFFLINE
+    if (tableType != TableType.REALTIME && (InstancePartitionsType.OFFLINE.toString().equals(instancePartitionsType)
         || instancePartitionsType == null)) {
       removeInstancePartitionsHelper(InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
     }
     if (tableType != TableType.OFFLINE) {
-      if (instancePartitionsType == InstancePartitionsType.CONSUMING || instancePartitionsType == null) {
+      if (InstancePartitionsType.CONSUMING.toString().equals(instancePartitionsType)
+          || instancePartitionsType == null) {
         removeInstancePartitionsHelper(InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
       }
-      if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
+      if (InstancePartitionsType.COMPLETED.toString().equals(instancePartitionsType)
+          || instancePartitionsType == null) {
         removeInstancePartitionsHelper(InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
       }
     }
@@ -379,8 +381,11 @@ public class PinotInstanceAssignmentRestletResource {
     for (TableConfig tableConfig : tableConfigs) {
       if (tableConfig != null && CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
         for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
-          removeInstancePartitionsHelper(
-              InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(), tierConfig.getName()));
+          if (instancePartitionsType == null || instancePartitionsType.equals(tierConfig.getName())) {
+            removeInstancePartitionsHelper(
+                InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(),
+                    tierConfig.getName()));
+          }
         }
       }
     }
