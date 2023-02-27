@@ -1928,7 +1928,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
 
     // Remove tier instance partitions
-
+    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed tier instance partitions", offlineTableName);
 
     // Remove segment lineage
     SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, offlineTableName);
@@ -1987,6 +1988,7 @@ public class PinotHelixResourceManager {
         InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
         InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
+    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, rawTableName);
     LOGGER.info("Deleting table {}: Removed instance partitions", realtimeTableName);
 
     // Remove segment lineage

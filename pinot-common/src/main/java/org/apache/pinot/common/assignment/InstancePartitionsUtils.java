@@ -46,6 +46,7 @@ public class InstancePartitionsUtils {
   }
 
   public static final char TYPE_SUFFIX_SEPARATOR = '_';
+  public static final String TIER_SUFFIX = "__TIER__";
 
   /**
    * Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
@@ -94,7 +95,7 @@ public class InstancePartitionsUtils {
   }
 
   public static String getInstancePartitonNameForTier(String tableName, String tierName) {
-    return TableNameBuilder.extractRawTableName(tableName) + TYPE_SUFFIX_SEPARATOR + tierName;
+    return TableNameBuilder.extractRawTableName(tableName) + TIER_SUFFIX + tierName;
   }
 
 
@@ -181,5 +182,17 @@ public class InstancePartitionsUtils {
     if (!propertyStore.remove(path, AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to remove instance partitions: " + instancePartitionsName);
     }
+  }
+
+  public static void removeTierInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions("");
+    List<ZNRecord> records = propertyStore.getChildren(path, null, AccessOption.PERSISTENT);
+    records.stream().filter(
+            znRecord -> znRecord.getId().startsWith(TableNameBuilder.extractRawTableName(tableNameWithType) + TIER_SUFFIX))
+        .forEach(znRecord -> {
+          propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(znRecord.getId()),
+              AccessOption.PERSISTENT);
+        });
   }
 }
