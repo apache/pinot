@@ -44,7 +44,7 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       pinotQuery.getGroupByList().set(i, expression);
     }
     for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
-      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getOrderByList().get(i),false);
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getOrderByList().get(i), false);
       pinotQuery.getOrderByList().set(i, expression);
     }
     Expression filterExpression = invokeCompileTimeFunctionExpression(pinotQuery.getFilterExpression(), true);
@@ -86,7 +86,7 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
           FunctionInvoker invoker = new FunctionInvoker(functionInfo);
           invoker.convertTypes(arguments);
           Object result = invoker.invoke(arguments, ignoreNull);
-          if(!ignoreNull) {
+          if (!ignoreNull) {
             return RequestUtils.getLiteralExpression(result);
           }
           return RequestUtils.getLiteralExpression(false);

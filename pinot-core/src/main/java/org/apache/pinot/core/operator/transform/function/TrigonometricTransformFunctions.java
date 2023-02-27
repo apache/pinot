@@ -49,6 +49,7 @@ public class TrigonometricTransformFunctions {
       Preconditions.checkArgument(
           _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
               .isSingleValue(), "Argument must be single-valued for transform function: %s", getName());
+      super.init(arguments, dataSourceMap);
     }
 
     @Override

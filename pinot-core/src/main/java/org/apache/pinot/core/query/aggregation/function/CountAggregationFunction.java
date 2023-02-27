@@ -43,6 +43,8 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   private final boolean _nullHandlingEnabled;
 
+  private final boolean _isCountStar;
+
   public CountAggregationFunction(ExpressionContext expression) {
     this(expression, false);
   }
@@ -50,7 +52,8 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     // Consider null values only when null handling is enabled and function is not COUNT(*)
-    _nullHandlingEnabled = nullHandlingEnabled && !expression.getIdentifier().equals("*");
+    _nullHandlingEnabled = nullHandlingEnabled;
+    _isCountStar = expression.getIdentifier().equals("*");
   }
 
   @Override
@@ -60,17 +63,17 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   @Override
   public String getColumnName() {
-    return _nullHandlingEnabled ? super.getColumnName() : COUNT_STAR_COLUMN_NAME;
+    return _isCountStar ? COUNT_STAR_COLUMN_NAME : super.getColumnName();
   }
 
   @Override
   public String getResultColumnName() {
-    return _nullHandlingEnabled ? super.getResultColumnName() : COUNT_STAR_RESULT_COLUMN_NAME;
+    return _isCountStar ? COUNT_STAR_RESULT_COLUMN_NAME : super.getColumnName();
   }
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return _nullHandlingEnabled ? super.getInputExpressions() : Collections.emptyList();
+    return _isCountStar ? Collections.emptyList() : super.getInputExpressions();
   }
 
   @Override
@@ -88,7 +91,7 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     if (blockValSetMap.isEmpty()) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
-    } else if (_nullHandlingEnabled) {
+    } else if (_nullHandlingEnabled && !_isCountStar) {
       assert blockValSetMap.size() == 1;
       BlockValSet blockValSet = blockValSetMap.values().iterator().next();
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();

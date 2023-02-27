@@ -233,7 +233,7 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = Double.valueOf(src[i]).intValue();
       }
     }
@@ -241,7 +241,7 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = new BigDecimal(src[i]).longValue();
       }
     }
@@ -249,7 +249,7 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, float[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = Float.parseFloat(src[i]);
       }
     }
@@ -257,7 +257,7 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, double[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = Double.parseDouble(src[i]);
       }
     }
@@ -265,7 +265,7 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = new BigDecimal(src[i]);
       }
     }
@@ -273,7 +273,7 @@ public class ArrayCopyUtils {
 
   public static void copyToBoolean(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = BooleanUtils.toInt(src[i]);
       }
     }
@@ -281,7 +281,7 @@ public class ArrayCopyUtils {
 
   public static void copyToTimestamp(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
       }
     }
@@ -289,7 +289,7 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, byte[][] dest, int length) {
     for (int i = 0; i < length; i++) {
-      if (src[i] != "null") {
+      if (!src[i].equals("null")) {
         dest[i] = src[i].getBytes(UTF_8);
       }
     }

@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -250,8 +251,17 @@ public class CaseTransformFunction extends BaseTransformFunction {
     if (!nullHandlingEnabled) {
       return whenStatement.transformToIntValuesSV(projectionBlock);
     }
-    int[] result = whenStatement.transformToIntValuesSV(projectionBlock);
-    return result;
+    Pair<RoaringBitmap, int[]> result = whenStatement.transformToIntValuesSVWithNull(projectionBlock);
+    RoaringBitmap bitmap = result.getLeft();
+    int[] intResult = result.getRight();
+    if (bitmap != null) {
+      bitmap.forEach((IntConsumer) (i) -> {
+        if (bitmap.contains(i)) {
+          intResult[i] = 0;
+        }
+      });
+    }
+    return intResult;
   }
 
   /**

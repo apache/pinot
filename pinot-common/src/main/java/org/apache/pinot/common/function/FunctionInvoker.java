@@ -126,9 +126,9 @@ public class FunctionInvoker {
    * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
    */
   public Object invoke(Object[] arguments, boolean ignoreNull) {
-    if(_isNullIntorelant){
-      for(Object arg: arguments){
-        if(arg == null){
+    if (_isNullIntorelant) {
+      for (Object arg : arguments) {
+        if (arg == null) {
           return null;
         }
       }

@@ -874,8 +874,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
       if (bitmap != null) {
+        int finalI = i;
         bitmap.forEach((IntConsumer) (j) -> {
-          _nonLiteralValues[j] = null;
+          _nonLiteralValues[finalI][j] = null;
         });
       }
     }
