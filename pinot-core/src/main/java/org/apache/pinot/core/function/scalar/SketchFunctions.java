@@ -47,8 +47,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *     {
  *       "columnName": "names",
  *       "transformFunction": "DistinctCountRawHLL(playerName)"
- *     },
- *   }
+ *     }
+ *   ]
  * }
  */
 public class SketchFunctions {
