@@ -623,7 +623,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/rebalanceStatus/{jobId}")
-  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
+  @ApiOperation(value = "Gets the current status of a rebalance operation",
       notes = "Gets the current status of a rebalance operation")
   public RebalanceResult rebalanceStatus(@ApiParam(value = "Rebalance Job Id", required = true) @PathParam("jobId") String jobId)
       throws JsonProcessingException {
