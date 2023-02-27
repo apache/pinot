@@ -19,11 +19,14 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
+import java.util.UUID;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceObserver;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 
@@ -55,6 +58,8 @@ public class PinotTableRebalancer extends PinotZKChanger {
   public RebalanceResult rebalance(String tableNameWithType) {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
-    return new TableRebalancer(_helixManager).rebalance(tableConfig, _rebalanceConfig, "");
+    //todo: create the observer properly
+    TableRebalanceObserver observer = new ZkBasedTableRebalanceObserver(UUID.randomUUID().toString(), null);
+    return new TableRebalancer(_helixManager).rebalance(tableConfig, _rebalanceConfig, UUID.randomUUID().toString());
   }
 }

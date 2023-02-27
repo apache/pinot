@@ -624,7 +624,7 @@ public class PinotTableRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Path("/rebalanceStatus/{jobId}")
   @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
-      notes = "Rebalances a table (reassign instances and segments for a table)")
+      notes = "Gets the current status of a rebalance operation")
   public RebalanceResult rebalanceStatus(@ApiParam(value = "Rebalance Job Id", required = true) @PathParam("jobId") String jobId)
       throws JsonProcessingException {
     Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(jobId);
@@ -632,9 +632,7 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
           Response.Status.NOT_FOUND);
     }
-    RebalanceResult rebalanceResult =
-        JsonUtils.stringToObject(controllerJobZKMetadata.get("rebalanceResult"), RebalanceResult.class);
-    return rebalanceResult;
+    return JsonUtils.stringToObject(controllerJobZKMetadata.get("rebalanceResult"), RebalanceResult.class);
   }
 
   @POST

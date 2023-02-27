@@ -34,7 +34,9 @@ public class RebalanceResult {
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
   private final String _rebalanceId;
+  //indicates the time at which the rebalance was started (for status: IN_PROGRESS)
   private final Long _startTimestamp;
+  //indicates the time at which the rebalance finished.
   private Long _finishTimestamp;
 
   public RebalanceResult(@JsonProperty(value = "status", required = true) Status status,
