@@ -82,7 +82,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
   // QUERY UTILS
   // --------------------------------------------------------------------------
-  protected List<Object[]> queryRunner(String sql, ExecutionStatsAggregator executionStatsAggregator) {
+  protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()),
@@ -105,11 +105,14 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
           _servers.get(serverInstance.getServer()).processQuery(distributedStagePlan, requestMetadataMap);
         }
       }
+      if (executionStatsAggregatorMap != null) {
+        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(false));
+      }
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
     return QueryDispatcher.toResultTable(
         QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS,
-            null, null),
+            executionStatsAggregatorMap, null),
         queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
   }
 
