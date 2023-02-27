@@ -189,7 +189,8 @@ public class InstancePartitionsUtils {
     String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions("");
     List<ZNRecord> records = propertyStore.getChildren(path, null, AccessOption.PERSISTENT);
     records.stream().filter(
-            znRecord -> znRecord.getId().startsWith(TableNameBuilder.extractRawTableName(tableNameWithType) + TIER_SUFFIX))
+            znRecord -> znRecord.getId()
+                .startsWith(TableNameBuilder.extractRawTableName(tableNameWithType) + TIER_SUFFIX))
         .forEach(znRecord -> {
           propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(znRecord.getId()),
               AccessOption.PERSISTENT);
