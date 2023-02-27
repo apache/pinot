@@ -29,13 +29,18 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalExchange;
+import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
@@ -100,11 +105,21 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
-    ImmutableList<RelHint> orgHints = oldAggRel.getHints();
+    ImmutableList<RelHint> oldHints = oldAggRel.getHints();
+
+    // If "skipLeafStageGroupByAggregation" SQLHint is passed, the leaf stage aggregation is skipped. This only
+    // applies for Group By Aggregations.
+    if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHint(oldHints,
+        PinotHintStrategyTable.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)) {
+      // This is not the default path. Use this group by optimization to skip leaf stage aggregation when aggregating
+      // at leaf level could be wasted effort. eg: when cardinality of group by column is very high.
+      createPlanWithoutLeafAggregation(call);
+      return;
+    }
 
     // 1. attach leaf agg RelHint to original agg.
     ImmutableList<RelHint> newLeafAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(AggregateNode.INTERMEDIATE_STAGE_HINT).build();
+        new ImmutableList.Builder<RelHint>().addAll(oldHints).add(AggregateNode.INTERMEDIATE_STAGE_HINT).build();
     Aggregate newLeafAgg =
         new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
             oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
@@ -119,16 +134,16 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     }
 
     // 3. attach intermediate agg stage.
-    RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, exchange);
+    RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, exchange, true, null, null);
     call.transformTo(newAggNode);
   }
 
-  private RelNode makeNewIntermediateAgg(RelOptRuleCall ruleCall, Aggregate oldAggRel, LogicalExchange exchange) {
+  private RelNode makeNewIntermediateAgg(RelOptRuleCall ruleCall, Aggregate oldAggRel, LogicalExchange exchange,
+      boolean isLeafStageAggregationPresent, List<Integer> argList, List<Integer> groupByList) {
 
     // add the exchange as the input node to the relation builder.
     RelBuilder relBuilder = ruleCall.builder();
     relBuilder.push(exchange);
-    List<RexNode> inputExprs = new ArrayList<>(relBuilder.fields());
 
     // make input ref to the exchange after the leaf aggregate.
     RexBuilder rexBuilder = exchange.getCluster().getRexBuilder();
@@ -144,14 +159,15 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     for (int oldCallIndex = 0; oldCallIndex < oldCalls.size(); oldCallIndex++) {
       AggregateCall oldCall = oldCalls.get(oldCallIndex);
-      convertAggCall(rexBuilder, oldAggRel, oldCallIndex, oldCall, newCalls, aggCallMapping, inputExprs);
+      convertAggCall(rexBuilder, oldAggRel, oldCallIndex, oldCall, newCalls, aggCallMapping,
+          isLeafStageAggregationPresent, argList);
     }
 
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
     ImmutableList<RelHint> newIntermediateAggHints =
         new ImmutableList.Builder<RelHint>().addAll(orgHints).add(AggregateNode.FINAL_STAGE_HINT).build();
-    ImmutableBitSet groupSet = ImmutableBitSet.range(nGroups);
+    ImmutableBitSet groupSet = groupByList == null ? ImmutableBitSet.range(nGroups) : ImmutableBitSet.of(groupByList);
     relBuilder.aggregate(
         relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)),
         newCalls);
@@ -169,7 +185,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    */
   private static void convertAggCall(RexBuilder rexBuilder, Aggregate oldAggRel, int oldCallIndex,
       AggregateCall oldCall, List<AggregateCall> newCalls, Map<AggregateCall, RexNode> aggCallMapping,
-      List<RexNode> inputExprs) {
+      boolean isLeafStageAggregationPresent, List<Integer> argList) {
     final int nGroups = oldAggRel.getGroupCount();
     final SqlAggFunction oldAggregation = oldCall.getAggregation();
     final SqlKind aggKind = oldAggregation.getKind();
@@ -177,28 +193,128 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     Preconditions.checkState(SUPPORTED_AGG_KIND.contains(aggKind), "Unsupported SQL aggregation "
         + "kind: {}. Only splittable aggregation functions are supported!", aggKind);
 
-    // Special treatment on COUNT
     AggregateCall newCall;
-    if (oldAggregation instanceof SqlCountAggFunction) {
-      newCall = AggregateCall.create(new SqlSumEmptyIsZeroAggFunction(), oldCall.isDistinct(), oldCall.isApproximate(),
-          oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, Collections.singletonList(oldCallIndex)),
-          oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
+    if (isLeafStageAggregationPresent) {
+
+      // Special treatment for Count. If count is performed at the Leaf Stage, a Sum needs to be performed at the
+      // intermediate stage.
+      if (oldAggregation instanceof SqlCountAggFunction) {
+        newCall =
+            AggregateCall.create(new SqlSumEmptyIsZeroAggFunction(), oldCall.isDistinct(), oldCall.isApproximate(),
+                oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, Collections.singletonList(oldCallIndex)),
+                oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
+      } else {
+        newCall = AggregateCall.create(oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(),
+            oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, oldCall.getArgList()), oldCall.filterArg,
+            oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
+      }
     } else {
-      newCall = AggregateCall.create(
-          oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(), oldCall.ignoreNulls(),
-          convertArgList(nGroups + oldCallIndex, oldCall.getArgList()), oldCall.filterArg, oldCall.distinctKeys,
-          oldCall.collation, oldCall.type, oldCall.getName());
+      List<Integer> newArgList = oldCall.getArgList().size() == 0 ? Collections.emptyList()
+          : Collections.singletonList(argList.get(oldCallIndex));
+
+      newCall = AggregateCall.create(oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(),
+          oldCall.ignoreNulls(), newArgList, oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type,
+          oldCall.getName());
     }
-    rexBuilder.addAggCall(newCall,
-        nGroups,
-        newCalls,
-        aggCallMapping,
-        oldAggRel.getInput()::fieldIsNullable);
+
+    rexBuilder.addAggCall(newCall, nGroups, newCalls, aggCallMapping, oldAggRel.getInput()::fieldIsNullable);
   }
 
   private static List<Integer> convertArgList(int oldCallIndexWithShift, List<Integer> argList) {
     Preconditions.checkArgument(argList.size() <= 1,
         "Unable to convert call as the argList contains more than 1 argument");
     return argList.size() == 1 ? Collections.singletonList(oldCallIndexWithShift) : Collections.emptyList();
+  }
+
+  private void createPlanWithoutLeafAggregation(RelOptRuleCall call) {
+    Aggregate oldAggRel = call.rel(0);
+    RelNode childRel = ((HepRelVertex) oldAggRel.getInput()).getCurrentRel();
+    LogicalProject project;
+
+    List<Integer> newAggArgColumns = new ArrayList<>();
+    List<Integer> newAggGroupByColumns = new ArrayList<>();
+
+    // 1. Create the LogicalProject node if it does not exist. This is to send only the relevant columns over
+    //    the wire for intermediate aggregation.
+    if (childRel instanceof Project) {
+      // Avoid creating a new LogicalProject if the child node of aggregation is already a project node.
+      project = (LogicalProject) childRel;
+      newAggArgColumns = fetchNewAggArgCols(oldAggRel.getAggCallList());
+      newAggGroupByColumns = oldAggRel.getGroupSet().asList();
+    } else {
+      // Create a leaf stage project. This is done so that only the required columns are sent over the wire for
+      // intermediate aggregation. If there are multiple aggregations on the same column, the column is projected
+      // only once.
+      project = createLogicalProjectForAggregate(oldAggRel, newAggArgColumns, newAggGroupByColumns);
+    }
+
+    // 2. Create an exchange on top of the LogicalProject.
+    LogicalExchange exchange = LogicalExchange.create(project, RelDistributions.hash(newAggGroupByColumns));
+
+    // 3. Create an intermediate stage aggregation.
+    RelNode newAggNode =
+        makeNewIntermediateAgg(call, oldAggRel, exchange, false, newAggArgColumns, newAggGroupByColumns);
+
+    call.transformTo(newAggNode);
+  }
+
+  private LogicalProject createLogicalProjectForAggregate(Aggregate oldAggRel, List<Integer> newAggArgColumns,
+      List<Integer> newAggGroupByCols) {
+    RelNode childRel = ((HepRelVertex) oldAggRel.getInput()).getCurrentRel();
+    RexBuilder childRexBuilder = childRel.getCluster().getRexBuilder();
+    List<RelDataTypeField> fieldList = childRel.getRowType().getFieldList();
+
+    List<RexNode> projectColRexNodes = new ArrayList<>();
+    List<String> projectColNames = new ArrayList<>();
+    // Maintains a mapping from the column to the corresponding index in projectColRexNodes.
+    Map<Integer, Integer> projectSet = new HashMap<>();
+
+    int projectIndex = 0;
+    for (int group : oldAggRel.getGroupSet().asSet()) {
+      projectColNames.add(fieldList.get(group).getName());
+      projectColRexNodes.add(childRexBuilder.makeInputRef(childRel, group));
+      projectSet.put(group, projectColRexNodes.size() - 1);
+      newAggGroupByCols.add(projectIndex++);
+    }
+
+    List<AggregateCall> oldAggCallList = oldAggRel.getAggCallList();
+    for (int i = 0; i < oldAggCallList.size(); i++) {
+      List<Integer> argList = oldAggCallList.get(i).getArgList();
+      if (argList.size() == 0) {
+        newAggArgColumns.add(-1);
+        continue;
+      }
+      for (int j = 0; j < argList.size(); j++) {
+        Integer col = argList.get(j);
+        if (!projectSet.containsKey(col)) {
+          projectColRexNodes.add(childRexBuilder.makeInputRef(childRel, col));
+          projectColNames.add(fieldList.get(col).getName());
+          projectSet.put(col, projectColRexNodes.size() - 1);
+          newAggArgColumns.add(projectColRexNodes.size() - 1);
+        } else {
+          newAggArgColumns.add(projectSet.get(col));
+        }
+      }
+    }
+
+    return LogicalProject.create(childRel, Collections.emptyList(), projectColRexNodes, projectColNames);
+  }
+
+  private List<Integer> fetchNewAggArgCols(List<AggregateCall> oldAggCallList) {
+    List<Integer> newAggArgColumns = new ArrayList<>();
+
+    for (int i = 0; i < oldAggCallList.size(); i++) {
+      if (oldAggCallList.get(i).getArgList().size() == 0) {
+        // This can be true for COUNT. Add a placeholder value which will be ignored.
+        newAggArgColumns.add(-1);
+        continue;
+      }
+      for (int j = 0; j < oldAggCallList.get(i).getArgList().size(); j++) {
+        Integer col = oldAggCallList.get(i).getArgList().get(j);
+        newAggArgColumns.add(col);
+      }
+    }
+
+    return newAggArgColumns;
   }
 }
