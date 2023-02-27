@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -115,10 +116,16 @@ public class TableRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
+  private final Set<TableRebalanceObserver> _rebalanceObservers;
 
   public TableRebalancer(HelixManager helixManager) {
     _helixManager = helixManager;
     _helixDataAccessor = helixManager.getHelixDataAccessor();
+    _rebalanceObservers = new HashSet<>();
+  }
+
+  public void registerObserver(TableRebalanceObserver observer) {
+    _rebalanceObservers.add(observer);
   }
 
   public RebalanceResult rebalance(TableConfig tableConfig, Configuration rebalanceConfig) {
@@ -162,14 +169,20 @@ public class TableRebalancer {
       if (tableConfig.getTableType() == TableType.REALTIME && new StreamConfig(tableNameWithType,
           IngestionConfigUtils.getStreamConfigMap(tableConfig)).hasHighLevelConsumerType()) {
         LOGGER.warn("Cannot rebalance table: {} with high-level consumer, aborting the rebalance", tableNameWithType);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot rebalance table with high-level consumer",
-            null, null);
+        RebalanceResult rebalanceResult =
+            new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot rebalance table with high-level consumer",
+                null, null);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while validating table config for table: {}, aborting the rebalance",
           tableNameWithType, e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while validating table config: " + e,
-          null, null);
+      RebalanceResult rebalanceResult =
+          new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while validating table config: " + e,
+              null, null);
+      _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+      return rebalanceResult;
     }
 
     // Fetch ideal state
@@ -180,17 +193,26 @@ public class TableRebalancer {
     } catch (Exception e) {
       LOGGER.warn("Caught exception while fetching IdealState for table: {}, aborting the rebalance", tableNameWithType,
           e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while fetching IdealState: " + e,
-          null, null);
+      RebalanceResult rebalanceResult =
+          new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while fetching IdealState: " + e,
+              null, null);
+      _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+      return rebalanceResult;
     }
     if (currentIdealState == null) {
       LOGGER.warn("Cannot find the IdealState for table: {}, aborting the rebalance", tableNameWithType);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot find the IdealState for table", null, null);
+      RebalanceResult rebalanceResult =
+          new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot find the IdealState for table", null, null);
+      _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+      return rebalanceResult;
     }
     if (!currentIdealState.isEnabled() && !downtime) {
       LOGGER.warn("Cannot rebalance disabled table: {} without downtime, aborting the rebalance", tableNameWithType);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot rebalance disabled table without downtime",
-          null, null);
+      RebalanceResult rebalanceResult =
+          new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot rebalance disabled table without downtime",
+              null, null);
+      _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+      return rebalanceResult;
     }
 
     LOGGER.info("Fetching/computing instance partitions, reassigning instances if configured for table: {}",
@@ -204,8 +226,10 @@ public class TableRebalancer {
       LOGGER.warn(
           "Caught exception while fetching/calculating instance partitions for table: {}, aborting the rebalance",
           tableNameWithType, e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED,
+      RebalanceResult rebalanceResult = new RebalanceResult(RebalanceResult.Status.FAILED,
           "Caught exception while fetching/calculating instance partitions: " + e, null, null);
+      _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+      return rebalanceResult;
     }
 
     // Calculate instance partitions for tiers if configured
@@ -223,8 +247,10 @@ public class TableRebalancer {
     } catch (Exception e) {
       LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
           tableNameWithType, e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED,
+      RebalanceResult rebalanceResult = new RebalanceResult(RebalanceResult.Status.FAILED,
           "Caught exception while calculating target assignment: " + e, instancePartitionsMap, null);
+      _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+      return rebalanceResult;
     }
 
     if (currentAssignment.equals(targetAssignment)) {
@@ -235,18 +261,27 @@ public class TableRebalancer {
               "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
               targetAssignment);
         } else {
-          return new RebalanceResult(RebalanceResult.Status.DONE, "Instance reassigned, table is already balanced",
-              instancePartitionsMap, targetAssignment);
+          RebalanceResult rebalanceResult =
+              new RebalanceResult(RebalanceResult.Status.DONE, "Instance reassigned, table is already balanced",
+                  instancePartitionsMap, targetAssignment);
+          _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+          return rebalanceResult;
         }
       } else {
-        return new RebalanceResult(RebalanceResult.Status.NO_OP, "Table is already balanced", instancePartitionsMap,
-            targetAssignment);
+        RebalanceResult rebalanceResult =
+            new RebalanceResult(RebalanceResult.Status.NO_OP, "Table is already balanced", instancePartitionsMap,
+                targetAssignment);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       }
     }
 
     if (dryRun) {
       LOGGER.info("Rebalancing table: {} in dry-run mode, returning the target assignment", tableNameWithType);
-      return new RebalanceResult(RebalanceResult.Status.DONE, "Dry-run mode", instancePartitionsMap, targetAssignment);
+      RebalanceResult rebalanceResult =
+          new RebalanceResult(RebalanceResult.Status.DONE, "Dry-run mode", instancePartitionsMap, targetAssignment);
+      _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+      return rebalanceResult;
     }
 
     if (downtime) {
@@ -265,14 +300,19 @@ public class TableRebalancer {
                 AccessOption.PERSISTENT), "Failed to update IdealState");
         LOGGER.info("Finished rebalancing table: {} with downtime in {}ms.", tableNameWithType,
             System.currentTimeMillis() - startTimeMs);
-        return new RebalanceResult(RebalanceResult.Status.DONE,
+        RebalanceResult rebalanceResult = new RebalanceResult(RebalanceResult.Status.DONE,
             "Success with downtime (replaced IdealState with the target segment assignment, ExternalView might not "
                 + "reach the target segment assignment yet)", instancePartitionsMap, targetAssignment);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while updating IdealState for table: {}, aborting the rebalance",
             tableNameWithType, e);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
-            instancePartitionsMap, targetAssignment);
+        RebalanceResult rebalanceResult =
+            new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
+                instancePartitionsMap, targetAssignment);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       }
     }
 
@@ -294,8 +334,11 @@ public class TableRebalancer {
             "Illegal config for minReplicasToKeepUpForNoDowntime: {} for table: {}, must be less than number of "
                 + "replicas: {}, aborting the rebalance", minReplicasToKeepUpForNoDowntime, tableNameWithType,
             numReplicas);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Illegal min available replicas config",
-            instancePartitionsMap, targetAssignment);
+        RebalanceResult rebalanceResult =
+            new RebalanceResult(RebalanceResult.Status.FAILED, "Illegal min available replicas config",
+                instancePartitionsMap, targetAssignment);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       }
       minAvailableReplicas = minReplicasToKeepUpForNoDowntime;
     } else {
@@ -319,9 +362,11 @@ public class TableRebalancer {
       } catch (Exception e) {
         LOGGER.warn("Caught exception while waiting for ExternalView to converge for table: {}, aborting the rebalance",
             tableNameWithType, e);
-        return new RebalanceResult(RebalanceResult.Status.FAILED,
+        RebalanceResult rebalanceResult = new RebalanceResult(RebalanceResult.Status.FAILED,
             "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
             targetAssignment);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       }
 
       // Re-calculate the target assignment if IdealState changed while waiting for ExternalView to converge
@@ -360,9 +405,11 @@ public class TableRebalancer {
             LOGGER.warn(
                 "Caught exception while re-calculating the target assignment for table: {}, aborting the rebalance",
                 tableNameWithType, e);
-            return new RebalanceResult(RebalanceResult.Status.FAILED,
+            RebalanceResult rebalanceResult = new RebalanceResult(RebalanceResult.Status.FAILED,
                 "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
                 targetAssignment);
+            _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+            return rebalanceResult;
           }
         } else {
           LOGGER.info(
@@ -381,10 +428,12 @@ public class TableRebalancer {
             "Finished rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts:"
                 + " {} in {}ms.", tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
             System.currentTimeMillis() - startTimeMs);
-        return new RebalanceResult(RebalanceResult.Status.DONE,
+        RebalanceResult rebalanceResult = new RebalanceResult(RebalanceResult.Status.DONE,
             "Success with minAvailableReplicas: " + minAvailableReplicas
                 + " (both IdealState and ExternalView should reach the target segment assignment)",
             instancePartitionsMap, targetAssignment);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       }
 
       Map<String, Map<String, String>> nextAssignment =
@@ -411,8 +460,11 @@ public class TableRebalancer {
       } catch (Exception e) {
         LOGGER.warn("Caught exception while updating IdealState for table: {}, aborting the rebalance",
             tableNameWithType, e);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
-            instancePartitionsMap, targetAssignment);
+        RebalanceResult rebalanceResult =
+            new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
+                instancePartitionsMap, targetAssignment);
+        _rebalanceObservers.forEach(o -> o.onNext(rebalanceResult));
+        return rebalanceResult;
       }
     }
   }

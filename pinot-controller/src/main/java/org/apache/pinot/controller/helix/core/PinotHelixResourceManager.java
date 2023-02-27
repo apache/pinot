@@ -133,6 +133,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceObserver;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
@@ -2129,7 +2130,7 @@ public class PinotHelixResourceManager {
     return addControllerJobToZK(jobId, jobMetadata);
   }
 
-  private boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata) {
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata) {
     String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob();
     Stat stat = new Stat();
     ZNRecord tableJobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
@@ -3096,13 +3097,15 @@ public class PinotHelixResourceManager {
         "Instance: " + instanceName + (enableInstance ? " enable" : " disable") + " failed, timeout");
   }
 
-  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig)
+  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig, TableRebalanceObserver rebalanceObserver)
       throws TableNotFoundException {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
-    return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager);
+    tableRebalancer.registerObserver(rebalanceObserver);
+    return tableRebalancer.rebalance(tableConfig, rebalanceConfig);
   }
 
   /**

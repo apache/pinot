@@ -44,6 +44,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
@@ -91,6 +92,7 @@ import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
@@ -662,21 +664,24 @@ public class PinotTableRestletResource {
     rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
         externalViewStabilizationTimeoutInMs);
 
+    String rebalanceJobId = UUID.randomUUID().toString();
+    ZkBasedTableRebalanceObserver rebalanceObserver = new ZkBasedTableRebalanceObserver(rebalanceJobId, _pinotHelixResourceManager);
+
     try {
       if (dryRun || downtime) {
         // For dry-run or rebalance with downtime, directly return the rebalance result as it should return immediately
-        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver);
       } else {
         // Make a dry-run first to get the target assignment
         rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
-        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, false);
           _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceObserver);
             } catch (Throwable t) {
               LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
             }
