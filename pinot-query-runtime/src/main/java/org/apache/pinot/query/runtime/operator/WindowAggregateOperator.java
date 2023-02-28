@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * columns and in addition will add the aggregation columns to the output data.
  * [input columns, aggregate result1, ... aggregate resultN]
  *
- * The window functions supported today are SUM/COUNT/MIN/MAX aggregations. Window functions also include
+ * The window functions supported today are SUM/COUNT/MIN/MAX/AVG aggregations. Window functions also include
  * other types of functions such as rank and value functions.
  *
  * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
@@ -64,6 +64,7 @@ import org.slf4j.LoggerFactory;
  *     2. Add support for rank window functions
  *     3. Add support for value window functions
  *     4. Add support for custom frames
+ *     5. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
  */
 public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
@@ -198,20 +199,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       orderByInputRefIndexes.add(((RexExpression.InputRef) orderSet.get(i)).getIndex());
     }
 
-    boolean isPartitionByOnly = partitionByInputRefIndexes.equals(orderByInputRefIndexes);
-    if (isPartitionByOnly) {
-      // Check the direction and null direction to ensure default ordering on the order by keys, which are:
-      // Direction: ASC
-      // Null Direction: LAST
-      for (int i = 0; i < orderSet.size(); i++) {
-        if (orderSetDirection.get(i) == RelFieldCollation.Direction.DESCENDING
-            || orderSetNullDirection.get(i) == RelFieldCollation.NullDirection.FIRST) {
-          isPartitionByOnly = false;
-          break;
-        }
-      }
-    }
-    return isPartitionByOnly;
+    return partitionByInputRefIndexes.equals(orderByInputRefIndexes);
   }
 
   private TransferableBlock produceWindowAggregateBlock() {
@@ -254,7 +242,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<Object[]> container = block.getContainer();
       for (Object[] row : container) {
         _numRows++;
-        // TODO: Revisit the aggregation logic once ORDER BY inside OVER() support is added
+        // TODO: Revisit the aggregation logic once ORDER BY inside OVER() support is added, also revisit null direction
+        //       handling for all query types
         Key key = AggregationUtils.extractRowKey(row, _groupSet);
         _partitionRows.putIfAbsent(key, new ArrayList<>());
         _partitionRows.get(key).add(row);

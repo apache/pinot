@@ -1520,7 +1520,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$2], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC] aggs [SUM($1), COUNT($1)])])",
-          "\n    LogicalSortExchange(distribution=[hash[0]], collation=[[0 DESC]])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
@@ -1533,7 +1533,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$2], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0 ASC-nulls-first] aggs [SUM($1), COUNT($1)])])",
-          "\n    LogicalSortExchange(distribution=[hash[0]], collation=[[0 ASC-nulls-first]])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
@@ -1546,7 +1546,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$2], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC-nulls-last] aggs [SUM($1), COUNT($1)])])",
-          "\n    LogicalSortExchange(distribution=[hash[0]], collation=[[0 DESC-nulls-last]])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
@@ -1727,7 +1727,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC] aggs [SUM($0), COUNT($0), MIN($0)])])",
-          "\n    LogicalSortExchange(distribution=[hash[1]], collation=[[1 DESC]])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col3=[$1], col1=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
@@ -1740,7 +1740,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 ASC-nulls-first] aggs [SUM($0), COUNT($0), MIN($0)])])",
-          "\n    LogicalSortExchange(distribution=[hash[1]], collation=[[1 ASC-nulls-first]])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col3=[$1], col1=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
@@ -1753,7 +1753,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC-nulls-last] aggs [SUM($0), COUNT($0), MIN($0)])])",
-          "\n    LogicalSortExchange(distribution=[hash[1]], collation=[[1 DESC-nulls-last]])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col3=[$1], col1=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
@@ -2169,6 +2169,24 @@
         "description": "Multiple window groups",
         "notes": "not yet supported",
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Multiple window groups",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col2), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Multiple window groups",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(), MAX(a.col3) OVER(PARTITION BY a.col2) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Multiple window groups",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2), MIN(a.col3) OVER(PARTITION BY a.col2) FROM a",
         "expectedException": "Error explain query plan for.*"
       },
       {

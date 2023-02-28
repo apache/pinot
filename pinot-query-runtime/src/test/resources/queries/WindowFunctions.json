@@ -706,6 +706,28 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k1) sum with select columns with order by DESC",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY string_col DESC), int_col FROM {tbl}",
+        "outputs": [
+          ["a", 130, 2],
+          ["a", 130, 2],
+          ["a", 130, 42],
+          ["a", 130, 42],
+          ["a", 130, 42],
+          ["b", 103, 3],
+          ["b", 103, 100],
+          ["e", 84, 42],
+          ["e", 84, 42],
+          ["d", 42, 42],
+          ["h", 150, 150],
+          ["g", 3, 3],
+          ["c", 54, -101],
+          ["c", 54, 150],
+          ["c", 54, 3],
+          ["c", 54, 2]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY) max with select columns with alias",
         "sql": "SELECT string_col AS str, MAX(double_col) OVER(PARTITION BY string_col) AS max, int_col FROM {tbl}",
         "outputs": [
@@ -866,6 +888,31 @@
       {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k1) with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY bool_col, string_col) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "outputs": [
+          [100, 103],
+          [1, 103],
+          [100, 3],
+          [1.01, 51],
+          [1.5, 51],
+          [400, 51]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k1) with select col and filter where ORDER BY is DESC",
+        "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY bool_col, string_col DESC) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "outputs": [
+          [100, 103],
+          [1, 103],
+          [100, 3],
+          [1.01, 51],
+          [1.5, 51],
+          [400, 51]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k1) with select col and filter where ORDER BY is DESC, NULL DIRECTION IS LAST",
+        "comment": "TODO: Modify test to handle null direction when null direction support is added",
+        "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY bool_col, string_col DESC NULLS LAST) FROM {tbl} WHERE string_col IN ('b', 'c')",
         "outputs": [
           [100, 103],
           [1, 103],

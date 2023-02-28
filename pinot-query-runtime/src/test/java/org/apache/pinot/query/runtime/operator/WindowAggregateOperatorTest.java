@@ -413,18 +413,21 @@ public class WindowAggregateOperatorTest {
         _serverAddress);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Order by is not yet "
-      + "supported in window functions")
+  @Test
   public void testShouldThrowOnNonEmptyOrderByKeysMatchingPartitionByKeysWithDifferentDirection() {
-    // TODO: Remove this test once order by support is added
     // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
-    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
-    List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(0));
+    // Set ORDER BY key same as PARTITION BY key with custom direction and null direction. Should still be treated
+    // like a PARTITION BY only query (since the final aggregation value won't change).
+    // TODO: Test null direction handling once support for it is available
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(1));
+    List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
     Mockito.when(_input.nextBlock())
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "bar"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"},
@@ -433,6 +436,17 @@ public class WindowAggregateOperatorTest {
         Arrays.asList(RelFieldCollation.Direction.DESCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
         calls, Integer.MIN_VALUE, Integer.MAX_VALUE, false, Collections.emptyList(), outSchema, inSchema, 1, 2,
         _serverAddress);
+
+    // When:
+    TransferableBlock resultBlock = operator.nextBlock(); // (output result)
+
+    // Then:
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{2, "bar", 2},
+        "Expected three columns (original two columns, agg literal value)");
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{2, "foo", 5.0},
+        "Expected three columns (original two columns, agg literal value)");
+    Assert.assertEquals(resultBlock.getContainer().get(2), new Object[]{3, "foo", 5.0},
+        "Expected three columns (original two columns, agg literal value)");
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only RANGE type frames "
