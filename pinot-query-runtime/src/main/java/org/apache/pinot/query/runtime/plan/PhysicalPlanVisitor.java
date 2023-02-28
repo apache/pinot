@@ -63,7 +63,8 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
-            node.getSenderStageId(), node.getStageId());
+            node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(), node.isSortOnReceiver(),
+            node.getDataSchema(), node.getSenderStageId(), node.getStageId());
     context.addReceivingMailboxes(mailboxReceiveOperator.getSendingMailbox());
     return mailboxReceiveOperator;
   }
@@ -72,7 +73,8 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   public MultiStageOperator visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new MailboxSendOperator(context.getOpChainExecutionContext(), nextOperator, node.getExchangeType(),
-        node.getPartitionKeySelector(), node.getStageId(), node.getReceiverStageId());
+        node.getPartitionKeySelector(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
+        node.getStageId(), node.getReceiverStageId());
   }
 
   @Override
@@ -120,8 +122,10 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   @Override
   public MultiStageOperator visitSort(SortNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
+    boolean isInputSorted =
+        nextOperator instanceof MailboxReceiveOperator && ((MailboxReceiveOperator) nextOperator).hasCollationKeys();
     return new SortOperator(context.getOpChainExecutionContext(), nextOperator, node.getCollationKeys(),
-        node.getCollationDirections(), node.getFetch(), node.getOffset(), node.getDataSchema());
+        node.getCollationDirections(), node.getFetch(), node.getOffset(), node.getDataSchema(), isInputSorted);
   }
 
   @Override

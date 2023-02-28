@@ -215,7 +215,8 @@ public class QueryRunner {
               deadlineMs, distributedStagePlan.getMetadataMap());
       mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext,
           new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema()),
-          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getStageId(),
+          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(),
+          sendNode.getCollationDirections(), sendNode.isSortOnSender(), sendNode.getStageId(),
           sendNode.getReceiverStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
