@@ -32,17 +32,19 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
@@ -59,6 +61,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,7 +137,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
-  private BrokerResponseNative handleRequest(long requestId, String query,
+  private BrokerResponse handleRequest(long requestId, String query,
       @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext)
       throws Exception {
@@ -167,16 +170,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     ResultTable queryResults;
-    Map<String, String> metadata = new HashMap<>();
+    Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
+    for (Integer stageId: queryPlan.getStageMetadataMap().keySet()) {
+      stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(false));
+    }
+
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions(), metadata);
+          sqlNodeAndOptions.getOptions(), stageIdStatsMap);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
 
-    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     long executionEndTimeNs = System.nanoTime();
 
     // Set total query processing time
@@ -185,55 +192,29 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
 
-    attachMetadataToResponse(metadata, brokerResponse);
+    for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
+      if (entry.getKey() == 0) {
+        // Root stats are aggregated and added separately to broker response for backward compatibility
+        entry.getValue().setStats(brokerResponse);
+        continue;
+      }
+
+      BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
+      List<String> tableNames = queryPlan.getStageMetadataMap().get(entry.getKey()).getScannedTables();
+      if (tableNames.size() > 0) {
+        //TODO: Only using first table to assign broker metrics
+        // find a way to split metrics in case of multiple table
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNames.get(0));
+        entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
+      } else {
+        entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
+      }
+      brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
+    }
 
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     return brokerResponse;
-  }
-
-  //TODO: Remove this duplicate method, use the implementation from V1 engine
-  private void attachMetadataToResponse(Map<String, String> stats, BrokerResponseNative brokerResponse) {
-    brokerResponse.setNumDocsScanned(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName(), "0")));
-    brokerResponse.setNumEntriesScannedInFilter(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), "0")));
-    brokerResponse.setNumEntriesScannedPostFilter(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0")));
-    brokerResponse.setTotalDocs(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.TOTAL_DOCS.getName(), "0")));
-    brokerResponse.setNumSegmentsQueried(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName(), "0")));
-    brokerResponse.setNumSegmentsProcessed(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0")));
-    brokerResponse.setNumSegmentsMatched(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0")));
-    brokerResponse.setNumConsumingSegmentsQueried(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), "0")));
-
-    brokerResponse.setNumSegmentsPrunedByServer(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), "0")));
-    brokerResponse.setNumSegmentsPrunedInvalid(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), "0")));
-    brokerResponse.setNumSegmentsPrunedByLimit(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), "0")));
-    brokerResponse.setNumSegmentsPrunedByValue(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), "0")));
-    brokerResponse.setExplainPlanNumEmptyFilterSegments(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
-            "0")));
-    brokerResponse.setExplainPlanNumMatchAllFilterSegments(Long.parseLong(
-        stats.getOrDefault(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(), "0")));
-    brokerResponse.setNumConsumingSegmentsQueried(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), "0")));
-    brokerResponse.setMinConsumingFreshnessTimeMs(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), "0")));
-    brokerResponse.setNumConsumingSegmentsProcessed(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), "0")));
-    brokerResponse.setNumConsumingSegmentsMatched(
-        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), "0")));
-    brokerResponse.setNumGroupsLimitReached(
-        Boolean.parseBoolean(stats.getOrDefault(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "0")));
   }
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {

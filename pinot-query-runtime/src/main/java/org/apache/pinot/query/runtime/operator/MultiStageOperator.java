@@ -22,7 +22,9 @@ import com.google.common.base.Joiner;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
@@ -38,14 +40,18 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   // TODO: Move to OperatorContext class.
   protected final long _requestId;
   protected final int _stageId;
+  protected final VirtualServerAddress _serverAddress;
   protected final OperatorStats _operatorStats;
   protected final Map<String, OperatorStats> _operatorStatsMap;
+  private final String _operatorId;
 
-  public MultiStageOperator(long requestId, int stageId) {
+  public MultiStageOperator(long requestId, int stageId, VirtualServerAddress serverAddress) {
     _requestId = requestId;
     _stageId = stageId;
-    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStats = new OperatorStats(requestId, stageId, serverAddress, toExplainString());
+    _serverAddress = serverAddress;
     _operatorStatsMap = new HashMap<>();
+    _operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId, _serverAddress);
   }
 
   public Map<String, OperatorStats> getOperatorStatsMap() {
@@ -62,7 +68,6 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       TransferableBlock nextBlock = getNextBlock();
       _operatorStats.recordRow(1, nextBlock.getNumRows());
       _operatorStats.endTimer();
-      // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
         if (nextBlock.isSuccessfulEndOfStreamBlock()) {
           for (MultiStageOperator op : getChildOperators()) {
@@ -70,8 +75,8 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
           }
 
           if (!_operatorStats.getExecutionStats().isEmpty()) {
-            String operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId);
-            _operatorStatsMap.put(operatorId, _operatorStats);
+            _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
+            _operatorStatsMap.put(_operatorId, _operatorStats);
           }
           return TransferableBlockUtils.getEndOfStreamTransferableBlock(
               OperatorUtils.getMetadataFromOperatorStats(_operatorStatsMap));
