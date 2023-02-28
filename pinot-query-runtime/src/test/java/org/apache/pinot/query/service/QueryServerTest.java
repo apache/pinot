@@ -58,8 +58,10 @@ public class QueryServerTest extends QueryTestSet {
   private static final int QUERY_SERVER_COUNT = 2;
   private static final String KEY_OF_SERVER_INSTANCE_HOST = "pinot.query.runner.server.hostname";
   private static final String KEY_OF_SERVER_INSTANCE_PORT = "pinot.query.runner.server.port";
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryServerTestExecutorService"));
+  private static final ExecutorService WORKER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
+      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryServerTest_Worker"));
+  private static final ExecutorService RUNNER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
+      ResourceManager.DEFAULT_QUERY_RUNNER_THREADS, new NamedThreadFactory("QueryServerTest_Runner"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, ServerInstance> _queryServerInstanceMap = new HashMap<>();
@@ -74,7 +76,8 @@ public class QueryServerTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      Mockito.when(queryRunner.getExecutorService()).thenReturn(EXECUTOR_SERVICE);
+      Mockito.when(queryRunner.getQueryWorkerExecutorService()).thenReturn(WORKER_EXECUTOR_SERVICE);
+      Mockito.when(queryRunner.getQueryRunnerExecutorService()).thenReturn(RUNNER_EXECUTOR_SERVICE);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
