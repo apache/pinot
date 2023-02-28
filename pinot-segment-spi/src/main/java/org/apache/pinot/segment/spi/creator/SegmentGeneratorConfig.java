@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -249,7 +251,12 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
-    return _columnProperties;
+    HashMap<String, Map<String, String>> copy = new HashMap<>();
+    for (Map.Entry<String, Map<String, String>> entry : _columnProperties.entrySet()) {
+      copy.put(entry.getKey(), Collections.unmodifiableMap(entry.getValue()));
+    }
+
+    return Collections.unmodifiableMap(copy);
   }
 
   /**
@@ -348,7 +355,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Map<String, String> getCustomProperties() {
-    return _customProperties;
+    return Collections.unmodifiableMap(_customProperties);
   }
 
   public void setCustomProperties(Map<String, String> properties) {
@@ -381,19 +388,23 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Set<String> getRawIndexCreationColumns() {
-    return _rawIndexCreationColumns;
+    return Collections.unmodifiableSet(_rawIndexCreationColumns);
   }
 
   public List<String> getInvertedIndexCreationColumns() {
-    return _invertedIndexCreationColumns;
+    return Collections.unmodifiableList(_invertedIndexCreationColumns);
+  }
+
+  public void addInvertedIndexCreationColumns(Collection<String> newColumns) {
+    _invertedIndexCreationColumns.addAll(newColumns);
   }
 
   public List<String> getBloomFilterCreationColumns() {
-    return _bloomFilterCreationColumns;
+    return Collections.unmodifiableList(_bloomFilterCreationColumns);
   }
 
   public List<String> getRangeIndexCreationColumns() {
-    return _rangeIndexCreationColumns;
+    return Collections.unmodifiableList(_rangeIndexCreationColumns);
   }
 
   /**
@@ -402,29 +413,32 @@ public class SegmentGeneratorConfig implements Serializable {
    * @return list of text index columns.
    */
   public List<String> getTextIndexCreationColumns() {
-    return _textIndexCreationColumns;
+    return Collections.unmodifiableList(_textIndexCreationColumns);
   }
 
   public List<String> getFSTIndexCreationColumns() {
-    return _fstIndexCreationColumns;
+    return Collections.unmodifiableList(_fstIndexCreationColumns);
   }
 
   public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
-    return _jsonIndexConfigs;
+    return Collections.unmodifiableMap(_jsonIndexConfigs);
   }
 
   public List<String> getForwardIndexDisabledColumns() {
-    return _forwardIndexDisabledColumns;
+    return Collections.unmodifiableList(_forwardIndexDisabledColumns);
   }
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
-    return _h3IndexConfigs;
+    return Collections.unmodifiableMap(_h3IndexConfigs);
   }
 
   public List<String> getColumnSortOrder() {
-    return _columnSortOrder;
+    return Collections.unmodifiableList(_columnSortOrder);
   }
 
+  /**
+   * Even when this method looks like a setter, it is in fact an adder.
+   */
   public void setRawIndexCreationColumns(List<String> rawIndexCreationColumns) {
     Preconditions.checkNotNull(rawIndexCreationColumns);
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
@@ -479,7 +493,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public List<String> getVarLengthDictionaryColumns() {
-    return _varLengthDictionaryColumns;
+    return Collections.unmodifiableList(_varLengthDictionaryColumns);
   }
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
@@ -660,6 +674,15 @@ public class SegmentGeneratorConfig implements Serializable {
     _segmentVersion = segmentVersion;
   }
 
+  /**
+   * Returns the {@link TableConfig} that was used to initialize this object.
+   *
+   * Remember that this object is mutable. Therefore it may have modified since the object was created. Changes on this
+   * object may or may not modify the initial table config, so the object returned by this method may not contain the
+   * same information stored on this SegmentGeneratorConfig. For example, if someone called
+   * {@link #setFSTIndexType(FSTType)} on the SegmentGeneratorConfig, the TableConfig returned by this method
+   * will not be modified accordingly.
+   */
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
@@ -678,7 +701,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
   @Nullable
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
-    return _starTreeIndexConfigs;
+    if (_starTreeIndexConfigs == null) {
+      return null;
+    }
+    return Collections.unmodifiableList(_starTreeIndexConfigs);
   }
 
   public void setStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs) {
@@ -750,7 +776,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Map<String, ChunkCompressionType> getRawIndexCompressionType() {
-    return _rawIndexCompressionType;
+    return Collections.unmodifiableMap(_rawIndexCompressionType);
   }
 
   public void setRawIndexCompressionType(Map<String, ChunkCompressionType> rawIndexCompressionType) {

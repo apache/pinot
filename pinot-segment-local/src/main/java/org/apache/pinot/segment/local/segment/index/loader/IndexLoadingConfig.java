@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -115,7 +117,6 @@ public class IndexLoadingConfig {
     this(instanceDataManagerConfig, tableConfig, null);
   }
 
-  @VisibleForTesting
   public IndexLoadingConfig() {
   }
 
@@ -369,7 +370,7 @@ public class IndexLoadingConfig {
   }
 
   public List<String> getSortedColumns() {
-    return _sortedColumns;
+    return unmodifiable(_sortedColumns);
   }
 
   /**
@@ -386,11 +387,15 @@ public class IndexLoadingConfig {
   }
 
   public Set<String> getInvertedIndexColumns() {
-    return _invertedIndexColumns;
+    return unmodifiable(_invertedIndexColumns);
   }
 
   public Set<String> getRangeIndexColumns() {
-    return _rangeIndexColumns;
+    return unmodifiable(_rangeIndexColumns);
+  }
+
+  public void addRangeIndexColumn(String... columns) {
+    _rangeIndexColumns.addAll(Arrays.asList(columns));
   }
 
   public int getRangeIndexVersion() {
@@ -410,23 +415,23 @@ public class IndexLoadingConfig {
    * @return a set containing names of text index columns
    */
   public Set<String> getTextIndexColumns() {
-    return _textIndexColumns;
+    return unmodifiable(_textIndexColumns);
   }
 
   public Set<String> getFSTIndexColumns() {
-    return _fstIndexColumns;
+    return unmodifiable(_fstIndexColumns);
   }
 
   public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
-    return _jsonIndexConfigs;
+    return unmodifiable(_jsonIndexConfigs);
   }
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
-    return _h3IndexConfigs;
+    return unmodifiable(_h3IndexConfigs);
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
-    return _columnProperties;
+    return unmodifiable(_columnProperties);
   }
 
   public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
@@ -438,7 +443,27 @@ public class IndexLoadingConfig {
    */
   @VisibleForTesting
   public void setInvertedIndexColumns(Set<String> invertedIndexColumns) {
-    _invertedIndexColumns = invertedIndexColumns;
+    _invertedIndexColumns = new HashSet<>(invertedIndexColumns);
+  }
+
+  @VisibleForTesting
+  public void addInvertedIndexColumns(String... invertedIndexColumns) {
+    _invertedIndexColumns.addAll(Arrays.asList(invertedIndexColumns));
+  }
+
+  @VisibleForTesting
+  public void addInvertedIndexColumns(Collection<String> invertedIndexColumns) {
+    _invertedIndexColumns.addAll(invertedIndexColumns);
+  }
+
+  @VisibleForTesting
+  public void removeInvertedIndexColumns(String... invertedIndexColumns) {
+    Arrays.asList(invertedIndexColumns).forEach(_invertedIndexColumns::remove);
+  }
+
+  @VisibleForTesting
+  public void removeInvertedIndexColumns(Collection<String> invertedIndexColumns) {
+    _invertedIndexColumns.removeAll(invertedIndexColumns);
   }
 
   /**
@@ -448,6 +473,26 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setNoDictionaryColumns(Set<String> noDictionaryColumns) {
     _noDictionaryColumns = noDictionaryColumns;
+  }
+
+  @VisibleForTesting
+  public void removeNoDictionaryColumns(String... noDictionaryColumns) {
+    Arrays.asList(noDictionaryColumns).forEach(_noDictionaryColumns::remove);
+  }
+
+  @VisibleForTesting
+  public void removeNoDictionaryColumns(Collection<String> noDictionaryColumns) {
+    noDictionaryColumns.forEach(_noDictionaryColumns::remove);
+  }
+
+  @VisibleForTesting
+  public void addNoDictionaryColumns(String... noDictionaryColumns) {
+    _noDictionaryColumns.addAll(Arrays.asList(noDictionaryColumns));
+  }
+
+  @VisibleForTesting
+  public void addNoDictionaryColumns(Collection<String> noDictionaryColumns) {
+    _noDictionaryColumns.addAll(noDictionaryColumns);
   }
 
   /**
@@ -467,6 +512,14 @@ public class IndexLoadingConfig {
     _rangeIndexColumns = rangeIndexColumns;
   }
 
+  public void addRangeIndexColumns(String... rangeIndexColumns) {
+    _rangeIndexColumns.addAll(Arrays.asList(rangeIndexColumns));
+  }
+
+  public void removeRangeIndexColumns(String... rangeIndexColumns) {
+    Arrays.asList(rangeIndexColumns).forEach(_rangeIndexColumns::remove);
+  }
+
   /**
    * Used directly from text search unit test code since the test code
    * doesn't really have a table config and is directly testing the
@@ -479,8 +532,28 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
+  public void addTextIndexColumns(String... textIndexColumns) {
+    _textIndexColumns.addAll(Arrays.asList(textIndexColumns));
+  }
+
+  @VisibleForTesting
+  public void removeTextIndexColumns(String... textIndexColumns) {
+    Arrays.asList(textIndexColumns).forEach(_textIndexColumns::remove);
+  }
+
+  @VisibleForTesting
   public void setFSTIndexColumns(Set<String> fstIndexColumns) {
     _fstIndexColumns = fstIndexColumns;
+  }
+
+  @VisibleForTesting
+  public void addFSTIndexColumns(String... fstIndexColumns) {
+    _fstIndexColumns.addAll(Arrays.asList(fstIndexColumns));
+  }
+
+  @VisibleForTesting
+  public void removeFSTIndexColumns(String... fstIndexColumns) {
+    Arrays.asList(fstIndexColumns).forEach(_fstIndexColumns::remove);
   }
 
   @VisibleForTesting
@@ -524,8 +597,18 @@ public class IndexLoadingConfig {
         forwardIndexDisabledColumns == null ? Collections.emptySet() : forwardIndexDisabledColumns;
   }
 
+  @VisibleForTesting
+  public void addForwardIndexDisabledColumns(String... forwardIndexDisabledColumns) {
+    _forwardIndexDisabledColumns.addAll(Arrays.asList(forwardIndexDisabledColumns));
+  }
+
+  @VisibleForTesting
+  public void removeForwardIndexDisabledColumns(String... forwardIndexDisabledColumns) {
+    Arrays.asList(forwardIndexDisabledColumns).forEach(_forwardIndexDisabledColumns::remove);
+  }
+
   public Set<String> getNoDictionaryColumns() {
-    return _noDictionaryColumns;
+    return unmodifiable(_noDictionaryColumns);
   }
 
   /**
@@ -537,27 +620,27 @@ public class IndexLoadingConfig {
    * @return a map containing column name as key and compressionType as value.
    */
   public Map<String, ChunkCompressionType> getCompressionConfigs() {
-    return _compressionConfigs;
+    return unmodifiable(_compressionConfigs);
   }
 
   public Map<String, String> getNoDictionaryConfig() {
-    return _noDictionaryConfig;
+    return unmodifiable(_noDictionaryConfig);
   }
 
   public Set<String> getVarLengthDictionaryColumns() {
-    return _varLengthDictionaryColumns;
+    return unmodifiable(_varLengthDictionaryColumns);
   }
 
   public Set<String> getOnHeapDictionaryColumns() {
-    return _onHeapDictionaryColumns;
+    return unmodifiable(_onHeapDictionaryColumns);
   }
 
   public Set<String> getForwardIndexDisabledColumns() {
-    return _forwardIndexDisabledColumns;
+    return unmodifiable(_forwardIndexDisabledColumns);
   }
 
   public Map<String, BloomFilterConfig> getBloomFilterConfigs() {
-    return _bloomFilterConfigs;
+    return unmodifiable(_bloomFilterConfigs);
   }
 
   public boolean isEnableDynamicStarTreeCreation() {
@@ -566,7 +649,7 @@ public class IndexLoadingConfig {
 
   @Nullable
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
-    return _starTreeIndexConfigs;
+    return unmodifiable(_starTreeIndexConfigs);
   }
 
   public boolean isEnableDefaultStarTree() {
@@ -670,6 +753,18 @@ public class IndexLoadingConfig {
   }
 
   public Map<String, Map<String, String>> getInstanceTierConfigs() {
-    return _instanceTierConfigs;
+    return unmodifiable(_instanceTierConfigs);
+  }
+
+  private <E> List<E> unmodifiable(List<E> list) {
+    return list == null ? null : Collections.unmodifiableList(list);
+  }
+
+  private <E> Set<E> unmodifiable(Set<E> set) {
+    return set == null ? null : Collections.unmodifiableSet(set);
+  }
+
+  private <K, V> Map<K, V> unmodifiable(Map<K, V> map) {
+    return map == null ? null : Collections.unmodifiableMap(map);
   }
 }

@@ -1348,12 +1348,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     // Inverted index columns
-    Set<String> invertedIndexColumns = indexLoadingConfig.getInvertedIndexColumns();
     // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
     // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
     // are sorted on the sorted column.
     if (sortedColumn != null) {
-      invertedIndexColumns.add(sortedColumn);
+      indexLoadingConfig.addInvertedIndexColumns(sortedColumn);
     }
 
     // Read the max number of rows
@@ -1369,7 +1368,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
     _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
-        new ArrayList<>(invertedIndexColumns),
+        new ArrayList<>(indexLoadingConfig.getInvertedIndexColumns()),
         new ArrayList<>(indexLoadingConfig.getTextIndexColumns()),
         new ArrayList<>(indexLoadingConfig.getFSTIndexColumns()),
         new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
@@ -1383,7 +1382,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
+            .setInvertedIndexColumns(indexLoadingConfig.getInvertedIndexColumns())
+            .setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
             .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns())
             .setJsonIndexConfigs(indexLoadingConfig.getJsonIndexConfigs())
             .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
