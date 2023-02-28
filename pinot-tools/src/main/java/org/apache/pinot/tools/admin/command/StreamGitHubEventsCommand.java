@@ -64,11 +64,18 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   @CommandLine.Option(names = {"-awsRegion"}, description = "AWS Region in which Kinesis is located")
   private String _awsRegion = "us-east-1";
 
-  @CommandLine.Option(names = {"-awsAccessKey"}, description = "AccessKey for AWS Account.")
+  @CommandLine.Option(names = {"-awsAccessKey"}, description = "AccessKey for AWS Account")
   private String _accessKey;
 
   @CommandLine.Option(names = {"-awsSecretKey"}, description = "SecretKey for AWS Account")
   private String _secretKey;
+
+  // Pulsar related Configs
+  @CommandLine.Option(names = {"-pulsarBrokerServiceUrl"}, description = "Pulsar broker service url.")
+  private String _pulsarBrokerServiceUrl;
+
+  @CommandLine.Option(names = {"-token"}, description = "Pulsar token.")
+  private String _pulsarToken;
 
   @CommandLine.Option(names = {"-topic"}, required = true, description = "Name of kafka-topic/kinesis-stream to "
       + "publish events.")
@@ -141,6 +148,10 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
           streamDataProducer =
               PullRequestMergedEventsStream.getKinesisStreamDataProducer(_kinesisEndpoint, _awsRegion, _accessKey,
                   _secretKey);
+          break;
+        case PULSAR:
+          streamDataProducer =
+              PullRequestMergedEventsStream.getPulsarStreamDataProducer(_pulsarBrokerServiceUrl, _pulsarToken);
           break;
         case KAFKA:
         default:
