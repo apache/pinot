@@ -88,8 +88,8 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
 
   @Override
   public void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
-    materializeChildOperator();
     acquire();
+    materializeChildOperator();
   }
 
   @Override

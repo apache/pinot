@@ -415,7 +415,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       int[] operatorId = {3};
       ExplainPlanRows explainPlanRows = new ExplainPlanRows();
       // Get the segment explain plan for a single segment
-      getSegmentExplainPlanRowData(child, explainPlanRows, operatorId, 2);
+      if (child != null) {
+        child.explainPlan(explainPlanRows, operatorId, 2);
+      }
       int numRows = explainPlanRows.getExplainPlanRowData().size();
       if (numRows > 0) {
         operatorDepthToRowDataMap.putIfAbsent(numRows, new ArrayList<>());
@@ -453,29 +455,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     return operatorDepthToRowDataMap;
-  }
-
-  /**
-   * Get the list of Explain Plan rows for a single segment
-   */
-  private static void getSegmentExplainPlanRowData(Operator node, ExplainPlanRows explainPlanRows, int[] globalId,
-      int parentId) {
-    if (node == null) {
-      return;
-    }
-
-    node.prepareForExplainPlan(explainPlanRows);
-    String explainPlanString = node.toExplainString();
-    if (explainPlanString != null) {
-      ExplainPlanRowData explainPlanRowData = new ExplainPlanRowData(explainPlanString, globalId[0], parentId);
-      parentId = globalId[0]++;
-      explainPlanRows.appendExplainPlanRowData(explainPlanRowData);
-    }
-
-    List<Operator> children = node.getChildOperators();
-    for (Operator child : children) {
-      getSegmentExplainPlanRowData(child, explainPlanRows, globalId, parentId);
-    }
   }
 
   public static InstanceResponseBlock executeExplainQuery(Plan queryPlan, QueryContext queryContext) {
