@@ -27,6 +27,10 @@ import java.util.List;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+// TODO: Decouple the execution stats aggregator logic and make it into a util that can aggregate 2 values with the
+//  same metadataKey
+// TODO: Replace member fields with a simple map of <MetadataKey, Object>
+// TODO: Add a subStat field, stage level subStats will contain each operator stats
 @JsonPropertyOrder({"exceptions", "numBlocks", "numRows", "stageExecutionTimeMs", "numServersQueried",
     "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
     "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",

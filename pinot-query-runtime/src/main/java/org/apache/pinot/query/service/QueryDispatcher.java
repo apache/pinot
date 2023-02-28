@@ -19,7 +19,6 @@
 package org.apache.pinot.query.service;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
@@ -32,7 +31,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -158,10 +156,7 @@ public class QueryDispatcher {
             ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
             if (queryPlan != null) {
               StageMetadata operatorStageMetadata = queryPlan.getStageMetadataMap().get(operatorStats.getStageId());
-              if (!operatorStageMetadata.getScannedTables().isEmpty()) {
-                operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(),
-                    Joiner.on("::").join(operatorStageMetadata.getScannedTables()));
-              }
+              OperatorUtils.recordTableName(operatorStats, operatorStageMetadata);
             }
             rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
