@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.query.type;
 
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystemImpl;
+import org.apache.calcite.sql.type.SqlTypeName;
 
 
 /**
@@ -49,5 +52,12 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   @Override
   public int getMaxNumericPrecision() {
     return MAX_DECIMAL_PRECISION_DIGIT;
+  }
+
+  @Override
+  public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory,
+      RelDataType argumentType) {
+    return typeFactory.createTypeWithNullability(
+        typeFactory.createSqlType(SqlTypeName.DOUBLE), false);
   }
 }

@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
@@ -55,8 +56,8 @@ public class FilterOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
 
   public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
-      long requestId, int stageId) {
-    super(requestId, stageId);
+      long requestId, int stageId, VirtualServerAddress serverAddress) {
+    super(requestId, stageId, serverAddress);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);

@@ -130,7 +130,8 @@ public final class RelToStageConverter {
     JoinInfo joinInfo = node.analyzeCondition();
     FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.leftKeys);
     FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.rightKeys);
-    return new JoinNode(currentStageId, toDataSchema(node.getRowType()), joinType,
+    return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
+        toDataSchema(node.getRight().getRowType()), joinType,
         new JoinNode.JoinKeys(leftFieldSelectionKeySelector, rightFieldSelectionKeySelector),
         joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList()));
   }

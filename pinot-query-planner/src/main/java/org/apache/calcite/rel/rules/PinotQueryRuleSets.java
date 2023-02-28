@@ -37,6 +37,9 @@ public class PinotQueryRuleSets {
           EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_WINDOW_RULE,
           EnumerableRules.ENUMERABLE_SORT_RULE, EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
 
+          // ------------------------------------------------------------------
+          // Calcite core rules
+
           // push a filter into a join
           CoreRules.FILTER_INTO_JOIN,
           // push filter through an aggregation
@@ -71,6 +74,7 @@ public class PinotQueryRuleSets {
 
           // join rules
           CoreRules.JOIN_PUSH_EXPRESSIONS,
+          CoreRules.PROJECT_TO_SEMI_JOIN,
 
           // convert non-all union into all-union + distinct
           CoreRules.UNION_TO_DISTINCT,
@@ -94,10 +98,14 @@ public class PinotQueryRuleSets {
           PruneEmptyRules.JOIN_RIGHT_INSTANCE, PruneEmptyRules.PROJECT_INSTANCE, PruneEmptyRules.SORT_INSTANCE,
           PruneEmptyRules.UNION_INSTANCE,
 
+          // ------------------------------------------------------------------
           // Pinot specific rules
+          // ------------------------------------------------------------------
+
+          // ---- rules apply before exchange insertion.
           PinotFilterExpandSearchRule.INSTANCE,
 
-          // Pinot exchange rules
+          // ---- rules that insert exchange.
           // add an extra exchange for sort
           PinotSortExchangeNodeInsertRule.INSTANCE,
           // copy exchanges down, this must be done after SortExchangeNodeInsertRule

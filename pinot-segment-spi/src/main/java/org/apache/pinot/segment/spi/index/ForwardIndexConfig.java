@@ -47,7 +47,7 @@ public class ForwardIndexConfig extends IndexConfig {
       @Nullable @JsonProperty("chunkCompressionType") ChunkCompressionType chunkCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion) {
-    super(enabled != null && enabled);
+    super(enabled == null || enabled);
     _chunkCompressionType = chunkCompressionType;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null && deriveNumDocsPerChunk;
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
@@ -74,6 +74,9 @@ public class ForwardIndexConfig extends IndexConfig {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
+    if (!super.equals(o)) {
+      return false;
+    }
     ForwardIndexConfig that = (ForwardIndexConfig) o;
     return _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
         && _rawIndexWriterVersion == that._rawIndexWriterVersion && _chunkCompressionType == that._chunkCompressionType;
@@ -81,7 +84,7 @@ public class ForwardIndexConfig extends IndexConfig {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
+    return Objects.hash(super.hashCode(), _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
   }
 
   public static class Builder {

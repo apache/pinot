@@ -50,6 +50,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -103,7 +104,8 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.FST,
             (tableConfig, fieldConfig) -> {
-              FSTType fstIndexType = tableConfig.getIndexingConfig().getFSTIndexType();
+              IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+              FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
               return new FstIndexConfig(fstIndexType);
             }));
   }

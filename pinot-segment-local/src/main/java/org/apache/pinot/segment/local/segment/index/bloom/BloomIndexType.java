@@ -82,7 +82,7 @@ public class BloomIndexType
             IndexConfigDeserializer.ifIndexingConfig(
                     // reads tableConfig.indexingConfig.bloomFilterConfigs
                 IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())
-                  .withExclusiveAlternative(// reads tableConfig.indexingConfig.bloomFilterColumns
+                  .withFallbackAlternative(// reads tableConfig.indexingConfig.bloomFilterColumns
                       IndexConfigDeserializer.fromCollection(
                           tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
                           (accum, column) -> accum.put(column, BloomFilterConfig.createDefault())))

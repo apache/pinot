@@ -70,7 +70,7 @@ public class QueryConfig {
    * an operator chain despite any amount of time elapsed.
    */
   public static final String KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS = "pinot.query.scheduler.release.timeout.ms";
-  public static final long DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS = -1;
+  public static final long DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS = 10_000;
 
   private QueryConfig() {
     // do not instantiate.
