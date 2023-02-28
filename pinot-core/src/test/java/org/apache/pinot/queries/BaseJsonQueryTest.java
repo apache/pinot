@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -35,7 +34,6 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -145,7 +143,8 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     List<String> jsonIndexColumns = new ArrayList<>();
     jsonIndexColumns.add("jsonColumn");
     tableConfig.getIndexingConfig().setJsonIndexColumns(jsonIndexColumns);
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema());
+    Schema schema = schema();
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(indexDir.getPath());
@@ -154,13 +153,8 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(tableConfig);
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<>(jsonIndexColumns));
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), new IndexLoadingConfig(tableConfig, schema));
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }

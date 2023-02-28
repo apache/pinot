@@ -22,7 +22,6 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -39,7 +38,6 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,16 +56,13 @@ public class SegmentPreProcessor implements AutoCloseable {
 
   private final URI _indexDirURI;
   private final IndexLoadingConfig _indexLoadingConfig;
-  private final Schema _schema;
   private final SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
 
-  public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema) {
+  public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     _segmentDirectory = segmentDirectory;
     _indexDirURI = segmentDirectory.getIndexDir();
     _indexLoadingConfig = indexLoadingConfig;
-    _schema = schema;
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
   }
 
@@ -92,9 +87,10 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Update default columns according to the schema.
-      if (_schema != null) {
-        DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
-            .getDefaultColumnHandler(indexDir, _segmentMetadata, _indexLoadingConfig, _schema, segmentWriter);
+      if (_indexLoadingConfig.getSchema() != null) {
+        DefaultColumnHandler defaultColumnHandler =
+            DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, _segmentMetadata, _indexLoadingConfig,
+                segmentWriter);
         defaultColumnHandler.updateDefaultColumns();
         _segmentMetadata = new SegmentMetadataImpl(indexDir);
         _segmentDirectory.reloadMetadata();
@@ -106,8 +102,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
       List<IndexHandler> indexHandlers = new ArrayList<>();
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        IndexHandler handler =
-            IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema);
+        IndexHandler handler = IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig);
         indexHandlers.add(handler);
         // TODO: Find a way to ensure ForwardIndexHandler is always executed before other handlers instead of
         // relying on enum ordering.
@@ -155,9 +150,9 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
     try (SegmentDirectory.Reader segmentReader = _segmentDirectory.createReader()) {
       // Check if there is need to update default columns according to the schema.
-      if (_schema != null) {
-        DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
-            .getDefaultColumnHandler(null, _segmentMetadata, _indexLoadingConfig, _schema, null);
+      if (_indexLoadingConfig.getSchema() != null) {
+        DefaultColumnHandler defaultColumnHandler =
+            DefaultColumnHandlerFactory.getDefaultColumnHandler(null, _segmentMetadata, _indexLoadingConfig, null);
         if (defaultColumnHandler.needUpdateDefaultColumns()) {
           LOGGER.info("Found default columns need updates");
           return true;
@@ -165,7 +160,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        if (IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema)
+        if (IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig)
             .needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates", type);
           return true;

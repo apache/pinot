@@ -67,6 +67,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -168,6 +169,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", offlineTableName);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
     _tableDataManagerMap.computeIfAbsent(offlineTableName, k -> createTableDataManager(k, tableConfig))
         .addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema));
     LOGGER.info("Added segment: {} to table: {}", segmentName, offlineTableName);
@@ -185,6 +189,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, realtimeTableName, segmentName);
     Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s", segmentName,
         realtimeTableName);
+    TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableDataManagerMap.computeIfAbsent(realtimeTableName, k -> createTableDataManager(k, tableConfig))
         .addSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata);
     LOGGER.info("Added segment: {} to table: {}", segmentName, realtimeTableName);
@@ -280,9 +285,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
-
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
     reloadSegmentWithMetadata(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
 
     LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
@@ -335,6 +341,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
     List<String> failedSegments = new ArrayList<>();
     ExecutorService workers = Executors.newCachedThreadPool();
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
@@ -418,7 +427,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
       // Reloads an existing segment, and the local segment metadata is existing as asserted above.
       tableDataManager.reloadSegment(segmentName,
-          new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata, segmentMetadata, schema,
+          new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata, segmentMetadata,
           forceDownload);
       LOGGER.info("Reloaded segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
@@ -435,6 +444,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
     SegmentZKMetadata zkMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
     Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s", segmentName,

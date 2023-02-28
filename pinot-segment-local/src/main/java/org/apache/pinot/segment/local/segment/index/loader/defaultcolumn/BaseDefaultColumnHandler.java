@@ -125,11 +125,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private PropertiesConfiguration _segmentProperties;
 
   protected BaseDefaultColumnHandler(File indexDir, SegmentMetadata segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _indexLoadingConfig = indexLoadingConfig;
-    _schema = schema;
+    _schema = indexLoadingConfig.getSchema();
     _segmentWriter = segmentWriter;
   }
 

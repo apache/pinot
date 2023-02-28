@@ -72,7 +72,7 @@ public class DimensionTableDataManagerTest {
   private static final String AVRO_DATA_PATH = "data/dimBaseballTeams.avro";
 
   private File _indexDir;
-  private IndexLoadingConfig _indexLoadingConfig;
+  private TableConfig _tableConfig;
   private SegmentMetadata _segmentMetadata;
   private SegmentZKMetadata _segmentZKMetadata;
 
@@ -93,7 +93,7 @@ public class DimensionTableDataManagerTest {
 
     String segmentName = driver.getSegmentName();
     _indexDir = new File(TEMP_DIR, segmentName);
-    _indexLoadingConfig = new IndexLoadingConfig();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     _segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
     _segmentZKMetadata.setCrc(Long.parseLong(_segmentMetadata.getCrc()));
@@ -156,7 +156,7 @@ public class DimensionTableDataManagerTest {
     assertEquals(tableDataManager, returnedManager, "Manager should return already created instance");
 
     // assert that segments are released after loading data
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(_indexDir, new IndexLoadingConfig(_tableConfig));
     for (SegmentDataManager segmentManager : returnedManager.acquireAllSegments()) {
       assertEquals(segmentManager.getReferenceCount() - 1, // Subtract this acquisition
           1, // Default ref count
@@ -184,7 +184,7 @@ public class DimensionTableDataManagerTest {
     GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     assertNull(resp, "Response should be null if no segment is loaded");
 
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(_indexDir, new IndexLoadingConfig(_tableConfig));
 
     // Confirm table is loaded and available for lookup
     resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
@@ -223,7 +223,7 @@ public class DimensionTableDataManagerTest {
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
 
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(_indexDir, new IndexLoadingConfig(_tableConfig));
 
     // Confirm table is loaded and available for lookup
     GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
@@ -240,8 +240,8 @@ public class DimensionTableDataManagerTest {
     Schema schemaWithExtraColumn = getSchemaWithExtraColumn();
     when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaUtils.toZNRecord(schemaWithExtraColumn));
-    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(), _indexLoadingConfig, _segmentZKMetadata,
-        _segmentMetadata, schemaWithExtraColumn, false);
+    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(),
+        new IndexLoadingConfig(_tableConfig, schemaWithExtraColumn), _segmentZKMetadata, _segmentMetadata, false);
 
     // Confirm the new column is available for lookup
     teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
@@ -270,7 +270,7 @@ public class DimensionTableDataManagerTest {
     GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     assertNull(resp, "Response should be null if no segment is loaded");
 
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(_indexDir, new IndexLoadingConfig(_tableConfig));
 
     // Confirm table is loaded and available for lookup
     resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));

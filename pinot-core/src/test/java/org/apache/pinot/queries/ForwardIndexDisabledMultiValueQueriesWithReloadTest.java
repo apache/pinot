@@ -20,14 +20,12 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -45,19 +43,13 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -82,21 +74,10 @@ import static org.testng.Assert.assertTrue;
  */
 public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-mv.avro";
-  private static final String SEGMENT_NAME_1 = "testTable_1756015688_1756015688";
-  private static final String SEGMENT_NAME_2 = "testTable_1756015689_1756015689";
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String SEGMENT_NAME = "testSegment";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(),
       "ForwardIndexDisabledMultiValueQueriesWithReloadTest");
-
-  // Build the segment schema.
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName("testTable")
-      .addMetric("column1", FieldSpec.DataType.INT)
-      .addMetric("column2", FieldSpec.DataType.INT).addSingleValueDimension("column3", FieldSpec.DataType.STRING)
-      .addSingleValueDimension("column5", FieldSpec.DataType.STRING)
-      .addMultiValueDimension("column6", FieldSpec.DataType.INT)
-      .addMultiValueDimension("column7", FieldSpec.DataType.INT)
-      .addSingleValueDimension("column8", FieldSpec.DataType.INT).addMetric("column9", FieldSpec.DataType.INT)
-      .addMetric("column10", FieldSpec.DataType.INT)
-      .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
 
   // Hard-coded query filter.
   protected static final String FILTER = " WHERE column1 > 100000000"
@@ -105,14 +86,21 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
       + " AND (column6 < 500000 OR column7 NOT IN (225, 407))"
       + " AND daysSinceEpoch = 1756015683";
 
+  private static final Schema SCHEMA =
+      new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addMetric("column1", FieldSpec.DataType.INT)
+          .addMetric("column2", FieldSpec.DataType.INT).addSingleValueDimension("column3", FieldSpec.DataType.STRING)
+          .addSingleValueDimension("column5", FieldSpec.DataType.STRING)
+          .addMultiValueDimension("column6", FieldSpec.DataType.INT)
+          .addMultiValueDimension("column7", FieldSpec.DataType.INT)
+          .addSingleValueDimension("column8", FieldSpec.DataType.INT).addMetric("column9", FieldSpec.DataType.INT)
+          .addMetric("column10", FieldSpec.DataType.INT)
+          .addDateTime("daysSinceEpoch", FieldSpec.DataType.INT, "EPOCH|DAYS", "1:DAYS").build();
+
+  private TableConfig _tableConfig;
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
   private List<IndexSegment> _indexSegments;
 
-  private TableConfig _tableConfig;
-  private List<String> _invertedIndexColumns;
-  private List<String> _forwardIndexDisabledColumns;
-  private List<String> _noDictionaryColumns;
 
   @BeforeMethod
   public void buildSegment()
@@ -124,39 +112,27 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     assertNotNull(resource);
     String filePath = resource.getFile();
 
-    createSegment(filePath, SEGMENT_NAME_1);
-    createSegment(filePath, SEGMENT_NAME_2);
+    createSegment(filePath);
+    ImmutableSegment immutableSegment = loadSegmentWithMetadataChecks();
 
-    ImmutableSegment immutableSegment1 = loadSegmentWithMetadataChecks(SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment2 = loadSegmentWithMetadataChecks(SEGMENT_NAME_2);
-
-    _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  private void createSegment(String filePath, String segmentName)
+  private void createSegment(String filePath)
       throws Exception {
-    // Create field configs for the no forward index columns
-    List<FieldConfig> fieldConfigList = new ArrayList<>();
-    fieldConfigList.add(new FieldConfig("column6", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null,
-        Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())));
-    // Build table config based on segment 1 as it contains both columns under no forward index
-    _noDictionaryColumns = new ArrayList<>(Arrays.asList("column5", "column7"));
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
-        .setTimeColumnName("daysSinceEpoch").setNoDictionaryColumns(_noDictionaryColumns)
-        .setFieldConfigList(fieldConfigList).build();
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
+            .setInvertedIndexColumns(Arrays.asList("column3", "column6", "column8", "column9"))
+            .setNoDictionaryColumns(Arrays.asList("column5", "column7")).setFieldConfigList(Collections.singletonList(
+                new FieldConfig("column6", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null,
+                    Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())))).build();
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, SCHEMA);
     segmentGeneratorConfig.setInputFilePath(filePath);
-    segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setSegmentName(segmentName);
-    _invertedIndexColumns = Arrays.asList("column3", "column6", "column8", "column9");
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(_invertedIndexColumns);
-    _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6"));
-    segmentGeneratorConfig.setForwardIndexDisabledColumns(_forwardIndexDisabledColumns);
-    segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
+    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
@@ -170,17 +146,10 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     driver.build();
   }
 
-  private ImmutableSegment loadSegmentWithMetadataChecks(String segmentName)
+  private ImmutableSegment loadSegmentWithMetadataChecks()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(_tableConfig);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(_invertedIndexColumns));
-    indexLoadingConfig.setForwardIndexDisabledColumns(new HashSet<>(_forwardIndexDisabledColumns));
-    indexLoadingConfig.setNoDictionaryColumns(new HashSet<>(_noDictionaryColumns));
-    indexLoadingConfig.setReadMode(ReadMode.heap);
-
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName),
-        indexLoadingConfig);
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(_tableConfig));
 
     Map<String, ColumnMetadata> columnMetadataMap1 = immutableSegment.getSegmentMetadata().getColumnMetadataMap();
     columnMetadataMap1.forEach((column, metadata) -> {
@@ -745,69 +714,47 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
 
   private void disableForwardIndexForSomeColumns()
       throws Exception {
-    // Now disable forward index for column7 in the index loading config.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(_tableConfig);
-    Set<String> invertedIndexEnabledColumns = new HashSet<>(_invertedIndexColumns);
-    invertedIndexEnabledColumns.add("column7");
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexEnabledColumns);
-    Set<String> forwardIndexDisabledColumns = new HashSet<>(_forwardIndexDisabledColumns);
-    forwardIndexDisabledColumns.add("column7");
-    indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
-    indexLoadingConfig.getNoDictionaryColumns().remove("column7");
-    indexLoadingConfig.setReadMode(ReadMode.heap);
+    // Now disable forward index for column7 in the table config.
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
+            .setInvertedIndexColumns(Arrays.asList("column3", "column6", "column7", "column8", "column9"))
+            .setNoDictionaryColumns(Collections.singletonList("column5")).setFieldConfigList(Arrays.asList(
+                new FieldConfig("column6", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null,
+                    Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())),
+                new FieldConfig("column7", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null,
+                    Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())))).build();
 
     // Reload the segments to pick up the new configs
-    File indexDir = new File(INDEX_DIR, SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment1 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    indexDir = new File(INDEX_DIR, SEGMENT_NAME_2);
-    ImmutableSegment immutableSegment2 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
+    File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
+    ImmutableSegment immutableSegment = reloadSegment(indexDir, tableConfig, SCHEMA);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
 
-    assertNull(immutableSegment1.getForwardIndex("column7"));
-    assertNotNull(immutableSegment1.getInvertedIndex("column7"));
-    assertNotNull(immutableSegment1.getDictionary("column7"));
-
-    assertNull(immutableSegment2.getForwardIndex("column7"));
-    assertNotNull(immutableSegment2.getInvertedIndex("column7"));
-    assertNotNull(immutableSegment2.getDictionary("column7"));
+    assertNull(immutableSegment.getForwardIndex("column7"));
+    assertNotNull(immutableSegment.getInvertedIndex("column7"));
+    assertNotNull(immutableSegment.getDictionary("column7"));
   }
 
   private void reenableForwardIndexForSomeColumns()
       throws Exception {
-    // Now re-enable forward index for column7 in the index loading config.
+    // Now re-enable forward index for column7 in the table config.
     // Also re-enable forward index for column6
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(_tableConfig);
-    Set<String> invertedIndexEnabledColumns = new HashSet<>(_invertedIndexColumns);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexEnabledColumns);
-    Set<String> forwardIndexDisabledColumns = new HashSet<>(_forwardIndexDisabledColumns);
-    forwardIndexDisabledColumns.remove("column6");
-    indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
-    indexLoadingConfig.getNoDictionaryColumns().add("column7");
-    indexLoadingConfig.setReadMode(ReadMode.heap);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
+            .setInvertedIndexColumns(Arrays.asList("column3", "column6", "column8", "column9"))
+            .setNoDictionaryColumns(Arrays.asList("column5", "column7")).build();
 
     // Reload the segments to pick up the new configs
-    File indexDir = new File(INDEX_DIR, SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment1 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    indexDir = new File(INDEX_DIR, SEGMENT_NAME_2);
-    ImmutableSegment immutableSegment2 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
+    File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
+    ImmutableSegment immutableSegment = reloadSegment(indexDir, tableConfig, SCHEMA);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
 
-    assertNotNull(immutableSegment1.getForwardIndex("column7"));
-    assertNull(immutableSegment1.getInvertedIndex("column7"));
-    assertNull(immutableSegment1.getDictionary("column7"));
-    assertNotNull(immutableSegment1.getForwardIndex("column6"));
-    assertNotNull(immutableSegment1.getInvertedIndex("column6"));
-    assertNotNull(immutableSegment1.getDictionary("column6"));
-
-    assertNotNull(immutableSegment2.getForwardIndex("column7"));
-    assertNull(immutableSegment2.getInvertedIndex("column7"));
-    assertNull(immutableSegment2.getDictionary("column7"));
-    assertNotNull(immutableSegment2.getForwardIndex("column6"));
-    assertNotNull(immutableSegment2.getInvertedIndex("column6"));
-    assertNotNull(immutableSegment2.getDictionary("column6"));
+    assertNotNull(immutableSegment.getForwardIndex("column7"));
+    assertNull(immutableSegment.getInvertedIndex("column7"));
+    assertNull(immutableSegment.getDictionary("column7"));
+    assertNotNull(immutableSegment.getForwardIndex("column6"));
+    assertNotNull(immutableSegment.getInvertedIndex("column6"));
+    assertNotNull(immutableSegment.getDictionary("column6"));
   }
 }

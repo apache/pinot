@@ -31,11 +31,11 @@ public class DefaultColumnHandlerFactory {
   }
 
   public static DefaultColumnHandler getDefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     if (segmentMetadata.getVersion() == SegmentVersion.v3) {
-      return new V3DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
+      return new V3DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
     } else {
-      return new V1DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
+      return new V1DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
     }
   }
 }

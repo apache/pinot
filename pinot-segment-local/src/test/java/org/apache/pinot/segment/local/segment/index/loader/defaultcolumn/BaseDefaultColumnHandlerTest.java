@@ -33,9 +33,11 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -60,9 +62,9 @@ public class BaseDefaultColumnHandlerTest {
         TestUtils.getFileFromResourceUrl(SegmentMetadataImplTest.class.getClassLoader().getResource(AVRO_DATA));
 
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), _indexDir, "daysSinceEpoch", TimeUnit.HOURS,
-            "testTable");
+    final SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), _indexDir, "daysSinceEpoch",
+            TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -80,8 +82,8 @@ public class BaseDefaultColumnHandlerTest {
 
   @Test
   public void testComputeDefaultColumnActionMapForCommittedSegment() {
-    // Dummy IndexLoadingConfig
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig =
+        new IndexLoadingConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build());
 
     // Same schema
     Schema schema0 =
@@ -99,9 +101,9 @@ public class BaseDefaultColumnHandlerTest {
             .addSingleValueDimension("count", FieldSpec.DataType.INT)
             .addSingleValueDimension("daysSinceEpoch", FieldSpec.DataType.INT)
             .addSingleValueDimension("weeksSinceEpochSunday", FieldSpec.DataType.INT).build();
-
+    indexLoadingConfig.setSchema(schema0);
     BaseDefaultColumnHandler defaultColumnHandler =
-        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, schema0, _writer);
+        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, _writer);
     Assert.assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(), Collections.EMPTY_MAP);
 
     // Add single-value dimension in the schema
@@ -121,8 +123,9 @@ public class BaseDefaultColumnHandlerTest {
             .addSingleValueDimension("count", FieldSpec.DataType.INT)
             .addSingleValueDimension("daysSinceEpoch", FieldSpec.DataType.INT)
             .addSingleValueDimension("weeksSinceEpochSunday", FieldSpec.DataType.INT).build();
+    indexLoadingConfig.setSchema(schema1);
     defaultColumnHandler =
-        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, schema1, _writer);
+        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, _writer);
     Assert.assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(),
         ImmutableMap.of("column11", BaseDefaultColumnHandler.DefaultColumnAction.ADD_DIMENSION));
 
@@ -143,8 +146,9 @@ public class BaseDefaultColumnHandlerTest {
             .addSingleValueDimension("count", FieldSpec.DataType.INT)
             .addSingleValueDimension("daysSinceEpoch", FieldSpec.DataType.INT)
             .addSingleValueDimension("weeksSinceEpochSunday", FieldSpec.DataType.INT).build();
+    indexLoadingConfig.setSchema(schema2);
     defaultColumnHandler =
-        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, schema2, _writer);
+        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, _writer);
     Assert.assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(),
         ImmutableMap.of("column11", BaseDefaultColumnHandler.DefaultColumnAction.ADD_DIMENSION));
 
@@ -165,8 +169,9 @@ public class BaseDefaultColumnHandlerTest {
             .addSingleValueDimension("daysSinceEpoch", FieldSpec.DataType.INT)
             .addSingleValueDimension("weeksSinceEpochSunday", FieldSpec.DataType.INT)
             .addMetric("column11", FieldSpec.DataType.INT).build(); // add column11
+    indexLoadingConfig.setSchema(schema3);
     defaultColumnHandler =
-        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, schema3, _writer);
+        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, _writer);
     Assert.assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(),
         ImmutableMap.of("column11", BaseDefaultColumnHandler.DefaultColumnAction.ADD_METRIC));
 
@@ -187,8 +192,9 @@ public class BaseDefaultColumnHandlerTest {
             .addSingleValueDimension("daysSinceEpoch", FieldSpec.DataType.INT)
             .addSingleValueDimension("weeksSinceEpochSunday", FieldSpec.DataType.INT)
             .addDateTime("column11", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build(); // add column11
+    indexLoadingConfig.setSchema(schema4);
     defaultColumnHandler =
-        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, schema4, _writer);
+        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, _writer);
     Assert.assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(),
         ImmutableMap.of("column11", BaseDefaultColumnHandler.DefaultColumnAction.ADD_DATE_TIME));
 
@@ -207,8 +213,9 @@ public class BaseDefaultColumnHandlerTest {
             .addSingleValueDimension("count", FieldSpec.DataType.INT)
             .addSingleValueDimension("daysSinceEpoch", FieldSpec.DataType.INT)
             .addSingleValueDimension("weeksSinceEpochSunday", FieldSpec.DataType.INT).build();
+    indexLoadingConfig.setSchema(schema5);
     defaultColumnHandler =
-        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, schema5, _writer);
+        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, _writer);
     Assert.assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(), Collections.EMPTY_MAP);
 
     // Do not update non-autogenerated column in the schema
@@ -227,8 +234,9 @@ public class BaseDefaultColumnHandlerTest {
             .addSingleValueDimension("count", FieldSpec.DataType.INT)
             .addSingleValueDimension("daysSinceEpoch", FieldSpec.DataType.INT)
             .addSingleValueDimension("weeksSinceEpochSunday", FieldSpec.DataType.INT).build();
+    indexLoadingConfig.setSchema(schema6);
     defaultColumnHandler =
-        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, schema6, _writer);
+        new V3DefaultColumnHandler(_segmentDirectory, _committedSegmentMetadata, indexLoadingConfig, _writer);
     Assert.assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(), Collections.EMPTY_MAP);
   }
 }

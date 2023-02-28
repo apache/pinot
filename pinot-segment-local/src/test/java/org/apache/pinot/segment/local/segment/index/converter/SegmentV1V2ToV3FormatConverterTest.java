@@ -34,11 +34,12 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -49,7 +50,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
   private File _segmentDirectory;
   private IndexLoadingConfig _v3IndexLoadingConfig;
 
-  @BeforeMethod
+  @BeforeClass
   public void setUp()
       throws Exception {
 
@@ -68,12 +69,11 @@ public class SegmentV1V2ToV3FormatConverterTest {
     driver.build();
     _segmentDirectory = new File(_indexDir, driver.getSegmentName());
 
-    _v3IndexLoadingConfig = new IndexLoadingConfig();
-    _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
-    _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
+    _v3IndexLoadingConfig = new IndexLoadingConfig(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setSegmentVersion("v3").build());
   }
 
-  @AfterMethod
+  @AfterClass
   public void tearDown()
       throws Exception {
     if (_indexDir != null) {
@@ -84,7 +84,6 @@ public class SegmentV1V2ToV3FormatConverterTest {
   @Test
   public void testConvert()
       throws Exception {
-
     SegmentMetadataImpl beforeConversionMeta = new SegmentMetadataImpl(_segmentDirectory);
 
     SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
@@ -100,7 +99,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
 
     // verify that the segment loads correctly. This is necessary and sufficient
     // full proof way to ensure that segment is correctly translated
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, _v3IndexLoadingConfig, null, false);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, _v3IndexLoadingConfig);
     Assert.assertNotNull(indexSegment);
     Assert.assertEquals(indexSegment.getSegmentName(), metadata.getName());
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);

@@ -66,7 +66,6 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -78,6 +77,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 
@@ -646,8 +646,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentZKMetadata);
     File indexDir = new File(_indexDir, segmentZKMetadata.getSegmentName());
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig));
   }
 
   /**
@@ -659,13 +658,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to get table config for table: {}", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
-
-    // Construct a new indexLoadingConfig with the updated tableConfig and schema.
-    InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
-    IndexLoadingConfig newIndexLoadingConfig = new IndexLoadingConfig(instanceDataManagerConfig, tableConfig, schema);
-
+    Preconditions.checkState(schema != null, "Failed to get schema for table: {}", _tableNameWithType);
+    TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    indexLoadingConfig.setTableConfig(tableConfig);
+    indexLoadingConfig.setSchema(schema);
     try {
-      addSegment(indexDir, newIndexLoadingConfig);
+      addSegment(indexDir, indexLoadingConfig);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

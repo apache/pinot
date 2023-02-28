@@ -63,12 +63,12 @@ public class SegmentDirectoryPaths {
 
   @Nullable
   public static File findMetadataFile(File indexDir) {
-    return findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    return findFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
   }
 
   @Nullable
   public static File findCreationMetaFile(File indexDir) {
-    return findFormatFile(indexDir, V1Constants.SEGMENT_CREATION_META);
+    return findFile(indexDir, V1Constants.SEGMENT_CREATION_META);
   }
 
   /**
@@ -80,7 +80,7 @@ public class SegmentDirectoryPaths {
   @Nullable
   public static File findTextIndexIndexFile(File indexDir, String column) {
     String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
-    return findFormatFile(indexDir, luceneIndexDirectory);
+    return findFile(indexDir, luceneIndexDirectory);
   }
 
   /**
@@ -92,19 +92,19 @@ public class SegmentDirectoryPaths {
   @Nullable
   public static File findNativeTextIndexIndexFile(File indexDir, String column) {
     String nativeIndexDirectory = column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
-    return findFormatFile(indexDir, nativeIndexDirectory);
+    return findFile(indexDir, nativeIndexDirectory);
   }
 
   public static File findFSTIndexIndexFile(File indexDir, String column) {
     String luceneIndexDirectory = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
-    return findFormatFile(indexDir, luceneIndexDirectory);
+    return findFile(indexDir, luceneIndexDirectory);
   }
 
   @Nullable
   @VisibleForTesting
   public static File findTextIndexDocIdMappingFile(File indexDir, String column) {
     String file = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
-    return findFormatFile(indexDir, file);
+    return findFile(indexDir, file);
   }
 
   /**
@@ -113,7 +113,7 @@ public class SegmentDirectoryPaths {
    * <p>If file exists in multiple segment version, return the one in highest segment version.
    */
   @Nullable
-  private static File findFormatFile(File indexDir, String fileName) {
+  public static File findFile(File indexDir, String fileName) {
     Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);
 
     // Try to find v3 file first

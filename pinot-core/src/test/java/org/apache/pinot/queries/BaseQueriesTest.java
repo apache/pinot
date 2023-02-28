@@ -262,20 +262,19 @@ public abstract class BaseQueriesTest {
    * Helper function to call reloadSegment on an existing index directory. The segment is preprocessed using the
    * config provided in indexLoadingConfig. It returns an immutable segment.
    */
-  protected ImmutableSegment reloadSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema)
+  protected ImmutableSegment reloadSegment(File indexDir, TableConfig tableConfig, Schema schema)
       throws Exception {
     Map<String, Object> props = new HashMap<>();
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     PinotConfiguration configuration = new PinotConfiguration(props);
-
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(indexDir.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(configuration).build());
-        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
       processor.process();
     }
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
-    return immutableSegment;
+    return ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
   }
 
   /**

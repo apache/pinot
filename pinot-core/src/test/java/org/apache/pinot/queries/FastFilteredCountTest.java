@@ -36,6 +36,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -74,12 +75,6 @@ public class FastFilteredCountTest extends BaseQueriesTest {
       .addSingleValueDimension(INT_RANGE_COLUMN, FieldSpec.DataType.INT)
       .build();
 
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE)
-          .setTableName(RAW_TABLE_NAME)
-          .setSortedColumn(SORTED_COLUMN)
-          .build();
-
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -114,7 +109,15 @@ public class FastFilteredCountTest extends BaseQueriesTest {
       records.add(record);
     }
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(SORTED_COLUMN)
+            .setInvertedIndexColumns(Arrays.asList(CLASSIFICATION_COLUMN, SORTED_COLUMN))
+            .setRangeIndexColumns(Collections.singletonList(INT_RANGE_COLUMN))
+            .setJsonIndexColumns(Collections.singletonList(JSON_COLUMN)).setFieldConfigList(Collections.singletonList(
+                new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY,
+                    Collections.singletonList(FieldConfig.IndexType.TEXT), null, null))).build();
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
@@ -123,14 +126,8 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(CLASSIFICATION_COLUMN, SORTED_COLUMN)));
-    indexLoadingConfig.setTextIndexColumns(Collections.singleton(TEXT_COLUMN));
-    indexLoadingConfig.setJsonIndexColumns(Collections.singleton(JSON_COLUMN));
-    indexLoadingConfig.setRangeIndexColumns(Collections.singleton(INT_RANGE_COLUMN));
-
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME),
-        indexLoadingConfig);
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(tableConfig, SCHEMA));
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }

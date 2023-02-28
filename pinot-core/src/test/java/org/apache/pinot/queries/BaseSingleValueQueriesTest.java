@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -72,12 +71,11 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
 
   // Hard-coded query filter.
-  protected static final String FILTER = " WHERE column1 > 100000000"
-      + " AND column3 BETWEEN 20000000 AND 1000000000"
-      + " AND column5 = 'gFuH'"
-      + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))"
-      + " AND daysSinceEpoch = 126164076";
+  protected static final String FILTER =
+      " WHERE column1 > 100000000" + " AND column3 BETWEEN 20000000 AND 1000000000" + " AND column5 = 'gFuH'"
+          + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))" + " AND daysSinceEpoch = 126164076";
 
+  private TableConfig _tableConfig;
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
   private List<IndexSegment> _indexSegments;
@@ -110,17 +108,17 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setSegmentTimeValueCheck(false);
     ingestionConfig.setRowTimeValueCheck(false);
-    TableConfig tableConfig =
+    List<String> invertedIndexColumns = Arrays.asList("column6", "column7", "column11", "column17", "column18");
+    _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
-            .setIngestionConfig(ingestionConfig).build();
+            .setInvertedIndexColumns(invertedIndexColumns).setIngestionConfig(ingestionConfig).build();
 
     // Create the segment generator config.
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(
-        Arrays.asList("column6", "column7", "column11", "column17", "column18"));
+    segmentGeneratorConfig.setInvertedIndexCreationColumns(invertedIndexColumns);
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -131,11 +129,8 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   @BeforeClass
   public void loadSegment()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setInvertedIndexColumns(
-            new HashSet<>(Arrays.asList("column6", "column7", "column11", "column17", "column18")));
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(_tableConfig));
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }

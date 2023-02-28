@@ -34,7 +34,6 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -93,12 +92,11 @@ public interface TableDataManager {
    * @param zkMetadata the segment metadata from zookeeper
    * @param localMetadata the segment metadata object held by server right now,
    *                      which must not be null to reload the segment
-   * @param schema the latest table schema to load segment
    * @param forceDownload whether to force to download raw segment to reload
    * @throws Exception thrown upon failure when to reload the segment
    */
   void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
+      SegmentMetadata localMetadata, boolean forceDownload)
       throws Exception;
 
   /**

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
@@ -95,6 +96,7 @@ public class TableConfigBuilder {
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
   private List<String> _bloomFilterColumns;
+  private Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private List<String> _rangeIndexColumns;
   private Map<String, String> _streamConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
@@ -272,6 +274,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
+    _bloomFilterConfigs = bloomFilterConfigs;
+    return this;
+  }
+
   public TableConfigBuilder setRangeIndexColumns(List<String> rangeIndexColumns) {
     _rangeIndexColumns = rangeIndexColumns;
     return this;
@@ -431,6 +438,7 @@ public class TableConfigBuilder {
     indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
     indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
     indexingConfig.setBloomFilterColumns(_bloomFilterColumns);
+    indexingConfig.setBloomFilterConfigs(_bloomFilterConfigs);
     indexingConfig.setRangeIndexColumns(_rangeIndexColumns);
     indexingConfig.setStreamConfigs(_streamConfigs);
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);

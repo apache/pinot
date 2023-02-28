@@ -54,7 +54,6 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
@@ -328,11 +327,12 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testCommitAfterCatchupWithPeriodOffset() throws Exception {
+  public void testCommitAfterCatchupWithPeriodOffset()
+      throws Exception {
     TableConfig tableConfig = createTableConfig();
-    tableConfig.getIndexingConfig().getStreamConfigs()
-        .put(StreamConfigProperties.constructStreamProperty(
-            StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "fakeStream"), "2d");
+    tableConfig.getIndexingConfig().getStreamConfigs().put(
+        StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
+            "fakeStream"), "2d");
     FakeLLRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
@@ -375,11 +375,12 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testCommitAfterCatchupWithTimestampOffset() throws Exception {
+  public void testCommitAfterCatchupWithTimestampOffset()
+      throws Exception {
     TableConfig tableConfig = createTableConfig();
-    tableConfig.getIndexingConfig().getStreamConfigs()
-        .put(StreamConfigProperties.constructStreamProperty(
-            StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "fakeStream"), Instant.now().toString());
+    tableConfig.getIndexingConfig().getStreamConfigs().put(
+        StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
+            "fakeStream"), Instant.now().toString());
     FakeLLRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
@@ -873,8 +874,7 @@ public class LLRealtimeSegmentDataManagerTest {
       }
     };
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2),
-        segmentTimeThresholdMins + "m", null);
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", null);
     segmentDataManager._stubConsumeLoop = false;
     segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -983,24 +983,13 @@ public class LLRealtimeSegmentDataManagerTest {
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
 
-    private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
-      InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
-      when(dataManagerConfig.getReadMode()).thenReturn(null);
-      when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
-      when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
-      when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
-      when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
-      when(dataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
-      return dataManagerConfig;
-    }
-
     public FakeLLRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
         LLCSegmentName llcSegmentName, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics,
         TimeSupplier timeSupplier)
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
-          new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
+          new IndexLoadingConfig(tableConfig, schema), schema, llcSegmentName,
           semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, () -> true);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);

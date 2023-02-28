@@ -71,7 +71,6 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -218,8 +217,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    indexLoadingConfig.setTableDataDir(_tableDataDir);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema()));
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig));
   }
 
   @Override
@@ -347,12 +345,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
+      SegmentMetadata localMetadata, boolean forceDownload)
       throws Exception {
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig.setSegmentTier(segmentTier);
-    indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
       // Download segment from deep store if CRC changes or forced to download;
@@ -375,12 +371,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
         SegmentDirectory segmentDirectory =
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
         // We should first try to reuse existing segment directory
-        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig,
-            schema)) {
+        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
           LOGGER.info("Reloading segment: {} of table: {} using existing segment directory as no reprocessing needed",
               segmentName, _tableNameWithType);
           // No reprocessing needed, reuse the same segment
-          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
           addSegment(segment);
           return;
         }
@@ -401,7 +396,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       LOGGER.info("Load segment with data from indexDir: {} to tier: {}", indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
       addSegment(segment);
 
       // Remove backup directory to mark the completion of segment reloading.
@@ -417,14 +412,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata,
-      String currentSegmentTier, SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
-      Schema schema)
+  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
+      SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     return !segmentDirectoryLoader.needsTierMigration(segmentZKMetadata.getTier(), currentSegmentTier)
-        && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+        && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
   }
 
   @Override
@@ -444,8 +438,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     // not exist or fails to get loaded, we download segment from deep store to load it again.
     String segmentTier = zkMetadata.getTier();
     indexLoadingConfig.setSegmentTier(segmentTier);
-    indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     if (localMetadata == null && tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata)) {
       return;
     }
@@ -462,8 +454,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           localMetadata.getCrc(), zkMetadata.getCrc());
     }
     File indexDir = downloadSegment(segmentName, zkMetadata);
-    ImmutableSegment segment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema(), true);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
     addSegment(segment);
     LOGGER.info("Downloaded and loaded segment: {} of table: {} with crc: {} on tier: {}", segmentName,
         _tableNameWithType, zkMetadata.getCrc(), TierConfigUtils.normalizeTierName(segmentTier));
@@ -580,12 +571,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   // not thread safe. Caller should invoke it with safe concurrency control.
-  protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata,
-      File destTarFile) throws Exception {
+  protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata, File destTarFile)
+      throws Exception {
     Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme() != null,
-            "Download peers require non null peer download scheme");
-    List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName,
-        _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager, _tableNameWithType);
+        "Download peers require non null peer download scheme");
+    List<URI> peerSegmentURIs =
+        PeerServerSegmentFinder.getPeerServerURIs(segmentName, _tableDataManagerConfig.getTablePeerDownloadScheme(),
+            _helixManager, _tableNameWithType);
     if (peerSegmentURIs.isEmpty()) {
       String msg = String.format("segment %s doesn't have any peers", segmentName);
       LOGGER.warn(msg);
@@ -596,10 +588,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Next download the segment from a randomly chosen server using configured scheme.
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(peerSegmentURIs, destTarFile, zkMetadata.getCrypterName());
       LOGGER.info("Fetched segment {} from peers: {} to: {} of size: {}", segmentName, peerSegmentURIs, destTarFile,
-              destTarFile.length());
+          destTarFile.length());
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from peers {} to: {}", segmentName,
-              _tableNameWithType, peerSegmentURIs, destTarFile);
+          _tableNameWithType, peerSegmentURIs, destTarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1L);
       throw e;
     }
@@ -780,8 +772,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // If the segment is still kept by the server, then we can
       // either load it directly if it's still consistent with latest table config and schema;
       // or reprocess it to reflect latest table config and schema before loading.
-      Schema schema = indexLoadingConfig.getSchema();
-      if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema)) {
+      if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig)) {
         LOGGER.info("Segment: {} of table: {} is consistent with latest table config and schema", segmentName,
             _tableNameWithType);
       } else {
@@ -790,10 +781,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
         segmentDirectory.copyTo(indexDir);
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
-        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema);
+        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig);
         segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
       }
-      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
       addSegment(segment);
       LOGGER.info("Loaded existing segment: {} of table: {} with crc: {} on tier: {}", segmentName, _tableNameWithType,
           zkMetadata.getCrc(), TierConfigUtils.normalizeTierName(segmentTier));

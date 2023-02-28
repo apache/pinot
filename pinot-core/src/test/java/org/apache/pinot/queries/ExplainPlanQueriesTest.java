@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -60,7 +59,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -69,7 +68,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -133,13 +131,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
           DataSchema.ColumnDataType.INT});
 
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList(COL1_RAW, MV_COL1_RAW))
-          .setTableName(RAW_TABLE_NAME).build();
-
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private List<String> _segmentNames;
 
   private ServerMetrics _serverMetrics;
   private QueryExecutor _queryExecutor;
@@ -194,23 +187,16 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
   ImmutableSegment createImmutableSegment(List<GenericRow> records, String segmentName)
       throws Exception {
-    IndexingConfig indexingConfig = TABLE_CONFIG.getIndexingConfig();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(COL1_SORTED_INDEX)
+            .setInvertedIndexColumns(Arrays.asList(COL1_INVERTED_INDEX, COL2_INVERTED_INDEX, COL3_INVERTED_INDEX))
+            .setNoDictionaryColumns(Arrays.asList(COL1_RAW, MV_COL1_RAW))
+            .setRangeIndexColumns(Arrays.asList(COL1_RANGE_INDEX, COL2_RANGE_INDEX, COL3_RANGE_INDEX))
+            .setJsonIndexColumns(Collections.singletonList(COL1_JSON_INDEX)).setFieldConfigList(
+                Collections.singletonList(new FieldConfig(COL1_TEXT_INDEX, FieldConfig.EncodingType.DICTIONARY,
+                    Collections.singletonList(FieldConfig.IndexType.TEXT), null, null))).build();
 
-    List<String> invertedIndexColumns = Arrays.asList(COL1_INVERTED_INDEX, COL2_INVERTED_INDEX, COL3_INVERTED_INDEX);
-    indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
-
-    List<String> rangeIndexColumns = Arrays.asList(COL1_RANGE_INDEX, COL2_RANGE_INDEX, COL3_RANGE_INDEX);
-    indexingConfig.setRangeIndexColumns(rangeIndexColumns);
-
-    List<String> sortedIndexColumns = Collections.singletonList(COL1_SORTED_INDEX);
-    indexingConfig.setSortedColumn(sortedIndexColumns);
-
-    List<String> jsonIndexColumns = Arrays.asList(COL1_JSON_INDEX);
-    indexingConfig.setJsonIndexColumns(jsonIndexColumns);
-
-    List<String> textIndexColumns = Arrays.asList(COL1_TEXT_INDEX);
-
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
@@ -218,24 +204,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(TABLE_CONFIG);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(invertedIndexColumns));
-    indexLoadingConfig.setRangeIndexColumns(new HashSet<>(rangeIndexColumns));
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<>(jsonIndexColumns));
-    indexLoadingConfig.setTextIndexColumns(new HashSet<>(textIndexColumns));
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-
-    _segmentNames.add(segmentName);
-
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), indexLoadingConfig);
+    return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), new IndexLoadingConfig(tableConfig));
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
-    _segmentNames = new ArrayList<>();
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     records.add(createMockRecord(1, 2, 3, true, 1.1, 2, "daffy", 10.1, 20, 30, 100.1,
@@ -328,14 +303,14 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private void check(String query, ResultTable expected) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
 
-    int segmentsForServer1 = _segmentNames.size() / 2;
+    int segmentsForServer1 = _indexSegments.size() / 2;
     List<String> indexSegmentsForServer1 = new ArrayList<>();
     List<String> indexSegmentsForServer2 = new ArrayList<>();
     for (int i = 0; i < getIndexSegments().size(); i++) {
       if (i < segmentsForServer1) {
-        indexSegmentsForServer1.add(_segmentNames.get(i));
+        indexSegmentsForServer1.add(_indexSegments.get(i).getSegmentName());
       } else {
-        indexSegmentsForServer2.add(_segmentNames.get(i));
+        indexSegmentsForServer2.add(_indexSegments.get(i).getSegmentName());
       }
     }
 

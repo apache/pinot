@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -35,8 +36,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class TableDataManagerConfig {
   public static final String AUTH_CONFIG_PREFIX = "auth";
-  public static final String TIER_CONFIGS_PREFIX = "tierConfigs";
-  public static final String TIER_NAMES = "tierNames";
 
   private final InstanceDataManagerConfig _instanceDataManagerConfig;
   private final TableConfig _tableConfig;
@@ -97,17 +96,6 @@ public class TableDataManagerConfig {
   }
 
   public Map<String, Map<String, String>> getInstanceTierConfigs() {
-    PinotConfiguration tierConfigs = _instanceDataManagerConfig.getConfig().subset(TIER_CONFIGS_PREFIX);
-    List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
-    if (tierNames.isEmpty()) {
-      return Collections.emptyMap();
-    }
-    Map<String, Map<String, String>> instanceTierConfigs = new HashMap<>();
-    for (String tierName : tierNames) {
-      Map<String, String> tierConfigMap = new HashMap<>();
-      tierConfigs.subset(tierName).toMap().forEach((k, v) -> tierConfigMap.put(k, String.valueOf(v)));
-      instanceTierConfigs.put(tierName, tierConfigMap);
-    }
-    return instanceTierConfigs;
+    return TierConfigUtils.getInstanceTierConfigs(_instanceDataManagerConfig);
   }
 }

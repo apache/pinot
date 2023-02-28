@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -34,7 +33,6 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,7 +42,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,20 +74,18 @@ public class OnHeapDictionariesTest {
   @BeforeClass
   public void setup()
       throws Exception {
-    Schema schema = buildSchema();
-
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    Schema schema = buildSchema();
     buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, tableConfig, schema);
 
-    IndexLoadingConfig loadingConfig = new IndexLoadingConfig();
-    loadingConfig.setReadMode(ReadMode.mmap);
-    loadingConfig.setSegmentVersion(SegmentVersion.v3);
-    _offHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
+    _offHeapSegment =
+        ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), new IndexLoadingConfig(tableConfig));
 
-    loadingConfig.setOnHeapDictionaryColumns(new HashSet<>(
-        Arrays.asList(new String[]{INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN})));
-
-    _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
+    TableConfig onHeapTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test")
+        .setOnHeapDictionaryColumns(Arrays.asList(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN))
+        .build();
+    _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME),
+        new IndexLoadingConfig(onHeapTableConfig));
   }
 
   @AfterClass

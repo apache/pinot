@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -67,12 +68,12 @@ public class FSTIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(FSTIndexHandler.class);
 
   private final Set<String> _columnsToAddIdx;
-  private final FSTType _fstType;
+  private final Map<String, FSTType> _fstTypes;
 
   public FSTIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     super(segmentDirectory, indexLoadingConfig);
-    _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getFSTIndexColumns();
+    _fstTypes = indexLoadingConfig.getFSTTypes();
   }
 
   @Override
@@ -171,7 +172,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
 
     TextIndexCreator fstIndexCreator = indexCreatorProvider.newTextIndexCreator(
         IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
-            .forFSTIndex(_fstType, null));
+            .forFSTIndex(_fstTypes.get(columnName), null));
 
     try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {

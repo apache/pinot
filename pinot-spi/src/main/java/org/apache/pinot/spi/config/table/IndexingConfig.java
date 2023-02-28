@@ -35,7 +35,6 @@ public class IndexingConfig extends BaseJsonConfig {
   @Deprecated
   private List<String> _jsonIndexColumns;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
-  private List<String> _h3IndexColumns;
   private List<String> _sortedColumn;
   private List<String> _bloomFilterColumns;
   private Map<String, BloomFilterConfig> _bloomFilterConfigs;

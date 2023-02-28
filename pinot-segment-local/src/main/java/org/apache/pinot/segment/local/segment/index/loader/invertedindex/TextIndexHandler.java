@@ -86,13 +86,13 @@ public class TextIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
   private final Set<String> _columnsToAddIdx;
-  private final FSTType _fstType;
+  private final Map<String, FSTType> _fstTypes;
   private final Map<String, Map<String, String>> _columnProperties;
 
   public TextIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     super(segmentDirectory, indexLoadingConfig);
-    _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getTextIndexColumns();
+    _fstTypes = indexLoadingConfig.getFSTTypes();
     _columnProperties = indexLoadingConfig.getColumnProperties();
   }
 
@@ -176,8 +176,8 @@ public class TextIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", columnName, segmentName,
         hasDictionary);
-    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
-        _segmentDirectory.getSegmentMetadata().getVersion());
+    File segmentDirectory =
+        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
@@ -185,10 +185,11 @@ public class TextIndexHandler extends BaseIndexHandler {
     // based on segmentVersion.
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        TextIndexCreator textIndexCreator = textIndexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
-            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true,
-                TextIndexUtils.extractStopWordsInclude(columnName, _columnProperties),
-                TextIndexUtils.extractStopWordsExclude(columnName, _columnProperties)))) {
+        TextIndexCreator textIndexCreator = textIndexCreatorProvider.newTextIndexCreator(
+            IndexCreationContext.builder().withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build()
+                .forTextIndex(_fstTypes.get(columnName), true,
+                    TextIndexUtils.extractStopWordsInclude(columnName, _columnProperties),
+                    TextIndexUtils.extractStopWordsExclude(columnName, _columnProperties)))) {
       if (columnMetadata.isSingleValue()) {
         processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);

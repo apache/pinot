@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
@@ -32,8 +33,10 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,10 +46,13 @@ import org.slf4j.LoggerFactory;
  * Util methods for TierConfig
  */
 public final class TierConfigUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TierConfigUtils.class);
-
   private TierConfigUtils() {
   }
+
+  public static final String TIER_CONFIGS_PREFIX = "tierConfigs";
+  public static final String TIER_NAMES = "tierNames";
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TierConfigUtils.class);
 
   /**
    * Returns whether relocation of segments to tiers has been enabled for this table
@@ -57,6 +63,22 @@ public final class TierConfigUtils {
 
   public static String normalizeTierName(String tierName) {
     return tierName == null ? "default" : tierName;
+  }
+
+  public static Map<String, Map<String, String>> getInstanceTierConfigs(
+      InstanceDataManagerConfig instanceDataManagerConfig) {
+    PinotConfiguration tierConfigs = instanceDataManagerConfig.getConfig().subset(TIER_CONFIGS_PREFIX);
+    List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
+    if (tierNames.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<String, Map<String, String>> instanceTierConfigs = new HashMap<>();
+    for (String tierName : tierNames) {
+      Map<String, String> tierConfigMap = new HashMap<>();
+      tierConfigs.subset(tierName).toMap().forEach((k, v) -> tierConfigMap.put(k, String.valueOf(v)));
+      instanceTierConfigs.put(tierName, tierConfigMap);
+    }
+    return instanceTierConfigs;
   }
 
   public static String getDataDirForTier(TableConfig tableConfig, String tierName) {

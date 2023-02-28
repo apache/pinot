@@ -70,6 +70,17 @@ public class TextIndexUtils {
     return false;
   }
 
+  public static FSTType getFstType(@Nullable Map<String, String> fieldProperties, FSTType defaultFstType) {
+    if (fieldProperties == null) {
+      return defaultFstType;
+    }
+    String fieldFstType = fieldProperties.get(FieldConfig.TEXT_FST_TYPE);
+    if (fieldFstType != null) {
+      return FSTType.valueOf(fieldFstType.toUpperCase());
+    }
+    return defaultFstType;
+  }
+
   public static FSTType getFSTTypeOfIndex(File indexDir, String column) {
     return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
   }

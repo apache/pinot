@@ -21,7 +21,7 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -71,12 +71,11 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "MultiValueQueriesTest");
 
   // Hard-coded query filter.
-  protected static final String FILTER = " WHERE column1 > 100000000"
-      + " AND column2 BETWEEN 20000000 AND 1000000000"
-      + " AND column3 <> 'w'"
-      + " AND (column6 < 500000 OR column7 NOT IN (225, 407))"
-      + " AND daysSinceEpoch = 1756015683";
+  protected static final String FILTER =
+      " WHERE column1 > 100000000" + " AND column2 BETWEEN 20000000 AND 1000000000" + " AND column3 <> 'w'"
+          + " AND (column6 < 500000 OR column7 NOT IN (225, 407))" + " AND daysSinceEpoch = 1756015683";
 
+  private TableConfig _tableConfig;
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
   private List<IndexSegment> _indexSegments;
@@ -108,16 +107,18 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setSegmentTimeValueCheck(false);
     ingestionConfig.setRowTimeValueCheck(false);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList("column5"))
-        .setTableName("testTable").setTimeColumnName("daysSinceEpoch")
-        .setIngestionConfig(ingestionConfig).build();
+    List<String> invertedIndexColumns = Arrays.asList("column3", "column7", "column8", "column9");
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
+            .setInvertedIndexColumns(invertedIndexColumns).setNoDictionaryColumns(Collections.singletonList("column5"))
+            .setIngestionConfig(ingestionConfig).build();
 
     // Create the segment generator config.
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(Arrays.asList("column3", "column7", "column8", "column9"));
+    segmentGeneratorConfig.setInvertedIndexCreationColumns(invertedIndexColumns);
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -128,11 +129,8 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   @BeforeClass
   public void loadSegment()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setInvertedIndexColumns(
-            new HashSet<>(Arrays.asList("column3", "column7", "column8", "column9")));
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(_tableConfig));
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }

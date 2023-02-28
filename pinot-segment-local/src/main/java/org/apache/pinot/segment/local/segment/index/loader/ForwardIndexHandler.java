@@ -59,7 +59,6 @@ import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,8 +89,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private static final List<ColumnIndexType> DICTIONARY_BASED_INDEXES_TO_REWRITE =
       Arrays.asList(ColumnIndexType.RANGE_INDEX, ColumnIndexType.FST_INDEX, ColumnIndexType.INVERTED_INDEX);
 
-  private final Schema _schema;
-
   protected enum Operation {
     DISABLE_FORWARD_INDEX_FOR_DICT_COLUMN,
     DISABLE_FORWARD_INDEX_FOR_RAW_COLUMN,
@@ -102,9 +99,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     CHANGE_RAW_INDEX_COMPRESSION_TYPE,
   }
 
-  public ForwardIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, Schema schema) {
+  public ForwardIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     super(segmentDirectory, indexLoadingConfig);
-    _schema = schema;
   }
 
   @Override
@@ -229,7 +225,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         if (columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op. Do not return an
           // operation for this column related to disabling forward index.
-          LOGGER.warn("Trying to disable the forward index for a sorted column {}, ignoring", column);
+          LOGGER.info("Skip disabling forward index for sorted column: {}", column);
           continue;
         }
 
@@ -238,8 +234,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         } else {
           columnOperationMap.put(column, Operation.DISABLE_FORWARD_INDEX_FOR_RAW_COLUMN);
         }
-      } else if (existingForwardIndexDisabledColumns.contains(column)
-          && !newForwardIndexDisabledColumns.contains(column)) {
+      } else if (existingForwardIndexDisabledColumns.contains(column) && !newForwardIndexDisabledColumns.contains(
+          column)) {
         // Existing column does not have a forward index. New column config enables the forward index
         ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (columnMetadata != null && columnMetadata.isSorted()) {
@@ -257,14 +253,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         } else {
           columnOperationMap.put(column, Operation.ENABLE_FORWARD_INDEX_FOR_DICT_COLUMN);
         }
-      } else if (existingForwardIndexDisabledColumns.contains(column)
-          && newForwardIndexDisabledColumns.contains(column)) {
+      } else if (existingForwardIndexDisabledColumns.contains(column) && newForwardIndexDisabledColumns.contains(
+          column)) {
         // Forward index is disabled for the existing column and should remain disabled based on the latest config
         Preconditions.checkState(existingDictColumns.contains(column) && !newNoDictColumns.contains(column),
             String.format("Not allowed to disable the dictionary for a column: %s without forward index", column));
       } else if (existingNoDictColumns.contains(column) && !newNoDictColumns.contains(column)) {
         // Existing column is RAW. New column is dictionary enabled.
-        if (_schema == null || _indexLoadingConfig.getTableConfig() == null) {
+        if (_indexLoadingConfig.getTableConfig() == null || _indexLoadingConfig.getSchema() == null) {
           // This can only happen in tests.
           LOGGER.warn("Cannot enable dictionary for column={} as schema or tableConfig is null.", column);
           continue;
@@ -292,7 +288,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   }
 
   private boolean shouldDisableDictionary(String column, ColumnMetadata existingColumnMetadata) {
-    if (_schema == null || _indexLoadingConfig.getTableConfig() == null) {
+    if (_indexLoadingConfig.getTableConfig() == null || _indexLoadingConfig.getSchema() == null) {
       // This can only happen in tests.
       LOGGER.warn("Cannot disable dictionary for column={} as schema or tableConfig is null.", column);
       return false;
@@ -300,7 +296,13 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     // Sorted columns should always have a dictionary.
     if (existingColumnMetadata.isSorted()) {
-      LOGGER.warn("Cannot disable dictionary for column={} as it is sorted.", column);
+      LOGGER.info("Skip disabling dictionary for sorted column: {}", column);
+      return false;
+    }
+
+    // Column of cardinality 1 (e.g. default column) should always have dictionary
+    if (existingColumnMetadata.getCardinality() == 1) {
+      LOGGER.info("Skip disabling dictionary for column: {} with cardinality 1", column);
       return false;
     }
 
@@ -788,9 +790,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       boolean useVarLength = SegmentIndexCreationDriverImpl.shouldUseVarLengthDictionary(column,
           _indexLoadingConfig.getVarLengthDictionaryColumns(), reader.getStoredType(), statsCollector);
-      SegmentDictionaryCreator dictionaryCreator =
-          new SegmentDictionaryCreator(existingColMetadata.getFieldSpec(),
-              _segmentDirectory.getSegmentMetadata().getIndexDir(), useVarLength);
+      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(existingColMetadata.getFieldSpec(),
+          _segmentDirectory.getSegmentMetadata().getIndexDir(), useVarLength);
 
       dictionaryCreator.build(statsCollector.getUniqueValuesSet());
       return dictionaryCreator;
@@ -940,7 +941,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private AbstractColumnStatisticsCollector getStatsCollector(String column, FieldSpec.DataType storedType)
       throws Exception {
     StatsCollectorConfig statsCollectorConfig =
-        new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
+        new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _indexLoadingConfig.getSchema(), null);
     AbstractColumnStatisticsCollector statsCollector;
 
     // TODO(Vivek): Check if checking stored type will be problematic if column has dictionary. ie will dictionary
@@ -968,7 +969,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         statsCollector = new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig);
         break;
       default:
-        throw new IllegalStateException("Unsupported storedType=" + storedType.toString() + " for column=" + column);
+        throw new IllegalStateException("Unsupported storedType=" + storedType + " for column=" + column);
     }
 
     return statsCollector;

@@ -38,7 +38,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -92,16 +91,6 @@ public class TableDataManagerTestUtils {
     InstanceDataManagerConfig idmc = mock(InstanceDataManagerConfig.class);
     when(idmc.getSegmentDirectoryLoader()).thenReturn(segDirLoader);
     when(idmc.getConfig()).thenReturn(new PinotConfiguration());
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(idmc, tableConfig, schema);
-    indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-    return indexLoadingConfig;
-  }
-
-  public static IndexLoadingConfig createIndexLoadingConfig() {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-    return indexLoadingConfig;
+    return new IndexLoadingConfig(idmc, tableConfig, schema);
   }
 }
