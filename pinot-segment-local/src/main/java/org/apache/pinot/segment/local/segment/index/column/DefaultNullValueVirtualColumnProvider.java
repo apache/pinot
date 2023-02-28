@@ -122,7 +122,7 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
             .setMaxValue(new ByteArray((byte[]) defaultNullValue));
         break;
       default:
-        break;
+        throw new IllegalStateException();
     }
 
     return builder.build();
