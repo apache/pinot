@@ -574,21 +574,23 @@ public class MutableSegmentImpl implements MutableSegment {
     int numComparisonColumns = _upsertComparisonColumns.size();
     Comparable[] comparisonValues = new Comparable[numComparisonColumns];
 
+    int numNonNull = 0;
     for (int i = 0; i < numComparisonColumns; i++) {
       String columnName = _upsertComparisonColumns.get(i);
 
       if (!row.isNullValue(columnName)) {
+        // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
+        // columns are mutually exclusive
+        numNonNull++;
+
         Object comparisonValue = row.getValue(columnName);
         Preconditions.checkState(comparisonValue instanceof Comparable,
             "Upsert comparison column: %s must be comparable", columnName);
         comparisonValues[i] = (Comparable) comparisonValue;
-
-        // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
-        // columns are mutually exclusive
-        return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues));
       }
     }
-    // Note that reaching here implies all comparison values were null.
+    Preconditions.checkState(numNonNull == 1 || numNonNull == 0,
+        "Documents may only have at most 1 non-null comparison column value");
     return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues));
   }
 
