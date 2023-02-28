@@ -285,17 +285,16 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = convertToMergeableBlock((SelectionResultsBlock) blockToMerge);
+        mergedBlock = (SelectionResultsBlock) blockToMerge;
       } else {
         mergeResultsBlocks(mergedBlock, (SelectionResultsBlock) blockToMerge);
       }
       numBlocksMerged++;
 
       // Update the boundary value if enough rows are collected
-      PriorityQueue<Object[]> selectionResult = mergedBlock.getRowsAsPriorityQueue();
-      if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
-        assert selectionResult.peek() != null;
-        _globalBoundaryValue.set((Comparable) selectionResult.peek()[0]);
+      List<Object[]> rows = mergedBlock.getRows();
+      if (rows.size() == _numRowsToKeep) {
+        _globalBoundaryValue.set((Comparable) rows.get(_numRowsToKeep - 1)[0]);
       }
     }
     return mergedBlock;
@@ -315,17 +314,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
           QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
       return;
     }
-
-    PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
-    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
-    assert mergedRows != null && rowsToMerge != null;
-    SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
-  }
-
-  protected SelectionResultsBlock convertToMergeableBlock(SelectionResultsBlock resultsBlock) {
-    // This may create a copy or return the same instance. Anyway, this operator is the owner of the
-    // value now, so it can mutate it.
-    return resultsBlock.convertToPriorityQueueBased();
+    SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
   }
 
   private static class MinMaxValueContext {

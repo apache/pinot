@@ -149,7 +149,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
 
   @Nullable
   @Override
-  public Collection<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows(QueryContext queryContext) {
     if (_table == null) {
       return Collections.emptyList();
     }

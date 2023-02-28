@@ -18,12 +18,9 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -36,30 +33,35 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  */
 public class SelectionResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
-  private final Collection<Object[]> _rows;
   private final Comparator<? super Object[]> _comparator;
+  private List<Object[]> _rows;
 
-  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows) {
-    this(dataSchema, rows, null);
-  }
-
-  public SelectionResultsBlock(DataSchema dataSchema, PriorityQueue<Object[]> rows) {
-    this(dataSchema, rows, rows.comparator());
-  }
-
-  public SelectionResultsBlock(DataSchema dataSchema, Collection<Object[]> rows,
+  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
       @Nullable Comparator<? super Object[]> comparator) {
     _dataSchema = dataSchema;
     _rows = rows;
     _comparator = comparator;
   }
 
+  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows) {
+    this(dataSchema, rows, null);
+  }
+
   public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
-  public Collection<Object[]> getRows() {
+  public List<Object[]> getRows() {
     return _rows;
+  }
+
+  public void setRows(List<Object[]> rows) {
+    _rows = rows;
+  }
+
+  @Nullable
+  public Comparator<? super Object[]> getComparator() {
+    return _comparator;
   }
 
   @Override
@@ -73,23 +75,8 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public Collection<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows(QueryContext queryContext) {
     return _rows;
-  }
-
-  public SelectionResultsBlock convertToPriorityQueueBased() {
-    if (_rows instanceof PriorityQueue) {
-      return this;
-    }
-    Preconditions.checkState(_comparator != null, "No comparator specified in the results block");
-    PriorityQueue<Object[]> result = new PriorityQueue<>(_comparator);
-    result.addAll(_rows);
-    return new SelectionResultsBlock(_dataSchema, result);
-  }
-
-  public PriorityQueue<Object[]> getRowsAsPriorityQueue() {
-    Preconditions.checkState(_rows instanceof PriorityQueue, "The results block is not backed by a priority queue");
-    return (PriorityQueue<Object[]>) _rows;
   }
 
   @Override
