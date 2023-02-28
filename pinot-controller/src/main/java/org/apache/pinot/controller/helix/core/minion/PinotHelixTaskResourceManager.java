@@ -54,7 +54,6 @@ import org.apache.helix.task.WorkflowContext;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
-import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -918,8 +917,7 @@ public class PinotHelixTaskResourceManager {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     ZNRecord raw = MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, taskType, tableNameWithType);
     if (raw == null) {
-      throw new NoTaskMetadataException(
-          String.format("No task metadata for task type: %s from table: %s", taskType, tableNameWithType));
+      return JsonUtils.objectToString(JsonUtils.newObjectNode());
     }
     return JsonUtils.objectToString(raw);
   }

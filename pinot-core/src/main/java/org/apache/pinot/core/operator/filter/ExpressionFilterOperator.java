@@ -33,6 +33,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
@@ -45,7 +46,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
 
-  public ExpressionFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
+  public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
     _numDocs = numDocs;
 
     _dataSourceMap = new HashMap<>();
@@ -56,9 +57,9 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       _dataSourceMap.put(column, segment.getDataSource(column));
     }
 
-    _transformFunction = TransformFunctionFactory.get(lhs, _dataSourceMap);
-    _predicateEvaluator = PredicateEvaluatorProvider
-        .getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
+    _transformFunction = TransformFunctionFactory.get(lhs, _dataSourceMap, queryContext);
+    _predicateEvaluator =
+        PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
             _transformFunction.getResultMetadata().getDataType());
   }
 
@@ -67,7 +68,6 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     return new FilterBlock(
         new ExpressionFilterDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

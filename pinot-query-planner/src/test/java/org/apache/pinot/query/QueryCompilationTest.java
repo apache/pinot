@@ -225,6 +225,31 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testQueryWithHint()
+      throws Exception {
+    // Hinting the query to use final stage aggregation makes server directly return final result
+    // This is useful when data is already partitioned by col1
+    String query = "SELECT /*+ aggFinalStage */ col1, COUNT(*) FROM b GROUP BY col1";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 2);
+    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 2);
+    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
+      List<String> tables = e.getValue().getScannedTables();
+      if (tables.size() != 0) {
+        // table scan stages; for tableB it should have only 1
+        Assert.assertEquals(e.getValue().getServerInstances().stream()
+                .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
+            ImmutableList.of("0@Server_localhost_1"));
+      } else if (!PlannerUtils.isRootStage(e.getKey())) {
+        // join stage should have both servers used.
+        Assert.assertEquals(e.getValue().getServerInstances().stream()
+                .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
+            ImmutableList.of("0@Server_localhost_1", "0@Server_localhost_2"));
+      }
+    }
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------

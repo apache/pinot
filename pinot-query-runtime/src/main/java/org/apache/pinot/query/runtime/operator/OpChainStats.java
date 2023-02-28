@@ -26,12 +26,14 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 
 /**
  * {@code OpChainStats} tracks execution statistics for {@link OpChain}s.
  */
+@NotThreadSafe
 public class OpChainStats {
 
   // use memoized supplier so that the timing doesn't start until the
@@ -71,20 +73,20 @@ public class OpChainStats {
     }
   }
 
-  public void startExecutionTimer() {
-    _exTimerStarted = true;
-    _exTimer.get();
-    if (!_executeStopwatch.isRunning()) {
-      _executeStopwatch.start();
-    }
-  }
-
   public Map<String, OperatorStats> getOperatorStatsMap() {
     return _operatorStatsMap;
   }
 
   public void setOperatorStatsMap(Map<String, OperatorStats> operatorStatsMap) {
     _operatorStatsMap = operatorStatsMap;
+  }
+
+  private void startExecutionTimer() {
+    _exTimerStarted = true;
+    _exTimer.get();
+    if (!_executeStopwatch.isRunning()) {
+      _executeStopwatch.start();
+    }
   }
 
   @Override

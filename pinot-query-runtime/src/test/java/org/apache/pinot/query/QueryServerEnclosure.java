@@ -65,7 +65,7 @@ public class QueryServerEnclosure {
   private final InstanceDataManager _instanceDataManager;
   private final HelixManager _helixManager;
 
-  private QueryRunner _queryRunner;
+  private final QueryRunner _queryRunner;
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
     try {
@@ -112,7 +112,6 @@ public class QueryServerEnclosure {
   public void start()
       throws Exception {
     PinotConfiguration configuration = new PinotConfiguration(_runnerConfig);
-    _queryRunner = new QueryRunner();
     _queryRunner.init(configuration, _instanceDataManager, _helixManager, mockServiceMetrics());
     _queryRunner.start();
   }
