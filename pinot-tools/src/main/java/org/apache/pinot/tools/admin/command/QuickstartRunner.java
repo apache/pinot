@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -100,7 +101,12 @@ public class QuickstartRunner {
     _tempDir = tempDir;
     _enableTenantIsolation = enableIsolation;
     _authProvider = authProvider;
-    _configOverrides = configOverrides;
+    _configOverrides = new HashMap<>(configOverrides);
+    if (numMinions > 0) {
+      // configure the controller to schedule tasks when minion is enabled
+      _configOverrides.put("controller.task.scheduler.enabled", true);
+      _configOverrides.put("controller.task.skipLateCronSchedule", true);
+    }
     _zkExternalAddress = zkExternalAddress;
     _deleteExistingData = deleteExistingData;
     if (deleteExistingData) {

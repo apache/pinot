@@ -20,6 +20,7 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -58,6 +61,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,7 +137,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
-  private BrokerResponseNative handleRequest(long requestId, String query,
+  private BrokerResponse handleRequest(long requestId, String query,
       @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext)
       throws Exception {
@@ -166,16 +170,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     ResultTable queryResults;
-    ExecutionStatsAggregator executionStatsAggregator = new ExecutionStatsAggregator(false);
+    Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
+    for (Integer stageId: queryPlan.getStageMetadataMap().keySet()) {
+      stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(false));
+    }
+
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions(), executionStatsAggregator);
+          sqlNodeAndOptions.getOptions(), stageIdStatsMap);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
 
-    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     long executionEndTimeNs = System.nanoTime();
 
     // Set total query processing time
@@ -184,7 +192,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
 
-    executionStatsAggregator.setStats(brokerResponse);
+    for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
+      if (entry.getKey() == 0) {
+        // Root stats are aggregated and added separately to broker response for backward compatibility
+        entry.getValue().setStats(brokerResponse);
+        continue;
+      }
+
+      BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
+      List<String> tableNames = queryPlan.getStageMetadataMap().get(entry.getKey()).getScannedTables();
+      if (tableNames.size() > 0) {
+        //TODO: Only using first table to assign broker metrics
+        // find a way to split metrics in case of multiple table
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNames.get(0));
+        entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
+      } else {
+        entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
+      }
+      brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
+    }
 
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);

@@ -22,6 +22,7 @@ import com.google.common.base.Stopwatch;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
@@ -38,7 +39,7 @@ public class OperatorStats {
 
   private int _numBlock = 0;
   private int _numRows = 0;
-  private Map<String, String> _executionStats;
+  private final Map<String, String> _executionStats;
 
   public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress, String operatorType) {
     _stageId = stageId;
@@ -65,14 +66,18 @@ public class OperatorStats {
     _numRows += numRows;
   }
 
+  public void recordSingleStat(String key, String stat) {
+    _executionStats.put(key, stat);
+  }
+
   public void recordExecutionStats(Map<String, String> executionStats) {
-    _executionStats = executionStats;
+    _executionStats.putAll(executionStats);
   }
 
   public Map<String, String> getExecutionStats() {
-    _executionStats.put(OperatorUtils.NUM_BLOCKS, String.valueOf(_numBlock));
-    _executionStats.put(OperatorUtils.NUM_ROWS, String.valueOf(_numRows));
-    _executionStats.put(OperatorUtils.THREAD_EXECUTION_TIME,
+    _executionStats.putIfAbsent(DataTable.MetadataKey.NUM_BLOCKS.getName(), String.valueOf(_numBlock));
+    _executionStats.putIfAbsent(DataTable.MetadataKey.NUM_ROWS.getName(), String.valueOf(_numRows));
+    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName(),
         String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
     return _executionStats;
   }
