@@ -1767,9 +1767,12 @@ public class PinotHelixResourceManager {
           if (override || InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
               InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierConfig.getName()))
               == null) {
+            LOGGER.info("Calculating instance partitions for tier: {}, table : {}", tierConfig.getName(),
+                tableNameWithType);
             InstancePartitions instancePartitions =
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
                     tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
+            LOGGER.info("Persisting instance partitions: {}", instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
           }
         }

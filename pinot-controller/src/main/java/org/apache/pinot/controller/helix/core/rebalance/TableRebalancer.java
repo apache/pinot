@@ -541,11 +541,8 @@ public class TableRebalancer {
   }
 
   /**
-   * Creates a default instance assignment for the tier.
-   * TODO: We only support default server-tag based assignment currently.
-   *  In next iteration, we will add InstanceAssignmentConfig to the TierConfig and also support persisting of the
-   *  InstancePartitions to zk.
-   *  Then we'll be able to support replica group assignment while creating InstancePartitions for tiers
+   * Computes the instance partitions for the given tier. If table's instanceAssignmentConfigMap has an entry for the
+   * tier, it's used to calculate the instance partitions. Else default instance partitions are returned
    */
   private InstancePartitions getInstancePartitionsForTier(TableConfig tableConfig, Tier tier, boolean reassignInstances,
       boolean bootstrap, boolean dryRun) {

@@ -140,7 +140,7 @@ public class PinotInstanceAssignmentRestletResource {
         if (type == null || type.equals(tierConfig.getName())) {
           InstancePartitions instancePartitions =
               InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
-                  InstancePartitionsUtils.getInstancePartitonNameForTier(realtimeTableConfig.getTableName(),
+                  InstancePartitionsUtils.getInstancePartitonNameForTier(offlineTableConfig.getTableName(),
                       tierConfig.getName()));
           if (instancePartitions != null) {
             instancePartitionsMap.put(tierConfig.getName(), instancePartitions);

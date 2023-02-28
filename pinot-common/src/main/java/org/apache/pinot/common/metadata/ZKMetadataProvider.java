@@ -272,7 +272,7 @@ public class ZKMetadataProvider {
       return Optional.ofNullable(znRecordss).orElseGet(ArrayList::new).stream().map(InstancePartitions::fromZNRecord)
           .collect(Collectors.toList());
     } catch (Exception e) {
-      LOGGER.error("Caught exception while getting user list configuration", e);
+      LOGGER.error("Caught exception while getting instance partitions", e);
       return null;
     }
   }

@@ -339,7 +339,7 @@ public class TableConfigBuilder {
   }
 
   public TableConfigBuilder setInstanceAssignmentConfigMap(
-        Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     return this;
   }

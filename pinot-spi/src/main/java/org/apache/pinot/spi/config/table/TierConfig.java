@@ -26,6 +26,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
+
 /**
  * Config for the tiered storage and the segments which will move to that tier
  */

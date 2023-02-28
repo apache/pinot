@@ -56,39 +56,25 @@ public class InstanceAssignmentDriver {
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
-    LOGGER.info("Starting {} instance assignment for table: {}", instancePartitionsType, tableNameWithType);
-
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
-    InstanceTagPoolSelector tagPoolSelector =
-        new InstanceTagPoolSelector(assignmentConfig.getTagPoolConfig(), tableNameWithType);
-    Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = tagPoolSelector.selectInstances(instanceConfigs);
-
-    InstanceConstraintConfig constraintConfig = assignmentConfig.getConstraintConfig();
-    List<InstanceConstraintApplier> constraintAppliers = new ArrayList<>();
-    if (constraintConfig == null) {
-      LOGGER.info("No instance constraint is configured, using default hash-based-rotate instance constraint");
-      constraintAppliers.add(new HashBasedRotateInstanceConstraintApplier(tableNameWithType));
-    }
-    // TODO: support more constraints
-    for (InstanceConstraintApplier constraintApplier : constraintAppliers) {
-      poolToInstanceConfigsMap = constraintApplier.applyConstraint(poolToInstanceConfigsMap);
-    }
-
-    InstancePartitionSelector instancePartitionSelector =
-        InstancePartitionSelectorFactory.getInstance(assignmentConfig.getPartitionSelector(),
-            assignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
-    InstancePartitions instancePartitions = new InstancePartitions(
-        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)));
-    instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
-    return instancePartitions;
+    return getInstancePartitions(
+        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)),
+        assignmentConfig, instanceConfigs, existingInstancePartitions);
   }
 
-  // TODO (saurabh) : Move commons
   public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
+    return getInstancePartitions(
+        InstancePartitionsUtils.getInstancePartitonNameForTier(_tableConfig.getTableName(), tierName),
+        instanceAssignmentConfig, instanceConfigs, existingInstancePartitions);
+  }
+
+  private InstancePartitions getInstancePartitions(String instancePartitionsName,
+      InstanceAssignmentConfig instanceAssignmentConfig, List<InstanceConfig> instanceConfigs,
+      @Nullable InstancePartitions existingInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
-    LOGGER.info("Starting {} instance assignment for table: {}", tierName, tableNameWithType);
+    LOGGER.info("Starting {} instance assignment for table {}", instancePartitionsName, tableNameWithType);
 
     InstanceTagPoolSelector tagPoolSelector =
         new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType);
@@ -108,8 +94,7 @@ public class InstanceAssignmentDriver {
     InstancePartitionSelector instancePartitionSelector =
         InstancePartitionSelectorFactory.getInstance(instanceAssignmentConfig.getPartitionSelector(),
             instanceAssignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
-    InstancePartitions instancePartitions =
-        new InstancePartitions(InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierName));
+    InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
     instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
     return instancePartitions;
   }
