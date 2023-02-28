@@ -25,6 +25,8 @@ import java.util.function.Consumer;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.VirtualServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,6 +36,7 @@ import org.apache.pinot.query.routing.VirtualServer;
  *       let that take care of pooling. (2) Create a DispatchClient interface and implement pooled/non-pooled versions.
  */
 class DispatchClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DispatchClient.class);
   private ManagedChannel _channel;
   private PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
@@ -51,6 +54,7 @@ class DispatchClient {
     try {
       _dispatchStub.withDeadline(deadline).submit(request, new DispatchObserver(stageId, virtualServer, callback));
     } catch (Exception e) {
+      LOGGER.error("Query Dispatch failed at client-side", e);
       callback.accept(new AsyncQueryDispatchResponse(
           virtualServer, stageId, Worker.QueryResponse.getDefaultInstance(), e));
     }
