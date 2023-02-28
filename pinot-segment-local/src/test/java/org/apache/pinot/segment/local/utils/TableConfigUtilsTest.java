@@ -918,29 +918,30 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
     try {
-      // Enable forward index disabled flag for a raw column
+      // Enable forward index disabled flag for a raw column. This should succeed as though the forward index cannot
+      // be rebuilt without a dictionary, the constraint to have a dictionary has been lifted.
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
       FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null,
           fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for myCol1 without dictionary and with forward index disabled");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Forward index disabled column myCol1 must have dictionary enabled");
+      Assert.fail("Validation should pass since forward index can be disabled for a column without a dictionary");
     }
 
     try {
-      // Enable forward index disabled flag for a column without inverted index
+      // Enable forward index disabled flag for a column without inverted index. This should succeed as though the
+      // forward index cannot be rebuilt without an inverted index, the constraint to have an inverted index has been
+      // lifted.
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
       FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null,
           fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for conflicting myCol2 with forward index disabled but no inverted index");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Forward index disabled column myCol2 must have inverted index enabled");
+      Assert.fail("Validation should pass since forward index can be disabled for a column without an inverted index");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1007,6 +1008,51 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(), "Feature not supported for single-value columns with range index version "
           + "< 2. Cannot disable forward index for column myCol1. Either disable range index or create range index "
           + "with version >= 2 to use this feature");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2")).setInvertedIndexColumns(Arrays.asList("myCol2")).build();
+    try {
+      // Enable forward index disabled flag for a column with inverted index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.RAW,
+          FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should not be able to disable dictionary but keep inverted index");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "Cannot create an Inverted index on column myCol2 specified in the "
+          + "noDictionaryColumns config");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2")).build();
+    try {
+      // Enable forward index disabled flag for a column with FST index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.RAW,
+          FieldConfig.IndexType.FST, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should not be able to disable dictionary but keep inverted index");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "FST Index is only enabled on dictionary encoded columns");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("intCol")).setRangeIndexColumns(Arrays.asList("intCol")).build();
+    try {
+      // Enable forward index disabled flag for a column with FST index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.RAW,
+          FieldConfig.IndexType.RANGE, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.fail("Range index with forward index disabled no dictionary column is allowed");
     }
   }
 

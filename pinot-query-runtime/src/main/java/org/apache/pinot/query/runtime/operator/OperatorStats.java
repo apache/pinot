@@ -19,9 +19,13 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Stopwatch;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.query.runtime.operator.utils.StatsAggregator;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+
 
 public class OperatorStats {
   private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
@@ -29,18 +33,20 @@ public class OperatorStats {
   // TODO: add a operatorId for better tracking purpose.
   private final int _stageId;
   private final long _requestId;
+  private final VirtualServerAddress _serverAddress;
 
   private final String _operatorType;
 
   private int _numBlock = 0;
   private int _numRows = 0;
-  private StatsAggregator _statsAggregator;
+  private final Map<String, String> _executionStats;
 
-  public OperatorStats(long requestId, int stageId, String operatorType) {
+  public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress, String operatorType) {
     _stageId = stageId;
     _requestId = requestId;
+    _serverAddress = serverAddress;
     _operatorType = operatorType;
-    _statsAggregator = new StatsAggregator();
+    _executionStats = new HashMap<>();
   }
 
   public void startTimer() {
@@ -60,12 +66,20 @@ public class OperatorStats {
     _numRows += numRows;
   }
 
+  public void recordSingleStat(String key, String stat) {
+    _executionStats.put(key, stat);
+  }
+
   public void recordExecutionStats(Map<String, String> executionStats) {
-    _statsAggregator.aggregate(executionStats);
+    _executionStats.putAll(executionStats);
   }
 
   public Map<String, String> getExecutionStats() {
-    return _statsAggregator.getStats();
+    _executionStats.putIfAbsent(DataTable.MetadataKey.NUM_BLOCKS.getName(), String.valueOf(_numBlock));
+    _executionStats.putIfAbsent(DataTable.MetadataKey.NUM_ROWS.getName(), String.valueOf(_numRows));
+    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName(),
+        String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
+    return _executionStats;
   }
 
   public int getStageId() {
@@ -76,19 +90,16 @@ public class OperatorStats {
     return _requestId;
   }
 
+  public VirtualServerAddress getServerAddress() {
+    return _serverAddress;
+  }
+
   public String getOperatorType() {
     return _operatorType;
   }
 
-  public void clearExecutionStats() {
-    _statsAggregator = new StatsAggregator();
-  }
-
-  // TODO: Return the string as a JSON string.
   @Override
   public String toString() {
-    return String.format(
-        "OperatorStats[requestId: %s, stageId %s, type: %s] ExecutionWallTime: %sms, No. Rows: %s, No. Block: %s",
-        _requestId, _stageId, _operatorType, _executeStopwatch.elapsed(TimeUnit.MILLISECONDS), _numRows, _numBlock);
+    return OperatorUtils.operatorStatsToJson(this);
   }
 }

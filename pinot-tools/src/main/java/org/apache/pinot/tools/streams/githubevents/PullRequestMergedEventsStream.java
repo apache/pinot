@@ -46,6 +46,9 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class PullRequestMergedEventsStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
 
+  private static final String PULSAR_DATA_PRODUCER_CLASS_NAME =
+      "org.apache.pinot.plugin.stream.pulsar.server.PulsarDataProducer";
+
   private PinotRealtimeSource _pinotStream;
 
   public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
@@ -123,6 +126,21 @@ public class PullRequestMergedEventsStream {
     }
     properties.put("region", region);
     return StreamDataProvider.getStreamDataProducer(KinesisStarterUtils.KINESIS_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static StreamDataProducer getPulsarStreamDataProducer(String brokerServiceUrl, String token)
+      throws Exception {
+    Properties properties = new Properties();
+
+    if (StringUtils.isNotEmpty(brokerServiceUrl)) {
+      properties.put("brokerServiceUrl", brokerServiceUrl);
+    }
+
+    if (StringUtils.isNotEmpty(token)) {
+      properties.put("token", token);
+    }
+
+    return StreamDataProvider.getStreamDataProducer(PULSAR_DATA_PRODUCER_CLASS_NAME, properties);
   }
 
   public static StreamDataProducer getKinesisStreamDataProducer()

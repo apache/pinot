@@ -2,6 +2,22 @@
   "aggregates_planning_tests": {
     "queries": [
       {
+        "description": "Select aggregates with filters and select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/(CAST($0):DOUBLE, $1)], count=[$1])",
+          "\n  LogicalProject($f0=[CASE(=($1, 0), null:INTEGER, $0)], $f1=[$1])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)])",
+          "\n      LogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n          LogicalProject(col2=[$0], col3=[$1])",
+          "\n            LogicalFilter(condition=[AND(>=($1, 0), =($0, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select aggregates",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(a.col1) FROM a",
         "output": [
@@ -32,6 +48,37 @@
       {
         "description": "Select aggregates with filters and select alias",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(sum=[CASE(=($1, 0), null:INTEGER, $0)], count=[$1])",
+          "\n  LogicalAggregate(group=[{}], sum=[$SUM0($0)], agg#1=[$SUM0($1)])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], sum=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$0], col3=[$1])",
+          "\n          LogicalFilter(condition=[AND(>=($1, 0), =($0, 'pink floyd'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/(CAST($0):DOUBLE, $1)], count=[$1])",
+          "\n  LogicalProject($f0=[CASE(=($1, 0), null:INTEGER, $0)], $f1=[$1])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)])",
+          "\n      LogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n          LogicalProject(col2=[$0], col3=[$1])",
+          "\n            LogicalFilter(condition=[AND(>=($1, 0), =($0, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
           "\nLogicalProject(sum=[CASE(=($1, 0), null:INTEGER, $0)], count=[$1])",

@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -100,6 +101,9 @@ public final class TableConfigUtils {
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
       EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.COUNT);
+  private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
+      ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+          RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -557,8 +561,7 @@ public final class TableConfigUtils {
         "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
     Preconditions.checkState(tableConfig.getRoutingConfig() != null
-            && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
-            tableConfig.getRoutingConfig().getInstanceSelectorType()),
+            && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
@@ -927,10 +930,13 @@ public final class TableConfigUtils {
   /**
    * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
    * compatibility mismatch. The checks performed are:
-   *     - Validate dictionary is enabled.
-   *     - Validate inverted index is enabled.
+   *
    *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
-   *       multi-value column (since mulit-value defaults to index v1).
+   *       multi-value column (since multi-value defaults to index v1).
+   *
+   * To rebuild the forward index when it has been disabled the dictionary and inverted index must be enabled for the
+   * given column. If either the inverted index or dictionary are disabled then the only way to get the forward index
+   * back or generate a new index for existing segments is to either refresh or back-fill the segments.
    */
   private static void validateForwardIndexDisabledIndexCompatibility(String columnName, FieldConfig fieldConfig,
       IndexingConfig indexingConfigs, List<String> noDictionaryColumns, Schema schema) {
@@ -939,18 +945,15 @@ public final class TableConfigUtils {
       return;
     }
 
-    boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties.get(FieldConfig.FORWARD_INDEX_DISABLED));
+    boolean forwardIndexDisabled =
+        Boolean.parseBoolean(fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
+            FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
     if (!forwardIndexDisabled) {
       return;
     }
 
     FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-    Preconditions.checkState(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
-            || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
-        String.format("Forward index disabled column %s must have dictionary enabled", columnName));
-    Preconditions.checkState(indexingConfigs.getInvertedIndexColumns() != null
-            && indexingConfigs.getInvertedIndexColumns().contains(columnName),
-        String.format("Forward index disabled column %s must have inverted index enabled", columnName));
+    // Check for the range index since the index itself relies on the existence of the forward index to work.
     if (indexingConfigs.getRangeIndexColumns() != null && indexingConfigs.getRangeIndexColumns().contains(columnName)) {
       Preconditions.checkState(fieldSpec.isSingleValueField(), String.format("Feature not supported for multi-value "
           + "columns with range index. Cannot disable forward index for column %s. Disable range index on this "
@@ -959,6 +962,18 @@ public final class TableConfigUtils {
           String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
               + "forward index for column %s. Either disable range index or create range index with"
               + " version >= 2 to use this feature", columnName));
+    }
+
+    boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
+        || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);
+    boolean hasInvertedIndex = indexingConfigs.getInvertedIndexColumns() != null
+        && indexingConfigs.getInvertedIndexColumns().contains(columnName);
+
+    if (!hasDictionary || !hasInvertedIndex) {
+      LOGGER.warn("Forward index has been disabled for column {}. Either dictionary ({}) and / or inverted index ({}) "
+              + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
+              + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.",
+          columnName, hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
     }
   }
 
@@ -1147,5 +1162,10 @@ public final class TableConfigUtils {
       }
     }
     return false;
+  }
+
+  private static boolean isRoutingStrategyAllowedForUpsert(@Nonnull RoutingConfig routingConfig) {
+    String instanceSelectorType = routingConfig.getInstanceSelectorType();
+    return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
   }
 }

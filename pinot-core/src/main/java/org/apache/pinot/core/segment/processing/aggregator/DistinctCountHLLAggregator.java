@@ -16,14 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.exception;
+package org.apache.pinot.core.segment.processing.aggregator;
 
-public class NoTaskMetadataException extends RuntimeException {
-  public NoTaskMetadataException(String message) {
-    super(message);
-  }
+import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 
-  public NoTaskMetadataException(String message, Throwable cause) {
-    super(message, cause);
+
+public class DistinctCountHLLAggregator implements ValueAggregator {
+  @Override
+  public Object aggregate(Object value1, Object value2) {
+    try {
+      HyperLogLog first = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value1);
+      HyperLogLog second = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value2);
+      first.addAll(second);
+      return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(first);
+    } catch (CardinalityMergeException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
