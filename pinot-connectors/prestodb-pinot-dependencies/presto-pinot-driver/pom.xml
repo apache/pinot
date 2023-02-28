@@ -329,7 +329,7 @@
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-api</artifactId>
-            <version>${grpc.version}</version>
+            <version>1.41.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.google.guava</groupId>
