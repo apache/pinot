@@ -99,7 +99,7 @@ public class QueryDispatcher {
       throws Exception {
     int reduceStageId = -1;
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
-    BlockingQueue<AsyncQueryDispatchResponse> callbacks = new LinkedBlockingQueue<>();
+    BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks = new LinkedBlockingQueue<>();
     int dispatchCalls = 0;
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
       int stageId = stage.getKey();
@@ -118,15 +118,15 @@ public class QueryDispatcher {
                 QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
                 .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
                 .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
-                .putAllMetadata(queryOptions).build(), stageId, serverInstance, deadline, callbacks::offer);
+                .putAllMetadata(queryOptions).build(), stageId, serverInstance, deadline, dispatchCallbacks::offer);
           });
         }
       }
     }
-    int returnedDispatchCalls = 0;
+    int successfulDispatchCalls = 0;
     // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
-    while (!deadline.isExpired() && returnedDispatchCalls < dispatchCalls) {
-      AsyncQueryDispatchResponse resp = callbacks.poll(
+    while (!deadline.isExpired() && successfulDispatchCalls < dispatchCalls) {
+      AsyncQueryDispatchResponse resp = dispatchCallbacks.poll(
           DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
@@ -139,7 +139,7 @@ public class QueryDispatcher {
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", resp.getStageId(),
                     resp.getVirtualServer(), response));
           }
-          returnedDispatchCalls++;
+          successfulDispatchCalls++;
         }
       }
     }

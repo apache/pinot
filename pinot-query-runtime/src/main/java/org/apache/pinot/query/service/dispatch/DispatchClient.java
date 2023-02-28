@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
  */
 class DispatchClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(DispatchClient.class);
-  private ManagedChannel _channel;
-  private PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
+  private final ManagedChannel _channel;
+  private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
   public DispatchClient(String host, int port) {
     _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
