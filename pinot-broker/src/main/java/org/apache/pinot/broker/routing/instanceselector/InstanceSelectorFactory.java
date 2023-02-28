@@ -56,7 +56,8 @@ public class InstanceSelectorFactory {
       if (RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
           .equalsIgnoreCase(routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
-        return new StrictReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector);
+        return new StrictReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector,
+            propertyStore);
       }
       if (RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {

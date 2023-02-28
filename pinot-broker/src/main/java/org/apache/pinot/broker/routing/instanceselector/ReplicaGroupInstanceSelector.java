@@ -82,9 +82,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       for (Pair<String, Double> entry : serverRankListWithScores) {
         serverRankList.add(entry.getLeft());
       }
-
       selectServersUsingAdaptiverServerSelector(segments, requestId, segmentToSelectedInstanceMap,
-          segmentToEnabledInstancesMap, queryOptions, serverRankList);
+          segmentToEnabledInstancesMap, serverRankList);
     } else {
       // Adaptive Server Selection is NOT enabled.
       selectServersUsingRoundRobin(segments, requestId, segmentToSelectedInstanceMap, segmentToEnabledInstancesMap,
@@ -124,7 +123,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   private void selectServersUsingAdaptiverServerSelector(List<String> segments, int requestId,
       Map<String, String> segmentToSelectedInstanceMap, Map<String, List<String>> segmentToEnabledInstancesMap,
-      Map<String, String> queryOptions, List<String> serverRankList) {
+      List<String> serverRankList) {
     for (String segment : segments) {
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)

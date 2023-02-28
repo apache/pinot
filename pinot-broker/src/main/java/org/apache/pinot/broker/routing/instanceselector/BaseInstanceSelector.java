@@ -46,20 +46,21 @@ import org.slf4j.LoggerFactory;
  * in ERROR state).
  */
 abstract class BaseInstanceSelector implements InstanceSelector {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
-
   // To prevent int overflow, reset the request id once it reaches this value
   private static final long MAX_REQUEST_ID = 1_000_000_000;
 
-  private final String _tableNameWithType;
-  private final BrokerMetrics _brokerMetrics;
+  protected static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
+
+  protected final BrokerMetrics _brokerMetrics;
   protected final AdaptiveServerSelector _adaptiveServerSelector;
 
+  protected final String _tableNameWithType;
+
   // These 4 variables are the cached states to help accelerate the change processing
-  private Set<String> _enabledInstances;
-  private Map<String, List<String>> _segmentToOnlineInstancesMap;
-  private Map<String, List<String>> _segmentToOfflineInstancesMap;
-  private Map<String, List<String>> _instanceToSegmentsMap;
+  protected Set<String> _enabledInstances;
+  protected Map<String, List<String>> _segmentToOnlineInstancesMap;
+  protected Map<String, List<String>> _segmentToOfflineInstancesMap;
+  protected Map<String, List<String>> _instanceToSegmentsMap;
 
   // These 2 variables are needed for instance selection (multi-threaded), so make them volatile
   private volatile Map<String, List<String>> _segmentToEnabledInstancesMap;
@@ -230,7 +231,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * enabled instance or all enabled instances are in ERROR state).
    */
   @Nullable
-  private List<String> calculateEnabledInstancesForSegment(String segment, List<String> onlineInstancesForSegment,
+  protected List<String> calculateEnabledInstancesForSegment(String segment, List<String> onlineInstancesForSegment,
       Set<String> unavailableSegments) {
     List<String> enabledInstancesForSegment = new ArrayList<>(onlineInstancesForSegment.size());
     for (String onlineInstance : onlineInstancesForSegment) {
