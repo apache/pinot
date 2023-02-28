@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -142,14 +143,20 @@ public class UpsertConfig extends BaseJsonConfig {
    * in the case where there are multiple producers sinking to the same table.
    */
   public void setComparisonColumns(List<String> comparisonColumns) {
+    Preconditions.checkArgument(_comparisonColumns == null,
+        "Possible duplicated entries: comparisonColumn, comparisonColumns");
     _comparisonColumns = comparisonColumns;
   }
 
   public void setComparisonColumn(List<String> comparisonColumns) {
+    Preconditions.checkArgument(_comparisonColumns == null,
+        "Possible duplicated entries: comparisonColumn, comparisonColumns");
     _comparisonColumns = comparisonColumns;
   }
 
   public void setComparisonColumn(String comparisonColumn) {
+    Preconditions.checkArgument(_comparisonColumns == null,
+        "Possible duplicated entries: comparisonColumn, comparisonColumns");
     _comparisonColumns = Collections.singletonList(comparisonColumn);
   }
 
