@@ -19,24 +19,32 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongConsumer;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
+  private final List<String> _operatorIds = new ArrayList<>();
+  private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final boolean _enableTrace;
 
@@ -66,6 +74,9 @@ public class ExecutionStatsAggregator {
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private boolean _numGroupsLimitReached = false;
+  private int _numBlocks = 0;
+  private int _numRows = 0;
+  private long _stageExecutionTimeMs = 0;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -80,6 +91,32 @@ public class ExecutionStatsAggregator {
     // Reduce on trace info.
     if (_enableTrace) {
       _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
+    }
+
+    String tableNamesStr = metadata.get(DataTable.MetadataKey.TABLE.getName());
+    String tableName = null;
+
+    if (tableNamesStr != null) {
+      List<String> tableNames = Arrays.stream(tableNamesStr.split("::")).collect(Collectors.toList());
+      _tableNames.addAll(tableNames);
+
+      //TODO: Decide a strategy to split stageLevel stats across tables for brokerMetrics
+      // assigning everything to the first table only for now
+      tableName = tableNames.get(0);
+    }
+
+    TableType tableType = null;
+    if (routingInstance != null) {
+      tableType = routingInstance.getTableType();
+    } else if (tableName != null) {
+      tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    } else {
+      tableType = null;
+    }
+
+    String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
+    if (operatorId != null) {
+      _operatorIds.add(operatorId);
     }
 
     // Reduce on exceptions.
@@ -141,8 +178,8 @@ public class ExecutionStatsAggregator {
     }
 
     String threadCpuTimeNsString = metadata.get(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName());
-    if (routingInstance != null && threadCpuTimeNsString != null) {
-      if (routingInstance.getTableType() == TableType.OFFLINE) {
+    if (tableType != null && threadCpuTimeNsString != null) {
+      if (tableType == TableType.OFFLINE) {
         _offlineThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
       } else {
         _realtimeThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
@@ -151,8 +188,8 @@ public class ExecutionStatsAggregator {
 
     String systemActivitiesCpuTimeNsString =
         metadata.get(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName());
-    if (routingInstance != null && systemActivitiesCpuTimeNsString != null) {
-      if (routingInstance.getTableType() == TableType.OFFLINE) {
+    if (tableType != null && systemActivitiesCpuTimeNsString != null) {
+      if (tableType == TableType.OFFLINE) {
         _offlineSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
       } else {
         _realtimeSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
@@ -161,8 +198,8 @@ public class ExecutionStatsAggregator {
 
     String responseSerializationCpuTimeNsString =
         metadata.get(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
-    if (routingInstance != null && responseSerializationCpuTimeNsString != null) {
-      if (routingInstance.getTableType() == TableType.OFFLINE) {
+    if (tableType != null && responseSerializationCpuTimeNsString != null) {
+      if (tableType == TableType.OFFLINE) {
         _offlineResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
       } else {
         _realtimeResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
@@ -200,6 +237,22 @@ public class ExecutionStatsAggregator {
     }
     _numGroupsLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
+
+
+    String numBlocksString = metadata.get(DataTable.MetadataKey.NUM_BLOCKS.getName());
+    if (numBlocksString != null) {
+      _numBlocks += Long.parseLong(numBlocksString);
+    }
+
+    String numRowsString = metadata.get(DataTable.MetadataKey.NUM_ROWS.getName());
+    if (numBlocksString != null) {
+      _numRows += Long.parseLong(numRowsString);
+    }
+
+    String operatorExecutionTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName());
+    if (operatorExecutionTimeString != null) {
+      _stageExecutionTimeMs += Long.parseLong(operatorExecutionTimeString);
+    }
   }
 
   public void setStats(BrokerResponseNative brokerResponseNative) {
@@ -278,6 +331,17 @@ public class ExecutionStatsAggregator {
             System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
       }
     }
+  }
+
+  public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
+      @Nullable BrokerMetrics brokerMetrics) {
+    setStats(rawTableName, brokerResponseStats, brokerMetrics);
+
+    brokerResponseStats.setNumBlocks(_numBlocks);
+    brokerResponseStats.setNumRows(_numRows);
+    brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
+    brokerResponseStats.setOperatorIds(_operatorIds);
+    brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
 
   private void withNotNullLongMetadata(Map<String, String> metadata, DataTable.MetadataKey key, LongConsumer consumer) {
