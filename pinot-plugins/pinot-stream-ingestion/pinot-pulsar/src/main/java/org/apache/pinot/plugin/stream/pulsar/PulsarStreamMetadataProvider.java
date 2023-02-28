@@ -84,17 +84,15 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     String subscription = "Pinot_" + UUID.randomUUID();
-    MessageId offset = null;
-    try (Consumer consumer =
-        _pulsarClient.newConsumer().topic(_topic)
-            .subscriptionInitialPosition(PulsarUtils.offsetCriteriaToSubscription(offsetCriteria))
-            .subscriptionMode(SubscriptionMode.NonDurable)  // automatically deletes subscription on consumer close
-            .subscriptionName(subscription).subscribe()) {
-
+    MessageId offset;
+    try (Consumer consumer = _pulsarClient.newConsumer().topic(_topic)
+        .subscriptionInitialPosition(PulsarUtils.offsetCriteriaToSubscription(offsetCriteria))
+        .subscriptionMode(SubscriptionMode.NonDurable)  // automatically deletes subscription on consumer close
+        .subscriptionName(subscription).subscribe()) {
       if (offsetCriteria.isLargest()) {
         offset = consumer.getLastMessageId();
       } else if (offsetCriteria.isSmallest()) {
-        offset = consumer.receive().getMessageId();
+        offset = consumer.receive((int) timeoutMillis, TimeUnit.MILLISECONDS).getMessageId();
       } else {
         throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
       }
@@ -131,8 +129,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
         for (int p = newPartitionStartIndex; p < partitionedTopicNameList.size(); p++) {
           try (Consumer consumer = _pulsarClient.newConsumer().topic(partitionedTopicNameList.get(p))
               .subscriptionInitialPosition(_config.getInitialSubscriberPosition())
-              .subscriptionMode(SubscriptionMode.NonDurable)
-              .subscriptionName(subscription).subscribe()) {
+              .subscriptionMode(SubscriptionMode.NonDurable).subscriptionName(subscription).subscribe()) {
 
             Message message = consumer.receive(timeoutMillis, TimeUnit.MILLISECONDS);
             if (message != null) {
@@ -149,8 +146,9 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
                   new PartitionGroupMetadata(p, new MessageIdStreamOffset(lastMessageId)));
             }
           } catch (PulsarClientException pce) {
-            LOGGER.warn("Error encountered while calculating partition group metadata for topic "
-                + _config.getPulsarTopicName() + " partition " + partitionedTopicNameList.get(p), pce);
+            LOGGER.warn(
+                "Error encountered while calculating partition group metadata for topic " + _config.getPulsarTopicName()
+                    + " partition " + partitionedTopicNameList.get(p), pce);
           }
         }
       }

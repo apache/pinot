@@ -69,11 +69,17 @@ public abstract class BaseIndexHandler implements IndexHandler {
       return _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
     }
 
-    // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist.
+    // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist to
+    // regenerate it. If either are missing the only way to get the forward index back and potentially use it to
+    // generate newly added indexes is to refresh or back-fill the forward index.
     Preconditions.checkState(segmentWriter.hasIndexFor(columnName, StandardIndexes.dictionary()),
-        String.format("Forward index disabled column %s must have a dictionary", columnName));
+        String.format("Forward index disabled column %s must have a dictionary to regenerate the forward index. "
+            + "Regeneration of the forward index is required to create new indexes as well. Please refresh or "
+            + "back-fill the forward index", columnName));
     Preconditions.checkState(segmentWriter.hasIndexFor(columnName, StandardIndexes.inverted()),
-        String.format("Forward index disabled column %s must have an inverted index", columnName));
+        String.format("Forward index disabled column %s must have an inverted index to regenerate the forward index. "
+            + "Regeneration of the forward index is required to create new indexes as well. Please refresh or "
+            + "back-fill the forward index", columnName));
 
     LOGGER.info("Rebuilding the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
     InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =

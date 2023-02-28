@@ -106,7 +106,7 @@ public class QueryRunner {
       _executorService = Executors.newFixedThreadPool(
           ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("query_worker_on_" + _port + "_port"));
-      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _executorService, releaseMs);
+      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _executorService);
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -154,8 +154,9 @@ public class QueryRunner {
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator = new MailboxSendOperator(_mailboxService,
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
-              sendNode.getStageId()), receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
-          sendNode.getPartitionKeySelector(), _rootServer, serverQueryRequests.get(0).getRequestId(),
+              sendNode.getStageId(), _rootServer), receivingStageMetadata.getServerInstances(),
+          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _rootServer,
+          serverQueryRequests.get(0).getRequestId(),
           sendNode.getStageId(), sendNode.getReceiverStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {

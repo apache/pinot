@@ -41,7 +41,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
@@ -409,33 +408,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   /**
-   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
-   * compatibility mismatch. The checks performed are:
-   *     - Validate dictionary is enabled.
-   *     - Validate inverted index is enabled.
-   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
-   *       multi-value column (since multi-value defaults to index v1).
-   */
-  protected void validateForwardIndexDisabledConfigsIfPresent(String column, boolean forwardIndexDisabled) {
-    if (!forwardIndexDisabled) {
-      return;
-    }
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
-          String.format("Inverted index must be enabled for forward index disabled column: %s", column));
-      Preconditions.checkState(!_indexLoadingConfig.getNoDictionaryColumns().contains(column),
-          String.format("Dictionary disabled column: %s cannot disable the forward index", column));
-      if (_indexLoadingConfig.getRangeIndexColumns() != null
-          && _indexLoadingConfig.getRangeIndexColumns().contains(column)) {
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            String.format("Multi-value column with range index: %s cannot disable the forward index", column));
-        Preconditions.checkState(_indexLoadingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
-            String.format("Single-value column with range index version < 2: %s cannot disable the forward index",
-                column));
-      }
-  }
-
-  /**
    * Check and return whether the forward index is disabled for a given column
    */
   protected boolean isForwardIndexDisabled(String column) {
@@ -456,9 +428,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     Object defaultValue = fieldSpec.getDefaultNullValue();
     boolean isSingleValue = fieldSpec.isSingleValueField();
     int maxNumberOfMultiValueElements = isSingleValue ? 0 : 1;
-    boolean forwardIndexDisabled = isForwardIndexDisabled(column);
-
-    validateForwardIndexDisabledConfigsIfPresent(column, forwardIndexDisabled);
 
     Object sortedArray;
     switch (dataType.getStoredType()) {
@@ -525,12 +494,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     } else {
       // Multi-value column.
 
+      boolean forwardIndexDisabled = isForwardIndexDisabled(column);
       if (forwardIndexDisabled) {
         // Generate an inverted index instead of forward index for multi-value columns when forward index is disabled
         try (DictionaryBasedInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(_indexDir, fieldSpec,
             1, totalDocs, totalDocs)) {
+          int[] dictIds = new int[]{0};
           for (int docId = 0; docId < totalDocs; docId++) {
-            creator.add(0);
+            creator.add(dictIds, 1);
           }
           creator.seal();
         }
