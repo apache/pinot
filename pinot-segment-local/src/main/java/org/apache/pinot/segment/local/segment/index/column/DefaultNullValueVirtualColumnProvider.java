@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -88,17 +89,42 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
     ColumnMetadataImpl.Builder builder = getColumnMetadataBuilder(context).setCardinality(1).setHasDictionary(true);
     if (context.getFieldSpec().isSingleValueField()) {
       builder.setSorted(true);
-
-      if (context.getFieldSpec().getDefaultNullValue() instanceof Comparable) {
-        builder.setMinValue((Comparable) context.getFieldSpec().getDefaultNullValue());
-        builder.setMaxValue((Comparable) context.getFieldSpec().getDefaultNullValue());
-      }
     } else {
       // When there is no value for a multi-value column, the maxNumberOfMultiValues and cardinality should be
       // set as 1 because the MV column bitmap uses 1 to delimit the rows for a MV column. Each MV column will have a
       // default null value based on column's data type
       builder.setMaxNumberOfMultiValues(1);
     }
+
+    FieldSpec fieldSpec = context.getFieldSpec();
+    Object defaultNullValue = fieldSpec.getDefaultNullValue();
+    switch (fieldSpec.getDataType().getStoredType()) {
+      case INT:
+        builder.setMinValue((int) defaultNullValue).setMaxValue((int) defaultNullValue);
+        break;
+      case LONG:
+        builder.setMinValue((long) defaultNullValue).setMaxValue((long) defaultNullValue);
+        break;
+      case FLOAT:
+        builder.setMinValue((float) defaultNullValue).setMaxValue((float) defaultNullValue);
+        break;
+      case DOUBLE:
+        builder.setMinValue((double) defaultNullValue).setMaxValue((double) defaultNullValue);
+        break;
+      case BIG_DECIMAL:
+        builder.setMinValue((BigDecimal) defaultNullValue).setMaxValue((BigDecimal) defaultNullValue);
+        break;
+      case STRING:
+        builder.setMinValue((String) defaultNullValue).setMaxValue((String) defaultNullValue);
+        break;
+      case BYTES:
+        builder.setMinValue(new ByteArray((byte[]) defaultNullValue))
+            .setMaxValue(new ByteArray((byte[]) defaultNullValue));
+        break;
+      default:
+        break;
+    }
+
     return builder.build();
   }
 }
