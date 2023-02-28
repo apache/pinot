@@ -50,8 +50,8 @@ import org.slf4j.LoggerFactory;
  * columns and in addition will add the aggregation columns to the output data.
  * [input columns, aggregate result1, ... aggregate resultN]
  *
- * The window functions supported today are SUM/COUNT/MIN/MAX/AVG aggregations. Window functions also include
- * other types of functions such as rank and value functions.
+ * The window functions supported today are SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations. Window functions also
+ * include other types of functions such as rank and value functions.
  *
  * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
  * will output as many rows as input rows.

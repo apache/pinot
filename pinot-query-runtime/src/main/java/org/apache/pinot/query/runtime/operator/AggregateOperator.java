@@ -212,14 +212,6 @@ public class AggregateOperator extends MultiStageOperator {
     return false;
   }
 
-  private static Boolean mergeBoolAnd(Object left, Object right) {
-    return ((Boolean) left) && ((Boolean) right);
-  }
-
-  private static Boolean mergeBoolOr(Object left, Object right) {
-    return ((Boolean) left) || ((Boolean) right);
-  }
-
   // NOTE: the below two classes are needed depending on where the
   // fourth moment is being executed - if the leaf stage gets a
   // fourth moment pushed down to it, it will return a PinotFourthMoment
@@ -286,12 +278,6 @@ public class AggregateOperator extends MultiStageOperator {
     private static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> AGG_MERGERS =
         ImmutableMap.<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>>builder()
             .putAll(AggregationUtils.Accumulator.MERGERS)
-            .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-            .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-            .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
-            .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-            .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-            .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr)
             .put("FOURTHMOMENT",
                 cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
                     : new MergeFourthMomentNumeric())

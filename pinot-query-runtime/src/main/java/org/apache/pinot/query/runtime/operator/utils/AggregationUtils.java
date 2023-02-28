@@ -59,6 +59,14 @@ public class AggregationUtils {
     return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
   }
 
+  private static Boolean mergeBoolAnd(Object left, Object right) {
+    return ((Boolean) left) && ((Boolean) right);
+  }
+
+  private static Boolean mergeBoolOr(Object left, Object right) {
+    return ((Boolean) left) || ((Boolean) right);
+  }
+
   private static class MergeCounts implements AggregationUtils.Merger {
 
     @Override
@@ -105,6 +113,12 @@ public class AggregationUtils {
             .put("$MAX", cdt -> AggregationUtils::mergeMax)
             .put("$MAX0", cdt -> AggregationUtils::mergeMax)
             .put("COUNT", cdt -> new AggregationUtils.MergeCounts())
+            .put("BOOL_AND", cdt -> AggregationUtils::mergeBoolAnd)
+            .put("$BOOL_AND", cdt -> AggregationUtils::mergeBoolAnd)
+            .put("$BOOL_AND0", cdt -> AggregationUtils::mergeBoolAnd)
+            .put("BOOL_OR", cdt -> AggregationUtils::mergeBoolOr)
+            .put("$BOOL_OR", cdt -> AggregationUtils::mergeBoolOr)
+            .put("$BOOL_OR0", cdt -> AggregationUtils::mergeBoolOr)
             .build();
 
     protected final int _inputRef;

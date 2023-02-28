@@ -606,6 +606,34 @@
         "description": "Multiple empty OVER()s with select col, agg col and group by with a filter that matches no rows",
         "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(), AVG({tbl}.double_col) OVER() FROM {tbl} WHERE double_col > 500 GROUP BY double_col",
         "outputs": []
+      },
+      {
+        "description": "Multiple empty OVER()s with select col and filter using bool aggregation",
+        "sql": "SELECT string_col, BOOL_OR(bool_col) OVER(), BOOL_AND(bool_col) OVER() FROM {tbl} WHERE string_col = 'a'",
+        "outputs": [
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col and filter using bool aggregation",
+        "sql": "SELECT string_col, BOOL_OR(bool_col) OVER(), BOOL_AND(bool_col) OVER() FROM {tbl} WHERE string_col = 'a' AND double_col = 42",
+        "outputs": [
+          ["a", false, false]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col and filter using bool aggregation",
+        "sql": "SELECT string_col, BOOL_OR(bool_col) OVER(), BOOL_AND(bool_col) OVER() FROM {tbl} WHERE string_col = 'a' AND double_col != 42",
+        "outputs": [
+          ["a", true, true],
+          ["a", true, true],
+          ["a", true, true],
+          ["a", true, true]
+        ]
       }
     ]
   },
@@ -1070,6 +1098,28 @@
           ["c", 54, 150, 400],
           ["c", 54, 3, 400],
           ["c", 54, 2, 400]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select col using bool aggregation",
+        "sql": "SELECT string_col, BOOL_OR(bool_col) OVER(PARTITION BY string_col), BOOL_AND(bool_col) OVER(PARTITION BY string_col) FROM {tbl}",
+        "outputs": [
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false],
+          ["b", false, false],
+          ["b", false, false],
+          ["d", false, false],
+          ["e", true, false],
+          ["e", true, false],
+          ["h", false, false],
+          ["g", true, true],
+          ["c", true, false],
+          ["c", true, false],
+          ["c", true, false],
+          ["c", true, false]
         ]
       },
       {
