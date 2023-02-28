@@ -252,7 +252,8 @@ public class SegmentGeneratorConfig implements Serializable {
   public Map<String, Map<String, String>> getColumnProperties() {
     HashMap<String, Map<String, String>> copy = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : _columnProperties.entrySet()) {
-      copy.put(entry.getKey(), Collections.unmodifiableMap(entry.getValue()));
+      Map<String, String> value = entry.getValue();
+      copy.put(entry.getKey(), value == null ? null : Collections.unmodifiableMap(value));
     }
 
     return Collections.unmodifiableMap(copy);

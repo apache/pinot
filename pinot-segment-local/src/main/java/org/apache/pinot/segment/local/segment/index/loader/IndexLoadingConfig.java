@@ -435,7 +435,7 @@ public class IndexLoadingConfig {
   }
 
   public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
-    _columnProperties = columnProperties;
+    _columnProperties = new HashMap<>(columnProperties);
   }
 
   /**
@@ -472,7 +472,7 @@ public class IndexLoadingConfig {
    */
   @VisibleForTesting
   public void setNoDictionaryColumns(Set<String> noDictionaryColumns) {
-    _noDictionaryColumns = noDictionaryColumns;
+    _noDictionaryColumns = new HashSet<>(noDictionaryColumns);
   }
 
   @VisibleForTesting
@@ -501,7 +501,7 @@ public class IndexLoadingConfig {
    */
   @VisibleForTesting
   public void setCompressionConfigs(Map<String, ChunkCompressionType> compressionConfigs) {
-    _compressionConfigs = compressionConfigs;
+    _compressionConfigs = new HashMap<>(compressionConfigs);
   }
 
   /**
@@ -509,7 +509,7 @@ public class IndexLoadingConfig {
    */
   @VisibleForTesting
   public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
-    _rangeIndexColumns = rangeIndexColumns;
+    _rangeIndexColumns = new HashSet<>(rangeIndexColumns);
   }
 
   public void addRangeIndexColumns(String... rangeIndexColumns) {
@@ -528,7 +528,7 @@ public class IndexLoadingConfig {
    */
   @VisibleForTesting
   public void setTextIndexColumns(Set<String> textIndexColumns) {
-    _textIndexColumns = textIndexColumns;
+    _textIndexColumns = new HashSet<>(textIndexColumns);
   }
 
   @VisibleForTesting
@@ -543,7 +543,7 @@ public class IndexLoadingConfig {
 
   @VisibleForTesting
   public void setFSTIndexColumns(Set<String> fstIndexColumns) {
-    _fstIndexColumns = fstIndexColumns;
+    _fstIndexColumns = new HashSet<>(fstIndexColumns);
   }
 
   @VisibleForTesting
@@ -575,17 +575,17 @@ public class IndexLoadingConfig {
 
   @VisibleForTesting
   public void setH3IndexConfigs(Map<String, H3IndexConfig> h3IndexConfigs) {
-    _h3IndexConfigs = h3IndexConfigs;
+    _h3IndexConfigs = new HashMap<>(h3IndexConfigs);
   }
 
   @VisibleForTesting
   public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
-    _bloomFilterConfigs = bloomFilterConfigs;
+    _bloomFilterConfigs = new HashMap<>(bloomFilterConfigs);
   }
 
   @VisibleForTesting
   public void setOnHeapDictionaryColumns(Set<String> onHeapDictionaryColumns) {
-    _onHeapDictionaryColumns = onHeapDictionaryColumns;
+    _onHeapDictionaryColumns = new HashSet<>(onHeapDictionaryColumns);
   }
 
   /**
@@ -594,7 +594,7 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setForwardIndexDisabledColumns(Set<String> forwardIndexDisabledColumns) {
     _forwardIndexDisabledColumns =
-        forwardIndexDisabledColumns == null ? Collections.emptySet() : forwardIndexDisabledColumns;
+        forwardIndexDisabledColumns == null ? new HashSet<>() : new HashSet<>(forwardIndexDisabledColumns);
   }
 
   @VisibleForTesting
@@ -749,7 +749,7 @@ public class IndexLoadingConfig {
   }
 
   public void setInstanceTierConfigs(Map<String, Map<String, String>> tierConfigs) {
-    _instanceTierConfigs = tierConfigs;
+    _instanceTierConfigs = new HashMap<>(tierConfigs);
   }
 
   public Map<String, Map<String, String>> getInstanceTierConfigs() {

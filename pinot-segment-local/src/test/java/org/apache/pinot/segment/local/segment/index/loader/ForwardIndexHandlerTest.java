@@ -818,7 +818,7 @@ public class ForwardIndexHandlerTest {
 
     // TEST7: Disable forward index for a raw column without enabling dictionary or inverted index
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-    indexLoadingConfig.getForwardIndexDisabledColumns().add(DIM_LZ4_INTEGER);
+    indexLoadingConfig.addForwardIndexDisabledColumns(DIM_LZ4_INTEGER);
     fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
     operationMap = fwdIndexHandler.computeOperations(writer);
     assertEquals(operationMap.size(), 1);
@@ -827,7 +827,7 @@ public class ForwardIndexHandlerTest {
 
     // TEST8: Disable forward index for a dictionary column and also disable dictionary and inverted index
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-    indexLoadingConfig.getForwardIndexDisabledColumns().add(DIM_DICT_INTEGER);
+    indexLoadingConfig.addForwardIndexDisabledColumns(DIM_DICT_INTEGER);
     indexLoadingConfig.addNoDictionaryColumns(DIM_DICT_INTEGER);
     fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
     operationMap = fwdIndexHandler.computeOperations(writer);
@@ -840,7 +840,7 @@ public class ForwardIndexHandlerTest {
 
     // TEST9: Disable dictionary on a column that already has forward index disabled
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-    indexLoadingConfig.getForwardIndexDisabledColumns().add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    indexLoadingConfig.addForwardIndexDisabledColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
     indexLoadingConfig.addNoDictionaryColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
     indexLoadingConfig.removeInvertedIndexColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
     fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
@@ -851,7 +851,7 @@ public class ForwardIndexHandlerTest {
 
     // TEST10: Disable inverted index on a column that already has forward index disabled
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-    indexLoadingConfig.getForwardIndexDisabledColumns().add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    indexLoadingConfig.addForwardIndexDisabledColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
     indexLoadingConfig.removeInvertedIndexColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
     fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
     operationMap = fwdIndexHandler.computeOperations(writer);
@@ -868,8 +868,8 @@ public class ForwardIndexHandlerTest {
 
     // TEST12: Enable dictionary on a column that already has forward index disabled and dictionary disabled
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-    indexLoadingConfig.getForwardIndexDisabledColumns().add(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
-    indexLoadingConfig.getNoDictionaryColumns().remove(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    indexLoadingConfig.addForwardIndexDisabledColumns(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    indexLoadingConfig.removeNoDictionaryColumns(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
     fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
     try {
       operationMap = fwdIndexHandler.computeOperations(writer);
@@ -883,7 +883,7 @@ public class ForwardIndexHandlerTest {
     // TEST13: Disable dictionary on a column that already has forward index disabled without an inverted index but
     // with a range index
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-    indexLoadingConfig.getForwardIndexDisabledColumns().add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
+    indexLoadingConfig.addForwardIndexDisabledColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
     indexLoadingConfig.addNoDictionaryColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
     fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
     try {
@@ -1689,7 +1689,7 @@ public class ForwardIndexHandlerTest {
       forwardIndexDisabledColumns.add(column);
       indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
       noDictColumnsToRemove.add(column);
-      indexLoadingConfig.getNoDictionaryColumns().removeAll(noDictColumnsToRemove);
+      indexLoadingConfig.removeNoDictionaryColumns(noDictColumnsToRemove);
       Set<String> invertedIndexColumns = new HashSet<>(forwardIndexDisabledColumns);
       invertedIndexColumns.removeAll(FORWARD_INDEX_DISABLED_RAW_COLUMNS);
       invertedIndexColumns.remove(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
