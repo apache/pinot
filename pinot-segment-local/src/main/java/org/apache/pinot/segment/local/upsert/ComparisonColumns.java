@@ -21,14 +21,14 @@ package org.apache.pinot.segment.local.upsert;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ComparisonColumns implements Comparable<ComparisonColumns> {
-  private Comparable[] _comparisonColumns;
+  private Comparable[] _values;
 
-  public ComparisonColumns(Comparable[] comparisonColumns) {
-    _comparisonColumns = comparisonColumns;
+  public ComparisonColumns(Comparable[] values) {
+    _values = values;
   }
 
-  public Comparable[] getComparisonColumns() {
-    return _comparisonColumns;
+  public Comparable[] getValues() {
+    return _values;
   }
 
   @Override
@@ -41,15 +41,15 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
     if (comparableIndex < 0) {
       // All comparison values were null.  This record is only ok to keep if all prior values were also null
       comparisonResult = 1;
-      for (int i = 0; i < other.getComparisonColumns().length; i++) {
-        if (other.getComparisonColumns()[i] != null) {
+      for (int i = 0; i < other.getValues().length; i++) {
+        if (other.getValues()[i] != null) {
           comparisonResult = -1;
           break;
         }
       }
     } else {
-      Comparable comparisonValue = _comparisonColumns[comparableIndex];
-      Comparable otherComparisonValue = other.getComparisonColumns()[comparableIndex];
+      Comparable comparisonValue = _values[comparableIndex];
+      Comparable otherComparisonValue = other.getValues()[comparableIndex];
 
       if (otherComparisonValue == null) {
         // Keep this record because the existing record has no value for the same comparison column, therefore the
@@ -61,44 +61,31 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
     }
 
     if (comparisonResult >= 0) {
-      _comparisonColumns = merge(other.getComparisonColumns(), _comparisonColumns);
+      // TODO(egalpin):  This method currently may have side-effects on _values. Depending on the comparison result,
+      //  entities from {@param other} may be merged into _values. This really should not be done implicitly as part
+      //  of compareTo, but has been implemented this way to minimize the changes required within all subclasses of
+      //  {@link BasePartitionUpsertMetadataManager}. Ideally, this merge should only be triggered explicitly by
+      //  implementations of {@link BasePartitionUpsertMetadataManager}.
+      for (int i = 0; i < _values.length; i++) {
+        // N.B. null check _must_ be here to prevent overwriting _values[i] with null from other._values[i], such
+        // as in the case where this is the first time that a non-null value has been received for a given
+        // comparableIndex after previously receiving non-null value for a different comparableIndex
+        if (i != comparableIndex && other._values[i] != null) {
+          _values[i] = other._values[i];
+        }
+      }
     }
 
     return comparisonResult;
   }
 
   private int getComparableIndex() {
-    for (int i = 0; i < _comparisonColumns.length; i++) {
-      if (_comparisonColumns[i] == null) {
+    for (int i = 0; i < _values.length; i++) {
+      if (_values[i] == null) {
         continue;
       }
       return i;
     }
     return -1;
-  }
-
-  public static Comparable[] merge(Comparable[] current, Comparable[] next) {
-    // Create a shallow copy so {@param current} is unmodified
-    Comparable[] mergedComparisonColumns = new Comparable[current.length];
-
-    for (int i = 0; i < mergedComparisonColumns.length; i++) {
-      Comparable inboundValue = next[i];
-      Comparable existingValue = current[i];
-
-      if (existingValue == null) {
-        mergedComparisonColumns[i] = inboundValue;
-        continue;
-      }
-
-      if (inboundValue == null) {
-        mergedComparisonColumns[i] = existingValue;
-        continue;
-      }
-
-      int comparisonResult = inboundValue.compareTo(existingValue);
-      Comparable comparisonValue = comparisonResult >= 0 ? inboundValue : existingValue;
-      mergedComparisonColumns[i] = comparisonValue;
-    }
-    return mergedComparisonColumns;
   }
 }

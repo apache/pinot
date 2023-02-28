@@ -571,26 +571,25 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private RecordInfo multiComparisonRecordInfo(PrimaryKey primaryKey, int docId, GenericRow row) {
-    Comparable[] comparisonColumns = new Comparable[_upsertComparisonColumns.size()];
+    int numComparisonColumns = _upsertComparisonColumns.size();
+    Comparable[] comparisonValues = new Comparable[numComparisonColumns];
 
-    int i = -1;
-    for (String columnName : _upsertComparisonColumns) {
-      i++;
-      Object comparisonValue = row.getValue(columnName);
+    for (int i = 0; i < numComparisonColumns; i++) {
+      String columnName = _upsertComparisonColumns.get(i);
 
-      Preconditions.checkState(comparisonValue instanceof Comparable,
-          "Upsert comparison column: %s must be comparable", columnName);
+      if (!row.isNullValue(columnName)) {
+        Object comparisonValue = row.getValue(columnName);
+        Preconditions.checkState(comparisonValue instanceof Comparable,
+            "Upsert comparison column: %s must be comparable", columnName);
+        comparisonValues[i] = (Comparable) comparisonValue;
 
-      if (row.isNullValue(columnName)) {
         // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
         // columns are mutually exclusive
-        comparisonColumns[i] = null;
-        continue;
+        return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues));
       }
-
-      comparisonColumns[i] = (Comparable) comparisonValue;
     }
-    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
+    // Note that reaching here implies all comparison values were null.
+    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues));
   }
 
   private void updateDictionary(GenericRow row) {

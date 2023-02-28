@@ -156,4 +156,54 @@ public class UpsertUtils {
   public interface ComparisonColumnReader extends Closeable {
     Comparable getComparisonValue(int docId);
   }
+
+  public static class SingleComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
+    private final PinotSegmentColumnReader _comparisonColumnReader;
+
+    public SingleComparisonColumnReader(IndexSegment segment, String comparisonColumn) {
+      _comparisonColumnReader = new PinotSegmentColumnReader(segment, comparisonColumn);
+    }
+
+    @Override
+    public Comparable getComparisonValue(int docId) {
+      return (Comparable) _comparisonColumnReader.getValue(docId);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      _comparisonColumnReader.close();
+    }
+  }
+
+  public static class MultiComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
+    private final PinotSegmentColumnReader[] _comparisonColumnReaders;
+
+    public MultiComparisonColumnReader(IndexSegment segment, List<String> comparisonColumns) {
+      _comparisonColumnReaders = new PinotSegmentColumnReader[comparisonColumns.size()];
+      for (int i = 0; i < comparisonColumns.size(); i++) {
+        _comparisonColumnReaders[i] = new PinotSegmentColumnReader(segment, comparisonColumns.get(i));
+      }
+    }
+
+    public Comparable getComparisonValue(int docId) {
+      Comparable[] comparisonColumns = new Comparable[_comparisonColumnReaders.length];
+
+      for (int i = 0; i < _comparisonColumnReaders.length; i++) {
+        PinotSegmentColumnReader columnReader = _comparisonColumnReaders[i];
+        Comparable comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
+        comparisonColumns[i] = comparisonValue;
+      }
+
+      return new ComparisonColumns(comparisonColumns);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      for (PinotSegmentColumnReader comparisonColumnReader : _comparisonColumnReaders) {
+        comparisonColumnReader.close();
+      }
+    }
+  }
 }
