@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -52,8 +52,18 @@ public class SegmentNameSegmentPruner implements SegmentPruner {
     if (filterExpression == null || !isEligibleForPruning(filterExpression)) {
       return segments;
     }
+    Pair<Set<String>, Set<String>> eligibleSegments = getEligibleSegments(filterExpression);
 
-    return getSegmentsEligibleSegments(filterExpression, segments);
+    Set<String> eligibleSegmentsSet = new HashSet<>(segments);
+    if (eligibleSegments.getLeft() != null) {
+      eligibleSegmentsSet.retainAll(eligibleSegments.getLeft());
+    }
+
+    if (eligibleSegments.getRight() != null) {
+      eligibleSegmentsSet.removeAll(eligibleSegments.getRight());
+    }
+
+    return eligibleSegmentsSet;
   }
 
   private boolean isEligibleForPruning(Expression filterExpression) {
@@ -93,8 +103,10 @@ public class SegmentNameSegmentPruner implements SegmentPruner {
     return false;
   }
 
-  private Set<String> getSegmentsEligibleSegments(Expression filterExpression, Set<String> segments) {
-    Set<String> result = new HashSet<>(segments);
+  private Pair<Set<String>, Set<String>> getEligibleSegments(Expression filterExpression) {
+    Set<String> includedSegments = null;
+    Set<String> excludedSegments = null;
+
     Function function = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(function.getOperator());
     List<Expression> operands = function.getOperands();
@@ -104,14 +116,43 @@ public class SegmentNameSegmentPruner implements SegmentPruner {
     switch (filterKind) {
       case AND:
         for (Expression child : operands) {
-          result.retainAll(getSegmentsEligibleSegments(child, segments));
+          Pair<Set<String>, Set<String>> eligibleSegments = getEligibleSegments(child);
+          if (eligibleSegments.getLeft() != null) {
+            if (includedSegments == null) {
+              includedSegments = new HashSet<>(eligibleSegments.getLeft());
+            } else {
+              includedSegments.retainAll(eligibleSegments.getLeft());
+            }
+          }
+
+          if (eligibleSegments.getRight() != null) {
+            if (excludedSegments == null) {
+              excludedSegments = new HashSet<>(eligibleSegments.getRight());
+            } else {
+              excludedSegments.addAll(eligibleSegments.getRight());
+            }
+          }
         }
         break;
 
       case OR:
-        result = new HashSet<>();
         for (Expression child : operands) {
-          result.addAll(getSegmentsEligibleSegments(child, segments));
+          Pair<Set<String>, Set<String>> eligibleSegments = getEligibleSegments(child);
+          if (eligibleSegments.getLeft() != null) {
+            if (includedSegments == null) {
+              includedSegments = new HashSet<>(eligibleSegments.getLeft());
+            } else {
+              includedSegments.addAll(eligibleSegments.getLeft());
+            }
+          }
+
+          if (eligibleSegments.getRight() != null) {
+            if (excludedSegments == null) {
+              excludedSegments = new HashSet<>(eligibleSegments.getRight());
+            } else {
+              excludedSegments.retainAll(eligibleSegments.getRight());
+            }
+          }
         }
         break;
 
@@ -119,7 +160,8 @@ public class SegmentNameSegmentPruner implements SegmentPruner {
         identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName()
             .equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
-          result.retainAll(Collections.singleton(operands.get(1).getLiteral().getFieldValue().toString()));
+          includedSegments = new HashSet<>();
+          includedSegments.add(operands.get(1).getLiteral().getFieldValue().toString());
         }
         break;
 
@@ -127,7 +169,8 @@ public class SegmentNameSegmentPruner implements SegmentPruner {
         identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName()
             .equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
-          result.removeAll(Collections.singleton(operands.get(1).getLiteral().getFieldValue().toString()));
+          excludedSegments = new HashSet<>();
+          excludedSegments.add(operands.get(1).getLiteral().getFieldValue().toString());
         }
         break;
 
@@ -135,30 +178,30 @@ public class SegmentNameSegmentPruner implements SegmentPruner {
         identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName()
             .equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
+          includedSegments = new HashSet<>();
           int numOperands = operands.size();
-          Set<String> segmentNames = new HashSet<>();
           for (int i = 1; i < numOperands; i++) {
-            segmentNames.add(operands.get(i).getLiteral().getFieldValue().toString());
+            includedSegments.add(operands.get(i).getLiteral().getFieldValue().toString());
           }
-          result.retainAll(segmentNames);
         }
         break;
+
       case NOT_IN:
         identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName()
             .equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
           int numOperands = operands.size();
-          Set<String> segmentNames = new HashSet<>();
+          excludedSegments = new HashSet<>();
           for (int i = 1; i < numOperands; i++) {
-            segmentNames.add(operands.get(i).getLiteral().getFieldValue().toString());
+            excludedSegments.add(operands.get(i).getLiteral().getFieldValue().toString());
           }
-          result.removeAll(segmentNames);
         }
         break;
+
       default:
         break;
     }
 
-    return result;
+    return Pair.of(includedSegments, excludedSegments);
   }
 }
