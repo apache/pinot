@@ -983,6 +983,49 @@ public class InstanceSelectorTest {
             requestId);
     assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
     assertEquals(selectionResult.getUnavailableSegments().size(), 3);
+    // Add a new segment: segment4
+    String segment4 = "segment4";
+    idealStateSegmentAssignment.put(segment4, idealStateInstanceStateMap0);
+    onlineSegments.add(segment4);
+    // External view for 3 segments
+    //   [segment0] -> [instance0:online, instance1:online]
+    //   [segment1] -> [instance0:online, instance1:online]
+    //   [segment3] -> [instance0:online, instance1:online]
+    //   [segment4] -> [instance1:online]
+    // Update segment1, segment3 to be fully online
+    externalViewSegmentAssignment.put(segment0, externalViewInstanceStateMap0);
+    externalViewSegmentAssignment.put(segment1, externalViewInstanceStateMap0);
+    externalViewSegmentAssignment.put(segment3, externalViewInstanceStateMap0);
+    // Segment4 is only available in instance1. This is fine for now because segment3 is a new segment.
+    externalViewSegmentAssignment.put(segment4, externalViewInstanceStateMap1);
+    strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+    expectedReplicaGroupInstanceSelectorResult.put(segment0, instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segment1, instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segment3, instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segment4, instance1);
+    selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest,
+        ImmutableList.of(segment0, segment3, segment1, segment4), requestId);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+    // Converge segment4 to be fully online and then offline again to make segment4 old.
+    externalViewSegmentAssignment.put(segment4, externalViewInstanceStateMap0);
+    strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+    selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest,
+        ImmutableList.of(segment0, segment3, segment1, segment4), requestId);
+    expectedReplicaGroupInstanceSelectorResult.put(segment4, instance0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+    // Move segment4 to be offline in instance0
+    externalViewSegmentAssignment.put(segment4, externalViewInstanceStateMap1);
+    strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+    selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest,
+        ImmutableList.of(segment0, segment3, segment1, segment4), requestId);
+    expectedReplicaGroupInstanceSelectorResult.put(segment0, instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segment1, instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segment3, instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segment4, instance1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 
   @Test
