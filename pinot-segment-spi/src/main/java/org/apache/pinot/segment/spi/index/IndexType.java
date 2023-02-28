@@ -19,14 +19,13 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -38,7 +37,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * @param <IR> the {@link IndexReader} subclass that should be used to read indexes of this type.
  * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
  */
-public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
+public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator> {
 
   /**
    * The unique id that identifies this index type.
@@ -59,44 +58,14 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
    */
   String getIndexName();
 
-  default Class<C> getIndexConfigClass() {
-    throw new UnsupportedOperationException();
-  }
+  Class<C> getIndexConfigClass();
 
   /**
    * The default config when it is not explicitly defined by the user.
-   *
-   * Can return null if the index should be disabled by default.
    */
-  @Nullable
-  default C getDefaultConfig() {
-    return null;
-  }
+  C getDefaultConfig();
 
-  /**
-   * This method is called to transform from a JSON node to a config object.
-   *
-   * This is usually used to deserialize {@link FieldConfig#getIndexes() fieldConfigLists.indexes.(indexId)}.
-   *
-   * @return The index config if the index is enabled or null if it disabled
-   * @throws IOException
-   */
-  @Nullable
-  default C deserialize(JsonNode node)
-      throws IOException {
-    return JsonUtils.jsonNodeToObject(node, getIndexConfigClass());
-  }
-
-  /**
-   * This method can be overridden by indexes that support alternative configuration formats where the configuration is
-   * spread on different fields in the TableConfig.
-   *
-   * Configuration that can be read from the {@link FieldConfig#getIndexes() fieldConfigLists.indexes} shall not be
-   * included here.
-   */
-  default IndexDeclaration<C> deserializeSpreadConf(TableConfig tableConfig, Schema schema, String column) {
-    return IndexDeclaration.notDeclared(this);
-  }
+  C deserialize(TableConfig tableConfig, Schema schema);
 
   /**
    * Transforms a config object into a Jackson {@link JsonNode}.
@@ -130,17 +99,13 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
    *                cardinality or the total number of documents.
    * @param indexConfig The index specific configuration that should be used.
    */
-  default IC createIndexCreator(IndexCreationContext context, C indexConfig)
-      throws Exception {
-    throw new UnsupportedOperationException();
-  }
+  IC createIndexCreator(IndexCreationContext context, C indexConfig)
+      throws Exception;
 
   /**
    * Returns the {@link IndexReaderFactory} that should be used to return readers for this type.
    */
-  default IndexReaderFactory<IR> getReaderFactory() {
-    throw new UnsupportedOperationException();
-  }
+  IndexReaderFactory<IR> getReaderFactory();
 
   /**
    * This method is used to extract a compatible reader from a given ColumnIndexContainer.
@@ -153,9 +118,7 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
     throw new UnsupportedOperationException();
   }
 
-  default String getFileExtension(ColumnMetadata columnMetadata) {
-    throw new UnsupportedOperationException();
-  }
+  String getFileExtension(ColumnMetadata columnMetadata);
 
   /**
    * Returns whether the index is stored as a buffer or not.
@@ -166,8 +129,6 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
     return true;
   }
 
-  default IndexHandler createIndexHandler(SegmentDirectory segmentDirectory,
-      Map<String, FieldIndexConfigs> configsByCol, @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    throw new UnsupportedOperationException();
-  }
+  IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
+      @Nullable Schema schema, @Nullable TableConfig tableConfig);
 }
