@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,7 +52,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -173,8 +173,17 @@ public class PinotQueryResource {
 
     SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
     List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    if (tableNames.size() == 0) {
+      return QueryException.SQL_PARSING_ERROR.toString();
+    }
 
-    List<String> instanceIds = getCommonInstances(tableNames);
+    String brokerTenant = getCommonBrokerTenant(tableNames);
+    String serverTenant = getCommonServerTenant(tableNames);
+    if (brokerTenant == null || serverTenant == null) {
+      return QueryException.TABLES_NOT_ON_SAME_TENANT_ERROR.toString();
+    }
+    List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenant));
+
     if (instanceIds.isEmpty()) {
       return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
     }
@@ -227,27 +236,42 @@ public class PinotQueryResource {
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
-  // get list of common broker instances for a given set of tables
-  private List<String> getCommonInstances(List<String> tableNames) {
-    boolean firstTable = true;
-    Set<String> brokerInstances = new HashSet<>();
+  // return the brokerTenant if all tables point to the same broker, else returns null
+  private String getCommonBrokerTenant(List<String> tableNames) {
+    Set<String> tableBrokers = new HashSet<>();
     for (String tableName : tableNames) {
-      List<String> tableBrokerInstances;
-      try {
-        tableBrokerInstances = _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
-      } catch (TableNotFoundException e) {
-        LOGGER.debug("No table found: ", e);
-        return new ArrayList<>();
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        tableBrokers.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(tableName))
+                .getTenantConfig().getBroker());
       }
-      if (firstTable) {
-        brokerInstances = new HashSet<>(tableBrokerInstances);
-        firstTable = false;
-      } else {
-        brokerInstances = tableBrokerInstances.stream().distinct().filter(brokerInstances::contains)
-                .collect(Collectors.toSet());
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        tableBrokers.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(tableName))
+                .getTenantConfig().getBroker());
       }
     }
-    return new ArrayList<>(brokerInstances);
+    if (tableBrokers.size() != 1) {
+      return null;
+    }
+    return (String) (tableBrokers.toArray()[0]);
+  }
+
+  // return the serverTenant if all tables point to the same broker, else returns null
+  private String getCommonServerTenant(List<String> tableNames) {
+    Set<String> tableServers = new HashSet<>();
+    for (String tableName : tableNames) {
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        tableServers.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(tableName))
+                .getTenantConfig().getServer());
+      }
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        tableServers.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(tableName))
+                .getTenantConfig().getServer());
+      }
+    }
+    if (tableServers.size() != 1) {
+      return null;
+    }
+    return (String) (tableServers.toArray()[0]);
   }
 
   private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,

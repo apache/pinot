@@ -73,6 +73,7 @@ public class QueryException {
   public static final int BROKER_REQUEST_SEND_ERROR_CODE = 425;
   public static final int SERVER_NOT_RESPONDING_ERROR_CODE = 427;
   public static final int TOO_MANY_REQUESTS_ERROR_CODE = 429;
+  public static final int TABLES_NOT_ON_SAME_TENANT_CODE = 431;
   public static final int INTERNAL_ERROR_CODE = 450;
   public static final int MERGE_RESPONSE_ERROR_CODE = 500;
   public static final int FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE = 550;
@@ -130,6 +131,8 @@ public class QueryException {
   public static final ProcessingException UNKNOWN_COLUMN_ERROR = new ProcessingException(UNKNOWN_COLUMN_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
   public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
+  public static final ProcessingException TABLES_NOT_ON_SAME_TENANT_ERROR =
+      new ProcessingException(TABLES_NOT_ON_SAME_TENANT_CODE);
 
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");
@@ -161,6 +164,7 @@ public class QueryException {
     UNKNOWN_COLUMN_ERROR.setMessage("UnknownColumnError");
     UNKNOWN_ERROR.setMessage("UnknownError");
     QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
+    TABLES_NOT_ON_SAME_TENANT_ERROR.setMessage("TablesNotOnSameTenantError");
   }
 
   public static ProcessingException getException(ProcessingException processingException, Throwable t) {
@@ -219,6 +223,7 @@ public class QueryException {
       case QueryException.SQL_PARSING_ERROR_CODE:
       case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
       case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
+      case QueryException.TABLES_NOT_ON_SAME_TENANT_CODE:
         return true;
       default:
         return false;
