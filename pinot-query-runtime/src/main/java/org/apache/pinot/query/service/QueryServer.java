@@ -52,12 +52,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public QueryServer(int port, QueryRunner queryRunner) {
     _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
     _queryRunner = queryRunner;
-    _executorService = queryRunner.getExecutorService();
-    LOGGER.info("Initialized QueryServer on port: {}", port);
+    _executorService = queryRunner.getQueryRunnerExecutorService();
   }
 
   public void start() {
-    LOGGER.info("Starting QueryWorker");
+    LOGGER.info("Starting QueryServer");
     try {
       _queryRunner.start();
       _server.start();
@@ -67,7 +66,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   }
 
   public void shutdown() {
-    LOGGER.info("Shutting down QueryWorker");
+    LOGGER.info("Shutting down QueryServer");
     try {
       _queryRunner.shutDown();
       _server.shutdown();
