@@ -346,11 +346,12 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       // We won't report error when segment is new.
       segmentToOnlineInstancesMap.put(segment, onlineInstances);
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
-      Set<String> unavailableInstances = unavailableInstancesMap.get(instancesInIdealState);
+      Set<String> unavailableInstances =
+          unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());
       SegmentState newSegmentState = _newSegmentStates.getOrDefault(segment, null);
       for (String instance : tempOnlineInstances) {
         // Some instances are unavailable, add the remaining instances as online instance
-        if (unavailableInstances == null || !unavailableInstances.contains(instance)) {
+        if (!unavailableInstances.contains(instance)) {
           onlineInstances.add(instance);
           if (newSegmentState != null) {
             newSegmentState.setOnline(instance);
