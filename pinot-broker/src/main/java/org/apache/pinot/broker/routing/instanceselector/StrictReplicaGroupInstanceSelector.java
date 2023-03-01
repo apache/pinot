@@ -80,6 +80,11 @@ import org.roaringbitmap.RoaringBitmap;
  * - After initialization, we use the system clock when we receive the first update of ideal state for that segment as
  *   approximation of segment creation time.
  *
+ * We retire new segment as old when:
+ * - The creation time is more than 5 mins ago
+ * - We receive error state for new segment
+ * - External view for segment converges with ideal state.
+ *
  * Note that this implementation means:
  * 1) Inconsistency across requests for new segments (some may be available, some may be not)
  * 2) When there is no assignment/instance change for long time, some of the new segments that expire with the clock
@@ -262,8 +267,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         _newSegmentStates.remove(segment);
       }
       idealStateSegmentToInstancesMap.put(segment, entry.getValue().keySet());
-      // Initialize tempSegmentToOnlineInstancesMap in ideal state to cover the segment whose external view may be
-      // missing.
+      // Initialize state maps in ideal state to cover the segments with missing external view.
       tempSegmentToOnlineInstancesMap.put(segment, Collections.emptySet());
       segmentToOfflineInstancesMap.put(segment, Collections.emptyList());
     }
@@ -313,8 +317,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         _newSegmentStates.remove(segment);
         continue;
       }
-      // Exclude new segment from unavailable instances as well since we don't want to hotspot the instance where new
-      // segment is online.
+      // Exclude new segment from marking unavailable instances as well since we don't want to bring down instances
+      // when segment is new and valid.
       if (isNewSegment(segment, nowMillis)) {
         continue;
       }

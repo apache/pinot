@@ -50,7 +50,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   // To prevent int overflow, reset the request id once it reaches this value
   private static final long MAX_REQUEST_ID = 1_000_000_000;
 
-  protected static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
 
   protected final BrokerMetrics _brokerMetrics;
   protected final AdaptiveServerSelector _adaptiveServerSelector;
@@ -249,20 +249,19 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     }
     if (!enabledInstancesForSegment.isEmpty()) {
       return enabledInstancesForSegment;
+    }
+    if (isValidUnavailable(segment)) {
+      LOGGER.info("Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
+              + "disabled not counting the segment as unavailable)", segment, _tableNameWithType,
+          onlineInstancesForSegment);
     } else {
-      if (isValidUnavailable(segment)) {
-        LOGGER.info("Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
-                + "disabled not counting the segment as unavailable)", segment, _tableNameWithType,
-            onlineInstancesForSegment);
-        return null;
-      }
       LOGGER.warn(
           "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} counting"
               + " segment as unavailable)", segment, _tableNameWithType, onlineInstancesForSegment);
       unavailableSegments.add(segment);
       _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
-      return null;
     }
+    return null;
   }
 
   protected boolean isValidUnavailable(String segment) {
