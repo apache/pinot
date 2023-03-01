@@ -60,7 +60,9 @@ public class CustomAuthAccessControlFactory extends AccessControlFactory {
     public void init(PinotConfiguration configuration) {
         String listOfPrincipals = configuration.getProperty("AUTH_PRINCIPALS");
         configuration.setProperty(BROKER_PREFIX, configuration.getProperty("AUTH_PRINCIPALS"));
-        Arrays.stream(listOfPrincipals.split(",")).forEach(x -> configuration.setProperty(BROKER_PREFIX +"."+ x + ".password", configuration.getProperty("AUTH_"+x.toUpperCase(Locale.ROOT) + "_PASSWORD")));
+        for (String x : listOfPrincipals.split(",")) {
+            configuration.setProperty(BROKER_PREFIX + "." + x + ".password", configuration.getProperty("AUTH_" + x.toUpperCase(Locale.ROOT) + "_PASSWORD"));
+        }
         _accessControl = new CustomAuthAccessControl(CustomAuthUtils.extractBasicAuthPrincipals(configuration, BROKER_PREFIX));
     }
 
