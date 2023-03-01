@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.controller.api.access;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.CustomAuthUtils;
-import org.apache.pinot.spi.env.Environment;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.env.SystemEnvironment;
 
 
 /**
@@ -52,9 +55,11 @@ public class CustomAuthAccessControlFactory implements AccessControlFactory {
     public void init(PinotConfiguration configuration) {
         String listOfPrincipals = configuration.getProperty("AUTH_PRINCIPALS");
         configuration.setProperty(PREFIX, configuration.getProperty("AUTH_PRINCIPALS"));
-        configuration.setProperty("controller.segment.fetcher.auth.token", configuration.getProperty("ADMIN_AUTH_TOKEN"));
+        configuration.setProperty("controller.segment.fetcher.auth.token",
+                configuration.getProperty("ADMIN_AUTH_TOKEN"));
         for (String principalName : listOfPrincipals.split(",")) {
-            configuration.setProperty(String.format("%s.%s.password", PREFIX, principalName), configuration.getProperty("AUTH_" + principalName.toUpperCase(Locale.ROOT) + "_PASSWORD"));
+            configuration.setProperty(String.format("%s.%s.password", PREFIX, principalName),
+                    configuration.getProperty("AUTH_" + principalName.toUpperCase(Locale.ROOT) + "_PASSWORD"));
         }
         _accessControl = new CustomAuthAccessControl(CustomAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
     }

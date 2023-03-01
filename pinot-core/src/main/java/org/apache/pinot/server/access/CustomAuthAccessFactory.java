@@ -20,7 +20,6 @@ package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
 import java.util.Collection;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -41,8 +40,10 @@ public class CustomAuthAccessFactory implements AccessControlFactory {
 
     @Override
     public void init(PinotConfiguration configuration) {
-        configuration.setProperty("pinot.server.segment.fetcher.auth.token", configuration.getProperty("ADMIN_AUTH_TOKEN"));
-        configuration.setProperty("pinot.server.segment.uploader.auth.token", configuration.getProperty("ADMIN_AUTH_TOKEN"));
+        configuration.setProperty("pinot.server.segment.fetcher.auth.token",
+                configuration.getProperty("ADMIN_AUTH_TOKEN"));
+        configuration.setProperty("pinot.server.segment.uploader.auth.token",
+                configuration.getProperty("ADMIN_AUTH_TOKEN"));
         configuration.setProperty("pinot.server.instance.auth.token", configuration.getProperty("ADMIN_AUTH_TOKEN"));
         _accessControl = new CustomAuthAccessControl(CustomAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
     }

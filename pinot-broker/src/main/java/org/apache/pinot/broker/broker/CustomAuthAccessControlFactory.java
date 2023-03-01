@@ -19,8 +19,11 @@
 package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
-
-import java.util.*;
+import java.util.Collection;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
@@ -61,9 +64,11 @@ public class CustomAuthAccessControlFactory extends AccessControlFactory {
         String listOfPrincipals = configuration.getProperty("AUTH_PRINCIPALS");
         configuration.setProperty(BROKER_PREFIX, configuration.getProperty("AUTH_PRINCIPALS"));
         for (String x : listOfPrincipals.split(",")) {
-            configuration.setProperty(BROKER_PREFIX + "." + x + ".password", configuration.getProperty("AUTH_" + x.toUpperCase(Locale.ROOT) + "_PASSWORD"));
+            configuration.setProperty(BROKER_PREFIX + "." + x + ".password",
+                    configuration.getProperty("AUTH_" + x.toUpperCase(Locale.ROOT) + "_PASSWORD"));
         }
-        _accessControl = new CustomAuthAccessControl(CustomAuthUtils.extractBasicAuthPrincipals(configuration, BROKER_PREFIX));
+        _accessControl = new CustomAuthAccessControl(
+                CustomAuthUtils.extractBasicAuthPrincipals(configuration, BROKER_PREFIX));
     }
 
     @Override
@@ -88,12 +93,14 @@ public class CustomAuthAccessControlFactory extends AccessControlFactory {
 
         @Override
         public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-            Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
+            Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity,
+                    "HttpRequesterIdentity required");
             HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
 
             Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
             Optional<BasicAuthPrincipal> principalOpt =
-                    tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get).filter(Objects::nonNull)
+                    tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get)
+                            .filter(Objects::nonNull)
                             .findFirst();
 
             if (!principalOpt.isPresent()) {

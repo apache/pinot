@@ -83,24 +83,24 @@ public final class CustomAuthUtils {
 
     public static List<ZkBasicAuthPrincipal> extractBasicAuthPrincipals(List<UserConfig> userConfigList) {
         return userConfigList.stream()
-                .map(user -> {
-                    String name = user.getUserName().trim();
-                    Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid username", name);
-                    String password = user.getPassword().trim();
-                    Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
-                    String component = user.getComponentType().toString();
-                    String role = user.getRoleType().toString();
+            .map(user -> {
+                String name = user.getUserName().trim();
+                Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid username", name);
+                String password = user.getPassword().trim();
+                Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
+                String component = user.getComponentType().toString();
+                String role = user.getRoleType().toString();
 
-                    Set<String> tables = Optional.ofNullable(user.getTables())
-                            .orElseGet(() -> Collections.emptyList())
-                            .stream().collect(Collectors.toSet());
-                    Set<String> permissions = Optional.ofNullable(user.getPermissios())
-                            .orElseGet(() -> Collections.emptyList())
-                            .stream().map(x -> x.toString())
-                            .collect(Collectors.toSet());
-                    return new ZkBasicAuthPrincipal(name, toBasicAuthToken(name, password), password,
-                            component, role, tables, permissions);
-                }).collect(Collectors.toList());
+                Set<String> tables = Optional.ofNullable(user.getTables())
+                        .orElseGet(() -> Collections.emptyList())
+                        .stream().collect(Collectors.toSet());
+                Set<String> permissions = Optional.ofNullable(user.getPermissios())
+                        .orElseGet(() -> Collections.emptyList())
+                        .stream().map(x -> x.toString())
+                        .collect(Collectors.toSet());
+                return new ZkBasicAuthPrincipal(name, toBasicAuthToken(name, password), password,
+                        component, role, tables, permissions);
+            }).collect(Collectors.toList());
     }
 
     private static Set<String> extractSet(PinotConfiguration configuration, String key) {
@@ -124,7 +124,8 @@ public final class CustomAuthUtils {
             return null;
         }
         String identifier = String.format("%s:%s", name, password);
-        return normalizeBase64Token(String.format("Basic %s", Base64.getEncoder().encodeToString(identifier.getBytes())));
+        return normalizeBase64Token(String.format("Basic %s",
+                Base64.getEncoder().encodeToString(identifier.getBytes())));
     }
 
     public static String decodeBasicAuthToken(String auth) {
