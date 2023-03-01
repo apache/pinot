@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,14 +64,21 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   protected Map<String, List<String>> _instanceToSegmentsMap;
 
   // These 2 variables are needed for instance selection (multi-threaded), so make them volatile
-  private volatile Map<String, List<String>> _segmentToEnabledInstancesMap;
-  private volatile Set<String> _unavailableSegments;
+  protected volatile Map<String, List<String>> _segmentToEnabledInstancesMap;
+  protected volatile Set<String> _unavailableSegments;
+  protected Clock _clock;
 
   BaseInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector) {
+    this(tableNameWithType, brokerMetrics, adaptiveServerSelector, Clock.systemUTC());
+  }
+
+  BaseInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
     _tableNameWithType = tableNameWithType;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
+    _clock = clock;
   }
 
   @Override
@@ -231,7 +239,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * enabled instance or all enabled instances are in ERROR state).
    */
   @Nullable
-  protected List<String> calculateEnabledInstancesForSegment(String segment, List<String> onlineInstancesForSegment,
+  private List<String> calculateEnabledInstancesForSegment(String segment, List<String> onlineInstancesForSegment,
       Set<String> unavailableSegments) {
     List<String> enabledInstancesForSegment = new ArrayList<>(onlineInstancesForSegment.size());
     for (String onlineInstance : onlineInstancesForSegment) {
@@ -242,39 +250,47 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     if (!enabledInstancesForSegment.isEmpty()) {
       return enabledInstancesForSegment;
     } else {
-      // NOTE: When there are enabled instances in OFFLINE state, we don't count the segment as unavailable because it
-      //       is a valid state when the segment is new added.
-      List<String> offlineInstancesForSegment = _segmentToOfflineInstancesMap.get(segment);
-      for (String offlineInstance : offlineInstancesForSegment) {
-        if (_enabledInstances.contains(offlineInstance)) {
-          LOGGER.info(
-              "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
-                  + "disabled, but find enabled OFFLINE instance: {} from OFFLINE instances: {}, not counting the "
-                  + "segment as unavailable)", segment, _tableNameWithType, onlineInstancesForSegment, offlineInstance,
-              offlineInstancesForSegment);
-          return null;
-        }
+      if (isValidUnavailable(segment)) {
+        LOGGER.info("Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
+                + "disabled not counting the segment as unavailable)", segment, _tableNameWithType,
+            onlineInstancesForSegment);
+        return null;
       }
       LOGGER.warn(
-          "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} and OFFLINE "
-              + "instances: {} are disabled, counting segment as unavailable)", segment, _tableNameWithType,
-          onlineInstancesForSegment, offlineInstancesForSegment);
+          "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} counting"
+              + " segment as unavailable)", segment, _tableNameWithType, onlineInstancesForSegment);
       unavailableSegments.add(segment);
       _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       return null;
     }
   }
 
+  protected boolean isValidUnavailable(String segment) {
+    // NOTE: When there are enabled instances in OFFLINE state, we don't count the segment as unavailable because it
+    //       is a valid state when the segment is new added.
+    List<String> offlineInstancesForSegment = _segmentToOfflineInstancesMap.get(segment);
+    for (String offlineInstance : offlineInstancesForSegment) {
+      if (_enabledInstances.contains(offlineInstance)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  protected Set<String> getUnavailableSegments(long nowMillis) {
+    return _unavailableSegments;
+  }
+
   @Override
   public SelectionResult select(BrokerRequest brokerRequest, List<String> segments, long requestId) {
-    Map<String, String> queryOptions = (brokerRequest.getPinotQuery() != null
-        && brokerRequest.getPinotQuery().getQueryOptions() != null)
-        ? brokerRequest.getPinotQuery().getQueryOptions()
-        : Collections.emptyMap();
+    Map<String, String> queryOptions =
+        (brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().getQueryOptions() != null)
+            ? brokerRequest.getPinotQuery().getQueryOptions() : Collections.emptyMap();
     int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
-    Map<String, String> segmentToInstanceMap = select(segments, requestIdInt, _segmentToEnabledInstancesMap,
-        queryOptions);
-    Set<String> unavailableSegments = _unavailableSegments;
+    long nowMillis = _clock.millis();
+    Map<String, String> segmentToInstanceMap =
+        select(segments, requestIdInt, _segmentToEnabledInstancesMap, queryOptions, nowMillis);
+    Set<String> unavailableSegments = getUnavailableSegments(nowMillis);
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(segmentToInstanceMap, Collections.emptyList());
     } else {
@@ -295,5 +311,5 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * ONLINE/CONSUMING instances). If enabled instances are not {@code null}, they are sorted in alphabetical order.
    */
   abstract Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions);
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions, long nowMillis);
 }

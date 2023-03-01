@@ -20,12 +20,15 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -33,11 +36,11 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -80,71 +83,93 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  * Note that this implementation means:
  * 1) Inconsistency across requests for new segments (some may be available, some may be not)
  * 2) When there is no assignment/instance change for long time, some of the new segments that expire with the clock
- * won't be counted as unavailable since no update is triggered.
+ * won't be used to exclude unavailable instances since no update is triggered.
  * </pre>
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
-  private final Clock _clock;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private HashMap<String, Long> _newSegmentCreationTimeMillis;
+
+  private class SegmentState {
+    // List of instance for this segment in ideal state.
+    private List<String> _candidateInstance;
+    // Mapping from candidate to index in _candidateInstance.
+    private HashMap<String, Integer> _candidateIdx;
+    // Mark offline instance in _candidateInstance using idx.
+    private RoaringBitmap _offlineFlags;
+    // Segment creation time.
+    // It is zk record's creation time when instance selector is init.
+    // After init, we use system clock time when we receive first ideal state for this segment as approximation.
+    private long _creationMillis;
+
+    public SegmentState(long creationMillis) {
+      _creationMillis = creationMillis;
+      _candidateIdx = new HashMap<>();
+      _candidateInstance = new ArrayList<>();
+      _offlineFlags = new RoaringBitmap();
+    }
+
+    public boolean isNew(long nowMillis) {
+      return CommonConstants.Helix.StateModel.isNewSegment(_creationMillis, nowMillis);
+    }
+
+    // Reset the candidate state upon ideal state and external view change.
+    public void resetCandidates(Set<String> candidates) {
+      _candidateIdx.clear();
+      _candidateInstance.clear();
+      _offlineFlags.clear();
+      Object[] candidateList = candidates.toArray();
+      for (int i = 0; i < candidateList.length; i++) {
+        String cand = (String) candidateList[i];
+        _candidateIdx.put(cand, i);
+        _offlineFlags.add(i);
+        _candidateInstance.add(cand);
+      }
+    }
+
+    public void setOnline(String candidate) {
+      _offlineFlags.remove(_candidateIdx.get(candidate));
+    }
+
+    public Pair<List<String>, RoaringBitmap> getCandidates() {
+      return ImmutablePair.of(_candidateInstance, _offlineFlags);
+    }
+  }
+
+  private HashMap<String, SegmentState> _newSegmentStates;
+
   private boolean _initialized = false;
 
-  private void updateNewSegmentsCreationTime(Set<String> onlineSegments) {
-    long nowMillis = _clock.millis();
-    for (String segment : onlineSegments) {
-      if (!_segmentToOnlineInstancesMap.containsKey(segment)) {
-        _newSegmentCreationTimeMillis.put(segment, nowMillis);
-      }
-    }
-  }
-
   private boolean isNewSegment(String segment, long nowMillis) {
-    Long segmentCreationMillis = _newSegmentCreationTimeMillis.getOrDefault(segment, null);
-    if (segmentCreationMillis == null) {
-      return false;
-    }
-    return CommonConstants.Helix.StateModel.isNewSegment(segmentCreationMillis, nowMillis);
+    SegmentState state = _newSegmentStates.getOrDefault(segment, null);
+    return state != null && state.isNew(nowMillis);
   }
 
-  @Override
-  protected List<String> calculateEnabledInstancesForSegment(String segment, List<String> onlineInstancesForSegment,
-      Set<String> unavailableSegments) {
-    List<String> enabledInstancesForSegment = new ArrayList<>(onlineInstancesForSegment.size());
-    for (String onlineInstance : onlineInstancesForSegment) {
-      if (_enabledInstances.contains(onlineInstance)) {
-        enabledInstancesForSegment.add(onlineInstance);
-      }
+  protected Pair<List<String>, RoaringBitmap> getCandidateInstances(String segment, long nowMillis) {
+    SegmentState state = _newSegmentStates.getOrDefault(segment, null);
+    if (state == null || !state.isNew(nowMillis)) {
+      return super.getCandidateInstances(segment, nowMillis);
     }
-    if (!enabledInstancesForSegment.isEmpty()) {
-      return enabledInstancesForSegment;
-    } else {
-      // NOTE: When there are enabled instances in OFFLINE state, we don't count the segment as unavailable because it
-      //       is a valid state when the segment is new added.
-      List<String> offlineInstancesForSegment = _segmentToOfflineInstancesMap.get(segment);
-      for (String offlineInstance : offlineInstancesForSegment) {
-        if (_enabledInstances.contains(offlineInstance)) {
-          LOGGER.info(
-              "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
-                  + "disabled, but find enabled OFFLINE instance: {} from OFFLINE instances: {}, not counting the "
-                  + "segment as unavailable)", segment, _tableNameWithType, onlineInstancesForSegment, offlineInstance,
-              offlineInstancesForSegment);
-          return null;
+    return state.getCandidates();
+  }
+
+  protected Set<String> getUnavailableSegments(long nowMillis) {
+    Set<String> unavailableSegments = _unavailableSegments;
+    for (Map.Entry<String, SegmentState> entry : _newSegmentStates.entrySet()) {
+      if (entry.getValue().isNew(nowMillis)) {
+        unavailableSegments.remove(entry.getKey());
+      } else {
+        Pair<List<String>, RoaringBitmap> candidates = entry.getValue().getCandidates();
+        RoaringBitmap offlineFlags = candidates.getRight();
+        if (offlineFlags != null && offlineFlags.getCardinality() == candidates.getLeft().size()) {
+          unavailableSegments.add(entry.getKey());
         }
       }
-      // NOTE: When the segment is new, we don't count the segment as unavailable.
-      if (isNewSegment(segment, _clock.millis())) {
-        LOGGER.info("Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
-            + "disabled) and segments are new.", segment, _tableNameWithType, onlineInstancesForSegment);
-        return null;
-      }
-      LOGGER.warn(
-          "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} and OFFLINE "
-              + "instances: {} are disabled, counting segment as unavailable)", segment, _tableNameWithType,
-          onlineInstancesForSegment, offlineInstancesForSegment);
-      unavailableSegments.add(segment);
-      _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
-      return null;
     }
+    return unavailableSegments;
+  }
+
+  protected boolean isValidUnavailable(String segment) {
+    return isNewSegment(segment, _clock.millis());
   }
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
@@ -155,10 +180,9 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Clock clock) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
-    _newSegmentCreationTimeMillis = new HashMap<>();
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, clock);
+    _newSegmentStates = new HashMap<>();
     _propertyStore = propertyStore;
-    _clock = clock;
   }
 
   @Override
@@ -170,7 +194,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     _segmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
     _segmentToOfflineInstancesMap = new HashMap<>(segmentMapCapacity);
     _instanceToSegmentsMap = new HashMap<>();
-    _newSegmentCreationTimeMillis = new HashMap<>();
+    _newSegmentStates = new HashMap<>();
     long nowMillis = _clock.millis();
     for (String onlineSegment : onlineSegments) {
       SegmentZKMetadata metadata =
@@ -180,7 +204,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       }
       long creationTimeMillis = metadata.getCreationTime();
       if (CommonConstants.Helix.StateModel.isNewSegment(creationTimeMillis, nowMillis)) {
-        _newSegmentCreationTimeMillis.put(onlineSegment, creationTimeMillis);
+        _newSegmentStates.put(onlineSegment, new SegmentState(creationTimeMillis));
       }
     }
     onAssignmentChange(idealState, externalView, onlineSegments);
@@ -190,7 +214,13 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     if (_initialized) {
-      updateNewSegmentsCreationTime(onlineSegments);
+      // Update new segments with assignment change when the init has been called.
+      long nowMillis = _clock.millis();
+      for (String segment : onlineSegments) {
+        if (!_segmentToOnlineInstancesMap.containsKey(segment) && !_newSegmentStates.containsKey(segment)) {
+          _newSegmentStates.put(segment, new SegmentState(nowMillis));
+        }
+      }
     }
     super.onAssignmentChange(idealState, externalView, onlineSegments);
   }
@@ -216,20 +246,32 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     // instances hosting the segment in the ideal state
     int segmentMapCapacity = HashUtil.getHashMapCapacity(onlineSegments.size());
     Map<String, Set<String>> idealStateSegmentToInstancesMap = new HashMap<>(segmentMapCapacity);
+    Map<String, Set<String>> tempSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
+
+    long nowMillis = _clock.millis();
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
       // Only track online segments
       if (!onlineSegments.contains(segment)) {
         continue;
       }
+      SegmentState state = _newSegmentStates.getOrDefault(segment, null);
+      if (state != null && state.isNew(nowMillis)) {
+        state.resetCandidates(entry.getValue().keySet());
+      } else {
+        _newSegmentStates.remove(segment);
+      }
       idealStateSegmentToInstancesMap.put(segment, entry.getValue().keySet());
+      // Initialize tempSegmentToOnlineInstancesMap in ideal state to cover the segment whose external view may be
+      // missing.
+      tempSegmentToOnlineInstancesMap.put(segment, Collections.emptySet());
+      segmentToOfflineInstancesMap.put(segment, Collections.emptyList());
     }
 
     // Iterate over the external view to fill up 'tempSegmentToOnlineInstancesMap' and 'segmentToOfflineInstancesMap'.
     // 'tempSegmentToOnlineInstancesMap' is a temporary map from segment to set of instances that are in the ideal state
     // and also ONLINE/CONSUMING in the external view. This map does not have the strict replica-group guarantee, and
     // will be used to calculate the final 'segmentToOnlineInstancesMap'.
-    Map<String, Set<String>> tempSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
     for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
@@ -254,10 +296,12 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         } else if (state.equals(SegmentStateModel.OFFLINE)) {
           offlineInstances.add(instance);
           instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
+        } else {
+          // error or dropped state should not be considered as new any more.
+          _newSegmentStates.remove(segment);
         }
       }
     }
-    long nowMillis = _clock.millis();
     // Iterate over the 'tempSegmentToOnlineInstancesMap' to gather the unavailable instances for each set of instances
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
     for (Map.Entry<String, Set<String>> entry : tempSegmentToOnlineInstancesMap.entrySet()) {
@@ -265,14 +309,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       Set<String> tempOnlineInstances = entry.getValue();
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       if (tempOnlineInstances.size() == instancesInIdealState.size()) {
-        _newSegmentCreationTimeMillis.remove(segment);
-        continue;
-      }
-      // NOTE: When a segment is unavailable on all the instances, do not count all the instances as unavailable because
-      //       this segment is unavailable and won't be included in the routing table, thus not breaking the requirement
-      //       of routing to the same replica-group. This is normal for new added segments, and we don't want to mark
-      //       all instances down on all segments with the same assignment.
-      if (tempOnlineInstances.isEmpty()) {
+        // converged state segment is not considered as new
+        _newSegmentStates.remove(segment);
         continue;
       }
       // Exclude new segment from unavailable instances as well since we don't want to hotspot the instance where new
@@ -280,7 +318,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       if (isNewSegment(segment, nowMillis)) {
         continue;
       }
-      _newSegmentCreationTimeMillis.remove(segment);
+      _newSegmentStates.remove(segment);
       Set<String> unavailableInstances =
           unavailableInstancesMap.computeIfAbsent(instancesInIdealState, k -> new TreeSet<>());
       for (String instance : instancesInIdealState) {
@@ -303,22 +341,17 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       // In calculateEnabledInstancesForSegment, we will check whether the segment is new or not.
       // We won't report error when segment is new.
       segmentToOnlineInstancesMap.put(segment, onlineInstances);
-
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances = unavailableInstancesMap.get(instancesInIdealState);
-      if (unavailableInstances == null) {
-        // No unavailable instance, add all instances as online instance
-        for (String instance : tempOnlineInstances) {
-          onlineInstances.add(instance);
-          instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
-        }
-      } else {
+      SegmentState newSegmentState = _newSegmentStates.getOrDefault(segment, null);
+      for (String instance : tempOnlineInstances) {
         // Some instances are unavailable, add the remaining instances as online instance
-        for (String instance : tempOnlineInstances) {
-          if (!unavailableInstances.contains(instance)) {
-            onlineInstances.add(instance);
-            instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
+        if (unavailableInstances == null || !unavailableInstances.contains(instance)) {
+          onlineInstances.add(instance);
+          if (newSegmentState != null) {
+            newSegmentState.setOnline(instance);
           }
+          instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
         }
       }
     }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,11 +26,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -59,6 +62,10 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
  * NUM_REPLICA_GROUPS_TO_QUERY is not supported is AdaptiveServerSelection is enabled.
  */
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
+  public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, clock);
+  }
 
   public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector) {
@@ -67,9 +74,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions, long nowMillis) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
-
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<String> serverRankList = new ArrayList<>();
@@ -83,11 +89,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         serverRankList.add(entry.getLeft());
       }
       selectServersUsingAdaptiverServerSelector(segments, requestId, segmentToSelectedInstanceMap,
-          segmentToEnabledInstancesMap, serverRankList);
+          segmentToEnabledInstancesMap, serverRankList, nowMillis);
     } else {
       // Adaptive Server Selection is NOT enabled.
       selectServersUsingRoundRobin(segments, requestId, segmentToSelectedInstanceMap, segmentToEnabledInstancesMap,
-          queryOptions);
+          queryOptions, nowMillis);
     }
 
     return segmentToSelectedInstanceMap;
@@ -95,48 +101,55 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   private void selectServersUsingRoundRobin(List<String> segments, int requestId,
       Map<String, String> segmentToSelectedInstanceMap, Map<String, List<String>> segmentToEnabledInstancesMap,
-      Map<String, String> queryOptions) {
+      Map<String, String> queryOptions, long nowMillis) {
     int replicaOffset = 0;
     Integer replicaGroup = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
     int numReplicaGroupsToQuery = replicaGroup == null ? 1 : replicaGroup;
 
     for (String segment : segments) {
+      Pair<List<String>, RoaringBitmap> candidateInstances = getCandidateInstances(segment, nowMillis);
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
-      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
-      if (enabledInstances == null) {
+      if (candidateInstances == null) {
         continue;
       }
-
+      List<String> enabledInstances = candidateInstances.getLeft();
+      RoaringBitmap offlineFlags = candidateInstances.getRight();
       // Round robin selection.
       int numEnabledInstances = enabledInstances.size();
       int instanceIdx = (requestId + replicaOffset) % numEnabledInstances;
       String selectedInstance = enabledInstances.get(instanceIdx);
+      boolean isOnline = isOnline(offlineFlags, instanceIdx);
 
       if (numReplicaGroupsToQuery > numEnabledInstances) {
         numReplicaGroupsToQuery = numEnabledInstances;
       }
-      segmentToSelectedInstanceMap.put(segment, selectedInstance);
+      if (isOnline) {
+        segmentToSelectedInstanceMap.put(segment, selectedInstance);
+      }
       replicaOffset = (replicaOffset + 1) % numReplicaGroupsToQuery;
     }
   }
 
   private void selectServersUsingAdaptiverServerSelector(List<String> segments, int requestId,
       Map<String, String> segmentToSelectedInstanceMap, Map<String, List<String>> segmentToEnabledInstancesMap,
-      List<String> serverRankList) {
+      List<String> serverRankList, long nowMillis) {
     for (String segment : segments) {
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
-      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
-      if (enabledInstances == null) {
+      Pair<List<String>, RoaringBitmap> candidateInstances = getCandidateInstances(segment, nowMillis);
+      if (candidateInstances == null) {
         continue;
       }
 
       // Round Robin.
+      List<String> enabledInstances = candidateInstances.getLeft();
+      RoaringBitmap offlineFlags = candidateInstances.getRight();
       int numEnabledInstances = enabledInstances.size();
       int instanceIdx = requestId % numEnabledInstances;
-      String selectedInstance = enabledInstances.get(instanceIdx);
 
+      String selectedInstance = enabledInstances.get(instanceIdx);
+      boolean isOnline = isOnline(offlineFlags, instanceIdx);
       // Adaptive Server Selection
       // TODO: Support numReplicaGroupsToQuery with Adaptive Server Selection.
       if (serverRankList.size() > 0) {
@@ -146,16 +159,19 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
           if (idx == -1) {
             // Let's use the round-robin approach until stats for all servers are populated.
             selectedInstance = enabledInstances.get(instanceIdx);
+            isOnline = isOnline(offlineFlags, instanceIdx);
             break;
           }
           if (idx < minIdx) {
             minIdx = idx;
             selectedInstance = enabledInstances.get(i);
+            isOnline = isOnline(offlineFlags, instanceIdx);
           }
         }
       }
-
-      segmentToSelectedInstanceMap.put(segment, selectedInstance);
+      if (isOnline) {
+        segmentToSelectedInstanceMap.put(segment, selectedInstance);
+      }
     }
   }
 
@@ -173,5 +189,17 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
     serversList.addAll(tempServerSet);
     return serversList;
+  }
+
+  private static boolean isOnline(RoaringBitmap offlineFlags, int instanceIdx) {
+    return offlineFlags == null || !offlineFlags.contains(instanceIdx);
+  }
+
+  protected Pair<List<String>, RoaringBitmap> getCandidateInstances(String segment, long nowMillis) {
+    List<String> enabledInstances = _segmentToEnabledInstancesMap.get(segment);
+    if (enabledInstances == null) {
+      return null;
+    }
+    return ImmutablePair.of(enabledInstances, null);
   }
 }
