@@ -32,6 +32,7 @@ public interface IndexReaderFactory<R extends IndexReader> {
    * indexes may require the column to be dictionary based.
    */
   @Nullable
-  R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+  R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+      ColumnMetadata metadata)
       throws IOException, IndexReaderConstraintException;
 }
