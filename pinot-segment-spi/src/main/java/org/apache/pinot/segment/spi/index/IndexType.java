@@ -65,7 +65,7 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   C getDefaultConfig();
 
-  C deserialize(TableConfig tableConfig, Schema schema);
+  C getConfig(TableConfig tableConfig, Schema schema);
 
   /**
    * Transforms a config object into a Jackson {@link JsonNode}.
