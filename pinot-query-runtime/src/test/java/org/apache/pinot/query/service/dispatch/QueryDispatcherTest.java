@@ -16,15 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.service;
+package org.apache.pinot.query.service.dispatch;
 
-import com.google.common.collect.Lists;
+import io.grpc.stub.StreamObserver;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.QueryEnvironment;
@@ -33,12 +36,16 @@ import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.service.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 
 public class QueryDispatcherTest extends QueryTestSet {
@@ -53,6 +60,7 @@ public class QueryDispatcherTest extends QueryTestSet {
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
+  private DispatchClient _dispatchClient;
 
   @BeforeClass
   public void setUp()
@@ -64,6 +72,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       Mockito.when(queryRunner.getQueryWorkerExecutorService()).thenReturn(WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryRunnerExecutorService()).thenReturn(RUNNER_EXECUTOR_SERVICE);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
+      queryServer = Mockito.spy(queryServer);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
       _queryRunnerMap.put(availablePort, queryRunner);
@@ -92,5 +101,85 @@ public class QueryDispatcherTest extends QueryTestSet {
     int reducerStageId = dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
     Assert.assertTrue(PlannerUtils.isRootStage(reducerStageId));
     dispatcher.shutdown();
+  }
+
+  @Test
+  public void testQueryDispatcherThrowsWhenQueryServerThrows()
+      throws Exception {
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
+    Mockito.doThrow(new RuntimeException("foo")).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    QueryDispatcher dispatcher = new QueryDispatcher();
+    try {
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
+      Assert.fail("Method call above should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+    }
+  }
+
+  @Test
+  public void testQueryDispatcherThrowsWhenQueryServerCallsOnError()
+      throws Exception {
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
+    Mockito.doAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
+        observer.onError(new RuntimeException("foo"));
+        return null;
+      }
+    }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    QueryDispatcher dispatcher = new QueryDispatcher();
+    try {
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
+      Assert.fail("Method call above should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+    }
+  }
+
+  @Test
+  public void testQueryDispatcherThrowsWhenQueryServerTimesOut() {
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
+    CountDownLatch neverClosingLatch = new CountDownLatch(1);
+    Mockito.doAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        neverClosingLatch.await(5, TimeUnit.SECONDS);
+        StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
+        observer.onCompleted();
+        return null;
+      }
+    }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    QueryDispatcher dispatcher = new QueryDispatcher();
+    try {
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 1_000, new HashMap<>());
+      Assert.fail("Method call above should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Timed out waiting for response")
+          || e.getMessage().contains("Error dispatching query"));
+    }
+    neverClosingLatch.countDown();
+  }
+
+  @Test
+  public void testQueryDispatcherThrowsWhenDeadlinePreExpiredAndAsyncResponseNotPolled() {
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    QueryDispatcher dispatcher = new QueryDispatcher();
+    try {
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, -10_000, new HashMap<>());
+      Assert.fail("Method call above should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Timed out waiting"));
+    }
   }
 }

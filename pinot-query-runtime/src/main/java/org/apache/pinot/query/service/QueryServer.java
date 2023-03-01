@@ -32,6 +32,7 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,12 +46,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   // See https://github.com/apache/pinot/issues/10331
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
-  private final Server _server;
+  private final int _port;
+  private Server _server = null;
   private final QueryRunner _queryRunner;
   private final ExecutorService _executorService;
 
   public QueryServer(int port, QueryRunner queryRunner) {
-    _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+    _port = port;
     _queryRunner = queryRunner;
     _executorService = queryRunner.getQueryRunnerExecutorService();
   }
@@ -58,6 +60,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void start() {
     LOGGER.info("Starting QueryServer");
     try {
+      if (_server == null) {
+        _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        LOGGER.info("Initialized QueryServer on port: {}", _port);
+      }
       _queryRunner.start();
       _server.start();
     } catch (IOException | TimeoutException e) {
@@ -69,8 +75,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     LOGGER.info("Shutting down QueryServer");
     try {
       _queryRunner.shutDown();
-      _server.shutdown();
-      _server.awaitTermination();
+      if (_server != null) {
+        _server.shutdown();
+        _server.awaitTermination();
+      }
     } catch (InterruptedException | TimeoutException e) {
       throw new RuntimeException(e);
     }

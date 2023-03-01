@@ -16,28 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.service;
+package org.apache.pinot.query.service.dispatch;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
+import io.grpc.Deadline;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
+import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -51,6 +55,7 @@ import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.service.QueryConfig;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,10 +66,15 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
+  private static final long DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS = 100;
+  private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
 
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
+  private final ExecutorService _executorService;
 
   public QueryDispatcher() {
+    _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
+        new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
@@ -88,6 +98,9 @@ public class QueryDispatcher {
   public int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
+    Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+    BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks = new LinkedBlockingQueue<>();
+    int dispatchCalls = 0;
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
       int stageId = stage.getKey();
       // stage rooting at a mailbox receive node means reduce stage.
@@ -99,26 +112,41 @@ public class QueryDispatcher {
           String host = serverInstance.getHostname();
           int servicePort = serverInstance.getQueryServicePort();
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
-          Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
-                  QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
-              .putAllMetadata(queryOptions).build());
-
-          if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
-            throw new RuntimeException(
-                String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,
-                    serverInstance, response));
-          }
+          dispatchCalls++;
+          _executorService.submit(() -> {
+            client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
+                QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
+                .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
+                .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
+                .putAllMetadata(queryOptions).build(), stageId, serverInstance, deadline, dispatchCallbacks::offer);
+          });
         }
       }
     }
+    int successfulDispatchCalls = 0;
+    // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
+    while (!deadline.isExpired() && successfulDispatchCalls < dispatchCalls) {
+      AsyncQueryDispatchResponse resp = dispatchCallbacks.poll(
+          DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      if (resp != null) {
+        if (resp.getThrowable() != null) {
+          throw new RuntimeException(String.format("Error dispatching query to server=%s stage=%s",
+              resp.getVirtualServer(), resp.getStageId()), resp.getThrowable());
+        } else {
+          Worker.QueryResponse response = resp.getQueryResponse();
+          if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
+            throw new RuntimeException(
+                String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", resp.getStageId(),
+                    resp.getVirtualServer(), response));
+          }
+          successfulDispatchCalls++;
+        }
+      }
+    }
+    if (deadline.isExpired()) {
+      throw new RuntimeException("Timed out waiting for response of async query-dispatch");
+    }
     return reduceStageId;
-  }
-
-  private DispatchClient getOrCreateDispatchClient(String host, int port) {
-    String key = String.format("%s_%d", host, port);
-    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(host, port));
   }
 
   public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
@@ -228,23 +256,14 @@ public class QueryDispatcher {
 
   public void shutdown() {
     for (DispatchClient dispatchClient : _dispatchClientMap.values()) {
-      dispatchClient._managedChannel.shutdown();
+      dispatchClient.getChannel().shutdown();
     }
     _dispatchClientMap.clear();
   }
 
-  public static class DispatchClient {
-    private final PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub _blockingStub;
-    private final ManagedChannel _managedChannel;
-
-    public DispatchClient(String host, int port) {
-      ManagedChannelBuilder managedChannelBuilder = ManagedChannelBuilder.forAddress(host, port).usePlaintext();
-      _managedChannel = managedChannelBuilder.build();
-      _blockingStub = PinotQueryWorkerGrpc.newBlockingStub(_managedChannel);
-    }
-
-    public Worker.QueryResponse submit(Worker.QueryRequest request) {
-      return _blockingStub.submit(request);
-    }
+  @VisibleForTesting
+  DispatchClient getOrCreateDispatchClient(String host, int port) {
+    String key = String.format("%s_%d", host, port);
+    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(host, port));
   }
 }
