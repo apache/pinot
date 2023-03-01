@@ -223,8 +223,8 @@ public class AggregationFunctionUtils {
     // If it is, populate the corresponding filter operator and corresponding transform operator
     assert aggregationFunctions != null;
     for (Pair<AggregationFunction, FilterContext> inputPair : aggregationFunctions) {
-      FilterContext currentFilterExpression = inputPair.getRight();
       AggregationFunction aggFunc = inputPair.getLeft();
+      FilterContext currentFilterExpression = inputPair.getRight();
       if (currentFilterExpression != null) {
         if (filterContextToAggFuncsMap.get(currentFilterExpression) != null) {
           filterContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(aggFunc);
