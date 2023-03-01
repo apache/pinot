@@ -256,8 +256,11 @@ public class AggregationFunctionUtils {
       }
       aggToTransformOpList.add(Pair.of(aggregationFunctionList.toArray(new AggregationFunction[0]), pair.getRight()));
     }
-    aggToTransformOpList.add(
-        Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
+
+    if (!nonFilteredAggregationFunctions.isEmpty()) {
+      aggToTransformOpList.add(
+          Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
+    }
 
     return aggToTransformOpList;
   }
