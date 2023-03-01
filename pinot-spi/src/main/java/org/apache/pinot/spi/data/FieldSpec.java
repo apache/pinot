@@ -528,6 +528,47 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
+     * This method can be used to apply a visitor pattern to the type of this field spec.
+     *
+     * Given that {@link FieldSpec} is an enum, a switch can always be used instead of a visitor. Visitors are usually
+     * more verbose and inefficient than an enum-switch, but visitors are typesafe (produce an error in compilation time
+     * if some case is forgotten) and they can be composed.
+     * @param <R> The type returned by the visitor.
+     */
+    public <R> R accept(DataTypeVisitor<R> visitor) {
+      switch (this) {
+        case INT:
+          return visitor.visitInt();
+        case LONG:
+          return visitor.visitLong();
+        case FLOAT:
+          return visitor.visitFloat();
+        case DOUBLE:
+          return visitor.visitDouble();
+        case BIG_DECIMAL:
+          return visitor.visitBigDecimal();
+        case BOOLEAN:
+          return visitor.visitBoolean();
+        case TIMESTAMP:
+          return visitor.visitTimestamp();
+        case STRING:
+          return visitor.visitString();
+        case JSON:
+          return visitor.visitJson();
+        case BYTES:
+          return visitor.visitBytes();
+        case LIST:
+          return visitor.visitList();
+        case MAP:
+          return visitor.visitMap();
+        case STRUCT:
+          return visitor.visitStruct();
+        default:
+          throw new IllegalStateException();
+      }
+    }
+
+    /**
      * Checks whether the data type can be a sorted column.
      */
     public boolean canBeASortedColumn() {
