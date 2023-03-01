@@ -130,7 +130,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       if (segmentsToUpdate.contains(segment)) {
         List<String> enabledInstancesForSegment =
             calculateEnabledInstancesForSegment(segment, _segmentToOnlineInstancesMap.get(segment),
-                newUnavailableSegments);
+                newUnavailableSegments, _clock.millis());
         entry.setValue(enabledInstancesForSegment);
       } else {
         if (currentUnavailableSegments.contains(segment)) {
@@ -166,10 +166,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     // NOTE: Put null as the value when there is no enabled instances for a segment so that segmentToEnabledInstancesMap
     // always contains all segments. With this, in onInstancesChange() we can directly iterate over
     // segmentToEnabledInstancesMap.entrySet() and modify the value without changing the map entries.
+    long nowMillis = _clock.millis();
     for (Map.Entry<String, List<String>> entry : _segmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       List<String> enabledInstancesForSegment =
-          calculateEnabledInstancesForSegment(segment, entry.getValue(), unavailableSegments);
+          calculateEnabledInstancesForSegment(segment, entry.getValue(), unavailableSegments, nowMillis);
       segmentToEnabledInstancesMap.put(segment, enabledInstancesForSegment);
     }
 
@@ -240,7 +241,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    */
   @Nullable
   private List<String> calculateEnabledInstancesForSegment(String segment, List<String> onlineInstancesForSegment,
-      Set<String> unavailableSegments) {
+      Set<String> unavailableSegments, long nowMillis) {
     List<String> enabledInstancesForSegment = new ArrayList<>(onlineInstancesForSegment.size());
     for (String onlineInstance : onlineInstancesForSegment) {
       if (_enabledInstances.contains(onlineInstance)) {
@@ -250,7 +251,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     if (!enabledInstancesForSegment.isEmpty()) {
       return enabledInstancesForSegment;
     }
-    if (isValidUnavailable(segment)) {
+    if (isValidUnavailable(segment, nowMillis)) {
       LOGGER.info("Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
               + "disabled not counting the segment as unavailable)", segment, _tableNameWithType,
           onlineInstancesForSegment);
@@ -264,7 +265,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     return null;
   }
 
-  protected boolean isValidUnavailable(String segment) {
+  protected boolean isValidUnavailable(String segment, long nowMillis) {
     // NOTE: When there are enabled instances in OFFLINE state, we don't count the segment as unavailable because it
     //       is a valid state when the segment is new added.
     List<String> offlineInstancesForSegment = _segmentToOfflineInstancesMap.get(segment);

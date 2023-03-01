@@ -173,8 +173,9 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     return unavailableSegments;
   }
 
-  protected boolean isValidUnavailable(String segment) {
-    return isNewSegment(segment, _clock.millis());
+  @Override
+  protected boolean isValidUnavailable(String segment, long nowMillis) {
+    return isNewSegment(segment, nowMillis);
   }
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
