@@ -21,8 +21,11 @@ package org.apache.pinot.core.operator.filter.predicate;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MultiValueVisitor;
+import org.apache.pinot.spi.data.SingleValueVisitor;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -155,7 +158,25 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class IntRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static abstract class NeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    public NeqPredicateEvaluator(Predicate predicate) {
+      super(predicate);
+    }
+
+    /**
+     * Visits the not matching value of this predicate.
+     */
+    public abstract <R> R accept(SingleValueVisitor<R> visitor);
+
+    /**
+     * Visits the not matching value of this predicate, which will be transformed into an array with a single value.
+     */
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      return accept(visitor.asSingleValueVisitor());
+    }
+  }
+
+  private static final class IntRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
     final int _nonMatchingValue;
 
     IntRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, int nonMatchingValue) {
@@ -190,9 +211,14 @@ public class NotEqualsPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(SingleValueVisitor<R> visitor) {
+      return visitor.visitInt(_nonMatchingValue);
+    }
   }
 
-  private static final class LongRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class LongRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
     final long _nonMatchingValue;
 
     LongRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, long nonMatchingValue) {
@@ -227,9 +253,14 @@ public class NotEqualsPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(SingleValueVisitor<R> visitor) {
+      return visitor.visitLong(_nonMatchingValue);
+    }
   }
 
-  private static final class FloatRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class FloatRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
     final float _nonMatchingValue;
 
     FloatRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, float nonMatchingValue) {
@@ -264,9 +295,14 @@ public class NotEqualsPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(SingleValueVisitor<R> visitor) {
+      return visitor.visitFloat(_nonMatchingValue);
+    }
   }
 
-  private static final class DoubleRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class DoubleRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
     final double _nonMatchingValue;
 
     DoubleRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, double nonMatchingValue) {
@@ -301,9 +337,14 @@ public class NotEqualsPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(SingleValueVisitor<R> visitor) {
+      return visitor.visitDouble(_nonMatchingValue);
+    }
   }
 
-  private static final class BigDecimalRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class BigDecimalRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
     final BigDecimal _nonMatchingValue;
 
     BigDecimalRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, BigDecimal nonMatchingValue) {
@@ -325,9 +366,14 @@ public class NotEqualsPredicateEvaluatorFactory {
     public boolean applySV(BigDecimal value) {
       return _nonMatchingValue.compareTo(value) != 0;
     }
+
+    @Override
+    public <R> R accept(SingleValueVisitor<R> visitor) {
+      return visitor.visitBigDecimal(_nonMatchingValue);
+    }
   }
 
-  private static final class StringRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class StringRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
     final String _nonMatchingValue;
 
     StringRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, String nonMatchingValue) {
@@ -349,9 +395,14 @@ public class NotEqualsPredicateEvaluatorFactory {
     public boolean applySV(String value) {
       return !_nonMatchingValue.equals(value);
     }
+
+    @Override
+    public <R> R accept(SingleValueVisitor<R> visitor) {
+      return visitor.visitString(_nonMatchingValue);
+    }
   }
 
-  private static final class BytesRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class BytesRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
     final byte[] _nonMatchingValue;
 
     BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, byte[] nonMatchingValue) {
@@ -372,6 +423,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public boolean applySV(byte[] value) {
       return !Arrays.equals(_nonMatchingValue, value);
+    }
+
+    @Override
+    public <R> R accept(SingleValueVisitor<R> visitor) {
+      return visitor.visitBytes(_nonMatchingValue);
     }
   }
 }
