@@ -191,11 +191,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     return serversList;
   }
 
-  private static boolean isOnline(RoaringBitmap offlineFlags, int instanceIdx) {
+  private static boolean isOnline(@Nullable RoaringBitmap offlineFlags, int instanceIdx) {
     return offlineFlags == null || !offlineFlags.contains(instanceIdx);
   }
 
-  protected Pair<List<String>, RoaringBitmap> getCandidateInstances(String segment, long nowMillis) {
+  protected @Nullable Pair<List<String>, RoaringBitmap> getCandidateInstances(String segment, long nowMillis) {
     List<String> enabledInstances = _segmentToEnabledInstancesMap.get(segment);
     if (enabledInstances == null) {
       return null;
