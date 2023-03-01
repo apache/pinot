@@ -16,8 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.controllerjob;
+package org.apache.pinot.controller.helix.core.rebalance;
 
-public enum ControllerJobType {
-  RELOAD_SEGMENT, RELOAD_ALL_SEGMENTS, FORCE_COMMIT, TABLE_REBALANCE
+import java.util.Map;
+
+/**
+ * Default No-op TableRebalanceObserver.
+ */
+public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
+  @Override
+  public void onTrigger(TableRebalanceObserver.Trigger trigger, Map<String, Map<String, String>> initialState,
+      Map<String, Map<String, String>> targetState) {
+  }
+
+  @Override
+  public void onSuccess(String msg) {
+  }
+
+  @Override
+  public void onError(String errorMsg) {
+  }
 }
