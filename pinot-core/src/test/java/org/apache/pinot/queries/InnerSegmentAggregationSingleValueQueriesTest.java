@@ -66,8 +66,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         + "FROM testTable WHERE column3 > 0";
     FilteredAggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 180000L, 0L,
-        540000L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L,
+        450000L, 30000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getResults(), 22266008882250L, 30000, 2147419555,
         32289159189150L, 28175373944314L, 30000L);
 
@@ -76,8 +76,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         + "FROM testTable";
     aggregationOperator = getOperator(query);
     resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 180000L, 0L,
-        540000L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L,
+        450000L, 30000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getResults(), 22266008882250L, 30000, 2147419555,
         32289159189150L, 28175373944314L, 30000L);
 
@@ -86,8 +86,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0 AND column7 < 100) FROM testTable";
     aggregationOperator = getOperator(query);
     resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L,
-        450000L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 120000L, 0L,
+        360000L, 30000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getResults(), 22266008882250L, 30000, 2147419555,
         32289159189150L, 0L, 0L);
   }
@@ -97,7 +97,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     // Test query without filter.
     GroupByOperator groupByOperator = getOperator(AGGREGATION_QUERY + SMALL_GROUP_BY);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 150000L,
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 120000L,
         30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         new Object[]{11270}, 1L, 815409257L, 1215316262, 1328642550, 788414092L, 1L);

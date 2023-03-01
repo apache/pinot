@@ -595,7 +595,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
     ResultTable expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{370236L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 740472L, 400000L, 0L, 400000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 370236L, 0L, 0L, 400000L, expectedResultTable);
   }
 
   @Test
