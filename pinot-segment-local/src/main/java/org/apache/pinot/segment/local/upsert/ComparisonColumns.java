@@ -21,10 +21,21 @@ package org.apache.pinot.segment.local.upsert;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ComparisonColumns implements Comparable<ComparisonColumns> {
-  private Comparable[] _values;
+  private final Comparable[] _values;
+  private int _comparableIndex;
 
   public ComparisonColumns(Comparable[] values) {
     _values = values;
+    for (int i = 0; i < _values.length; i++) {
+      if (_values[i] != null) {
+        // This must be stored at construction time because _values is volatile and may mutate depending on what
+        // `this` is compared against, which could result in multiple non-null values and therefore non-deterministic
+        // _comparableIndex. All this would go away if it's possible to make the merging of values explicit by
+        // implementations of BasePartitionUpsertMetadataManager, rather than implicit via compareTo.
+        _comparableIndex = i;
+        break;
+      }
+    }
   }
 
   public Comparable[] getValues() {
@@ -36,28 +47,16 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
     // _comparisonColumns should only at most one non-null comparison value. If not, it is the user's responsibility.
     // There is no attempt to guarantee behavior in the case where there are multiple non-null values
     int comparisonResult;
-    int comparableIndex = getComparableIndex();
 
-    if (comparableIndex < 0) {
-      // All comparison values were null.  This record is only ok to keep if all prior values were also null
+    Comparable comparisonValue = _values[_comparableIndex];
+    Comparable otherComparisonValue = other.getValues()[_comparableIndex];
+
+    if (otherComparisonValue == null) {
+      // Keep this record because the existing record has no value for the same comparison column, therefore the
+      // (lack of) existing value could not possibly cause the new value to be rejected.
       comparisonResult = 1;
-      for (int i = 0; i < other.getValues().length; i++) {
-        if (other.getValues()[i] != null) {
-          comparisonResult = -1;
-          break;
-        }
-      }
     } else {
-      Comparable comparisonValue = _values[comparableIndex];
-      Comparable otherComparisonValue = other.getValues()[comparableIndex];
-
-      if (otherComparisonValue == null) {
-        // Keep this record because the existing record has no value for the same comparison column, therefore the
-        // (lack of) existing value could not possibly cause the new value to be rejected.
-        comparisonResult = 1;
-      } else {
-        comparisonResult = comparisonValue.compareTo(otherComparisonValue);
-      }
+      comparisonResult = comparisonValue.compareTo(otherComparisonValue);
     }
 
     if (comparisonResult >= 0) {
@@ -67,25 +66,11 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
       //  {@link BasePartitionUpsertMetadataManager}. Ideally, this merge should only be triggered explicitly by
       //  implementations of {@link BasePartitionUpsertMetadataManager}.
       for (int i = 0; i < _values.length; i++) {
-        // N.B. null check _must_ be here to prevent overwriting _values[i] with null from other._values[i], such
-        // as in the case where this is the first time that a non-null value has been received for a given
-        // comparableIndex after previously receiving non-null value for a different comparableIndex
-        if (i != comparableIndex && other._values[i] != null) {
+        if (i != _comparableIndex) {
           _values[i] = other._values[i];
         }
       }
     }
-
     return comparisonResult;
-  }
-
-  private int getComparableIndex() {
-    for (int i = 0; i < _values.length; i++) {
-      if (_values[i] != null) {
-        return i;
-      }
-    }
-    // Should be impossible due to MutableSegmentImpl discarding any inputs with numNonNull != 1
-    return -1;
   }
 }

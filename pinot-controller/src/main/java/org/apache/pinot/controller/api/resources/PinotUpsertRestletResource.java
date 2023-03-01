@@ -147,7 +147,7 @@ public class PinotUpsertRestletResource {
         }
       }
       if (comparisonColumns.size() > 1) {
-        bytesPerValue += 48;  // array overhead
+        bytesPerValue += 48 + 4;  // array overhead + comparableIndex integer
       }
     }
 
