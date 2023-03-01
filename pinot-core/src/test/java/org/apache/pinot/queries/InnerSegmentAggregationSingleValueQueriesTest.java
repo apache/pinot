@@ -97,7 +97,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     // Test query without filter.
     GroupByOperator groupByOperator = getOperator(AGGREGATION_QUERY + SMALL_GROUP_BY);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 120000L,
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 150000L,
         30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         new Object[]{11270}, 1L, 815409257L, 1215316262, 1328642550, 788414092L, 1L);
