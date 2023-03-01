@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
 
@@ -86,12 +85,12 @@ public class FieldIndexConfigs {
       _configMap = new HashMap<>(other._configMap);
     }
 
-    public <C extends IndexConfig, I extends IndexType<C, ?, ?>> Builder add(I indexType, @Nullable C config) {
+    public <C extends IndexConfig, I extends IndexType<C, ?, ?>> Builder add(I indexType, C config) {
       _configMap.put(indexType, config);
       return this;
     }
 
-    public Builder addUnsafe(IndexType<?, ?, ?> indexType, @Nullable IndexConfig config) {
+    public Builder addUnsafe(IndexType<?, ?, ?> indexType, IndexConfig config) {
       _configMap.put(indexType, config);
       return this;
     }
