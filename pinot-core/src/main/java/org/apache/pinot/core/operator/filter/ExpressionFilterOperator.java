@@ -28,7 +28,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.ExpressionFilterDocIdSet;
+import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -65,8 +65,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(
-        new ExpressionFilterDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
+    return new FilterBlock(new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
   }
 
   @Override
