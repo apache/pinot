@@ -530,7 +530,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     /**
      * This method can be used to apply a visitor pattern to the type of this field spec.
      *
-     * Given that {@link FieldSpec} is an enum, a switch can always be used instead of a visitor. Visitors are usually
+     * Given that {@link DataType} is an enum, a switch can always be used instead of a visitor. Visitors are usually
      * more verbose and inefficient than an enum-switch, but visitors are typesafe (produce an error in compilation time
      * if some case is forgotten) and they can be composed.
      * @param <R> The type returned by the visitor.
