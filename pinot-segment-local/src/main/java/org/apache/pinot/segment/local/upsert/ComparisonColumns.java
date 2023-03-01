@@ -81,11 +81,11 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
 
   private int getComparableIndex() {
     for (int i = 0; i < _values.length; i++) {
-      if (_values[i] == null) {
-        continue;
+      if (_values[i] != null) {
+        return i;
       }
-      return i;
     }
+    // Should be impossible due to MutableSegmentImpl discarding any inputs with numNonNull != 1
     return -1;
   }
 }

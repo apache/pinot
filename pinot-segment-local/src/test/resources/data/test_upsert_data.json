@@ -33,18 +33,5 @@
     "event_id": "bb",
     "description" : "late arrival",
     "secondsSinceEpoch": 1567205392
-  },
-  {
-    "event_id": "cc",
-    "description" : "first arrival, all null comparison columns"
-  },
-  {
-    "event_id": "cc",
-    "description" : "second",
-    "secondsSinceEpoch": 1567205390
-  },
-  {
-    "event_id": "dd",
-    "description" : "only arrival, all null comparison columns"
   }
 ]

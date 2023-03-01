@@ -589,8 +589,8 @@ public class MutableSegmentImpl implements MutableSegment {
         comparisonValues[i] = (Comparable) comparisonValue;
       }
     }
-    Preconditions.checkState(numNonNull == 1 || numNonNull == 0,
-        "Documents may only have at most 1 non-null comparison column value");
+    Preconditions.checkState(numNonNull == 1,
+        "Documents must have exactly 1 non-null comparison column value");
     return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues));
   }
 

@@ -143,20 +143,18 @@ public class UpsertConfig extends BaseJsonConfig {
    * in the case where there are multiple producers sinking to the same table.
    */
   public void setComparisonColumns(List<String> comparisonColumns) {
-    Preconditions.checkArgument(_comparisonColumns == null,
+    Preconditions.checkArgument(_comparisonColumns == null || !comparisonColumns.isEmpty(),
         "Possible duplicated entries: comparisonColumn, comparisonColumns");
     _comparisonColumns = comparisonColumns;
   }
 
   public void setComparisonColumn(List<String> comparisonColumns) {
-    Preconditions.checkArgument(_comparisonColumns == null,
+    Preconditions.checkArgument(comparisonColumns == null || !comparisonColumns.isEmpty(),
         "Possible duplicated entries: comparisonColumn, comparisonColumns");
     _comparisonColumns = comparisonColumns;
   }
 
   public void setComparisonColumn(String comparisonColumn) {
-    Preconditions.checkArgument(_comparisonColumns == null,
-        "Possible duplicated entries: comparisonColumn, comparisonColumns");
     _comparisonColumns = Collections.singletonList(comparisonColumn);
   }
 
