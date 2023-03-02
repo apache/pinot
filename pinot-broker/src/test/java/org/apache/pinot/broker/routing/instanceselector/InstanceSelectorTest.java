@@ -1206,7 +1206,7 @@ public class InstanceSelectorTest {
       assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment1));
       selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(segment0, segment1));
+      assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
 
       // Disable the ONLINE instance, both segments should be unavailable
       // {
