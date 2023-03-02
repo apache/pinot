@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -72,6 +74,15 @@ public class FieldIndexConfigs {
     return _configMap.entrySet().stream()
         .filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(entry -> entry.getKey().getId(), serializer));
+  }
+
+  @Override
+  public String toString() {
+    try {
+      return JsonUtils.objectToString(this);
+    } catch (JsonProcessingException e) {
+      return "Unserializable value due to " + e.getMessage();
+    }
   }
 
   public static class Builder {
