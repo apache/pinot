@@ -53,6 +53,7 @@ public class CustomAuthAccessControlFactory implements AccessControlFactory {
 
     @Override
     public void init(PinotConfiguration configuration) {
+        System.out.println(configuration.toString());
         String listOfPrincipals = configuration.getProperty("AUTH_PRINCIPALS");
         configuration.setProperty(PREFIX, configuration.getProperty("AUTH_PRINCIPALS"));
         configuration.setProperty("controller.segment.fetcher.auth.token",
