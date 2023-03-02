@@ -139,9 +139,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
   public void init(PinotConfiguration serverConf)
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
-    serverConf.setProperty("pinot.server.segment.fetcher.auth.token", serverConf.getProperty("ADMIN_AUTH_TOKEN"));
-    serverConf.setProperty("pinot.server.segment.uploader.auth.token", serverConf.getProperty("ADMIN_AUTH_TOKEN"));
-    serverConf.setProperty("pinot.server.instance.auth.token", serverConf.getProperty("ADMIN_AUTH_TOKEN"));
+    serverConf.setProperty("pinot.server.segment.fetcher.auth.token", System.getenv("ADMIN_AUTH_TOKEN"));
+    serverConf.setProperty("pinot.server.segment.uploader.auth.token", System.getenv("ADMIN_AUTH_TOKEN"));
+    serverConf.setProperty("pinot.server.instance.auth.token", System.getenv("ADMIN_AUTH_TOKEN"));
+    System.out.println(serverConf.toString());
     _serverConf = serverConf.clone();
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);

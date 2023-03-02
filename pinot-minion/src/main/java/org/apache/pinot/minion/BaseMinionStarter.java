@@ -86,8 +86,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   @Override
   public void init(PinotConfiguration config)
       throws Exception {
-    config.setProperty("segment.fetcher.auth.token", config.getProperty("ADMIN_AUTH_TOKEN"));
-    config.setProperty("task.auth.token", config.getProperty("ADMIN_AUTH_TOKEN"));
+    config.setProperty("segment.fetcher.auth.token", System.getenv("ADMIN_AUTH_TOKEN"));
+    config.setProperty("task.auth.token", System.getenv("ADMIN_AUTH_TOKEN"));
+    System.out.println(config.toString());
     _config = new MinionConf(config.toMap());
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();

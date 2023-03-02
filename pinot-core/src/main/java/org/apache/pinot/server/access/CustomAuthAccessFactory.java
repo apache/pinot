@@ -41,10 +41,11 @@ public class CustomAuthAccessFactory implements AccessControlFactory {
     @Override
     public void init(PinotConfiguration configuration) {
         configuration.setProperty("pinot.server.segment.fetcher.auth.token",
-                configuration.getProperty("ADMIN_AUTH_TOKEN"));
+                System.getenv("ADMIN_AUTH_TOKEN"));
         configuration.setProperty("pinot.server.segment.uploader.auth.token",
-                configuration.getProperty("ADMIN_AUTH_TOKEN"));
-        configuration.setProperty("pinot.server.instance.auth.token", configuration.getProperty("ADMIN_AUTH_TOKEN"));
+                System.getenv("ADMIN_AUTH_TOKEN"));
+        configuration.setProperty("pinot.server.instance.auth.token", System.getenv("ADMIN_AUTH_TOKEN"));
+        System.out.println(configuration.toString());;
         _accessControl = new CustomAuthAccessControl(CustomAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
     }
 

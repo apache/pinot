@@ -53,14 +53,14 @@ public class CustomAuthAccessControlFactory implements AccessControlFactory {
 
     @Override
     public void init(PinotConfiguration configuration) {
-        System.out.println(configuration.toString());
-        String listOfPrincipals = configuration.getProperty("AUTH_PRINCIPALS");
-        configuration.setProperty(PREFIX, configuration.getProperty("AUTH_PRINCIPALS"));
+        String listOfPrincipals = System.getenv("AUTH_PRINCIPALS");
+        configuration.setProperty(PREFIX, System.getenv("AUTH_PRINCIPALS"));
         configuration.setProperty("controller.segment.fetcher.auth.token",
-                configuration.getProperty("ADMIN_AUTH_TOKEN"));
+                System.getenv("ADMIN_AUTH_TOKEN"));
+        System.out.println(configuration.toString());
         for (String principalName : listOfPrincipals.split(",")) {
             configuration.setProperty(String.format("%s.%s.password", PREFIX, principalName),
-                    configuration.getProperty("AUTH_" + principalName.toUpperCase(Locale.ROOT) + "_PASSWORD"));
+                    System.getenv("AUTH_" + principalName.toUpperCase(Locale.ROOT) + "_PASSWORD"));
         }
         _accessControl = new CustomAuthAccessControl(CustomAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
     }
