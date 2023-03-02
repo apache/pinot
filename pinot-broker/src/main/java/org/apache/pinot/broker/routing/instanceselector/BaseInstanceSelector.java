@@ -381,8 +381,19 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     return false;
   }
 
-  protected Set<String> getUnavailableSegments(long nowMillis) {
-    return _unavailableSegments;
+  private Set<String> getUnavailableSegments(Map<String, SegmentState> newSegmentToCandidateInstanceMap,
+      long nowMillis) {
+    Set<String> unavailableSegments = _unavailableSegments;
+    for (Map.Entry<String, SegmentState> entry : newSegmentToCandidateInstanceMap.entrySet()) {
+      if (entry.getValue().isNew(nowMillis)) {
+        unavailableSegments.remove(entry.getKey());
+      } else {
+        if (entry.getValue().isAllOffline()) {
+          unavailableSegments.add(entry.getKey());
+        }
+      }
+    }
+    return unavailableSegments;
   }
 
   @Override
@@ -395,7 +406,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     Map<String, String> segmentToInstanceMap =
         select(segments, requestIdInt, _segmentToEnabledInstancesMap, _newSegmentToCandidateInstanceMap, queryOptions,
             nowMillis);
-    Set<String> unavailableSegments = getUnavailableSegments(nowMillis);
+    Set<String> unavailableSegments = getUnavailableSegments(_newSegmentToCandidateInstanceMap, nowMillis);
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(segmentToInstanceMap, Collections.emptyList());
     } else {

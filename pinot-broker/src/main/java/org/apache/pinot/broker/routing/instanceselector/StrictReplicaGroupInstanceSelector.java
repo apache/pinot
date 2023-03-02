@@ -98,20 +98,6 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     return state != null && state.isNew(nowMillis);
   }
 
-  protected Set<String> getUnavailableSegments(long nowMillis) {
-    Set<String> unavailableSegments = _unavailableSegments;
-    for (Map.Entry<String, SegmentState> entry : _newSegmentStates.entrySet()) {
-      if (entry.getValue().isNew(nowMillis)) {
-        unavailableSegments.remove(entry.getKey());
-      } else {
-        if (entry.getValue().isAllOffline()) {
-          unavailableSegments.add(entry.getKey());
-        }
-      }
-    }
-    return unavailableSegments;
-  }
-
   @Override
   protected boolean isValidUnavailable(@Nullable Long creationMillis, String segment, long nowMillis) {
     return creationMillis != null && CommonConstants.Helix.StateModel.isNewSegment(creationMillis, nowMillis);
