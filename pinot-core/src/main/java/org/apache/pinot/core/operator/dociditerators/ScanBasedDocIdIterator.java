@@ -42,6 +42,9 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
    * Applies AND operation to the given bitmap of document ids, returns a bitmap of the matching document ids.
    */
   default MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    if (docIds.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
     return applyAnd(docIds.getBatchIterator(), OptionalInt.of(docIds.first()), OptionalInt.of(docIds.last()),
         OPTIMAL_ITERATOR_BATCH_SIZE);
   }
