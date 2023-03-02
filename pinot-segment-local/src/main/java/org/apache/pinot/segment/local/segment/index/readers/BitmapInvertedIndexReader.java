@@ -43,9 +43,13 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   private final long _firstOffset;
 
   public BitmapInvertedIndexReader(PinotDataBuffer dataBuffer, int numBitmaps) {
+    this(dataBuffer, numBitmaps, 0);
+  }
+
+  public BitmapInvertedIndexReader(PinotDataBuffer dataBuffer, int numBitmaps, long offsetInFile) {
     long offsetBufferEndOffset = (long) (numBitmaps + 1) * Integer.BYTES;
-    _offsetBuffer = dataBuffer.view(0, offsetBufferEndOffset, ByteOrder.BIG_ENDIAN);
-    _bitmapBuffer = dataBuffer.view(offsetBufferEndOffset, dataBuffer.size());
+    _offsetBuffer = dataBuffer.view(offsetInFile, offsetBufferEndOffset + offsetInFile, ByteOrder.BIG_ENDIAN);
+    _bitmapBuffer = dataBuffer.view(offsetInFile + offsetBufferEndOffset, getOffset(numBitmaps));
     _firstOffset = getOffset(0);
   }
 
