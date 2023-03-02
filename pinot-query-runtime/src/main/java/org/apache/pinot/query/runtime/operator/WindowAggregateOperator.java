@@ -65,6 +65,7 @@ import org.slf4j.LoggerFactory;
  *     3. Add support for value window functions
  *     4. Add support for custom frames
  *     5. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
+ *     6. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
  */
 public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
@@ -106,7 +107,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
     super(requestId, stageId, virtualServerAddress);
 
     boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, orderSetDirection, orderSetNullDirection);
-    // TODO: add support for ORDER BY in the OVER() clause
     Preconditions.checkState(orderSet == null || orderSet.isEmpty() || isPartitionByOnly,
         "Order by is not yet supported in window functions");
 
@@ -115,7 +115,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
     _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection);
     _windowFrame = new WindowFrame(lowerBound, upperBound, isRows);
 
-    // TODO: add support for custom frames, and for ORDER BY default frame (upperBound => currentRow)
     Preconditions.checkState(!_windowFrame.isRows(), "Only RANGE type frames are supported at present");
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
@@ -128,14 +127,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
     _constants = constants;
     _resultSchema = resultSchema;
 
-    // TODO: Not all window functions (e.g. ROW_NUMBER, LAG, etc) need aggregations. Such functions should be handled
-    //       differently.
     _windowAccumulators = new AggregationUtils.Accumulator[_aggCalls.size()];
-    for (int i = 0; i < _aggCalls.size(); i++) {
+    int aggCallsSize = _aggCalls.size();
+    for (int i = 0; i < aggCallsSize; i++) {
       RexExpression.FunctionCall agg = _aggCalls.get(i);
       String functionName = agg.getFunctionName();
       if (!mergers.containsKey(functionName)) {
-        throw new IllegalStateException("Unexpected value: " + functionName);
+        throw new IllegalStateException("Unexpected aggregation function name: " + functionName);
       }
       _windowAccumulators[i] = new AggregationUtils.Accumulator(agg, mergers, functionName, inputSchema);
     }
@@ -170,7 +168,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
 
       if (!_hasReturnedWindowAggregateBlock) {
-        return produceWindowAggregateBlock();
+        return produceWindowAggregatedBlock();
       } else {
         // TODO: Move to close call.
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -194,7 +192,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     Set<Integer> partitionByInputRefIndexes = new HashSet<>();
     Set<Integer> orderByInputRefIndexes = new HashSet<>();
-    for (int i = 0; i < groupSet.size(); i++) {
+    int groupSetSize = groupSet.size();
+    for (int i = 0; i < groupSetSize; i++) {
       partitionByInputRefIndexes.add(((RexExpression.InputRef) groupSet.get(i)).getIndex());
       orderByInputRefIndexes.add(((RexExpression.InputRef) orderSet.get(i)).getIndex());
     }
@@ -202,7 +201,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     return partitionByInputRefIndexes.equals(orderByInputRefIndexes);
   }
 
-  private TransferableBlock produceWindowAggregateBlock() {
+  private TransferableBlock produceWindowAggregatedBlock() {
     List<Object[]> rows = new ArrayList<>(_numRows);
     for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
       Key partitionKey = e.getKey();
@@ -245,9 +244,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
         // TODO: Revisit the aggregation logic once ORDER BY inside OVER() support is added, also revisit null direction
         //       handling for all query types
         Key key = AggregationUtils.extractRowKey(row, _groupSet);
-        _partitionRows.putIfAbsent(key, new ArrayList<>());
-        _partitionRows.get(key).add(row);
-        for (int i = 0; i < _aggCalls.size(); i++) {
+        _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+        int aggCallsSize = _aggCalls.size();
+        for (int i = 0; i < aggCallsSize; i++) {
           _windowAccumulators[i].accumulate(key, row);
         }
       }

@@ -84,6 +84,8 @@ public class StageMetadata implements Serializable {
     }
     if (stageNode instanceof WindowNode) {
       WindowNode windowNode = (WindowNode) stageNode;
+      // TODO: Figure out a way to parallelize Empty OVER() and OVER(ORDER BY) so the computation can be done across
+      //       multiple nodes.
       // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
       // distributed as no global ordering is required across partitions.
       _requiresSingletonInstance = _requiresSingletonInstance || (windowNode.getGroupSet().size() == 0);

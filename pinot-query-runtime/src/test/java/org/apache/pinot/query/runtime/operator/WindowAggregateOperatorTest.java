@@ -350,16 +350,16 @@ public class WindowAggregateOperatorTest {
       result = sum0PartitionBy1.getNextBlock();
     }
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 1}, new Object[]{2, "BB", 5.0},
-        new Object[]{3, "BB", 5.0});
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0},
+        new Object[]{1, "Aa", 1});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
     Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected value: "
-      + "AVERAGE.*")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected aggregation "
+      + "function name: AVERAGE.*")
   public void testShouldThrowOnUnknownAggFunction() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
@@ -374,8 +374,8 @@ public class WindowAggregateOperatorTest {
         Collections.emptyList(), outSchema, inSchema, 1, 2, _serverAddress);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected value: "
-      + "ROW_NUMBER.*")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected aggregation "
+      + "function name: ROW_NUMBER.*")
   public void testShouldThrowOnUnknownRankAggFunction() {
     // TODO: Remove this test when support is added for RANK functions
     // Given:
