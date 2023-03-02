@@ -574,14 +574,17 @@ public class MutableSegmentImpl implements MutableSegment {
     int numComparisonColumns = _upsertComparisonColumns.size();
     Comparable[] comparisonValues = new Comparable[numComparisonColumns];
 
-    int numNonNull = 0;
+    int comparableIndex = -1;
     for (int i = 0; i < numComparisonColumns; i++) {
       String columnName = _upsertComparisonColumns.get(i);
 
       if (!row.isNullValue(columnName)) {
         // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
         // columns are mutually exclusive
-        numNonNull++;
+        Preconditions.checkState(comparableIndex == -1,
+            "Documents must have exactly 1 non-null comparison column value");
+
+        comparableIndex = i;
 
         Object comparisonValue = row.getValue(columnName);
         Preconditions.checkState(comparisonValue instanceof Comparable,
@@ -589,9 +592,7 @@ public class MutableSegmentImpl implements MutableSegment {
         comparisonValues[i] = (Comparable) comparisonValue;
       }
     }
-    Preconditions.checkState(numNonNull == 1,
-        "Documents must have exactly 1 non-null comparison column value");
-    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues));
+    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparableIndex, comparisonValues));
   }
 
   private void updateDictionary(GenericRow row) {

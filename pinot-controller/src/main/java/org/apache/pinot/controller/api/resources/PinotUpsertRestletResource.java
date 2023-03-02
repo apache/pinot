@@ -140,7 +140,7 @@ public class PinotUpsertRestletResource {
           throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
         } else {
           if (comparisonColumns.size() == 1) {
-            bytesPerKey += dt.size();
+            bytesPerValue += dt.size();
           } else {
             bytesPerValue += bytesPerArrayElem + dt.size();
           }

@@ -77,7 +77,6 @@ public class UpsertUtils {
 
   public static RecordInfoReader makeRecordReader(IndexSegment segment, List<String> primaryKeyColumns,
       List<String> comparisonColumns) {
-
     if (comparisonColumns.size() > 1) {
       return new RecordInfoReader(segment, primaryKeyColumns, comparisonColumns);
     }
@@ -195,7 +194,9 @@ public class UpsertUtils {
         comparisonColumns[i] = comparisonValue;
       }
 
-      return new ComparisonColumns(comparisonColumns);
+      // Note that the comparable index is negative here to indicate that this instance could be the argument to
+      // ComparisonColumns#compareTo, but should never call compareTo itself.
+      return new ComparisonColumns(-1, comparisonColumns);
     }
 
     @Override

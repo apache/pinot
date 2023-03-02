@@ -22,20 +22,11 @@ package org.apache.pinot.segment.local.upsert;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ComparisonColumns implements Comparable<ComparisonColumns> {
   private final Comparable[] _values;
-  private int _comparableIndex;
+  private final int _comparableIndex;
 
-  public ComparisonColumns(Comparable[] values) {
+  public ComparisonColumns(int comparableIndex, Comparable[] values) {
     _values = values;
-    for (int i = 0; i < _values.length; i++) {
-      if (_values[i] != null) {
-        // This must be stored at construction time because _values is volatile and may mutate depending on what
-        // `this` is compared against, which could result in multiple non-null values and therefore non-deterministic
-        // _comparableIndex. All this would go away if it's possible to make the merging of values explicit by
-        // implementations of BasePartitionUpsertMetadataManager, rather than implicit via compareTo.
-        _comparableIndex = i;
-        break;
-      }
-    }
+    _comparableIndex = comparableIndex;
   }
 
   public Comparable[] getValues() {

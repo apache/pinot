@@ -144,13 +144,7 @@ public class UpsertConfig extends BaseJsonConfig {
    */
   public void setComparisonColumns(List<String> comparisonColumns) {
     Preconditions.checkArgument(_comparisonColumns == null || !comparisonColumns.isEmpty(),
-        "Possible duplicated entries: comparisonColumn, comparisonColumns");
-    _comparisonColumns = comparisonColumns;
-  }
-
-  public void setComparisonColumn(List<String> comparisonColumns) {
-    Preconditions.checkArgument(comparisonColumns == null || !comparisonColumns.isEmpty(),
-        "Possible duplicated entries: comparisonColumn, comparisonColumns");
+        "Comparison columns cannot be empty.");
     _comparisonColumns = comparisonColumns;
   }
 
