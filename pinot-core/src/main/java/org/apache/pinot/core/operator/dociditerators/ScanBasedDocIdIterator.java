@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.util.OptionalInt;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -34,10 +36,15 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
 
+  MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc, int bufferSize);
+
   /**
    * Applies AND operation to the given bitmap of document ids, returns a bitmap of the matching document ids.
    */
-  MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds);
+  default MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    return applyAnd(docIds.getBatchIterator(), OptionalInt.of(docIds.first()), OptionalInt.of(docIds.last()),
+        OPTIMAL_ITERATOR_BATCH_SIZE);
+  }
 
   /**
    * Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned during the

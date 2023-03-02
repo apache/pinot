@@ -38,7 +38,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   private final int _numDocs;
   private final boolean _nullHandlingEnabled;
 
-  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+  public ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
       boolean nullHandlingEnabled) {
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;

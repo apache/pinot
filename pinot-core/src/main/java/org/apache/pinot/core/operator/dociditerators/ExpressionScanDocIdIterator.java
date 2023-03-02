@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.dociditerators;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
@@ -33,7 +34,9 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.BitmapDataProvider;
+import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -108,6 +111,20 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     // Search the block following the target document id
     _docIdIterator = null;
     return next();
+  }
+
+  @Override
+  public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc,
+      int bufferSize) {
+    IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
+    ProjectionOperator projectionOperator =
+        new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(intIterator, _docIdBuffer));
+    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+    ProjectionBlock projectionBlock;
+    while ((projectionBlock = projectionOperator.nextBlock()) != null) {
+      processProjectionBlock(projectionBlock, matchingDocIds);
+    }
+    return matchingDocIds;
   }
 
   @Override
