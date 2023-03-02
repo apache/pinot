@@ -24,7 +24,7 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
   private final Comparable[] _values;
   private final int _comparableIndex;
 
-  public ComparisonColumns(int comparableIndex, Comparable[] values) {
+  public ComparisonColumns(Comparable[] values, int comparableIndex) {
     _values = values;
     _comparableIndex = comparableIndex;
   }

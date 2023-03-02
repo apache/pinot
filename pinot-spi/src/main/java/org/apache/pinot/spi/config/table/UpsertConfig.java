@@ -19,11 +19,11 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -143,13 +143,15 @@ public class UpsertConfig extends BaseJsonConfig {
    * in the case where there are multiple producers sinking to the same table.
    */
   public void setComparisonColumns(List<String> comparisonColumns) {
-    Preconditions.checkArgument(_comparisonColumns == null || !comparisonColumns.isEmpty(),
-        "Comparison columns cannot be empty.");
-    _comparisonColumns = comparisonColumns;
+    if (CollectionUtils.isNotEmpty(comparisonColumns)) {
+      _comparisonColumns = comparisonColumns;
+    }
   }
 
   public void setComparisonColumn(String comparisonColumn) {
-    _comparisonColumns = Collections.singletonList(comparisonColumn);
+    if (comparisonColumn != null) {
+      _comparisonColumns = Collections.singletonList(comparisonColumn);
+    }
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {

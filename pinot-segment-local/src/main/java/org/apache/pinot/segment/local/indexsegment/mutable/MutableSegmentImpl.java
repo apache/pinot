@@ -580,7 +580,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
       if (!row.isNullValue(columnName)) {
         // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
-        // columns are mutually exclusive
+        // columns are mutually exclusive. If comparableIndex has already been modified from its initialized value,
+        // that means there must have already been a non-null value processed and therefore processing an additional
+        // non-null value would be an error.
         Preconditions.checkState(comparableIndex == -1,
             "Documents must have exactly 1 non-null comparison column value");
 
@@ -592,7 +594,9 @@ public class MutableSegmentImpl implements MutableSegment {
         comparisonValues[i] = (Comparable) comparisonValue;
       }
     }
-    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparableIndex, comparisonValues));
+    Preconditions.checkState(comparableIndex != -1,
+        "Documents must have exactly 1 non-null comparison column value");
+    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues, comparableIndex));
   }
 
   private void updateDictionary(GenericRow row) {

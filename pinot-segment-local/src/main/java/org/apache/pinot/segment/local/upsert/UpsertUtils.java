@@ -196,7 +196,7 @@ public class UpsertUtils {
 
       // Note that the comparable index is negative here to indicate that this instance could be the argument to
       // ComparisonColumns#compareTo, but should never call compareTo itself.
-      return new ComparisonColumns(-1, comparisonColumns);
+      return new ComparisonColumns(comparisonColumns, -1);
     }
 
     @Override
