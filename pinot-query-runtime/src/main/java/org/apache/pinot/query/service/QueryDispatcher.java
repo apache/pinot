@@ -69,7 +69,7 @@ public class QueryDispatcher {
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
       MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions,
-      ExecutionStatsAggregator executionStatsAggregator)
+      Map<Integer, ExecutionStatsAggregator> executionStatsAggregator)
       throws Exception {
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
@@ -80,7 +80,7 @@ public class QueryDispatcher {
         reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(),
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
     List<DataBlock> resultDataBlocks =
-        reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, executionStatsAggregator);
+        reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, executionStatsAggregator, queryPlan);
     return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
   }
@@ -128,11 +128,11 @@ public class QueryDispatcher {
   }
 
   public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs) {
-    return reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, null);
+    return reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, null, null);
   }
 
   public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
-      @Nullable ExecutionStatsAggregator executionStatsAggregator) {
+      @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap, QueryPlan queryPlan) {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
     long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
@@ -147,11 +147,19 @@ public class QueryDispatcher {
       if (transferableBlock.isNoOpBlock()) {
         continue;
       } else if (transferableBlock.isEndOfStreamBlock()) {
-        if (executionStatsAggregator != null) {
+        if (executionStatsAggregatorMap != null) {
           for (Map.Entry<String, OperatorStats> entry : transferableBlock.getResultMetadata().entrySet()) {
             LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
                 OperatorUtils.operatorStatsToJson(entry.getValue()));
-            executionStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+            OperatorStats operatorStats = entry.getValue();
+            ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
+            ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
+            if (queryPlan != null) {
+              StageMetadata operatorStageMetadata = queryPlan.getStageMetadataMap().get(operatorStats.getStageId());
+              OperatorUtils.recordTableName(operatorStats, operatorStageMetadata);
+            }
+            rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+            stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
           }
         }
         return resultDataBlocks;

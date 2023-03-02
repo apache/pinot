@@ -20,10 +20,13 @@ package org.apache.pinot.query.runtime.operator.utils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Joiner;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -32,10 +35,6 @@ import org.slf4j.LoggerFactory;
 
 
 public class OperatorUtils {
-  public static final String NUM_BLOCKS = "numBlocks";
-  public static final String NUM_ROWS = "numRows";
-  public static final String THREAD_EXECUTION_TIME = "threadExecutionTime";
-
   private static final Logger LOGGER = LoggerFactory.getLogger(OperatorUtils.class);
   private static final Map<String, String> OPERATOR_TOKEN_MAPPING = new HashMap<>();
 
@@ -67,6 +66,13 @@ public class OperatorUtils {
     functionName = StringUtils.remove(functionName, " ");
     functionName = OPERATOR_TOKEN_MAPPING.getOrDefault(functionName, functionName);
     return functionName;
+  }
+
+  public static void recordTableName(OperatorStats operatorStats, StageMetadata operatorStageMetadata) {
+    if (!operatorStageMetadata.getScannedTables().isEmpty()) {
+      operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(),
+          Joiner.on("::").join(operatorStageMetadata.getScannedTables()));
+    }
   }
 
   public static String operatorStatsToJson(OperatorStats operatorStats) {

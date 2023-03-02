@@ -36,7 +36,6 @@ import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.AbstractForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SameValueForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
@@ -57,7 +56,6 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -124,16 +122,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return;
     }
 
-    // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
-    _nullHandlingEnabled = _config.isNullHandlingEnabled();
-    if (_nullHandlingEnabled) {
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        // Initialize Null value vector map
-        String columnName = fieldSpec.getName();
-        _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
-      }
-    }
-
     Map<String, FieldIndexConfigs> indexConfigs = segmentCreationSpec.getIndexConfigsByColName();
 
     _creatorsByColAndIndex = Maps.newHashMapWithExpectedSize(indexConfigs.keySet().size());
@@ -141,29 +129,23 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       if (fieldSpec == null) {
-        throw new IllegalStateException("Cannot create index for column: " + columnName + " because it is not in "
-            + "schema");
+        Preconditions.checkState(schema.hasColumn(columnName),
+            "Cannot create inverted index for column: %s because it is not in schema", columnName);
       }
       if (fieldSpec.isVirtualColumn()) {
         LOGGER.warn("Ignoring index creation for virtual column " + columnName);
         continue;
       }
 
-      FieldIndexConfigs fieldIndexConfigs = indexConfigs.get(columnName);
+      FieldIndexConfigs originalConfig = indexConfigs.get(columnName);
       ColumnIndexCreationInfo columnIndexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(columnIndexCreationInfo, "Missing index creation info for column: %s", columnName);
       boolean dictEnabledColumn = createDictionaryForColumn(columnIndexCreationInfo, segmentCreationSpec, fieldSpec);
+      Preconditions.checkState(dictEnabledColumn || !originalConfig.getConfig(StandardIndexes.inverted()).isEnabled(),
+          "Cannot create inverted index for raw index column: %s", columnName);
 
-      if (!dictEnabledColumn && fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
-        throw new IllegalStateException("Cannot create inverted index for raw index column: " + columnName);
-      }
-
-      int rangeIndexVersion = _config.getTableConfig().getIndexingConfig().getRangeIndexVersion();
-      IndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator> forwardIdx = StandardIndexes.forward();
-      boolean forwardIndexDisabled = !fieldIndexConfigs.getConfig(forwardIdx).isEnabled();
-
-      validateForwardIndexDisabledIndexCompatibility(fieldIndexConfigs, dictEnabledColumn,
-          columnIndexCreationInfo, rangeIndexVersion, fieldSpec);
+      IndexType<ForwardIndexConfig, ?, ForwardIndexCreator> forwardIdx = StandardIndexes.forward();
+      boolean forwardIndexDisabled = !originalConfig.getConfig(forwardIdx).isEnabled();
 
       IndexCreationContext.Common context = IndexCreationContext.builder()
           .withIndexDir(_indexDir)
@@ -179,6 +161,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withTextCommitOnClose(true)
           .build();
 
+      FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnIndexCreationInfo, segmentCreationSpec);
+
       if (dictEnabledColumn) {
         // Create dictionary-encoded index
         // Initialize dictionary creator
@@ -188,7 +172,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         DictionaryIndexType dictIdx = DictionaryIndexType.INSTANCE;
         // Index conf should be present if dictEnabledColumn is true. In case it doesn't, getConfig will throw an
         // exception
-        DictionaryIndexConfig dictConfig = fieldIndexConfigs.getConfig(dictIdx).getEnabledConfig();
+        DictionaryIndexConfig dictConfig = config.getConfig(dictIdx).getEnabledConfig();
         SegmentDictionaryCreator creator = dictIdx.createIndexCreator(context, dictConfig);
 
         try {
@@ -208,14 +192,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (skipIndexType(index)) {
           continue;
         }
-        if (fieldIndexConfigs.getConfig(index).isEnabled()) {
-          tryCreateCreator(creatorsByIndex, index, context, fieldIndexConfigs);
+        if (config.getConfig(index).isEnabled()) {
+          tryCreateCreator(creatorsByIndex, index, context, config);
         }
       }
       // TODO: Remove this when values stored as ForwardIndex stop depending on TextIndex config
       IndexCreator oldFwdCreator = creatorsByIndex.get(forwardIdx);
       if (oldFwdCreator instanceof AbstractForwardIndexCreator) { // this implies that oldFwdCreator != null
-        Object fakeForwardValue = calculateAlternativeValue(dictEnabledColumn, fieldIndexConfigs, fieldSpec);
+        Object fakeForwardValue = calculateAlternativeValue(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
           AbstractForwardIndexCreator castedOldFwdCreator = (AbstractForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
@@ -225,6 +209,32 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
       _creatorsByColAndIndex.put(columnName, creatorsByIndex);
     }
+
+    // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
+    _nullHandlingEnabled = _config.isNullHandlingEnabled();
+    if (_nullHandlingEnabled) {
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        // Initialize Null value vector map
+        String columnName = fieldSpec.getName();
+        _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
+      }
+    }
+  }
+
+  private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
+      ColumnIndexCreationInfo columnIndexCreationInfo, SegmentGeneratorConfig segmentCreationSpec) {
+    FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(config);
+    // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
+    if (config.getConfig(StandardIndexes.forward()).isEnabled() && columnIndexCreationInfo.isSorted()) {
+      builder.add(StandardIndexes.forward(), new ForwardIndexConfig.Builder()
+          .withLegacyProperties(segmentCreationSpec.getColumnProperties(), columnName)
+          .build());
+    }
+    // Initialize inverted index creator; skip creating inverted index if sorted
+    if (config.getConfig(StandardIndexes.inverted()).isEnabled() && columnIndexCreationInfo.isSorted()) {
+      builder.undeclare(StandardIndexes.inverted());
+    }
+    return builder.build();
   }
 
   /**
@@ -248,42 +258,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (declaration.isEnabled() && index.shouldBeCreated(context, fieldIndexConfigs)) {
       creatorsByIndex.put(index, index.createIndexCreator(context, declaration.getEnabledConfig()));
     }
-  }
-
-  /**
-   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
-   * compatibility mismatch. The checks performed are:
-   *     - Validate dictionary is enabled.
-   *     - Validate inverted index is enabled.
-   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
-   *       multi-value column (since multi-value defaults to index v1).
-   * TODO(index-spi): Ideally this should be delegated into each index type
-   */
-  private void validateForwardIndexDisabledIndexCompatibility(FieldIndexConfigs fieldIndexConfigs,
-      boolean dictEnabledColumn, ColumnIndexCreationInfo columnIndexCreationInfo, int rangeIndexVersion,
-      FieldSpec fieldSpec) {
-    if (isEnabled(fieldIndexConfigs, StandardIndexes.forward())) {
-      return;
-    }
-    String columnName = fieldSpec.getName();
-
-    Preconditions.checkState(dictEnabledColumn,
-        String.format("Cannot disable forward index for column %s without dictionary", columnName));
-    Preconditions.checkState(isEnabled(fieldIndexConfigs, StandardIndexes.inverted()),
-        String.format("Cannot disable forward index for column %s without inverted index enabled", columnName));
-    if (isEnabled(fieldIndexConfigs, StandardIndexes.range())) {
-      Preconditions.checkState(fieldSpec.isSingleValueField(),
-          String.format("Feature not supported for multi-value columns with range index. Cannot disable forward index "
-              + "for column %s. Disable range index on this column to use this feature", columnName));
-      Preconditions.checkState(rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION,
-          String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
-              + "forward index for column %s. Either disable range index or create range index with version >= 2 to "
-              + "use this feature", columnName));
-    }
-  }
-
-  private boolean isEnabled(FieldIndexConfigs fieldIndexConfigs, IndexType<?, ?, ?> indexType) {
-    return fieldIndexConfigs.getConfig(indexType).isEnabled();
   }
 
   /**

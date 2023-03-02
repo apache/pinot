@@ -18,16 +18,14 @@
  */
 package org.apache.pinot.core.operator.transform;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -51,29 +49,14 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   protected final Map<String, DataSource> _dataSourceMap;
   protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
 
-  /**
-   *
-   * @param queryContext the query context
-   * @param projectionOperator Projection operator
-   * @param expressions Collection of expressions to evaluate
-   */
-  public TransformOperator(@Nullable QueryContext queryContext, ProjectionOperator projectionOperator,
+  public TransformOperator(QueryContext queryContext, ProjectionOperator projectionOperator,
       Collection<ExpressionContext> expressions) {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
     for (ExpressionContext expression : expressions) {
-      TransformFunction transformFunction = TransformFunctionFactory.get(queryContext, expression, _dataSourceMap);
+      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap, queryContext);
       _transformFunctionMap.put(expression, transformFunction);
     }
-  }
-
-  /**
-   *
-   * @param projectionOperator Projection operator
-   * @param expressions Collection of expressions to evaluate
-   */
-  public TransformOperator(ProjectionOperator projectionOperator, Collection<ExpressionContext> expressions) {
-    this(null, projectionOperator, expressions);
   }
 
   /**
@@ -116,30 +99,19 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     }
   }
 
-
   @Override
   public String toExplainString() {
-    return toExplainString(EXPLAIN_NAME);
+    List<String> expressions =
+        _transformFunctionMap.keySet().stream().map(ExpressionContext::toString).sorted().collect(Collectors.toList());
+    return getExplainName() + "(" + StringUtils.join(expressions, ", ") + ")";
   }
-  public String toExplainString(String explainName) {
-    ExpressionContext[] functions = _transformFunctionMap.keySet().toArray(new ExpressionContext[0]);
 
-    // Sort to make the order, in which names appear within the operator, deterministic.
-    Arrays.sort(functions, Comparator.comparing(ExpressionContext::toString));
-
-    StringBuilder stringBuilder = new StringBuilder(explainName).append("(");
-    if (functions != null && functions.length > 0) {
-      stringBuilder.append(functions[0].toString());
-      for (int i = 1; i < functions.length; i++) {
-        stringBuilder.append(", ").append(functions[i].toString());
-      }
-    }
-
-    return stringBuilder.append(')').toString();
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
   }
 
   @Override
-  public List<Operator> getChildOperators() {
+  public List<ProjectionOperator> getChildOperators() {
     return Collections.singletonList(_projectionOperator);
   }
 

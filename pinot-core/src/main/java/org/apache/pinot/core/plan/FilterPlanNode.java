@@ -228,13 +228,13 @@ public class FilterPlanNode implements PlanNode {
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
           if (canApplyH3IndexForDistanceCheck(predicate, lhs.getFunction())) {
-            return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
+            return new H3IndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
-            return new H3InclusionIndexFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
+            return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
             //       IS_NOT_NULL, TEXT_MATCH)
-            return new ExpressionFilterOperator(_indexSegment, predicate, numDocs);
+            return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           }
         } else {
           String column = lhs.getIdentifier();

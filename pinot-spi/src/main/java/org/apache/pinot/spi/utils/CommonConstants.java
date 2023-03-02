@@ -46,6 +46,7 @@ public class CommonConstants {
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
+
   /**
    * The state of the consumer for a given segment
    */
@@ -90,6 +91,10 @@ public class CommonConstants {
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
+
+    // 2 to the power of 16, for tradeoffs see datasketches library documentation:
+    // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
+    public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 65536;
 
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
@@ -262,8 +267,7 @@ public class CommonConstants {
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
-    public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING =
-        "pinot.broker.request.client.ip.logging";
+    public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING = "pinot.broker.request.client.ip.logging";
 
     // TODO: Support populating clientIp for GrpcRequestIdentity.
     public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = false;
@@ -271,10 +275,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.broker.logger.root.dir";
     public static final String CONFIG_OF_SWAGGER_BROKER_ENABLED = "pinot.broker.swagger.enabled";
     public static final boolean DEFAULT_SWAGGER_BROKER_ENABLED = true;
-    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT
-        = "pinot.broker.instance.enableThreadCpuTimeMeasurement";
-    public static final String CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT
-        = "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
+        "pinot.broker.instance.enableThreadCpuTimeMeasurement";
+    public static final String CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT =
+        "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
@@ -772,8 +776,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_SLEEP_TIME_DENOMINATOR = "accounting.sleep.time.denominator";
     public static final int DEFAULT_SLEEP_TIME_DENOMINATOR = 3;
 
-    public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO
-        = "accounting.min.memory.footprint.to.kill.ratio";
+    public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO =
+        "accounting.min.memory.footprint.to.kill.ratio";
     public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
 
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
