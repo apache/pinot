@@ -20,15 +20,22 @@ package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import java.time.Duration;
 import java.util.UUID;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.http.SdkHttpConfigurationOption;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 
 
 /**
  * S3 related config
  */
 public class S3Config {
+  private static final Logger LOGGER = LoggerFactory.getLogger(S3Config.class);
+
   private static final boolean DEFAULT_DISABLE_ACL = true;
   // From https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html, the part number must be an integer
   // between 1 and 10000, inclusive; and the min part size allowed is 5MiB, except the last one.
@@ -59,7 +66,12 @@ public class S3Config {
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
-
+  public static final String HTTP_CLIENT_CONFIG_PREFIX = "httpclient";
+  public static final String HTTP_CLIENT_CONFIG_MAX_CONNECTIONS = "maxConnections";
+  private static final String HTTP_CLIENT_CONFIG_SOCKET_TIMEOUT = "socketTimeout";
+  private static final String HTTP_CLIENT_CONFIG_CONNECTION_TIMEOUT = "connectionTimeout";
+  private static final String HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE = "connectionTimeToLive";
+  private static final String HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT = "connectionAcquisitionTimeout";
   private final String _accessKey;
   private final String _secretKey;
   private final String _region;
@@ -78,6 +90,7 @@ public class S3Config {
   private boolean _asyncSessionUpdateEnabled;
   private final long _minObjectSizeForMultiPartUpload;
   private final long _multiPartUploadPartSize;
+  private final ApacheHttpClient.Builder _httpClientBuilder;
 
   public S3Config(PinotConfiguration pinotConfig) {
     _disableAcl = pinotConfig.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
@@ -111,6 +124,43 @@ public class S3Config {
     if (_iamRoleBasedAccess) {
       Preconditions.checkNotNull(_roleArn, "Must provide 'roleArn' if iamRoleBasedAccess is enabled");
     }
+    PinotConfiguration httpConfig = pinotConfig.subset(HTTP_CLIENT_CONFIG_PREFIX);
+    _httpClientBuilder = httpConfig.isEmpty() ? null : createHttpClientBuilder(httpConfig);
+  }
+
+  private static ApacheHttpClient.Builder createHttpClientBuilder(PinotConfiguration config) {
+    ApacheHttpClient.Builder httpClientBuilder = ApacheHttpClient.builder();
+    String value = config.getProperty(HTTP_CLIENT_CONFIG_MAX_CONNECTIONS);
+    if (value != null) {
+      int pv = Integer.parseInt(value);
+      LOGGER.debug("Set maxConnections to {} for http client builder", pv);
+      httpClientBuilder.maxConnections(pv);
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_SOCKET_TIMEOUT);
+    if (value != null) {
+      Duration pv = Duration.parse(value);
+      httpClientBuilder.socketTimeout(pv);
+      LOGGER.debug("Set socketTimeout to {}sec for http client builder", pv.toSeconds());
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIMEOUT);
+    if (value != null) {
+      Duration pv = Duration.parse(value);
+      httpClientBuilder.connectionTimeout(pv);
+      LOGGER.debug("Set connectionTimeout to {}sec for http client builder", pv.toSeconds());
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE);
+    if (value != null) {
+      Duration pv = Duration.parse(value);
+      httpClientBuilder.connectionTimeToLive(pv);
+      LOGGER.debug("Set connectionTimeToLive to {}sec for http client builder", pv.toSeconds());
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT);
+    if (value != null) {
+      Duration pv = Duration.parse(value);
+      httpClientBuilder.connectionAcquisitionTimeout(pv);
+      LOGGER.debug("Set connectionAcquisitionTimeout to {}sec for http client builder", pv.toSeconds());
+    }
+    return httpClientBuilder;
   }
 
   public String getAccessKey() {
@@ -175,5 +225,9 @@ public class S3Config {
 
   public long getMultiPartUploadPartSize() {
     return _multiPartUploadPartSize;
+  }
+
+  public ApacheHttpClient.Builder getHttpClientBuilder() {
+    return _httpClientBuilder;
   }
 }
