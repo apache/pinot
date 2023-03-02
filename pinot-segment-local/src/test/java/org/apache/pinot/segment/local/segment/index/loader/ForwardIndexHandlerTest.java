@@ -1212,7 +1212,7 @@ public class ForwardIndexHandlerTest {
     String col2;
     do {
       col2 = _noDictionaryColumns.get(rand.nextInt(_noDictionaryColumns.size()));
-    } while (FORWARD_INDEX_DISABLED_RAW_COLUMNS.contains(col2));
+    } while (FORWARD_INDEX_DISABLED_RAW_COLUMNS.contains(col2) || col2.equals(col1));
     indexLoadingConfig.getNoDictionaryColumns().remove(col2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
