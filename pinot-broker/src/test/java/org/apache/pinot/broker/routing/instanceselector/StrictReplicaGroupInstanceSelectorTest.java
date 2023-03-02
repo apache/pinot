@@ -219,6 +219,7 @@ public class StrictReplicaGroupInstanceSelectorTest {
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 
+  // Test that we don't report new segment as unavailable till it gets old.
   @Test
   public void testNewSegmentFromZKMetadataReportingUnavailable() {
     // Set segment0 as old segment
@@ -275,6 +276,7 @@ public class StrictReplicaGroupInstanceSelectorTest {
     assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
   }
 
+  // Test that we mark new segment as old when we see error state.
   @Test
   public void testNewSegmentGetsOldWithErrorState() {
     // Set segment0 as old segment
@@ -346,6 +348,7 @@ public class StrictReplicaGroupInstanceSelectorTest {
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 
+  // Test that we mark new segment as old when external view state converges with ideal state.
   @Test
   public void testNewSegmentGetsOldWithStateConverge() {
     // Set segment0 as old segment
@@ -412,8 +415,9 @@ public class StrictReplicaGroupInstanceSelectorTest {
     assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg, newSeg));
   }
 
+  // Test that we get new segment from ideal state update.
   @Test
-  public void testNewSegmentsFromExternalViewUpdate() {
+  public void testNewSegmentsFromIDWithMissingEV() {
     String oldSeg0 = "segment0";
     createSegment(oldSeg0,
         _mutableClock.millis() - CommonConstants.Helix.StateModel.NEW_SEGMENT_EXPIRATION_MILLIS - 100);
@@ -487,5 +491,67 @@ public class StrictReplicaGroupInstanceSelectorTest {
     selectionResult = strictReplicaGroupInstanceSelector.select(_brokerRequest, List.copyOf(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
     assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg0, oldSeg1, newSeg));
+  }
+
+  // Test that on instance change, we exclude not enabled instance from serving for new segments.
+  @Test
+  public void testExcludeNotEnabledInstanceForNewSegment() {
+    // Set segment0 as old segment
+    String oldSeg = "segment0";
+    createSegment(oldSeg,
+        _mutableClock.millis() - CommonConstants.Helix.StateModel.NEW_SEGMENT_EXPIRATION_MILLIS - 100);
+    // Set segment1 as new segment
+    String newSeg = "segment1";
+    createSegment(newSeg, _mutableClock.millis() - 100);
+    Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
+
+    // Set up instances
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> enabledInstances = ImmutableSet.of(instance0, instance1);
+    // Set up ideal state:
+    // Ideal states for two segments
+    //   [segment0] -> [instance0:online, instance1:online]
+    //   [segment1] -> [instance0:online, instance1:online]
+    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg, List.of(instance0, instance1)),
+        Map.entry(newSeg, List.of(instance0, instance1)));
+    IdealState idealState = createIdealState(idealSateMap);
+
+    // Set up external view:
+    // External view for two segments
+    //   [segment0] -> [instance0:online, instance1:online]
+    //   [segment1] -> [instance0:online]
+    Map<String, List<Pair<String, String>>> externalViewMap = Map.ofEntries(
+        Map.entry(oldSeg, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
+        Map.entry(newSeg, List.of(Pair.of(instance0, ONLINE)))
+    );
+    ExternalView externalView = createExternalView(externalViewMap);
+
+    StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
+        new StrictReplicaGroupInstanceSelector(TABLE_NAME, _brokerMetrics, null, _propertyStore, _mutableClock);
+    strictReplicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+
+    // First selection, we select instance0 for newSeg.
+    int requestId = 0;
+    Map<String, String> expectedReplicaGroupInstanceSelectorResult = Map.ofEntries(
+        Map.entry(oldSeg, instance0),
+        Map.entry(newSeg, instance0)
+    );
+    InstanceSelector.SelectionResult selectionResult =
+        strictReplicaGroupInstanceSelector.select(_brokerRequest, List.copyOf(onlineSegments), requestId);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+
+    // Remove instance0 from enabledInstances.
+    enabledInstances = ImmutableSet.of(instance1);
+    List<String> changeInstance = ImmutableList.of(instance0);
+    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, changeInstance);
+    selectionResult = strictReplicaGroupInstanceSelector.select(_brokerRequest, List.copyOf(onlineSegments), requestId);
+    // We don't include instance0 in selection anymore.
+    expectedReplicaGroupInstanceSelectorResult = Map.ofEntries(
+        Map.entry(oldSeg, instance1)
+    );
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 }

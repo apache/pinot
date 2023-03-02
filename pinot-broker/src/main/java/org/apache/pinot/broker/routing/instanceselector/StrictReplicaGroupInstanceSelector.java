@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -40,7 +38,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -94,67 +91,11 @@ import org.roaringbitmap.RoaringBitmap;
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  private class SegmentState {
-    // List of instance for this segment in ideal state.
-    private List<String> _candidateInstance;
-    // Mapping from candidate to index in _candidateInstance.
-    private HashMap<String, Integer> _candidateIdx;
-    // Mark offline instance in _candidateInstance using idx.
-    private RoaringBitmap _offlineFlags;
-    // Segment creation time.
-    // It is zk record's creation time when instance selector is init.
-    // After init, we use system clock time when we receive first ideal state for this segment as approximation.
-    private long _creationMillis;
-
-    public SegmentState(long creationMillis) {
-      _creationMillis = creationMillis;
-      _candidateIdx = new HashMap<>();
-      _candidateInstance = new ArrayList<>();
-      _offlineFlags = new RoaringBitmap();
-    }
-
-    public boolean isNew(long nowMillis) {
-      return CommonConstants.Helix.StateModel.isNewSegment(_creationMillis, nowMillis);
-    }
-
-    // Reset the candidate state upon ideal state and external view change.
-    public void resetCandidates(Set<String> candidates) {
-      _candidateIdx.clear();
-      _candidateInstance.clear();
-      _offlineFlags.clear();
-      Object[] candidateList = candidates.toArray();
-      for (int i = 0; i < candidateList.length; i++) {
-        String cand = (String) candidateList[i];
-        _candidateIdx.put(cand, i);
-        _offlineFlags.add(i);
-        _candidateInstance.add(cand);
-      }
-    }
-
-    public void setOnline(String candidate) {
-      _offlineFlags.remove(_candidateIdx.get(candidate));
-    }
-
-    public Pair<List<String>, RoaringBitmap> getCandidates() {
-      return ImmutablePair.of(_candidateInstance, _offlineFlags);
-    }
-  }
-
-  private HashMap<String, SegmentState> _newSegmentStates;
-
   private boolean _initialized = false;
 
   private boolean isNewSegment(String segment, long nowMillis) {
     SegmentState state = _newSegmentStates.getOrDefault(segment, null);
     return state != null && state.isNew(nowMillis);
-  }
-
-  protected Pair<List<String>, RoaringBitmap> getCandidateInstances(String segment, long nowMillis) {
-    SegmentState state = _newSegmentStates.getOrDefault(segment, null);
-    if (state == null || !state.isNew(nowMillis)) {
-      return super.getCandidateInstances(segment, nowMillis);
-    }
-    return state.getCandidates();
   }
 
   protected Set<String> getUnavailableSegments(long nowMillis) {
@@ -163,9 +104,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       if (entry.getValue().isNew(nowMillis)) {
         unavailableSegments.remove(entry.getKey());
       } else {
-        Pair<List<String>, RoaringBitmap> candidates = entry.getValue().getCandidates();
-        RoaringBitmap offlineFlags = candidates.getRight();
-        if (offlineFlags != null && offlineFlags.getCardinality() == candidates.getLeft().size()) {
+        if (entry.getValue().isAllOffline()) {
           unavailableSegments.add(entry.getKey());
         }
       }
@@ -174,8 +113,24 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   }
 
   @Override
-  protected boolean isValidUnavailable(String segment, long nowMillis) {
-    return isNewSegment(segment, nowMillis);
+  protected boolean isValidUnavailable(@Nullable Long creationMillis, String segment, long nowMillis) {
+    return creationMillis != null && CommonConstants.Helix.StateModel.isNewSegment(creationMillis, nowMillis);
+  }
+
+  @Override
+  protected SegmentState calculateCandidatesForNewSegment(String segment, @Nullable SegmentState state) {
+    if (state == null) {
+      return null;
+    }
+    SegmentState newCandidateInstances = new SegmentState(state.getCreationMillis());
+    List<String> candidates = state.getCandidates();
+    for (int i = 0; i < candidates.size(); i++) {
+      String instance = candidates.get(i);
+      if (_enabledInstances.contains(instance)) {
+        newCandidateInstances.addCandidate(instance, state.isInstanceOnline(i));
+      }
+    }
+    return newCandidateInstances;
   }
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
@@ -246,7 +201,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   @Override
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> segmentToOfflineInstancesMap,
-      Map<String, List<String>> instanceToSegmentsMap) {
+      Map<String, List<String>> instanceToSegmentsMap, long nowMillis) {
     // TODO: Add support for AdaptiveServerSelection.
     // Iterate over the ideal state to fill up 'idealStateSegmentToInstancesMap' which is a map from segment to set of
     // instances hosting the segment in the ideal state
@@ -254,7 +209,6 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     Map<String, Set<String>> idealStateSegmentToInstancesMap = new HashMap<>(segmentMapCapacity);
     Map<String, Set<String>> tempSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
 
-    long nowMillis = _clock.millis();
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
       // Only track online segments
@@ -263,7 +217,10 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       }
       SegmentState state = _newSegmentStates.getOrDefault(segment, null);
       if (state != null && state.isNew(nowMillis)) {
-        state.resetCandidates(entry.getValue().keySet());
+        state.resetCandidates();
+        for (String instance : entry.getValue().keySet()) {
+          state.addCandidate(instance, false);
+        }
       } else {
         _newSegmentStates.remove(segment);
       }

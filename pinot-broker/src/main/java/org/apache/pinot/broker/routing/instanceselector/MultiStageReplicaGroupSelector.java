@@ -85,7 +85,9 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions, long nowMillis) {
+      Map<String, List<String>> segmentToEnabledInstancesMap,
+      Map<String, SegmentState> newSegmentToCandidateInstanceMap, Map<String, String> queryOptions,
+      long nowMillis) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
