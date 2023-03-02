@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.time.Duration;
 import java.util.UUID;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
@@ -137,29 +139,40 @@ public class S3Config {
     }
     value = config.getProperty(HTTP_CLIENT_CONFIG_SOCKET_TIMEOUT);
     if (value != null) {
-      Duration pv = Duration.parse(value);
+      Duration pv = parseDuration(value);
       httpClientBuilder.socketTimeout(pv);
       LOGGER.debug("Set socketTimeout to {}sec for http client builder", pv.toSeconds());
     }
     value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIMEOUT);
     if (value != null) {
-      Duration pv = Duration.parse(value);
+      Duration pv = parseDuration(value);
       httpClientBuilder.connectionTimeout(pv);
       LOGGER.debug("Set connectionTimeout to {}sec for http client builder", pv.toSeconds());
     }
     value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE);
     if (value != null) {
-      Duration pv = Duration.parse(value);
+      Duration pv = parseDuration(value);
       httpClientBuilder.connectionTimeToLive(pv);
       LOGGER.debug("Set connectionTimeToLive to {}sec for http client builder", pv.toSeconds());
     }
     value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT);
     if (value != null) {
-      Duration pv = Duration.parse(value);
+      Duration pv = parseDuration(value);
       httpClientBuilder.connectionAcquisitionTimeout(pv);
       LOGGER.debug("Set connectionAcquisitionTimeout to {}sec for http client builder", pv.toSeconds());
     }
     return httpClientBuilder;
+  }
+
+  @VisibleForTesting
+  static Duration parseDuration(String durStr) {
+    try {
+      // try format like '1hr20s'
+      return Duration.ofMillis(TimeUtils.convertPeriodToMillis(durStr));
+    } catch (Exception ignore) {
+    }
+    // try format like 'PT1H20S'
+    return Duration.parse(durStr);
   }
 
   public String getAccessKey() {

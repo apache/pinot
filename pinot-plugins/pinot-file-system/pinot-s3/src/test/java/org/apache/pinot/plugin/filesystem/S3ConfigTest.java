@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import java.time.format.DateTimeParseException;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -31,11 +32,17 @@ public class S3ConfigTest {
     Assert.assertNull(cfg.getHttpClientBuilder());
 
     pinotConfig.setProperty("httpclient.maxConnections", 100);
-    pinotConfig.setProperty("httpclient.socketTimeout", "PT10S");
-    pinotConfig.setProperty("httpclient.connectionTimeout", "PT20S");
-    pinotConfig.setProperty("httpclient.connectionTimeToLive", "PT30S");
-    pinotConfig.setProperty("httpclient.connectionAcquisitionTimeout", "PT40S");
+    pinotConfig.setProperty("httpclient.socketTimeout", "PT1M10S");
+    pinotConfig.setProperty("httpclient.connectionTimeout", "PT2M20S");
+    pinotConfig.setProperty("httpclient.connectionTimeToLive", "3m30s");
+    pinotConfig.setProperty("httpclient.connectionAcquisitionTimeout", "4m40s");
     cfg = new S3Config(pinotConfig);
     Assert.assertNotNull(cfg.getHttpClientBuilder());
+  }
+
+  @Test(expectedExceptions = DateTimeParseException.class)
+  public void testParseDuration() {
+    Assert.assertEquals(S3Config.parseDuration("P1DT2H30S"), S3Config.parseDuration("1d2h30s"));
+    S3Config.parseDuration("unknown_format");
   }
 }
