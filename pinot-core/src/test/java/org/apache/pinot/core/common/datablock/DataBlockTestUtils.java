@@ -127,6 +127,9 @@ public class DataBlockTestUtils {
           }
           row[colId] = timestampArray;
           break;
+        case UNKNOWN:
+          row[colId] = null;
+          break;
         default:
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
       }

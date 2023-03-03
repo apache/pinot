@@ -263,6 +263,7 @@ public class DataSchema {
     JSON(STRING, ""),
     BYTES(new ByteArray(new byte[0])),
     OBJECT(null),
+    UNKNOWN(null),
     INT_ARRAY(new int[0]),
     LONG_ARRAY(new long[0]),
     FLOAT_ARRAY(new float[0]),
@@ -376,6 +377,8 @@ public class DataSchema {
           return DataType.JSON;
         case BYTES:
           return DataType.BYTES;
+        case UNKNOWN:
+          return DataType.UNKNOWN;
         default:
           throw new IllegalStateException(String.format("Cannot convert ColumnDataType: %s to DataType", this));
       }
@@ -422,6 +425,7 @@ public class DataSchema {
           return toTimestampArray(value);
         case BYTES_ARRAY:
           return (byte[][]) value;
+        case UNKNOWN: // fall through
         case OBJECT:
           return (Serializable) value;
         default:
@@ -586,6 +590,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case UNKNOWN:
+          return UNKNOWN;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
