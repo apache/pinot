@@ -488,7 +488,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // trigger gc if consecutively kill more than some number of queries
       // set this to 0 to always trigger gc before killing a query
       // should consider use -XX:+ExplicitGCInvokesConcurrent to avoid STW for some gc algorithms
-      private final int _gcTriggerCount =
+      private final int _gcBackoffCount =
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT,
               CommonConstants.Accounting.DEFAULT_GC_BACKOFF_COUNT);
 
@@ -593,7 +593,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.info("_criticalLevel of on heap memory is {}", _criticalLevel);
         LOGGER.info("_criticalLevelAfterGC of on heap memory is {}", _criticalLevelAfterGC);
         LOGGER.info("_panicLevel of on heap memory is {}", _panicLevel);
-        LOGGER.info("_gcTriggerCount is {}", _gcTriggerCount);
+        LOGGER.info("_gcBackoffCount is {}", _gcBackoffCount);
         LOGGER.info("_gcWaitTime is {}", _gcWaitTime);
         LOGGER.info("_normalSleepTime is {}", _normalSleepTime);
         LOGGER.info("_alarmingSleepTime is {}", _alarmingSleepTime);
@@ -746,7 +746,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
        * use XX:+ExplicitGCInvokesConcurrent to avoid a full gc when system.gc is triggered
        */
       private void killMostExpensiveQuery() {
-        if (!_aggregatedUsagePerActiveQuery.isEmpty() && _numQueriesKilledConsecutively >= _gcTriggerCount) {
+        if (!_aggregatedUsagePerActiveQuery.isEmpty() && _numQueriesKilledConsecutively >= _gcBackoffCount) {
           _numQueriesKilledConsecutively = 0;
           System.gc();
           try {
