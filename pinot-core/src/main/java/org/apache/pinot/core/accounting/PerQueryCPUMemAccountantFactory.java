@@ -486,6 +486,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           CommonConstants.Accounting.DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC));
 
       // trigger gc if consecutively kill more than some number of queries
+      // set this to 0 to always trigger gc before killing a query
+      // should consider use -XX:+ExplicitGCInvokesConcurrent to avoid STW for some gc algorithms
       private final int _gcTriggerCount =
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT,
               CommonConstants.Accounting.DEFAULT_GC_BACKOFF_COUNT);
