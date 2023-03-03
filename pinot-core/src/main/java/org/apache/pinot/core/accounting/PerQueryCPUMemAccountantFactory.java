@@ -479,6 +479,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO,
           CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO));
 
+      // if after gc the heap usage is still above this, kill the most expensive query
+      // use this to prevent heap size oscillation and repeatedly triggering gc
+      private final long _criticalLevelAfterGC = _criticalLevel - (long) (_maxHeapSize
+          * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC,
+          CommonConstants.Accounting.DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC));
+
       // trigger gc if consecutively kill more than some number of queries
       private final int _gcTriggerCount =
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT,
@@ -494,6 +500,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private final int _normalSleepTime =
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME,
               CommonConstants.Accounting.DEFAULT_SLEEP_TIME);
+
+      // wait for gc to complete, according to system.gc() javadoc, when control returns from the method call,
+      // the Java Virtual Machine has made a best effort to reclaim space from all discarded objects.
+      // Therefore, we default this to 0.
+      // Tested with Shenandoah GC and G1GC, with -XX:+ExplicitGCInvokesConcurrent
+      private final int _gcWaitTime =
+          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_WAIT_TIME,
+              CommonConstants.Accounting.DEFAULT_CONFIG_OF_GC_WAIT_TIME);
 
       // alarming sleep time denominator, should be > 1 to sample more frequent at alarming level
       private final int _alarmingSleepTimeDenominator =
@@ -572,10 +586,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         // Log info for the accountant configs
         LOGGER.info("Starting accountant task for PerQueryCPUMemAccountant.");
         LOGGER.info("Xmx is {}", _maxHeapSize);
+        LOGGER.info("_instanceType is {}", _instanceType);
         LOGGER.info("_alarmingLevel of on heap memory is {}", _alarmingLevel);
         LOGGER.info("_criticalLevel of on heap memory is {}", _criticalLevel);
+        LOGGER.info("_criticalLevelAfterGC of on heap memory is {}", _criticalLevelAfterGC);
         LOGGER.info("_panicLevel of on heap memory is {}", _panicLevel);
+        LOGGER.info("_gcTriggerCount is {}", _gcTriggerCount);
+        LOGGER.info("_gcWaitTime is {}", _gcWaitTime);
+        LOGGER.info("_normalSleepTime is {}", _normalSleepTime);
+        LOGGER.info("_alarmingSleepTime is {}", _alarmingSleepTime);
         LOGGER.info("_oomKillQueryEnabled: {}", _oomKillQueryEnabled);
+        LOGGER.info("_minMemoryFootprintForKill: {}", _minMemoryFootprintForKill);
         LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
             _isCPUTimeBasedKillingEnabled, _cpuTimeBasedKillingThresholdNS);
 
@@ -669,7 +690,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private void triggeredActions() {
         switch (_triggeringLevel) {
           case HeapMemoryCritical:
-            LOGGER.debug("Heap used bytes {} exceeds critical level", _usedBytes);
+            LOGGER.warn("Heap used bytes {} exceeds critical level", _usedBytes);
             killMostExpensiveQuery();
             break;
           case CPUTimeBasedKilling:
@@ -724,14 +745,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
        */
       private void killMostExpensiveQuery() {
         if (!_aggregatedUsagePerActiveQuery.isEmpty() && _numQueriesKilledConsecutively >= _gcTriggerCount) {
-          System.gc();
           _numQueriesKilledConsecutively = 0;
+          System.gc();
           try {
-            Thread.sleep(_normalSleepTime);
+            Thread.sleep(_gcWaitTime);
           } catch (InterruptedException ignored) {
           }
           _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
-          if (_usedBytes < _criticalLevel) {
+          if (_usedBytes < _criticalLevelAfterGC) {
             return;
           }
         }
@@ -756,10 +777,19 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                     " Query %s got killed because using %d bytes of memory on %s, exceeding the quota",
                     maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType)));
             interruptRunnerThread(maxUsageTuple.getAnchorThread());
+            LOGGER.error("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+            LOGGER.error("Query {} got picked because using {} bytes of memory, actual kill committed true}",
+                maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
+            LOGGER.error("Current task status recorded is {}", _threadEntriesMap);
+          } else if (!_oomKillQueryEnabled) {
+            LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+            LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
+                    + "because oomKillQueryEnabled is false",
+                maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
+          } else {
+            LOGGER.warn("Heap used bytes {} exceeds critical level {}, but all queries are below quota",
+                _usedBytes, _criticalLevel);
           }
-          LOGGER.error("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
-          LOGGER.error("Query {} got picked because using {} bytes of memory, actual kill committed {}",
-              maxUsageTuple._queryId, maxUsageTuple._allocatedBytes, shouldKill);
         } else {
           maxUsageTuple = Collections.max(_aggregatedUsagePerActiveQuery.values(),
               Comparator.comparing(AggregatedStats::getCpuNS));
@@ -769,13 +799,18 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                     " Query %s got killed because memory pressure, using %d ns of CPU time on %s",
                     maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType)));
             interruptRunnerThread(maxUsageTuple.getAnchorThread());
+            LOGGER.error("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+            LOGGER.error("Query {} got picked because using {} ns of cpu time, actual kill committed true",
+                maxUsageTuple._allocatedBytes, maxUsageTuple._queryId);
+            LOGGER.error("Current task status recorded is {}", _threadEntriesMap);
+          } else {
+            LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+            LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
+                    + "because oomKillQueryEnabled is false",
+                maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
           }
-          LOGGER.error("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
-          LOGGER.error("Query {} got picked because using {} ns of cpu time, actual kill committed {}",
-              maxUsageTuple._allocatedBytes, maxUsageTuple._queryId, _oomKillQueryEnabled);
         }
-        LOGGER.error("Current task status recorded is {}", _threadEntriesMap);
-        LOGGER.error("Query aggregation results {} for the previous kill.", _aggregatedUsagePerActiveQuery.toString());
+        LOGGER.warn("Query aggregation results {} for the previous kill.", _aggregatedUsagePerActiveQuery.toString());
       }
 
       private void killCPUTimeExceedQueries() {
