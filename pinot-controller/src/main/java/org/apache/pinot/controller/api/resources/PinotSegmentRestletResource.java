@@ -906,27 +906,27 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("segments/{tableName}/zkmetadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the zookeeper metadata for all table segments",
-          notes = "Get the zookeeper metadata for all table segments")
+  @ApiOperation(value = "Get the zookeeper metadata for all table segments", notes = "Get the zookeeper metadata for "
+      + "all table segments")
   public String getZookeeperMetadata(
-          @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-          @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
-          throws JsonProcessingException {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
+      throws JsonProcessingException {
     LOGGER.info("Received a request to fetch zookeeper metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
     List<String> tableNamesWithType =
-            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER);
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER);
     Map<String, JsonNode> tableTypeToSegmentMetadata = new HashMap<>();
-    for (String tableNameWithType: tableNamesWithType) {
+    for (String tableNameWithType : tableNamesWithType) {
       List<SegmentZKMetadata> segmentZKMetadataList =
-              _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+          _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
       Map<String, JsonNode> segmentToMetadataMap = new HashMap<>();
-      for (SegmentZKMetadata segmentZKMetadata: segmentZKMetadataList) {
+      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         segmentToMetadataMap.put(segmentZKMetadata.getSegmentName(), JsonUtils.objectToJsonNode(segmentZKMetadata));
       }
-      tableTypeToSegmentMetadata.put(Objects.requireNonNull(
-              TableNameBuilder.getTableTypeFromTableName(tableNameWithType)).toString(),
+      tableTypeToSegmentMetadata
+          .put(Objects.requireNonNull(TableNameBuilder.getTableTypeFromTableName(tableNameWithType)).toString(),
               JsonUtils.objectToJsonNode(segmentToMetadataMap));
     }
     return JsonUtils.objectToPrettyString(tableTypeToSegmentMetadata);
