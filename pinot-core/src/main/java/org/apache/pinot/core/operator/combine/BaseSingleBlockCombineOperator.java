@@ -148,6 +148,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
         return blockToMerge;
       }
       if (mergedBlock == null) {
+        // could be null.
         mergedBlock = _resultsBlockMerger.convertToMergeableBlock((T) blockToMerge);
       } else {
         _resultsBlockMerger.mergeResultsBlocks(mergedBlock, (T) blockToMerge);

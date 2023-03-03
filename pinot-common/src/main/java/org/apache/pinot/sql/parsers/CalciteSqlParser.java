@@ -619,6 +619,7 @@ public class CalciteSqlParser {
     return orderByExpr;
   }
 
+  // Parse null last or null first.
   private static Expression convertOrderBy(SqlNode node) {
     Expression expression;
     if (node.getKind() == SqlKind.DESCENDING) {
