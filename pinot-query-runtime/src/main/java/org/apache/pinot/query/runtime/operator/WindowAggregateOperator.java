@@ -87,6 +87,16 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _hasReturnedWindowAggregateBlock;
 
+  /**
+   * Enum to denote the type of window frame
+   * ROW - ROW type window frame
+   * RANGE - RANGE type window frame
+   */
+  private enum WindowFrameType {
+    ROW,
+    RANGE
+  }
+
   public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
       List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
@@ -101,9 +111,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
   public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
       List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
-      int upperBound, boolean isRows, List<RexExpression> constants, DataSchema resultSchema, DataSchema inputSchema,
-      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, long requestId, int stageId,
-      VirtualServerAddress virtualServerAddress) {
+      int upperBound, boolean isRowBased, List<RexExpression> constants, DataSchema resultSchema,
+      DataSchema inputSchema, Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers,
+      long requestId, int stageId, VirtualServerAddress virtualServerAddress) {
     super(requestId, stageId, virtualServerAddress);
 
     boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, orderSetDirection, orderSetNullDirection);
@@ -113,9 +123,10 @@ public class WindowAggregateOperator extends MultiStageOperator {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection);
-    _windowFrame = new WindowFrame(lowerBound, upperBound, isRows);
+    _windowFrame = new WindowFrame(lowerBound, upperBound, isRowBased);
 
-    Preconditions.checkState(!_windowFrame.isRows(), "Only RANGE type frames are supported at present");
+    Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowFrameType.RANGE,
+        "Only RANGE type frames are supported at present");
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
     Preconditions.checkState(_windowFrame.isUnboundedFollowing()
@@ -295,13 +306,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
     final int _lowerBound;
     // The lower bound of the frame. Set to Integer.MAX_VALUE if UNBOUNDED FOLLOWING. Set to 0 if CURRENT ROW
     final int _upperBound;
-    // Set to 'true' for ROWS type frames, otherwise set to 'false'
-    final boolean _isRows;
+    // Enum to denote the FRAME type, can be either ROW or RANGE types
+    final WindowFrameType _windowFrameType;
 
-    WindowFrame(int lowerBound, int upperBound, boolean isRows) {
+    WindowFrame(int lowerBound, int upperBound, boolean isRowBased) {
       _lowerBound = lowerBound;
       _upperBound = upperBound;
-      _isRows = isRows;
+      _windowFrameType = isRowBased ? WindowFrameType.ROW : WindowFrameType.RANGE;
     }
 
     boolean isUnboundedPreceding() {
@@ -316,8 +327,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
       return _upperBound == 0;
     }
 
-    boolean isRows() {
-      return _isRows;
+    WindowFrameType getWindowFrameType() {
+      return _windowFrameType;
     }
 
     int getLowerBound() {

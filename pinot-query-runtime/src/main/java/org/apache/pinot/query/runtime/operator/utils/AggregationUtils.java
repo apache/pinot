@@ -31,8 +31,11 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Utility class to perform aggregations in the intermediate stage operators such as {@code AggregateOperator} and
- * {@code WindowAggregateOperator}
+ * Utility class to perform accumulation over a collection of rows. It provides utils for the following:
+ * (1) method to deal with aggregation key and
+ * (2) method to merge a row into an existing accumulator
+ *
+ * <p>Accumulation is used by {@code WindowAggregateOperator} and {@code AggregateOperator}.
  */
 public class AggregationUtils {
 
