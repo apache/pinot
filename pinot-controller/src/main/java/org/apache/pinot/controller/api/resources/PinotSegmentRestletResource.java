@@ -40,7 +40,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -908,7 +907,7 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the zookeeper metadata for all table segments", notes = "Get the zookeeper metadata for "
       + "all table segments")
-  public String getZookeeperMetadata(
+  public Map<String, Map<String, Object>> getZookeeperMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
       throws JsonProcessingException {
@@ -917,19 +916,21 @@ public class PinotSegmentRestletResource {
 
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER);
-    Map<String, JsonNode> tableTypeToSegmentMetadata = new HashMap<>();
-    for (String tableNameWithType : tableNamesWithType) {
-      List<SegmentZKMetadata> segmentZKMetadataList =
-          _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
-      Map<String, JsonNode> segmentToMetadataMap = new HashMap<>();
-      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-        segmentToMetadataMap.put(segmentZKMetadata.getSegmentName(), JsonUtils.objectToJsonNode(segmentZKMetadata));
-      }
-      tableTypeToSegmentMetadata
-          .put(Objects.requireNonNull(TableNameBuilder.getTableTypeFromTableName(tableNameWithType)).toString(),
-              JsonUtils.objectToJsonNode(segmentToMetadataMap));
+    String tableNameWithType;
+    if (tableNamesWithType.size() == 1) {
+      tableNameWithType = tableNamesWithType.get(0);
+    } else {
+      tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     }
-    return JsonUtils.objectToPrettyString(tableTypeToSegmentMetadata);
+    Map<String, Map<String, Object>> segmentToMetadataMap = new HashMap<>();
+    List<SegmentZKMetadata> segmentZKMetadataList =
+        _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      Map<String, Object> segmentZKMetadataObject = new HashMap<>(segmentZKMetadata.toMap());
+      segmentToMetadataMap.put(segmentZKMetadata.getSegmentName(), segmentZKMetadataObject);
+    }
+    return segmentToMetadataMap;
   }
 
   @GET
