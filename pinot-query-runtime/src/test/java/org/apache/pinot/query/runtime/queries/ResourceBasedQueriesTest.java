@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
@@ -248,11 +249,30 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       for (Integer stageId : stageIdStats.keySet()) {
         // check stats only for leaf stage
         BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
-        if (!brokerResponseStats.getTableNames().isEmpty()) {
-          Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-          String tableName = brokerResponseStats.getTableNames().get(0);
-          Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-          Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
+
+        if (brokerResponseStats.getTableNames().isEmpty()) {
+          continue;
+        }
+
+        String tableName = brokerResponseStats.getTableNames().get(0);
+        Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
+
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+        if (tableType == null) {
+          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        }
+
+        Assert.assertNotNull(_tableToSegmentMap.get(tableName));
+        Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
+
+        Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
+        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
+        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
+          if (entry.getKey().contains("LEAF_STAGE")) {
+            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
+          } else {
+            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));
+          }
         }
       }
     });

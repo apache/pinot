@@ -43,7 +43,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-  private final List<String> _operatorIds = new ArrayList<>();
   private final Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
@@ -117,11 +116,8 @@ public class ExecutionStatsAggregator {
 
     String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
     if (operatorId != null) {
-      _operatorIds.add(operatorId);
       if (_enableTrace) {
-        Map<String, String> metadataWithoutOperatorId = new HashMap<>(metadata);
-        metadataWithoutOperatorId.remove(DataTable.MetadataKey.OPERATOR_ID);
-        _operatorStats.put(operatorId, metadataWithoutOperatorId);
+        _operatorStats.put(operatorId, metadata);
       } else {
         _operatorStats.put(operatorId, new HashMap<>());
       }
