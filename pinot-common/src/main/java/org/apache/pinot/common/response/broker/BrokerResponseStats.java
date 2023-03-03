@@ -44,8 +44,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class BrokerResponseStats extends BrokerResponseNative {
 
-  private int _numBlocks = 0;
-  private int _numRows = 0;
+  private long _numBlocks = 0;
+  private long _numRows = 0;
   private long _stageExecutionTimeMs = 0;
   private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
@@ -56,22 +56,22 @@ public class BrokerResponseStats extends BrokerResponseNative {
   }
 
   @JsonProperty("numBlocks")
-  public int getNumBlocks() {
+  public long getNumBlocks() {
     return _numBlocks;
   }
 
   @JsonProperty("numBlocks")
-  public void setNumBlocks(int numBlocks) {
+  public void setNumBlocks(long numBlocks) {
     _numBlocks = numBlocks;
   }
 
   @JsonProperty("numRows")
-  public int getNumRows() {
+  public long getNumRows() {
     return _numRows;
   }
 
   @JsonProperty("numRows")
-  public void setNumRows(int numRows) {
+  public void setNumRows(long numRows) {
     _numRows = numRows;
   }
 
