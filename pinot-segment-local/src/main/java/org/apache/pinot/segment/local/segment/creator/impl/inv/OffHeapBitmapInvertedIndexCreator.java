@@ -223,8 +223,6 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
         bitmapWriter.reset();
         startIndex = endIndex;
       }
-      // This is needed to keep the invariant that says that channel position must be the last written byte
-      channel.position(writer.getLastWrittenPosition());
     }
   }
 
@@ -240,18 +238,6 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
       throws IOException {
     invert();
     write(channel);
-  }
-
-  /**
-   * Like {@link #seal()} but instead of overriding the file, this method serializes the index at the end of the index
-   * file.
-   */
-  public void sealAppend()
-      throws IOException {
-    try (FileChannel channel = new RandomAccessFile(_invertedIndexFile, "rw").getChannel()) {
-      channel.position(channel.size());
-      seal(channel);
-    }
   }
 
   @Override

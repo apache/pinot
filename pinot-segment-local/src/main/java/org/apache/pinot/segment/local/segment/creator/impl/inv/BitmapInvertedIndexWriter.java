@@ -64,6 +64,18 @@ public final class BitmapInvertedIndexWriter implements Closeable {
     this(new RandomAccessFile(outputFile, "rw").getChannel(), numBitmaps, true);
   }
 
+  /**
+   * Creates a new writer that uses the given {@link FileChannel}.
+   * It will start to write on the current position of the channel assuming it is the last useful byte in the file.
+   * When this object is {@link #close() closed}, the channel is truncated to the last byte written by this writer.
+   * @param fileChannel the file channel to be used
+   * @param numBitmaps the number of bitmaps that are expected. The actual value cannot be higher than this value. Fewer
+   *                   bitmaps than the given value can be used, but in that case the representation will not be as
+   *                   expected.
+   * @param ownsChannel whether this writer owns the channel or not. If the channel is owned then it will be closed when
+   *                    this object is closed. Otherwise the owner will have to close it by itself. Even if this writer
+   *                    does not own the channel, it will be truncated when the writer is closed.
+   */
   public BitmapInvertedIndexWriter(FileChannel fileChannel, int numBitmaps, boolean ownsChannel)
       throws IOException {
     _ownsChannel = ownsChannel;
@@ -127,8 +139,8 @@ public final class BitmapInvertedIndexWriter implements Closeable {
       throws IOException {
     long fileLength = _bytesWritten;
     _offsetBuffer.putInt(asUnsignedInt(fileLength));
+    _fileChannel.truncate(fileLength);
     if (_ownsChannel) {
-      _fileChannel.truncate(fileLength);
       _fileChannel.close();
     }
     if (CleanerUtil.UNMAP_SUPPORTED) {
