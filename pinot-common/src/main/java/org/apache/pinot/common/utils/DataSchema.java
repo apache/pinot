@@ -202,6 +202,7 @@ public class DataSchema {
     JSON(STRING, ""),
     BYTES(new ByteArray(new byte[0])),
     OBJECT(null),
+    UNKNOWN(null),
     INT_ARRAY(new int[0]),
     LONG_ARRAY(new long[0]),
     FLOAT_ARRAY(new float[0]),

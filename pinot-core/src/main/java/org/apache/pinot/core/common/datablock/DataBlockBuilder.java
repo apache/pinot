@@ -347,6 +347,11 @@ public class DataBlockBuilder {
             setColumn(columnarBuilder, byteBuffer, (ByteArray) value);
           }
           break;
+        case UNKNOWN:
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            setColumn(columnarBuilder, byteBuffer, (Object) null);
+          }
+          break;
         case OBJECT:
           for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
             value = column[rowId];
