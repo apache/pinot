@@ -47,9 +47,19 @@ public class WindowNode extends AbstractStageNode {
   @ProtoProperties
   private int _upperBound;
   @ProtoProperties
-  private boolean _isRowBased;
-  @ProtoProperties
   private List<RexExpression> _constants;
+  @ProtoProperties
+  private WindowFrameType _windowFrameType;
+
+  /**
+   * Enum to denote the type of window frame
+   * ROW - ROW type window frame
+   * RANGE - RANGE type window frame
+   */
+  public enum WindowFrameType {
+    ROW,
+    RANGE
+  }
 
   public WindowNode(int stageId) {
     super(stageId);
@@ -84,7 +94,7 @@ public class WindowNode extends AbstractStageNode {
     _lowerBound = Integer.MIN_VALUE;
     // Upper bound can only be unbounded following or current row for now
     _upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;
-    _isRowBased = windowGroup.isRows;
+    _windowFrameType = windowGroup.isRows ? WindowFrameType.ROW : WindowFrameType.RANGE;
 
     // TODO: Constants are used to store constants needed such as the frame literals. For now just save this, need to
     //       extract the constant values into bounds as a part of frame support.
@@ -132,8 +142,8 @@ public class WindowNode extends AbstractStageNode {
     return _upperBound;
   }
 
-  public boolean isRowBased() {
-    return _isRowBased;
+  public WindowFrameType getWindowFrameType() {
+    return _windowFrameType;
   }
 
   public List<RexExpression> getConstants() {

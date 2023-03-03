@@ -36,6 +36,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -87,23 +88,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _hasReturnedWindowAggregateBlock;
 
-  /**
-   * Enum to denote the type of window frame
-   * ROW - ROW type window frame
-   * RANGE - RANGE type window frame
-   */
-  private enum WindowFrameType {
-    ROW,
-    RANGE
-  }
-
   public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
       List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
-      int upperBound, boolean isRows, List<RexExpression> constants, DataSchema resultSchema, DataSchema inputSchema,
-      long requestId, int stageId, VirtualServerAddress virtualServerAddress) {
+      int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
+      DataSchema resultSchema, DataSchema inputSchema, long requestId, int stageId,
+      VirtualServerAddress virtualServerAddress) {
     this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
-        upperBound, isRows, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
+        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
         requestId, stageId, virtualServerAddress);
   }
 
@@ -111,9 +103,10 @@ public class WindowAggregateOperator extends MultiStageOperator {
   public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
       List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
-      int upperBound, boolean isRowBased, List<RexExpression> constants, DataSchema resultSchema,
-      DataSchema inputSchema, Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers,
-      long requestId, int stageId, VirtualServerAddress virtualServerAddress) {
+      int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
+      DataSchema resultSchema, DataSchema inputSchema, Map<String,
+      Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, long requestId, int stageId,
+      VirtualServerAddress virtualServerAddress) {
     super(requestId, stageId, virtualServerAddress);
 
     boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, orderSetDirection, orderSetNullDirection);
@@ -123,9 +116,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection);
-    _windowFrame = new WindowFrame(lowerBound, upperBound, isRowBased);
+    _windowFrame = new WindowFrame(lowerBound, upperBound, windowFrameType);
 
-    Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowFrameType.RANGE,
+    Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
         "Only RANGE type frames are supported at present");
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
@@ -307,12 +300,12 @@ public class WindowAggregateOperator extends MultiStageOperator {
     // The lower bound of the frame. Set to Integer.MAX_VALUE if UNBOUNDED FOLLOWING. Set to 0 if CURRENT ROW
     final int _upperBound;
     // Enum to denote the FRAME type, can be either ROW or RANGE types
-    final WindowFrameType _windowFrameType;
+    final WindowNode.WindowFrameType _windowFrameType;
 
-    WindowFrame(int lowerBound, int upperBound, boolean isRowBased) {
+    WindowFrame(int lowerBound, int upperBound, WindowNode.WindowFrameType windowFrameType) {
       _lowerBound = lowerBound;
       _upperBound = upperBound;
-      _windowFrameType = isRowBased ? WindowFrameType.ROW : WindowFrameType.RANGE;
+      _windowFrameType = windowFrameType;
     }
 
     boolean isUnboundedPreceding() {
@@ -327,7 +320,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       return _upperBound == 0;
     }
 
-    WindowFrameType getWindowFrameType() {
+    WindowNode.WindowFrameType getWindowFrameType() {
       return _windowFrameType;
     }
 

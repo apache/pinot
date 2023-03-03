@@ -95,7 +95,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new WindowAggregateOperator(nextOperator, node.getGroupSet(), node.getOrderSet(),
         node.getOrderSetDirection(), node.getOrderSetNullDirection(), node.getAggCalls(), node.getLowerBound(),
-        node.getUpperBound(), node.isRowBased(), node.getConstants(), node.getDataSchema(),
+        node.getUpperBound(), node.getWindowFrameType(), node.getConstants(), node.getDataSchema(),
         node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId, context.getServer());
   }
 
