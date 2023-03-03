@@ -98,9 +98,9 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
         _mailboxContentStreamObserver.onError(Status.fromThrowable(
             new RuntimeException("Cancelled by the caller")).asRuntimeException());
       } catch (Exception e) {
-        // TODO: This can happen if the statusObserver was finished since the check in the if-condition above. We
-        //  don't necessarily need to log this, but logging as warn for now to see how frequent this is.
-        LOGGER.info("Unexpected error issuing onError to MailboxContentStreamObserver", e);
+        // TODO: We don't necessarily need to log this since this is relatively quite likely to happen. Logging this
+        //  anyways as info for now so we can see how frequently this happens.
+        LOGGER.info("Unexpected error issuing onError to MailboxContentStreamObserver: {}", e.getMessage());
       }
     }
   }

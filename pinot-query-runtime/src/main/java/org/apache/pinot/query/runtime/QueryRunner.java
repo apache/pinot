@@ -164,9 +164,31 @@ public class QueryRunner {
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     if (isLeafStage(distributedStagePlan)) {
-      // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
-      // and package it here for return. But we should really use a MailboxSendOperator directly put into the
-      // server executor.
+      runLeafStage(distributedStagePlan, requestMetadataMap, deadlineMs, requestId);
+    } else {
+      StageNode stageRoot = distributedStagePlan.getStageRoot();
+      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
+          new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, deadlineMs,
+              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
+      _scheduler.register(rootOperator);
+    }
+  }
+
+  public ExecutorService getQueryWorkerExecutorService() {
+    return _queryWorkerExecutorService;
+  }
+
+  public ExecutorService getQueryRunnerExecutorService() {
+    return _queryRunnerExecutorService;
+  }
+
+  private void runLeafStage(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap,
+      long deadlineMs, long requestId) {
+    // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
+    // and package it here for return. But we should really use a MailboxSendOperator directly put into the
+    // server executor.
+    MailboxSendOperator mailboxSendOperator = null;
+    try {
       long leafStageStartMillis = System.currentTimeMillis();
       List<ServerPlanRequestContext> serverQueryRequests =
           constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService,
@@ -184,7 +206,7 @@ public class QueryRunner {
               + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
-      MailboxSendOperator mailboxSendOperator = new MailboxSendOperator(_mailboxService,
+      mailboxSendOperator = new MailboxSendOperator(_mailboxService,
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
               sendNode.getStageId(), _rootServer), receivingStageMetadata.getServerInstances(),
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _rootServer, requestId,
@@ -193,22 +215,13 @@ public class QueryRunner {
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
-      mailboxSendOperator.toExplainString();
-    } else {
-      StageNode stageRoot = distributedStagePlan.getStageRoot();
-      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
-          new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, deadlineMs,
-              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
-      _scheduler.register(rootOperator);
+      mailboxSendOperator.close();
+    } catch (Exception e) {
+      LOGGER.error(String.format("Error running leafStage for requestId=%s", requestId), e);
+      if (mailboxSendOperator != null) {
+        mailboxSendOperator.cancel(e);
+      }
     }
-  }
-
-  public ExecutorService getQueryWorkerExecutorService() {
-    return _queryWorkerExecutorService;
-  }
-
-  public ExecutorService getQueryRunnerExecutorService() {
-    return _queryRunnerExecutorService;
   }
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
