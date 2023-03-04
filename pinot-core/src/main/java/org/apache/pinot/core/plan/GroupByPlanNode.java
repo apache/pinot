@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
@@ -128,11 +127,11 @@ public class GroupByPlanNode implements PlanNode {
     if (transformPlanNode instanceof PassThroughTransformOperator && filterOperator instanceof MatchAllFilterOperator
         && canUseInvertedIndexForGroupBy()) {
       TransformOperator invertedIndexTransformOp =
-          new InvertedIndexFastCountStarGroupByPlanNode(_queryContext, groupByExpressions[0], filterOperator,
+          new InvertedIndexFastCountStarGroupByPlanNode(_queryContext, groupByExpressions[0],
               _indexSegment.getDataSource(groupByExpressions[0].getIdentifier())).run();
 
       return new GroupByOperator(aggregationFunctions, groupByExpressions, invertedIndexTransformOp, numTotalDocs,
-          _queryContext, false);
+          _queryContext, true);
     }
 
     return new GroupByOperator(aggregationFunctions, groupByExpressions, transformPlanNode, numTotalDocs, _queryContext,

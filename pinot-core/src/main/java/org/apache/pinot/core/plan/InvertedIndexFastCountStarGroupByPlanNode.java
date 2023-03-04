@@ -33,13 +33,12 @@ public class InvertedIndexFastCountStarGroupByPlanNode implements PlanNode {
   private final InvertedIndexFastCountStarGroupByProjectionPlanNode
       _invertedIndexFastCountStarGroupByProjectionPlanNode;
 
-  public InvertedIndexFastCountStarGroupByPlanNode(QueryContext queryContext, ExpressionContext groupByExpression,
-      BaseFilterOperator filterOperator, DataSource dataSource) {
+  public InvertedIndexFastCountStarGroupByPlanNode(QueryContext queryContext, ExpressionContext groupByExpression, DataSource dataSource) {
     _queryContext = queryContext;
     _groupByExpression = groupByExpression;
 
     _invertedIndexFastCountStarGroupByProjectionPlanNode =
-        new InvertedIndexFastCountStarGroupByProjectionPlanNode(filterOperator, dataSource);
+        new InvertedIndexFastCountStarGroupByProjectionPlanNode(dataSource);
   }
 
   @Override

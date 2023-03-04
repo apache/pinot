@@ -21,13 +21,12 @@ package org.apache.pinot.core.plan;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -38,7 +37,6 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements PlanNode {
-  private final BaseFilterOperator _filterOperator;
   private final DataSource _dataSource;
   private final Map<String, DataSource> _dataSourceMap;
 
@@ -82,22 +80,58 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
     }
   }
 
-  public InvertedIndexFastCountStarGroupByProjectionPlanNode(BaseFilterOperator filterOperator, DataSource dataSource) {
-    _filterOperator = filterOperator;
+  private static class DictionaryBasedForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
+    private final Dictionary _dictionary;
+
+    public DictionaryBasedForwardIndexReader(Dictionary dictionary) {
+      _dictionary = dictionary;
+    }
+
+    @Override
+    public boolean isDictionaryEncoded() {
+      return false;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public FieldSpec.DataType getStoredType() {
+      return _dictionary.getValueType();
+    }
+
+    @Override
+    public int getInt(int docId, ForwardIndexReaderContext context) {
+      return _dictionary.getIntValue(docId);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+
+    }
+  }
+
+  public InvertedIndexFastCountStarGroupByProjectionPlanNode(DataSource dataSource) {
     _dataSource = dataSource;
 
     _dataSourceMap = new HashMap<>();
-    _dataSourceMap.put(_dataSource.getDataSourceMetadata().getFieldSpec().getName(), _dataSource);
+    _dataSourceMap.put(_dataSource.getDataSourceMetadata().getFieldSpec().getName(),
+        new StarTreeDataSource(_dataSource.getDataSourceMetadata().getFieldSpec(), _dataSource.getDictionary().length(),
+            new DictionaryBasedForwardIndexReader(_dataSource.getDictionary()), null));
     _dataSourceMap.put(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(), new StarTreeDataSource(
         new DimensionFieldSpec(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(),
             DimensionFieldSpec.DataType.LONG, true), dataSource.getDictionary().length(),
-        new CountStarForwardIndexReader((InvertedIndexReader<ImmutableRoaringBitmap>) _dataSource.getInvertedIndex(), dataSource.getDictionary().length()),
-        null));
+        new CountStarForwardIndexReader((InvertedIndexReader<ImmutableRoaringBitmap>) _dataSource.getInvertedIndex(),
+            dataSource.getDictionary().length()), null));
   }
 
   @Override
   public ProjectionOperator run() {
     return new ProjectionOperator(_dataSourceMap,
-        new DocIdSetOperator(_filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL));
+        new DocIdSetOperator(new MatchAllFilterOperator(_dataSource.getDictionary().length()),
+            DocIdSetPlanNode.MAX_DOC_PER_CALL));
   }
 }
