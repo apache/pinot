@@ -24,10 +24,13 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
+import org.apache.pinot.core.operator.transform.PassThroughTransformOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -35,6 +38,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -119,7 +123,37 @@ public class GroupByPlanNode implements PlanNode {
     TransformOperator transformPlanNode =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
+
+    // use inverted index to solve the query if possible
+    if (transformPlanNode instanceof PassThroughTransformOperator && filterOperator instanceof MatchAllFilterOperator
+        && canUseInvertedIndexForGroupBy()) {
+      TransformOperator invertedIndexTransformOp =
+          new InvertedIndexFastCountStarGroupByPlanNode(_queryContext, groupByExpressions[0], filterOperator,
+              _indexSegment.getDataSource(groupByExpressions[0].getIdentifier())).run();
+
+      return new GroupByOperator(aggregationFunctions, groupByExpressions, invertedIndexTransformOp, numTotalDocs,
+          _queryContext, false);
+    }
+
     return new GroupByOperator(aggregationFunctions, groupByExpressions, transformPlanNode, numTotalDocs, _queryContext,
         false);
+  }
+
+  private boolean canUseInvertedIndexForGroupBy() {
+    // Only count(*), group by single column can use inverted index for group-by
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    if (aggregationFunctions.length != 1 || aggregationFunctions[0].getType() != AggregationFunctionType.COUNT) {
+      return false;
+    }
+
+    ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
+    if (groupByExpressions.length > 1 || groupByExpressions[0].getType() != ExpressionContext.Type.IDENTIFIER) {
+      return false;
+    }
+
+    ExpressionContext groupByExpression = groupByExpressions[0];
+
+    return _indexSegment.getDataSource(groupByExpression.getIdentifier()).getInvertedIndex() != null
+        && _indexSegment.getDataSource(groupByExpression.getIdentifier()).getDictionary() != null;
   }
 }
