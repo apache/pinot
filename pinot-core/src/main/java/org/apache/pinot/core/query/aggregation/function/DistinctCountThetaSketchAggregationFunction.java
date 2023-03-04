@@ -101,7 +101,7 @@ public class DistinctCountThetaSketchAggregationFunction
       ExpressionContext paramsExpression = arguments.get(1);
       Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (parameters)");
-      Parameters parameters = new Parameters(paramsExpression.getLiteralString());
+      Parameters parameters = new Parameters(paramsExpression.getLiteral().getStringValue());
       int nominalEntries = parameters.getNominalEntries();
       _updateSketchBuilder.setNominalEntries(nominalEntries);
       _setOperationBuilder.setNominalEntries(nominalEntries);
@@ -130,8 +130,8 @@ public class DistinctCountThetaSketchAggregationFunction
         Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL,
             "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal "
                 + "(filter expression)");
-        FilterContext filter =
-            RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteralString()));
+        FilterContext filter = RequestContextUtils.getFilter(
+            CalciteSqlParser.compileToExpression(filterExpression.getLiteral().getStringValue()));
         // NOTE: Collect expressions before constructing the FilterInfo so that expressionIndexMap always include the
         //       expressions in the filter.
         collectExpressions(filter, _inputExpressions, expressionIndexMap);
@@ -143,7 +143,7 @@ public class DistinctCountThetaSketchAggregationFunction
       Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL,
           "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation "
               + "expression)");
-      Expression expr = CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteralString());
+      Expression expr = CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral().getStringValue());
       _postAggregationExpression = RequestContextUtils.getExpression(expr);
 
 

@@ -104,10 +104,10 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     }
     _mainTransformFunction = firstArgument;
 
-    _dateTimeTransformer =
-        DateTimeTransformerFactory.getDateTimeTransformer(((LiteralTransformFunction) arguments.get(1)).getLiteral(),
-            ((LiteralTransformFunction) arguments.get(2)).getLiteral(),
-            ((LiteralTransformFunction) arguments.get(3)).getLiteral());
+    _dateTimeTransformer = DateTimeTransformerFactory.getDateTimeTransformer(
+        ((LiteralTransformFunction) arguments.get(1)).getStringLiteral(),
+            ((LiteralTransformFunction) arguments.get(2)).getStringLiteral(),
+            ((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
     if (_dateTimeTransformer instanceof EpochToEpochTransformer
         || _dateTimeTransformer instanceof SDFToEpochTransformer) {
       _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;

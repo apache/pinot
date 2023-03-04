@@ -102,7 +102,7 @@ public class AggregationFunctionFactory {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
           // second argument is a decimal number from 0.0 to 100.0.
           // Have to use literal string because we need to cast int to double here.
-          double percentile = parsePercentileToDouble(arguments.get(1).getLiteralString());
+          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getDoubleValue());
           if (remainingFunctionName.isEmpty()) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, percentile);
@@ -170,7 +170,7 @@ public class AggregationFunctionFactory {
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
               FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
+                  = FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
@@ -199,7 +199,8 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
+              FieldSpec.DataType fieldDataType =
+                  FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
@@ -315,8 +316,7 @@ public class AggregationFunctionFactory {
     return percentile;
   }
 
-  private static double parsePercentileToDouble(String percentileString) {
-    double percentile = Double.parseDouble(percentileString);
+  private static double parsePercentileToDouble(double percentile) {
     Preconditions.checkArgument(percentile >= 0d && percentile <= 100d, "Invalid percentile: %s", percentile);
     return percentile;
   }

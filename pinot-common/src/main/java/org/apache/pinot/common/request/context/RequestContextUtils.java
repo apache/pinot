@@ -360,6 +360,6 @@ public class RequestContextUtils {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    return expressionContext.getLiteralString();
+    return expressionContext.getLiteral().getStringValue();
   }
 }
