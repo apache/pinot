@@ -43,24 +43,22 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider
   public Object[][] params() {
-    return Stream.of(INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN)
-        .flatMap(col -> Stream.of(
-            new int[] {3, 2, 1},
-            new int[] {1, 2, 3},
-            new int[] {Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 4, 0},
-            new int[] {0, Integer.MAX_VALUE / 4, Integer.MAX_VALUE / 2},
-            new int[] {0, Integer.MIN_VALUE / 4, Integer.MIN_VALUE},
-            new int[] {Integer.MIN_VALUE, 0, 1},
-            new int[] {Integer.MAX_VALUE, Integer.MIN_VALUE, 1},
-            new int[] {Integer.MAX_VALUE, Integer.MAX_VALUE - 1, Integer.MAX_VALUE - 2}
-        ).map(thresholds -> new Object[]{col, thresholds[0], thresholds[1], thresholds[2]}))
+    return Stream.of(INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN).flatMap(
+            col -> Stream.of(new int[]{3, 2, 1}, new int[]{1, 2, 3},
+                    new int[]{Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 4, 0},
+                    new int[]{0, Integer.MAX_VALUE / 4, Integer.MAX_VALUE / 2},
+                    new int[]{0, Integer.MIN_VALUE / 4, Integer.MIN_VALUE}, new int[]{Integer.MIN_VALUE, 0, 1},
+                    new int[]{Integer.MAX_VALUE, Integer.MIN_VALUE, 1},
+                    new int[]{Integer.MAX_VALUE, Integer.MAX_VALUE - 1, Integer.MAX_VALUE - 2})
+                .map(thresholds -> new Object[]{col, thresholds[0], thresholds[1], thresholds[2]}))
         .toArray(Object[][]::new);
   }
 
   @Test(dataProvider = "params")
   public void testCasePriorityObserved(String column, int threshold1, int threshold2, int threshold3) {
-    String statement = String.format("CASE WHEN %s > %d THEN 3 WHEN %s > %d THEN 2 WHEN %s > %d THEN 1 ELSE -1 END",
-        column, threshold1, column, threshold2, column, threshold3);
+    String statement =
+        String.format("CASE WHEN %s > %d THEN 3 WHEN %s > %d THEN 2 WHEN %s > %d THEN 1 ELSE -1 END", column,
+            threshold1, column, threshold2, column, threshold3);
     ExpressionContext expression = RequestContextUtils.getExpression(statement);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedIntResults = new int[NUM_ROWS];
@@ -90,51 +88,53 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
-  public void testCaseTransformFunctionWithIntResults() {
-    int[] expectedIntResults = new int[NUM_ROWS];
-    Arrays.fill(expectedIntResults, 100);
-    testCaseQueryWithIntResults("true", expectedIntResults);
-    Arrays.fill(expectedIntResults, 10);
-    testCaseQueryWithIntResults("false", expectedIntResults);
+  public void testCaseTransformFunctionWithLongResults() {
+    long[] expectedLongResults = new long[NUM_ROWS];
+    Arrays.fill(expectedLongResults, 100);
+    testCaseQueryWithLongResults("true", expectedLongResults);
+    Arrays.fill(expectedLongResults, 10);
+    testCaseQueryWithLongResults("false", expectedLongResults);
 
     for (TransformFunctionType functionType : BINARY_OPERATOR_TRANSFORM_FUNCTIONS) {
-      testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
-          String.format("%d", _intSVValues[INDEX_TO_COMPARE])), getExpectedIntResults(INT_SV_COLUMN, functionType));
-      testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
-          String.format("%d", _longSVValues[INDEX_TO_COMPARE])), getExpectedIntResults(LONG_SV_COLUMN, functionType));
-      testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
-          String.format("%f", _floatSVValues[INDEX_TO_COMPARE])), getExpectedIntResults(FLOAT_SV_COLUMN, functionType));
-      testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
+      testCaseQueryWithLongResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
+          String.format("%d", _intSVValues[INDEX_TO_COMPARE])), getExpectedLongResults(INT_SV_COLUMN, functionType));
+      testCaseQueryWithLongResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
+          String.format("%d", _longSVValues[INDEX_TO_COMPARE])), getExpectedLongResults(LONG_SV_COLUMN, functionType));
+      testCaseQueryWithLongResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
+              String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
+          getExpectedLongResults(FLOAT_SV_COLUMN, functionType));
+      testCaseQueryWithLongResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
               String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
-          getExpectedIntResults(DOUBLE_SV_COLUMN, functionType));
-      testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
+          getExpectedLongResults(DOUBLE_SV_COLUMN, functionType));
+      testCaseQueryWithLongResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
               String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
-          getExpectedIntResults(STRING_SV_COLUMN, functionType));
+          getExpectedLongResults(STRING_SV_COLUMN, functionType));
     }
   }
 
   @Test
   public void testCaseTransformFunctionWithFloatResults() {
-    float[] expectedFloatResults = new float[NUM_ROWS];
+    double[] expectedFloatResults = new double[NUM_ROWS];
     Arrays.fill(expectedFloatResults, 100);
-    testCaseQueryWithFloatResults("true", expectedFloatResults);
+    testCaseQueryWithDoubleResults("true", expectedFloatResults);
     Arrays.fill(expectedFloatResults, 10);
-    testCaseQueryWithFloatResults("false", expectedFloatResults);
+    testCaseQueryWithDoubleResults("false", expectedFloatResults);
 
     for (TransformFunctionType functionType : BINARY_OPERATOR_TRANSFORM_FUNCTIONS) {
-      testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
-          String.format("%d", _intSVValues[INDEX_TO_COMPARE])), getExpectedFloatResults(INT_SV_COLUMN, functionType));
-      testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
-          String.format("%d", _longSVValues[INDEX_TO_COMPARE])), getExpectedFloatResults(LONG_SV_COLUMN, functionType));
-      testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
+      testCaseQueryWithDoubleResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
+          String.format("%d", _intSVValues[INDEX_TO_COMPARE])), getExpectedDoubleResults(INT_SV_COLUMN, functionType));
+      testCaseQueryWithDoubleResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
+              String.format("%d", _longSVValues[INDEX_TO_COMPARE])),
+          getExpectedDoubleResults(LONG_SV_COLUMN, functionType));
+      testCaseQueryWithDoubleResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
               String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
-          getExpectedFloatResults(FLOAT_SV_COLUMN, functionType));
-      testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
+          getExpectedDoubleResults(FLOAT_SV_COLUMN, functionType));
+      testCaseQueryWithDoubleResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
               String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
-          getExpectedFloatResults(DOUBLE_SV_COLUMN, functionType));
-      testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
+          getExpectedDoubleResults(DOUBLE_SV_COLUMN, functionType));
+      testCaseQueryWithDoubleResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
               String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
-          getExpectedFloatResults(STRING_SV_COLUMN, functionType));
+          getExpectedDoubleResults(STRING_SV_COLUMN, functionType));
     }
   }
 
@@ -196,23 +196,23 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  private void testCaseQueryWithIntResults(String predicate, int[] expectedValues) {
+  private void testCaseQueryWithLongResults(String predicate, long[] expectedValues) {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("CASE WHEN %s THEN 100 ELSE 10 END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
-    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
     testTransformFunction(transformFunction, expectedValues);
   }
 
-  private void testCaseQueryWithFloatResults(String predicate, float[] expectedValues) {
+  private void testCaseQueryWithDoubleResults(String predicate, double[] expectedValues) {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("CASE WHEN %s THEN 100.0 ELSE 10.0 END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
-    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.FLOAT);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.DOUBLE);
     testTransformFunction(transformFunction, expectedValues);
   }
 
@@ -237,8 +237,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
   }
 
-  private int[] getExpectedIntResults(String column, TransformFunctionType type) {
-    int[] result = new int[NUM_ROWS];
+  private long[] getExpectedLongResults(String column, TransformFunctionType type) {
+    long[] result = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       switch (column) {
         case INT_SV_COLUMN:
@@ -368,8 +368,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     return result;
   }
 
-  private float[] getExpectedFloatResults(String column, TransformFunctionType type) {
-    float[] result = new float[NUM_ROWS];
+  private double[] getExpectedDoubleResults(String column, TransformFunctionType type) {
+    double[] result = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       switch (column) {
         case INT_SV_COLUMN:
