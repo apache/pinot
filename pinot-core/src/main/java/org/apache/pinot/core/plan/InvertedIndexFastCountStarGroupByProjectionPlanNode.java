@@ -19,6 +19,7 @@
 package org.apache.pinot.core.plan;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.operator.DocIdSetOperator;
@@ -105,6 +106,36 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
       return _dictionary.getIntValue(docId);
+    }
+
+    @Override
+    public long getLong(int docId, ForwardIndexReaderContext context) {
+      return _dictionary.getIntValue(docId);
+    }
+
+    @Override
+    public float getFloat(int docId, ForwardIndexReaderContext context) {
+      return _dictionary.getFloatValue(docId);
+    }
+
+    @Override
+    public double getDouble(int docId, ForwardIndexReaderContext context) {
+      return _dictionary.getDoubleValue(docId);
+    }
+
+    @Override
+    public BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
+      return _dictionary.getBigDecimalValue(docId);
+    }
+
+    @Override
+    public String getString(int docId, ForwardIndexReaderContext context) {
+      return _dictionary.getStringValue(docId);
+    }
+
+    @Override
+    public byte[] getBytes(int docId, ForwardIndexReaderContext context) {
+      return _dictionary.getBytesValue(docId);
     }
 
     @Override

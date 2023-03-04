@@ -20,7 +20,6 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
