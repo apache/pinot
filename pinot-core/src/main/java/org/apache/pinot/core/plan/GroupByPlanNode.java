@@ -153,6 +153,7 @@ public class GroupByPlanNode implements PlanNode {
     ExpressionContext groupByExpression = groupByExpressions[0];
 
     return _indexSegment.getDataSource(groupByExpression.getIdentifier()).getInvertedIndex() != null
-        && _indexSegment.getDataSource(groupByExpression.getIdentifier()).getDictionary() != null;
+        && _indexSegment.getDataSource(groupByExpression.getIdentifier()).getDictionary() != null
+        && Boolean.parseBoolean(_queryContext.getQueryOptions().getOrDefault("enableInvertedIndexGroupBy", "false"));
   }
 }
