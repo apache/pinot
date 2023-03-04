@@ -907,28 +907,21 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the zookeeper metadata for all table segments", notes = "Get the zookeeper metadata for "
       + "all table segments")
-  public Map<String, Map<String, Object>> getZookeeperMetadata(
+  public Map<String, Map<String, String>> getZookeeperMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
       throws JsonProcessingException {
     LOGGER.info("Received a request to fetch zookeeper metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
-    List<String> tableNamesWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER);
-    String tableNameWithType;
-    if (tableNamesWithType.size() == 1) {
-      tableNameWithType = tableNamesWithType.get(0);
-    } else {
-      tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    }
-    Map<String, Map<String, Object>> segmentToMetadataMap = new HashMap<>();
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    Map<String, Map<String, String>> segmentToMetadataMap = new HashMap<>();
     List<SegmentZKMetadata> segmentZKMetadataList =
         _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
 
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      Map<String, Object> segmentZKMetadataObject = new HashMap<>(segmentZKMetadata.toMap());
-      segmentToMetadataMap.put(segmentZKMetadata.getSegmentName(), segmentZKMetadataObject);
+      segmentToMetadataMap.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata.toMap());
     }
     return segmentToMetadataMap;
   }
