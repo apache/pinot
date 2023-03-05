@@ -21,7 +21,6 @@ package org.apache.pinot.spi.config.table;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -61,9 +60,9 @@ public class UpsertConfigTest {
 
   @Test
   public void testGetTtlInMs() {
-    Assert.assertEquals(new UpsertTTLConfig("DAYS", "1").getTtlInMs(), 86400000);
-    Assert.assertEquals(new UpsertTTLConfig("HOURS", "1").getTtlInMs(), 3600000);
-    Assert.assertEquals(new UpsertTTLConfig("MINUTES", "1").getTtlInMs(), 60000);
-    Assert.assertEquals(new UpsertTTLConfig("SECONDS", "1").getTtlInMs(), 1000);
+    assertEquals(new UpsertTTLConfig("DAYS", "1").getTtlInMs(), 86400000);
+    assertEquals(new UpsertTTLConfig("HOURS", "1").getTtlInMs(), 3600000);
+    assertEquals(new UpsertTTLConfig("MINUTES", "1").getTtlInMs(), 60000);
+    assertEquals(new UpsertTTLConfig("SECONDS", "1").getTtlInMs(), 1000);
   }
 }

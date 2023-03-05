@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -57,7 +58,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   // keep track of all segments that haven't reach stable state to persist snapshot
   @VisibleForTesting
-  private final PriorityBlockingQueue<SegmentInfo> _nonPersistedSegmentsQueue = new PriorityBlockingQueue<>();
+  final PriorityBlockingQueue<SegmentInfo> _nonPersistedSegmentsQueue = new PriorityBlockingQueue<>();
 
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
@@ -82,7 +83,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     String segmentName = segment.getSegmentName();
     segment.enableUpsert(this, validDocIds);
     if (_upsertTTLConfig != null && _upsertTTLConfig.getTtlInMs() > 0) {
-      _nonPersistedSegmentsQueue.add(new SegmentInfo(segment, segment.getSegmentMetadata().getEndTime()));
+      long endTime = segment.getSegmentMetadata().getEndTime();
+      TimeUnit timeUnit = segment.getSegmentMetadata().getTimeUnit();
+      long endTimeMs = timeUnit.toMillis(endTime);
+      _nonPersistedSegmentsQueue.add(new SegmentInfo(segment, endTimeMs));
     }
 
     AtomicInteger numKeysInWrongSegment = new AtomicInteger();
