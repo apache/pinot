@@ -412,7 +412,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract void doRemoveExpiredPrimaryKeys(Comparable timestamp);
 
   /**
-   * When TTL is enabled for upsert, this function is used to persist validDocIdsSnapshot for segment that haven't persist before.
+   * When TTL is enabled for upsert, this function is used to persist validDocIdsSnapshot for segment that haven't
+   * persist before.
    */
   @Override
   public void persistSnapshotForStableSegment(long expiredTimestamp) {

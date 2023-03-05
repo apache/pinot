@@ -55,6 +55,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @VisibleForTesting
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
+  // keep track of all segments that haven't reach stable state to persist snapshot
   @VisibleForTesting
   private final PriorityBlockingQueue<SegmentInfo> _nonPersistedSegmentsQueue = new PriorityBlockingQueue<>();
 

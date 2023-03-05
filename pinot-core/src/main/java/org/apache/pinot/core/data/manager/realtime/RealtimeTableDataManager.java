@@ -72,6 +72,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.UpsertTTLConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -515,8 +516,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     partitionDedupMetadataManager.addSegment(immutableSegment);
   }
 
-  private void handleUpsert(ImmutableSegment immutableSegment) {
-    String segmentName = immutableSegment.getSegmentName();
+  /**
+   * Get the PartitionUpsertMetadataManager by segmentName.
+   */
+  private PartitionUpsertMetadataManager getPartitionUpsertMetadataManagerBySegment(String segmentName) {
     _logger.info("Adding immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
 
     Integer partitionId =
@@ -526,6 +529,32 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             _tableNameWithType));
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
+    return partitionUpsertMetadataManager;
+  }
+
+  /**
+   * Handle Upsert TTL during segment state change from CONSUMING to ONLINE.
+   *
+   * When a new segments commit, we will remove primary key indexes from heap that has timestamp < (eventTime - TTL).
+   * For all segments sealed before (eventTime-TTL), their validDocIds won't get updated. We do an one-time persistance.
+   */
+  protected void handleUpsertTTL(String segmentName, SegmentZKMetadata segmentZKMetadata,
+      UpsertTTLConfig upsertTTLConfig) {
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+        getPartitionUpsertMetadataManagerBySegment(segmentName);
+
+    assert segmentZKMetadata != null;
+    long endTimeInMillis = segmentZKMetadata.getEndTimeMs();
+    long expiredTimestamp = endTimeInMillis - upsertTTLConfig.getTtlInMs();
+
+    partitionUpsertMetadataManager.removeExpiredPrimaryKeys(expiredTimestamp);
+    partitionUpsertMetadataManager.persistSnapshotForStableSegment(expiredTimestamp);
+  }
+
+  private void handleUpsert(ImmutableSegment immutableSegment) {
+    String segmentName = immutableSegment.getSegmentName();
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+        getPartitionUpsertMetadataManagerBySegment(segmentName);
 
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalDocs());
