@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.UpsertTTLConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -39,6 +40,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected List<String> _comparisonColumns;
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
+  protected UpsertTTLConfig _upsertTTLConfig;
   protected boolean _enableSnapshot;
   protected ServerMetrics _serverMetrics;
 
@@ -71,6 +73,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
               _comparisonColumns);
     }
 
+    if (upsertConfig.isEnableTTL() && upsertConfig.getUpsertTTLConfig() != null) {
+      _upsertTTLConfig = upsertConfig.getUpsertTTLConfig();
+    }
     _enableSnapshot = upsertConfig.isEnableSnapshot();
 
     _serverMetrics = serverMetrics;
@@ -79,5 +84,10 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   @Override
   public UpsertConfig.Mode getUpsertMode() {
     return _partialUpsertHandler == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+  }
+
+  @Override
+  public UpsertTTLConfig getUpsertTTLConfig() {
+    return _upsertTTLConfig;
   }
 }

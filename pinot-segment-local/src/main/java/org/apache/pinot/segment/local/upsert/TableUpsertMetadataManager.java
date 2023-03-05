@@ -24,6 +24,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.UpsertTTLConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -38,6 +39,8 @@ public interface TableUpsertMetadataManager extends Closeable {
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
   UpsertConfig.Mode getUpsertMode();
+
+  UpsertTTLConfig getUpsertTTLConfig();
 
   /**
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
