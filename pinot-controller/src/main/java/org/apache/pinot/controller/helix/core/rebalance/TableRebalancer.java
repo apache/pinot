@@ -557,7 +557,7 @@ public class TableRebalancer {
           tableConfig.getTableName());
       if (!dryRun) {
         String instancePartitionsName =
-            InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(), tier.getName());
+            InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tier.getName());
         LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
         InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
       }
@@ -565,14 +565,14 @@ public class TableRebalancer {
     }
 
     String tableNameWithType = tableConfig.getTableName();
-    String instancePartitionName =
-        InstancePartitionsUtils.getInstancePartitonNameForTier(tableConfig.getTableName(), tier.getName());
+    String instancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tier.getName());
     if (reassignInstances) {
       // Set existing instance partition to null if bootstrap mode is enabled, so that the instance partition
       // map can be fully recalculated.
       InstancePartitions existingInstancePartitions = bootstrap ? null
           : InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-              instancePartitionName);
+              instancePartitionsName);
       InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
       InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(tier.getName(),
           _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
@@ -586,7 +586,7 @@ public class TableRebalancer {
 
     InstancePartitions instancePartitions =
         InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-            InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tier.getName()));
+            InstancePartitionsUtils.getInstancePartitionsNameForTier(tableNameWithType, tier.getName()));
     if (instancePartitions != null) {
       return instancePartitions;
     }

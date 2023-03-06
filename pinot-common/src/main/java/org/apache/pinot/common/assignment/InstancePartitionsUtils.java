@@ -94,7 +94,7 @@ public class InstancePartitionsUtils {
     return znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
   }
 
-  public static String getInstancePartitonNameForTier(String tableName, String tierName) {
+  public static String getInstancePartitionsNameForTier(String tableName, String tierName) {
     return TableNameBuilder.extractRawTableName(tableName) + TIER_SUFFIX + tierName;
   }
 
@@ -190,7 +190,7 @@ public class InstancePartitionsUtils {
     instancePartitions.stream().filter(instancePartition -> instancePartition.getInstancePartitionsName()
             .startsWith(TableNameBuilder.extractRawTableName(tableNameWithType) + TIER_SUFFIX))
         .forEach(instancePartition -> {
-          removeTierInstancePartitions(propertyStore, instancePartition.getInstancePartitionsName());
+          removeInstancePartitions(propertyStore, instancePartition.getInstancePartitionsName());
         });
   }
 }

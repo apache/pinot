@@ -66,7 +66,7 @@ public class InstanceAssignmentDriver {
   public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
     return getInstancePartitions(
-        InstancePartitionsUtils.getInstancePartitonNameForTier(_tableConfig.getTableName(), tierName),
+        InstancePartitionsUtils.getInstancePartitionsNameForTier(_tableConfig.getTableName(), tierName),
         instanceAssignmentConfig, instanceConfigs, existingInstancePartitions);
   }
 

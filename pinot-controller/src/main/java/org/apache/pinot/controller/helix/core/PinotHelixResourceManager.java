@@ -1765,7 +1765,7 @@ public class PinotHelixResourceManager {
       for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
         if (tableConfig.getInstanceAssignmentConfigMap().containsKey(tierConfig.getName())) {
           if (override || InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-              InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierConfig.getName()))
+              InstancePartitionsUtils.getInstancePartitionsNameForTier(tableNameWithType, tierConfig.getName()))
               == null) {
             LOGGER.info("Calculating instance partitions for tier: {}, table : {}", tierConfig.getName(),
                 tableNameWithType);
@@ -1991,8 +1991,10 @@ public class PinotHelixResourceManager {
         InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
         InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
-    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, rawTableName);
     LOGGER.info("Deleting table {}: Removed instance partitions", realtimeTableName);
+
+    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, rawTableName);
+    LOGGER.info("Deleting table {}: Removed tier instance partitions", realtimeTableName);
 
     // Remove segment lineage
     SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, realtimeTableName);
