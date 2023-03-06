@@ -106,13 +106,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
       }
       if (executionStatsAggregatorMap != null) {
-        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(false));
+        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
     return QueryDispatcher.toResultTable(
         QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS,
-            executionStatsAggregatorMap, null),
+            executionStatsAggregatorMap, queryPlan),
         queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
   }
 
