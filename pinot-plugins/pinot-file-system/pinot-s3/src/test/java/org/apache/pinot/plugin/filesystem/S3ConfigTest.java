@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import java.time.format.DateTimeParseException;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -40,9 +39,9 @@ public class S3ConfigTest {
     Assert.assertNotNull(cfg.getHttpClientBuilder());
   }
 
-  @Test(expectedExceptions = DateTimeParseException.class)
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseDuration() {
     Assert.assertEquals(S3Config.parseDuration("P1DT2H30S"), S3Config.parseDuration("1d2h30s"));
-    S3Config.parseDuration("unknown_format");
+    S3Config.parseDuration("10");
   }
 }

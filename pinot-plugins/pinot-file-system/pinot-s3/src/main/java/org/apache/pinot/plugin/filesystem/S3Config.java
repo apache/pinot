@@ -171,8 +171,13 @@ public class S3Config {
       return Duration.ofMillis(TimeUtils.convertPeriodToMillis(durStr));
     } catch (Exception ignore) {
     }
-    // try format like 'PT1H20S'
-    return Duration.parse(durStr);
+    try {
+      // try format like 'PT1H20S'
+      return Duration.parse(durStr);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid time duration '%s', for examples '1hr20s' or 'PT1H20S'", durStr), e);
+    }
   }
 
   public String getAccessKey() {
