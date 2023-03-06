@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
@@ -43,42 +42,12 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-
-  private final List<String> _operatorIds = new ArrayList<>();
   private final Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
-  private final boolean _enableTrace;
+  private final Map<DataTable.MetadataKey, Object> _aggregatedStats = new HashMap<>();
 
-  private long _numDocsScanned = 0L;
-  private long _numEntriesScannedInFilter = 0L;
-  private long _numEntriesScannedPostFilter = 0L;
-  private long _numSegmentsQueried = 0L;
-  private long _numSegmentsProcessed = 0L;
-  private long _numSegmentsMatched = 0L;
-  private long _numConsumingSegmentsQueried = 0L;
-  private long _numConsumingSegmentsProcessed = 0L;
-  private long _numConsumingSegmentsMatched = 0L;
-  private long _minConsumingFreshnessTimeMs = Long.MAX_VALUE;
-  private long _numTotalDocs = 0L;
-  private long _offlineThreadCpuTimeNs = 0L;
-  private long _realtimeThreadCpuTimeNs = 0L;
-  private long _offlineSystemActivitiesCpuTimeNs = 0L;
-  private long _realtimeSystemActivitiesCpuTimeNs = 0L;
-  private long _offlineResponseSerializationCpuTimeNs = 0L;
-  private long _realtimeResponseSerializationCpuTimeNs = 0L;
-  private long _offlineTotalCpuTimeNs = 0L;
-  private long _realtimeTotalCpuTimeNs = 0L;
-  private long _numSegmentsPrunedByServer = 0L;
-  private long _numSegmentsPrunedInvalid = 0L;
-  private long _numSegmentsPrunedByLimit = 0L;
-  private long _numSegmentsPrunedByValue = 0L;
-  private long _explainPlanNumEmptyFilterSegments = 0L;
-  private long _explainPlanNumMatchAllFilterSegments = 0L;
-  private boolean _numGroupsLimitReached = false;
-  private int _numBlocks = 0;
-  private int _numRows = 0;
-  private long _stageExecutionTimeMs = 0;
+  private final boolean _enableTrace;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -90,177 +59,71 @@ public class ExecutionStatsAggregator {
 
   public synchronized void aggregate(@Nullable ServerRoutingInstance routingInstance, Map<String, String> metadata,
       Map<Integer, String> exceptions) {
+
     // Reduce on trace info.
     if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName())) {
       _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
     }
 
-    String tableNamesStr = metadata.get(DataTable.MetadataKey.TABLE.getName());
-    String tableName = null;
-
-    if (tableNamesStr != null) {
-      List<String> tableNames = Arrays.stream(tableNamesStr.split("::")).collect(Collectors.toList());
-      _tableNames.addAll(tableNames);
-
-      //TODO: Decide a strategy to split stageLevel stats across tables for brokerMetrics
-      // assigning everything to the first table only for now
-      tableName = tableNames.get(0);
-    }
-
-    TableType tableType = null;
-    if (routingInstance != null) {
-      tableType = routingInstance.getTableType();
-    } else if (tableName != null) {
-      tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    } else {
-      tableType = null;
-    }
-
     String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
     if (operatorId != null) {
-      _operatorIds.add(operatorId);
       if (_enableTrace) {
-        Map<String, String> metadataWithoutOperatorId = new HashMap<>(metadata);
-        metadataWithoutOperatorId.remove(DataTable.MetadataKey.OPERATOR_ID);
-        _operatorStats.put(operatorId, metadataWithoutOperatorId);
+        _operatorStats.put(operatorId, metadata);
       } else {
         _operatorStats.put(operatorId, new HashMap<>());
       }
     }
 
+
+    for (Map.Entry<String, String> entry : metadata.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+
+      DataTable.MetadataKey metadataKey = DataTable.MetadataKey.getByName(key);
+
+      if (metadataKey == null) {
+        continue;
+      }
+
+      if (metadataKey == DataTable.MetadataKey.TRACE_INFO || metadataKey == DataTable.MetadataKey.OPERATOR_ID) {
+        continue;
+      }
+
+      switch (metadataKey.getValueType()) {
+        case INT:
+        case LONG: {
+          _aggregatedStats.put(metadataKey,
+              (Long) _aggregatedStats.getOrDefault(metadataKey, 0L) + Long.parseLong(value));
+          break;
+        }
+        case STRING: {
+          try {
+            boolean boolVal = Boolean.parseBoolean(value);
+            boolean existingBoolVal =
+                Boolean.parseBoolean((String) _aggregatedStats.getOrDefault(metadataKey, "false"));
+            _aggregatedStats.put(metadataKey, String.valueOf(existingBoolVal | boolVal));
+          } catch (Exception e) {
+            List<String> list = (List<String>) _aggregatedStats.getOrDefault(metadataKey, new ArrayList<>());
+            list.add(value);
+            _aggregatedStats.put(metadataKey, list);
+          }
+          break;
+        }
+        default: {
+          throw new RuntimeException("Unsupported value type: " + metadataKey.getValueType());
+        }
+      }
+    }
+
+    String tableNamesStr = metadata.get(DataTable.MetadataKey.TABLE.getName());
+    if (tableNamesStr != null) {
+      List<String> tableNames = Arrays.stream(tableNamesStr.split("::")).collect(Collectors.toList());
+      _tableNames.addAll(tableNames);
+    }
+
     // Reduce on exceptions.
     for (int key : exceptions.keySet()) {
       _processingExceptions.add(new QueryProcessingException(key, exceptions.get(key)));
-    }
-
-    // Reduce on execution statistics.
-    String numDocsScannedString = metadata.get(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName());
-    if (numDocsScannedString != null) {
-      _numDocsScanned += Long.parseLong(numDocsScannedString);
-    }
-    String numEntriesScannedInFilterString =
-        metadata.get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName());
-    if (numEntriesScannedInFilterString != null) {
-      _numEntriesScannedInFilter += Long.parseLong(numEntriesScannedInFilterString);
-    }
-    String numEntriesScannedPostFilterString =
-        metadata.get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName());
-    if (numEntriesScannedPostFilterString != null) {
-      _numEntriesScannedPostFilter += Long.parseLong(numEntriesScannedPostFilterString);
-    }
-    String numSegmentsQueriedString = metadata.get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName());
-    if (numSegmentsQueriedString != null) {
-      _numSegmentsQueried += Long.parseLong(numSegmentsQueriedString);
-    }
-
-    String numSegmentsProcessedString = metadata.get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName());
-    if (numSegmentsProcessedString != null) {
-      _numSegmentsProcessed += Long.parseLong(numSegmentsProcessedString);
-    }
-    String numSegmentsMatchedString = metadata.get(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName());
-    if (numSegmentsMatchedString != null) {
-      _numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
-    }
-
-    String numConsumingSegmentsQueriedString =
-        metadata.get(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName());
-    if (numConsumingSegmentsQueriedString != null) {
-      _numConsumingSegmentsQueried += Long.parseLong(numConsumingSegmentsQueriedString);
-    }
-
-    String numConsumingSegmentsProcessed =
-        metadata.get(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName());
-    if (numConsumingSegmentsProcessed != null) {
-      _numConsumingSegmentsProcessed += Long.parseLong(numConsumingSegmentsProcessed);
-    }
-
-    String numConsumingSegmentsMatched = metadata.get(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName());
-    if (numConsumingSegmentsMatched != null) {
-      _numConsumingSegmentsMatched += Long.parseLong(numConsumingSegmentsMatched);
-    }
-
-    String minConsumingFreshnessTimeMsString =
-        metadata.get(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName());
-    if (minConsumingFreshnessTimeMsString != null) {
-      _minConsumingFreshnessTimeMs =
-          Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), _minConsumingFreshnessTimeMs);
-    }
-
-    String threadCpuTimeNsString = metadata.get(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName());
-    if (tableType != null && threadCpuTimeNsString != null) {
-      if (tableType == TableType.OFFLINE) {
-        _offlineThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
-      } else {
-        _realtimeThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
-      }
-    }
-
-    String systemActivitiesCpuTimeNsString =
-        metadata.get(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName());
-    if (tableType != null && systemActivitiesCpuTimeNsString != null) {
-      if (tableType == TableType.OFFLINE) {
-        _offlineSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
-      } else {
-        _realtimeSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
-      }
-    }
-
-    String responseSerializationCpuTimeNsString =
-        metadata.get(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
-    if (tableType != null && responseSerializationCpuTimeNsString != null) {
-      if (tableType == TableType.OFFLINE) {
-        _offlineResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
-      } else {
-        _realtimeResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
-      }
-    }
-    _offlineTotalCpuTimeNs =
-        _offlineThreadCpuTimeNs + _offlineSystemActivitiesCpuTimeNs + _offlineResponseSerializationCpuTimeNs;
-    _realtimeTotalCpuTimeNs =
-        _realtimeThreadCpuTimeNs + _realtimeSystemActivitiesCpuTimeNs + _realtimeResponseSerializationCpuTimeNs;
-
-    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
-        l -> _numSegmentsPrunedByServer += l);
-    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID,
-        l -> _numSegmentsPrunedInvalid += l);
-    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
-        l -> _numSegmentsPrunedByLimit += l);
-    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
-        l -> _numSegmentsPrunedByValue += l);
-
-    String explainPlanNumEmptyFilterSegments =
-        metadata.get(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName());
-    if (explainPlanNumEmptyFilterSegments != null) {
-      _explainPlanNumEmptyFilterSegments += Long.parseLong(explainPlanNumEmptyFilterSegments);
-    }
-
-    String explainPlanNumMatchAllFilterSegments =
-        metadata.get(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName());
-    if (explainPlanNumMatchAllFilterSegments != null) {
-      _explainPlanNumMatchAllFilterSegments += Long.parseLong(explainPlanNumMatchAllFilterSegments);
-    }
-
-    String numTotalDocsString = metadata.get(DataTable.MetadataKey.TOTAL_DOCS.getName());
-    if (numTotalDocsString != null) {
-      _numTotalDocs += Long.parseLong(numTotalDocsString);
-    }
-    _numGroupsLimitReached |=
-        Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
-
-
-    String numBlocksString = metadata.get(DataTable.MetadataKey.NUM_BLOCKS.getName());
-    if (numBlocksString != null) {
-      _numBlocks += Long.parseLong(numBlocksString);
-    }
-
-    String numRowsString = metadata.get(DataTable.MetadataKey.NUM_ROWS.getName());
-    if (numBlocksString != null) {
-      _numRows += Long.parseLong(numRowsString);
-    }
-
-    String operatorExecutionTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName());
-    if (operatorExecutionTimeString != null) {
-      _stageExecutionTimeMs += Long.parseLong(operatorExecutionTimeString);
     }
   }
 
@@ -280,65 +143,104 @@ public class ExecutionStatsAggregator {
     }
 
     // Set execution statistics.
-    brokerResponseNative.setNumDocsScanned(_numDocsScanned);
-    brokerResponseNative.setNumEntriesScannedInFilter(_numEntriesScannedInFilter);
-    brokerResponseNative.setNumEntriesScannedPostFilter(_numEntriesScannedPostFilter);
-    brokerResponseNative.setNumSegmentsQueried(_numSegmentsQueried);
-    brokerResponseNative.setNumSegmentsProcessed(_numSegmentsProcessed);
-    brokerResponseNative.setNumSegmentsMatched(_numSegmentsMatched);
-    brokerResponseNative.setTotalDocs(_numTotalDocs);
-    brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
-    brokerResponseNative.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
-    brokerResponseNative.setRealtimeThreadCpuTimeNs(_realtimeThreadCpuTimeNs);
-    brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(_offlineSystemActivitiesCpuTimeNs);
-    brokerResponseNative.setRealtimeSystemActivitiesCpuTimeNs(_realtimeSystemActivitiesCpuTimeNs);
-    brokerResponseNative.setOfflineResponseSerializationCpuTimeNs(_offlineResponseSerializationCpuTimeNs);
-    brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(_realtimeResponseSerializationCpuTimeNs);
-    brokerResponseNative.setOfflineTotalCpuTimeNs(_offlineTotalCpuTimeNs);
-    brokerResponseNative.setRealtimeTotalCpuTimeNs(_realtimeTotalCpuTimeNs);
-    brokerResponseNative.setNumSegmentsPrunedByServer(_numSegmentsPrunedByServer);
-    brokerResponseNative.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
-    brokerResponseNative.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);
-    brokerResponseNative.setNumSegmentsPrunedByValue(_numSegmentsPrunedByValue);
-    brokerResponseNative.setExplainPlanNumEmptyFilterSegments(_explainPlanNumEmptyFilterSegments);
-    brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
-    if (_numConsumingSegmentsQueried > 0) {
-      brokerResponseNative.setNumConsumingSegmentsQueried(_numConsumingSegmentsQueried);
+    brokerResponseNative.setNumDocsScanned(getLongValue(DataTable.MetadataKey.NUM_DOCS_SCANNED));
+    brokerResponseNative.setNumEntriesScannedInFilter(
+        getLongValue(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER));
+    brokerResponseNative.setNumEntriesScannedPostFilter(
+        getLongValue(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER));
+    brokerResponseNative.setNumSegmentsQueried(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED));
+    brokerResponseNative.setNumSegmentsProcessed(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED));
+    brokerResponseNative.setNumSegmentsMatched(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED));
+    brokerResponseNative.setTotalDocs(getLongValue(DataTable.MetadataKey.TOTAL_DOCS));
+    brokerResponseNative.setNumGroupsLimitReached(Boolean.parseBoolean(
+        (String) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, "false")));
+
+    brokerResponseNative.setNumSegmentsPrunedByServer(
+        getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER));
+    brokerResponseNative.setNumSegmentsPrunedInvalid(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID));
+    brokerResponseNative.setNumSegmentsPrunedByLimit(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT));
+    brokerResponseNative.setNumSegmentsPrunedByValue(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE));
+    brokerResponseNative.setExplainPlanNumEmptyFilterSegments(
+        getLongValue(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS));
+    brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(
+        getLongValue(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS));
+
+    brokerResponseNative.setNumConsumingSegmentsQueried(
+        getLongValue(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
+    brokerResponseNative.setNumConsumingSegmentsProcessed(
+        getLongValue(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED));
+    brokerResponseNative.setNumConsumingSegmentsMatched(
+        getLongValue(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED));
+
+    if (_aggregatedStats.containsKey(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS)) {
+      brokerResponseNative.setMinConsumingFreshnessTimeMs(
+          getLongValue(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS));
     }
-    if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
-      brokerResponseNative.setMinConsumingFreshnessTimeMs(_minConsumingFreshnessTimeMs);
+
+    // OFFLINE/REALTIME
+    String tableName = _tableNames.isEmpty() ? rawTableName : _tableNames.iterator().next();
+    TableType tableType = null;
+    if (tableName != null && tableName.isEmpty()) {
+      tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     }
-    brokerResponseNative.setNumConsumingSegmentsProcessed(_numConsumingSegmentsProcessed);
-    brokerResponseNative.setNumConsumingSegmentsMatched(_numConsumingSegmentsMatched);
+
+    if (tableType == TableType.OFFLINE) {
+      brokerResponseNative.setOfflineThreadCpuTimeNs(getLongValue(DataTable.MetadataKey.THREAD_CPU_TIME_NS));
+      brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(
+          getLongValue(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS));
+      brokerResponseNative.setOfflineResponseSerializationCpuTimeNs(
+          getLongValue(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS));
+      brokerResponseNative.setOfflineTotalCpuTimeNs(
+          brokerResponseNative.getOfflineThreadCpuTimeNs() + brokerResponseNative.getOfflineSystemActivitiesCpuTimeNs()
+              + brokerResponseNative.getOfflineResponseSerializationCpuTimeNs()
+              + brokerResponseNative.getOfflineThreadCpuTimeNs());
+    }
+
+    if (tableType == TableType.REALTIME) {
+      brokerResponseNative.setRealtimeThreadCpuTimeNs(getLongValue(DataTable.MetadataKey.THREAD_CPU_TIME_NS));
+      brokerResponseNative.setRealtimeSystemActivitiesCpuTimeNs(
+          getLongValue(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS));
+      brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(
+          getLongValue(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS));
+      brokerResponseNative.setRealtimeTotalCpuTimeNs(brokerResponseNative.getRealtimeThreadCpuTimeNs()
+          + brokerResponseNative.getRealtimeSystemActivitiesCpuTimeNs()
+          + brokerResponseNative.getRealtimeResponseSerializationCpuTimeNs());
+    }
 
     // Update broker metrics.
     if (brokerMetrics != null && rawTableName != null) {
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, _numDocsScanned);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
-          _numEntriesScannedInFilter);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
-          _numEntriesScannedPostFilter);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_THREAD_CPU_TIME_NS, _offlineThreadCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS, _realtimeThreadCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_SYSTEM_ACTIVITIES_CPU_TIME_NS,
-          _offlineSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_SYSTEM_ACTIVITIES_CPU_TIME_NS,
-          _realtimeSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_RESPONSE_SER_CPU_TIME_NS,
-          _offlineResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_RESPONSE_SER_CPU_TIME_NS,
-          _realtimeResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_TOTAL_CPU_TIME_NS, _offlineTotalCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_TOTAL_CPU_TIME_NS, _realtimeTotalCpuTimeNs,
-          TimeUnit.NANOSECONDS);
+      addBrokerMetrics(rawTableName, brokerMetrics, brokerResponseNative);
+    }
+  }
 
-      if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
-        brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
-            System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
-      }
+  private void addBrokerMetrics(String rawTableName, BrokerMetrics brokerMetrics,
+      BrokerResponseNative brokerResponseNative) {
+    brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED,
+        brokerResponseNative.getNumDocsScanned());
+    brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+        brokerResponseNative.getNumEntriesScannedInFilter());
+    brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+        brokerResponseNative.getNumEntriesScannedPostFilter());
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_THREAD_CPU_TIME_NS,
+        brokerResponseNative.getOfflineThreadCpuTimeNs(), TimeUnit.NANOSECONDS);
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS,
+        brokerResponseNative.getRealtimeThreadCpuTimeNs(), TimeUnit.NANOSECONDS);
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_SYSTEM_ACTIVITIES_CPU_TIME_NS,
+        brokerResponseNative.getOfflineSystemActivitiesCpuTimeNs(), TimeUnit.NANOSECONDS);
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_SYSTEM_ACTIVITIES_CPU_TIME_NS,
+        brokerResponseNative.getRealtimeSystemActivitiesCpuTimeNs(), TimeUnit.NANOSECONDS);
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_RESPONSE_SER_CPU_TIME_NS,
+        brokerResponseNative.getOfflineResponseSerializationCpuTimeNs(), TimeUnit.NANOSECONDS);
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_RESPONSE_SER_CPU_TIME_NS,
+        brokerResponseNative.getRealtimeResponseSerializationCpuTimeNs(), TimeUnit.NANOSECONDS);
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_TOTAL_CPU_TIME_NS,
+        brokerResponseNative.getOfflineTotalCpuTimeNs(), TimeUnit.NANOSECONDS);
+    brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_TOTAL_CPU_TIME_NS,
+        brokerResponseNative.getRealtimeTotalCpuTimeNs(), TimeUnit.NANOSECONDS);
+
+    if (_aggregatedStats.containsKey(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS)) {
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
+          System.currentTimeMillis() - brokerResponseNative.getMinConsumingFreshnessTimeMs(), TimeUnit.MILLISECONDS);
     }
   }
 
@@ -346,17 +248,14 @@ public class ExecutionStatsAggregator {
       @Nullable BrokerMetrics brokerMetrics) {
     setStats(rawTableName, brokerResponseStats, brokerMetrics);
 
-    brokerResponseStats.setNumBlocks(_numBlocks);
-    brokerResponseStats.setNumRows(_numRows);
-    brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
+    brokerResponseStats.setNumBlocks(getLongValue(DataTable.MetadataKey.NUM_BLOCKS));
+    brokerResponseStats.setNumRows(getLongValue(DataTable.MetadataKey.NUM_ROWS));
+    brokerResponseStats.setStageExecutionTimeMs(getLongValue(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS));
     brokerResponseStats.setOperatorStats(_operatorStats);
     brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
 
-  private void withNotNullLongMetadata(Map<String, String> metadata, DataTable.MetadataKey key, LongConsumer consumer) {
-    String strValue = metadata.get(key.getName());
-    if (strValue != null) {
-      consumer.accept(Long.parseLong(strValue));
-    }
+  private long getLongValue(DataTable.MetadataKey metadataKey) {
+    return (Long) _aggregatedStats.getOrDefault(metadataKey, 0L);
   }
 }
