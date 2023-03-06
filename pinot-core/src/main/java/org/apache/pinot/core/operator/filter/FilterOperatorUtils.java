@@ -29,7 +29,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 
 public class FilterOperatorUtils {
 
-  private static volatile Implementation _instance = new Implementation();
+  private static Implementation _instance = new DefaultImplementation();
 
   private FilterOperatorUtils() {
   }
@@ -38,11 +38,44 @@ public class FilterOperatorUtils {
     _instance = newImplementation;
   }
 
-  public static class Implementation {
+  public interface Implementation {
 
     /**
      * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
      */
+    BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
+        int numDocs, boolean nullHandlingEnabled);
+
+    /**
+     * Returns the AND filter operator or equivalent filter operator.
+     */
+    BaseFilterOperator getAndFilterOperator(QueryContext queryContext,
+        List<BaseFilterOperator> filterOperators, int numDocs);
+
+    /**
+     * Returns the OR filter operator or equivalent filter operator.
+     */
+    BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
+        List<BaseFilterOperator> filterOperators, int numDocs);
+
+    /**
+     * Returns the NOT filter operator or equivalent filter operator.
+     */
+    BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
+        int numDocs);
+
+    /**
+     * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
+     * inverted index first in order to reduce the number of documents to be processed.
+     * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
+     * removed from the list before calling this method.
+     */
+    void reorderAndFilterChildOperators(QueryContext queryContext,
+        List<BaseFilterOperator> filterOperators);
+  }
+
+  public static class DefaultImplementation implements Implementation {
+    @Override
     public BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
         int numDocs, boolean nullHandlingEnabled) {
       if (predicateEvaluator.isAlwaysFalse()) {
@@ -88,11 +121,9 @@ public class FilterOperatorUtils {
       }
     }
 
-    /**
-     * Returns the AND filter operator or equivalent filter operator.
-     */
-    public BaseFilterOperator getAndFilterOperator(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators, int numDocs) {
+    @Override
+    public BaseFilterOperator getAndFilterOperator(QueryContext queryContext, List<BaseFilterOperator> filterOperators,
+        int numDocs) {
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(filterOperators.size());
       for (BaseFilterOperator filterOperator : filterOperators) {
         if (filterOperator.isResultEmpty()) {
@@ -115,9 +146,7 @@ public class FilterOperatorUtils {
       }
     }
 
-    /**
-     * Returns the OR filter operator or equivalent filter operator.
-     */
+    @Override
     public BaseFilterOperator getOrFilterOperator(QueryContext queryContext,
         List<BaseFilterOperator> filterOperators, int numDocs) {
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(filterOperators.size());
@@ -141,9 +170,7 @@ public class FilterOperatorUtils {
       }
     }
 
-    /**
-     * Returns the NOT filter operator or equivalent filter operator.
-     */
+    @Override
     public BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
         int numDocs) {
       if (filterOperator.isResultMatchingAll()) {
@@ -155,14 +182,8 @@ public class FilterOperatorUtils {
       return new NotFilterOperator(filterOperator, numDocs);
     }
 
-    /**
-     * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
-     * inverted index first in order to reduce the number of documents to be processed.
-     * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
-     * removed from the list before calling this method.
-     */
-    protected void reorderAndFilterChildOperators(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators) {
+    @Override
+    public void reorderAndFilterChildOperators(QueryContext queryContext, List<BaseFilterOperator> filterOperators) {
       filterOperators.sort(new Comparator<BaseFilterOperator>() {
         @Override
         public int compare(BaseFilterOperator o1, BaseFilterOperator o2) {
@@ -178,8 +199,8 @@ public class FilterOperatorUtils {
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator
               || filterOperator instanceof TextContainsFilterOperator
-              || filterOperator instanceof TextMatchFilterOperator
-              || filterOperator instanceof JsonMatchFilterOperator || filterOperator instanceof H3IndexFilterOperator
+              || filterOperator instanceof TextMatchFilterOperator || filterOperator instanceof JsonMatchFilterOperator
+              || filterOperator instanceof H3IndexFilterOperator
               || filterOperator instanceof H3InclusionIndexFilterOperator) {
             return 2;
           }
@@ -204,17 +225,7 @@ public class FilterOperatorUtils {
       });
     }
 
-    /**
-     * Returns the priority for scan based filtering. Multivalue column evaluation is costly, so
-     * reorder such that multivalue columns are evaluated after single value columns.
-     *
-     * TODO: additional cost based prioritization to be added
-     *
-     * @param scanBasedFilterOperator the filter operator to prioritize
-     * @param queryContext query context
-     * @return the priority to be associated with the filter
-     */
-    protected int getScanBasedFilterPriority(QueryContext queryContext,
+    public static int getScanBasedFilterPriority(QueryContext queryContext,
         ScanBasedFilterOperator scanBasedFilterOperator, int basePriority) {
       if (queryContext.isSkipScanFilterReorder()) {
         return basePriority;
