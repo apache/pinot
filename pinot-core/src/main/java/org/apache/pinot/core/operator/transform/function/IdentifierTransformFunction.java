@@ -21,13 +21,19 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+<<<<<<< HEAD
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
+=======
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+>>>>>>> 83bcce8674 (base transform)
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -97,8 +103,18 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+<<<<<<< HEAD
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
+=======
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    return projectionBlock.getBlockValueSet(_columnName).getBigDecimalValuesSV();
+>>>>>>> 83bcce8674 (base transform)
   }
 
   @Override
@@ -205,5 +221,10 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   public void transformToStringValuesMV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
       String[][] buffer) {
     projectionBlock.fillValues(_columnName, evaluator, buffer);
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    return projectionBlock.getBlockValueSet(_columnName).getNullBitmap();
   }
 }

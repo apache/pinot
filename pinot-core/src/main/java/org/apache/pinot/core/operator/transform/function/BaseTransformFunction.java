@@ -92,7 +92,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected String[][] _stringValuesMV;
   protected byte[][][] _bytesValuesMV;
 
-  @Nullable
   @Override
   public Dictionary getDictionary() {
     return null;

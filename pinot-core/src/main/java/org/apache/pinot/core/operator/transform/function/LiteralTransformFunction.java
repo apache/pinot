@@ -24,6 +24,7 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -245,5 +247,17 @@ public class LiteralTransformFunction implements TransformFunction {
   @Override
   public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
+  }
+  
+  @Override
+  public RoaringBitmap getNullBitmap(ProjectionBlock projectionBlock) {
+    // Treat all unknown type values as null regardless of the value.
+    if (_dataType != DataType.UNKNOWN) {
+      return null;
+    }
+    int length = projectionBlock.getNumDocs();
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, length);
+    return bitmap;
   }
 }
