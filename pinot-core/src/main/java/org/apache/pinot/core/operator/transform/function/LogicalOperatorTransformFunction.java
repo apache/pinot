@@ -31,8 +31,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
  * The results are BOOLEAN type.
  */
 public abstract class LogicalOperatorTransformFunction extends BaseTransformFunction {
-  protected List<TransformFunction> _arguments;
-
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     _arguments = arguments;

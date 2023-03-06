@@ -74,6 +74,7 @@ public class AdditionTransformFunction extends BaseTransformFunction {
     if (_resultDataType == DataType.BIG_DECIMAL) {
       _literalBigDecimalSum = _literalBigDecimalSum.add(BigDecimal.valueOf(_literalDoubleSum));
     }
+    super.init(arguments);
   }
 
   @Override

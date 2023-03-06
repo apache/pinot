@@ -18,13 +18,39 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.when;
 
 
 public class LiteralTransformFunctionTest {
+  private static final int NUM_DOCS = 100;
+  private AutoCloseable _mocks;
+
+  @Mock
+  private ProjectionBlock _projectionBlock;
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+    when(_projectionBlock.getNumDocs()).thenReturn(NUM_DOCS);
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
+  }
 
   @Test
   public void testLiteralTransformFunction() {
@@ -36,5 +62,22 @@ public class LiteralTransformFunctionTest {
     Assert.assertEquals(falseBoolean.getBooleanLiteral(), false);
     LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
     Assert.assertEquals(nullLiteral.getStringLiteral(), "null");
+  }
+
+  @Test
+  public void testNullTransform() {
+    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
+    Assert.assertEquals(nullLiteral.getStringLiteral(), "null");
+    RoaringBitmap bitmap = nullLiteral.getNullBitmap(_projectionBlock);
+    RoaringBitmap expectedBitmap = new RoaringBitmap();
+    expectedBitmap.add(0L, NUM_DOCS);
+    Assert.assertEquals(bitmap, expectedBitmap);
+    Pair<int[], RoaringBitmap> intResult = nullLiteral.transformToIntValuesSVWithNull(_projectionBlock);
+    int[] intValues = intResult.getLeft();
+    Assert.assertEquals(intValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      Assert.assertEquals(intValues[i], 0);
+    }
+    Assert.assertEquals(intResult.getRight(), expectedBitmap);
   }
 }
