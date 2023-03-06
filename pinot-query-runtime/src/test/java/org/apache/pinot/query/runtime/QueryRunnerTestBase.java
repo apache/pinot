@@ -139,6 +139,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows) {
+    compareRowEquals(resultRows, expectedRows, false);
+  }
+
+  protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows,
+      boolean keepOutputRowsInOrder) {
     Assert.assertEquals(resultRows.size(), expectedRows.size(),
         String.format("Mismatched number of results. expected: %s, actual: %s",
             expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
@@ -194,8 +199,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
       return 0;
     };
-    resultRows.sort(rowComp);
-    expectedRows.sort(rowComp);
+    if (!keepOutputRowsInOrder) {
+      resultRows.sort(rowComp);
+      expectedRows.sort(rowComp);
+    }
     for (int i = 0; i < resultRows.size(); i++) {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
@@ -367,6 +374,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public List<List<Object>> _outputs = null;
       @JsonProperty("expectedException")
       public String _expectedException;
+      @JsonProperty("keepOutputRowOrder")
+      public boolean _keepOutputRowOrder;
     }
 
     public static class ColumnAndType {
