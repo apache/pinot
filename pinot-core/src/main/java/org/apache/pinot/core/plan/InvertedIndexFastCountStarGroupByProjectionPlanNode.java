@@ -42,11 +42,11 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
   private final Map<String, DataSource> _dataSourceMap;
 
   private static class CountStarForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
-    private final InvertedIndexReader<ImmutableRoaringBitmap> invIndex;
+    private final InvertedIndexReader<ImmutableRoaringBitmap> _invIndex;
     private final long _size;
 
     public CountStarForwardIndexReader(InvertedIndexReader<ImmutableRoaringBitmap> invertedIndexReader, long size) {
-      invIndex = invertedIndexReader;
+      _invIndex = invertedIndexReader;
       _size = size;
     }
 
@@ -72,7 +72,7 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
 
     @Override
     public long getLong(int docId, ForwardIndexReaderContext context) {
-      return invIndex.getDocIds(docId).getLongCardinality();
+      return _invIndex.getDocIds(docId).getLongCardinality();
     }
 
     @Override
@@ -141,7 +141,6 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
     @Override
     public void close()
         throws IOException {
-
     }
   }
 
