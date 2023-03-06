@@ -70,11 +70,6 @@
       <artifactId>google-http-client</artifactId>
       <version>1.36.0</version>
     </dependency>
-    <dependency>
-      <groupId>com.google.oauth-client</groupId>
-      <artifactId>google-oauth-client</artifactId>
-      <version>1.33.3</version>
-    </dependency>
     <!-- Due to dependency convergence issues with google cloud storage: https://github.com/googleapis/google-cloud-java/issues/4175 -->
     <dependency>
       <groupId>com.google.api.grpc</groupId>
@@ -160,4 +155,13 @@
       </exclusions>
     </dependency>
   </dependencies>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.oauth-client</groupId>
+        <artifactId>google-oauth-client</artifactId>
+        <version>1.33.3</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 </project>
