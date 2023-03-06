@@ -80,6 +80,36 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   /**
+   * Get compatible data type of left and right.
+   *
+   * When left or right is numerical, we check both data types are numerical and widen the type.
+   * Otherwise, left and right have to be the same type.
+   * @param left data type
+   * @param right data type
+   * @return compatible data type.
+   */
+  private static DataType getCompatibleType(DataType left, DataType right) {
+    if (left.isNumeric()) {
+      Preconditions.checkState(right.isNumeric(), "Data type " + left + " is not compatible with ", right);
+      if (left == DataType.BIG_DECIMAL || right == DataType.BIG_DECIMAL) {
+        return DataType.BIG_DECIMAL;
+      }
+      if (left == DataType.DOUBLE || right == DataType.DOUBLE) {
+        return DataType.DOUBLE;
+      }
+      if (left == DataType.FLOAT || right == DataType.FLOAT) {
+        return DataType.FLOAT;
+      }
+      if (left == DataType.LONG || right == DataType.LONG) {
+        return DataType.LONG;
+      }
+      return DataType.INT;
+    }
+    Preconditions.checkState(left == right, "Data type " + left + " is not compatible with ", right);
+    return left;
+  }
+
+  /**
    * Get transform int results based on store type.
    */
   private int[] getIntTransformResults(ValueBlock valueBlock) {
@@ -299,10 +329,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           func instanceof IdentifierTransformFunction || func instanceof LiteralTransformFunction,
           "Only column names and literals are supported in COALESCE.");
       DataType dataType = func.getResultMetadata().getDataType();
-      if (_dataType == null) {
-        _dataType = dataType;
+      if (_dataType != null) {
+        _dataType = getCompatibleType(_dataType, dataType);
       } else {
-        Preconditions.checkArgument(dataType == _dataType, "Argument types have to be the same.");
+        _dataType = dataType;
       }
       _transformFunctions[i] = func;
     }

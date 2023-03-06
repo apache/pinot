@@ -62,9 +62,10 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
 
   @Test
   public void testLeastTransformFunctionInt() {
+    // -1 will be passed in as a long.
     TransformFunction transformFunction =
         testLeastPreconditions(String.format("least(%s, %d, cast(%s as INT))", INT_SV_COLUMN, -1, FLOAT_SV_COLUMN));
-    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.LONG);
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(intValues[i], Math.min(Math.min(_intSVValues[i], -1), (int) _floatSVValues[i]));
@@ -232,7 +233,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   @Test
   public void testGreatestTransformFunctionUnaryInt() {
     TransformFunction transformFunction = testGreatestPreconditions(String.format("greatest(%s)", INT_SV_COLUMN));
-    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.LONG);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(intValues[i], _intSVValues[i]);
