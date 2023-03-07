@@ -114,8 +114,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc,
-      int bufferSize) {
+  public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
     ProjectionOperator projectionOperator =
         new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(intIterator, _docIdBuffer));

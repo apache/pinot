@@ -36,7 +36,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
 
-  MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc, int bufferSize);
+  MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc);
 
   /**
    * Applies AND operation to the given bitmap of document ids, returns a bitmap of the matching document ids.
@@ -45,8 +45,7 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
     if (docIds.isEmpty()) {
       return new MutableRoaringBitmap();
     }
-    return applyAnd(docIds.getBatchIterator(), OptionalInt.of(docIds.first()), OptionalInt.of(docIds.last()),
-        OPTIMAL_ITERATOR_BATCH_SIZE);
+    return applyAnd(docIds.getBatchIterator(), OptionalInt.of(docIds.first()), OptionalInt.of(docIds.last()));
   }
 
   /**

@@ -47,8 +47,9 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
+  private final int _batchSize;
 
-  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
     _readerContext = _reader.createContext();
@@ -56,6 +57,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
     _valueMatcher = getValueMatcher();
     _cardinality = dataSource.getDataSourceMetadata().getCardinality();
+    _batchSize = batchSize;
   }
 
   @Override
@@ -79,8 +81,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(BatchIterator docIdIterator, OptionalInt firstDoc, OptionalInt lastDoc,
-      int bufferSize) {
+  public MutableRoaringBitmap applyAnd(BatchIterator docIdIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     if (!docIdIterator.hasNext()) {
       return new MutableRoaringBitmap();
     }
@@ -95,7 +96,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
           .runCompress(false)
           .get();
     }
-    int[] buffer = new int[bufferSize];
+    int[] buffer = new int[_batchSize];
     while (docIdIterator.hasNext()) {
       int limit = docIdIterator.nextBatch(buffer);
       for (int i = 0; i < limit; i++) {
