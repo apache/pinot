@@ -136,7 +136,7 @@ public class AdaptiveServerSelectorTest {
     serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     assertEquals(serverRankingWithVal.size(), _servers.size());
     for (Pair<Pair<String, Boolean>, Double> entry : serverRankingWithVal) {
-      assertEquals(entry.getRight(), (double) numInflightReqMap.get(entry.getLeft()));
+      assertEquals(entry.getRight(), (double) numInflightReqMap.get(entry.getLeft().getLeft()));
     }
 
     selectedServer = selector.select(_servers);
@@ -147,7 +147,7 @@ public class AdaptiveServerSelectorTest {
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 2);
     for (Pair<Pair<String, Boolean>, Double> entry : serverRankingWithVal) {
-      assertEquals(entry.getRight(), (double) numInflightReqMap.get(entry.getLeft()));
+      assertEquals(entry.getRight(), (double) numInflightReqMap.get(entry.getLeft().getLeft()));
     }
 
     // TEST 3 : Populate all servers with unequal stats.
@@ -169,36 +169,36 @@ public class AdaptiveServerSelectorTest {
     }
 
     serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
-    assertEquals(serverRankingWithVal.get(0).getLeft(), "server1");
+    assertEquals(serverRankingWithVal.get(0).getLeft().getLeft(), "server1");
     assertEquals(serverRankingWithVal.get(0).getRight(), (double) numInflightReqMap.get("server1"));
-    assertEquals(serverRankingWithVal.get(1).getLeft(), "server2");
+    assertEquals(serverRankingWithVal.get(1).getLeft().getLeft(), "server2");
     assertEquals(serverRankingWithVal.get(1).getRight(), (double) numInflightReqMap.get("server2"));
-    assertEquals(serverRankingWithVal.get(2).getLeft(), "server3");
+    assertEquals(serverRankingWithVal.get(2).getLeft().getLeft(), "server3");
     assertEquals(serverRankingWithVal.get(2).getRight(), (double) numInflightReqMap.get("server3"));
-    assertEquals(serverRankingWithVal.get(3).getLeft(), "server4");
+    assertEquals(serverRankingWithVal.get(3).getLeft().getLeft(), "server4");
     assertEquals(serverRankingWithVal.get(3).getRight(), (double) numInflightReqMap.get("server4"));
 
     selectedServer = selector.select(_servers);
-    assertEquals(selectedServer, "server1");
+    assertEquals(selectedServer.getLeft(), "server1");
 
     selectedServer =
         selector.select(Arrays.asList(ImmutablePair.of("server2", true), ImmutablePair.of("server3", true)));
-    assertEquals(selectedServer, "server2");
+    assertEquals(selectedServer.getLeft(), "server2");
 
     selectedServer = selector.select(Arrays.asList(ImmutablePair.of("server3", true), ImmutablePair.of("server1", true),
         ImmutablePair.of("server2", true)));
-    assertEquals(selectedServer, "server1");
+    assertEquals(selectedServer.getLeft(), "server1");
 
     candidateServers = new ArrayList<>(
         Arrays.asList(ImmutablePair.of("server4", true), ImmutablePair.of("server3", true),
             ImmutablePair.of("server1", true)));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 3);
-    assertEquals(serverRankingWithVal.get(0).getLeft(), "server1");
+    assertEquals(serverRankingWithVal.get(0).getLeft().getLeft(), "server1");
     assertEquals(serverRankingWithVal.get(0).getRight(), (double) numInflightReqMap.get("server1"));
-    assertEquals(serverRankingWithVal.get(1).getLeft(), "server3");
+    assertEquals(serverRankingWithVal.get(1).getLeft().getLeft(), "server3");
     assertEquals(serverRankingWithVal.get(1).getRight(), (double) numInflightReqMap.get("server3"));
-    assertEquals(serverRankingWithVal.get(2).getLeft(), "server4");
+    assertEquals(serverRankingWithVal.get(2).getLeft().getLeft(), "server4");
     assertEquals(serverRankingWithVal.get(2).getRight(), (double) numInflightReqMap.get("server4"));
 
     // TEST 4: Populate all servers with unequal stats.
@@ -223,33 +223,33 @@ public class AdaptiveServerSelectorTest {
     waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
 
     serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
-    assertEquals(serverRankingWithVal.get(0).getLeft(), "server2");
+    assertEquals(serverRankingWithVal.get(0).getLeft().getLeft(), "server2");
     assertEquals(serverRankingWithVal.get(0).getRight(), (double) numInflightReqMap.get("server2"));
-    assertEquals(serverRankingWithVal.get(1).getLeft(), "server1");
+    assertEquals(serverRankingWithVal.get(1).getLeft().getLeft(), "server1");
     assertEquals(serverRankingWithVal.get(1).getRight(), (double) numInflightReqMap.get("server1"));
-    assertEquals(serverRankingWithVal.get(2).getLeft(), "server4");
+    assertEquals(serverRankingWithVal.get(2).getLeft().getLeft(), "server4");
     assertEquals(serverRankingWithVal.get(2).getRight(), (double) numInflightReqMap.get("server4"));
-    assertEquals(serverRankingWithVal.get(3).getLeft(), "server3");
+    assertEquals(serverRankingWithVal.get(3).getLeft().getLeft(), "server3");
     assertEquals(serverRankingWithVal.get(3).getRight(), (double) numInflightReqMap.get("server3"));
 
     selectedServer = selector.select(_servers);
-    assertEquals(selectedServer, "server2");
+    assertEquals(selectedServer.getLeft(), "server2");
 
     selectedServer =
         selector.select(Arrays.asList(ImmutablePair.of("server2", true), ImmutablePair.of("server3", true)));
-    assertEquals(selectedServer, "server2");
+    assertEquals(selectedServer.getLeft(), "server2");
 
     selectedServer = selector.select(Arrays.asList(ImmutablePair.of("server3", true), ImmutablePair.of("server1", true),
         ImmutablePair.of("server2", true)));
-    assertEquals(selectedServer, "server2");
+    assertEquals(selectedServer.getLeft(), "server2");
 
     candidateServers =
         new ArrayList<>(Arrays.asList(ImmutablePair.of("server2", true), ImmutablePair.of("server1", true)));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 2);
-    assertEquals(serverRankingWithVal.get(0).getLeft(), "server2");
+    assertEquals(serverRankingWithVal.get(0).getLeft().getLeft(), "server2");
     assertEquals(serverRankingWithVal.get(0).getRight(), (double) numInflightReqMap.get("server2"));
-    assertEquals(serverRankingWithVal.get(1).getLeft(), "server1");
+    assertEquals(serverRankingWithVal.get(1).getLeft().getLeft(), "server1");
     assertEquals(serverRankingWithVal.get(1).getRight(), (double) numInflightReqMap.get("server1"));
 
     // Test 5: Simulate server selection code. Pick the best server using NumInFlightReqSelector during every
@@ -274,12 +274,12 @@ public class AdaptiveServerSelectorTest {
       selectedServer = serverRankingWithVal.get(0).getLeft();
       serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, selectedServer.getLeft());
       waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
-      int numReq = numInflightReqMap.get(selectedServer) + 1;
+      int numReq = numInflightReqMap.get(selectedServer.getLeft()) + 1;
       numInflightReqMap.put(selectedServer.getLeft(), numReq);
 
       if (rand.nextBoolean()) {
         serverRoutingStatsManager.recordStatsUponResponseArrival(-1, selectedServer.getLeft(), 1);
-        numReq = numInflightReqMap.get(selectedServer) - 1;
+        numReq = numInflightReqMap.get(selectedServer.getLeft()) - 1;
         numInflightReqMap.put(selectedServer.getLeft(), numReq);
         waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
       }
@@ -316,7 +316,7 @@ public class AdaptiveServerSelectorTest {
 
     // A random server will be returned if any of the candidate servers do not have stats.
     String selectedServer = selector.select(_servers).getLeft();
-    assertTrue(_servers.contains(selectedServer), selectedServer);
+    assertTrue(_servers.contains(ImmutablePair.of(selectedServer, true)));
 
     List<Pair<String, Boolean>> candidateServers = new ArrayList<>(Arrays.asList(ImmutablePair.of("server2", true)));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
@@ -329,7 +329,7 @@ public class AdaptiveServerSelectorTest {
       for (Pair<String, Boolean> server : _servers) {
         latencyMap.computeIfAbsent(server.getLeft(),
             k -> new ExponentialMovingAverage(alpha, autodecayWindowMs, warmupDurationMs, avgInitializationVal, null));
-        latencyMap.get(server).compute(2);
+        latencyMap.get(server.getLeft()).compute(2);
 
         serverRoutingStatsManager.recordStatsUponResponseArrival(-1, server.getLeft(), 2);
         waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
@@ -343,7 +343,7 @@ public class AdaptiveServerSelectorTest {
     }
 
     selectedServer = selector.select(_servers).getLeft();
-    assertEquals(selectedServer, _servers.get(0));
+    assertEquals(selectedServer, _servers.get(0).getLeft());
 
     candidateServers =
         new ArrayList<>(Arrays.asList(ImmutablePair.of("server4", true), ImmutablePair.of("server3", true)));
@@ -384,7 +384,7 @@ public class AdaptiveServerSelectorTest {
 
     selectedServer =
         selector.select(Arrays.asList(ImmutablePair.of("server3", true), ImmutablePair.of("server2", true))).getLeft();
-    assertEquals(selectedServer, ImmutablePair.of("server2", true));
+    assertEquals(selectedServer, "server2");
 
     selectedServer = selector.select(Arrays.asList(ImmutablePair.of("server3", true), ImmutablePair.of("server4", true),
         ImmutablePair.of("server2", true))).getLeft();
@@ -458,7 +458,7 @@ public class AdaptiveServerSelectorTest {
 
     // A random server will be returned if any of the candidate servers do not have stats.
     String selectedServer = selector.select(_servers).getLeft();
-    assertTrue(_servers.contains(selectedServer), selectedServer);
+    assertTrue(_servers.contains(ImmutablePair.of(selectedServer, true)));
 
     List<Pair<String, Boolean>> candidateServers = new ArrayList<>(
         Arrays.asList(ImmutablePair.of("server2", true), ImmutablePair.of("server3", true),
@@ -493,7 +493,7 @@ public class AdaptiveServerSelectorTest {
     }
 
     selectedServer = selector.select(_servers).getLeft();
-    assertEquals(selectedServer, _servers.get(0));
+    assertEquals(selectedServer, _servers.get(0).getLeft());
 
     candidateServers =
         new ArrayList<>(Arrays.asList(ImmutablePair.of("server1", true), ImmutablePair.of("server2", true)));
