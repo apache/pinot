@@ -52,6 +52,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
     super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore);
   }
 
+  // Test only for clock injection.
   public BalancedInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Clock clock) {

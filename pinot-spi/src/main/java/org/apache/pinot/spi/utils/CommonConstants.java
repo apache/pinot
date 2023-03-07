@@ -121,6 +121,9 @@ public class CommonConstants {
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
         public static final String CONSUMING = "CONSUMING";
+        public static boolean isOnline(String state) {
+          return state == ONLINE || state == CONSUMING;
+        }
       }
 
       public static class BrokerResourceStateModel {

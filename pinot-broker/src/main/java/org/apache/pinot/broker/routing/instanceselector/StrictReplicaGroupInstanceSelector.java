@@ -63,27 +63,9 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  * segments with the same assignment ([S1, S2, S3]) down on S1 to ensure that we always route the segments to the same
  * replica-group.
  *
- * New segment won't be counted as unavailable or used to exclude instance from serving where new segment is
- * unavailable.
- * This is because it is common for new segment to be partially available and we don't want to have hot spot or low
- * query availability problem caused by new segment.
- * We also don't report new segment as unavailable segments.
+ * Note that New segment won't be used to exclude instance from serving where new segment is unavailable.
  *
- * New segment is defined as segment that is created more than 5 minutes ago.
- * - For initialization, we look up segment creation time from zookeeper.
- * - After initialization, we use the system clock when we receive the first update of ideal state for that segment as
- *   approximation of segment creation time.
- *
- * We retire new segment as old when:
- * - The creation time is more than 5 mins ago
- * - We receive error state for new segment
- * - External view for segment converges with ideal state.
- *
- * Note that this implementation means:
- * 1) Inconsistency across requests for new segments (some may be available, some may be not)
- * 2) When there is no assignment/instance change for long time, some of the new segments that expire with the clock
- * won't be used to exclude unavailable instances since no update is triggered.
- * </pre>
+ *  </pre>
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
 
@@ -97,6 +79,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     this(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, Clock.systemUTC());
   }
 
+  // Test only for clock injection.
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Clock clock) {
@@ -113,6 +96,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    *   3. Compare the instances from the ideal state and the external view and gather the unavailable instances for each
    *      set of instances
    *   4. Exclude the unavailable instances from the online instances map
+   *   5. For old segment, add the remaining online instance to the map.
+   *   6. For new segment, add the ideal state instance to the map with online flags.
    * </pre>
    */
   @Override
@@ -148,7 +133,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
           continue;
         }
         String state = instanceStateEntry.getValue();
-        if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
+        if (SegmentStateModel.isOnline(state)) {
           tempOnlineInstances.add(instance);
         } else if (state.equals(SegmentStateModel.OFFLINE)) {
           instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);

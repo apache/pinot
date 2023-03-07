@@ -33,7 +33,6 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSele
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -63,6 +62,7 @@ import org.roaringbitmap.RoaringBitmap;
  * NUM_REPLICA_GROUPS_TO_QUERY is not supported is AdaptiveServerSelection is enabled.
  */
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
+  // Test only for clock injection.
   public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Clock clock) {
@@ -100,10 +100,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     return segmentToSelectedInstanceMap;
   }
 
-  private boolean isOnline(RoaringBitmap offlineFlags, int idx) {
-    return offlineFlags == null || !offlineFlags.contains(idx);
-  }
-
   private void selectServersUsingRoundRobin(List<String> segments, int requestId,
       Map<String, String> segmentToSelectedInstanceMap, SegmentStateSnapshot snapshot,
       Map<String, String> queryOptions) {
@@ -126,6 +122,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (numReplicaGroupsToQuery > numEnabledInstances) {
         numReplicaGroupsToQuery = numEnabledInstances;
       }
+      // Only put online instance.
+      // This can only be offline when it is a new segment.
       if (selectedInstance.getRight()) {
         segmentToSelectedInstanceMap.put(segment, selectedInstance.getLeft());
       }
@@ -166,6 +164,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
           }
         }
       }
+      // Only put online instance.
+      // This can only be offline when it is a new segment.
       if (selectedInstance.getRight()) {
         segmentToSelectedInstanceMap.put(segment, selectedInstance.getLeft());
       }

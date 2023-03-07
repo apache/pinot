@@ -33,10 +33,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ *  This class represents a snapshot state of segments used for routing purpose.
+ *  Note that this class is immutable after creation.
+ *
+ *  For old segments, we return a list of online instances with online flags set to true.
+ *  For old segments without any online instances, we report them as unavailable segments.
+ *
+ *  For new segments, we return a list of candidate instance with online flags to indicate whether the instance is
+ *  online or not.
+ *  We don't report new segment as unavailable segments because it is valid for new segments to be not online at all.
+ */
 public class SegmentStateSnapshot {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStateSnapshot.class);
 
   private static class SelectionCandidate {
+    // Mapping from segment to list of servers with online flags.
     private Map<String, List<Pair<String, Boolean>>> _instanceMap;
     private Set<String> _unavailableSegments;
 
@@ -60,6 +72,7 @@ public class SegmentStateSnapshot {
   }
 
   private final SelectionCandidate _oldSegmentSelectionCandidate;
+  // New segment doesn't have unavailable segments reported.
   private final SelectionCandidate _newSegmentSelectionCandidate;
 
   private SegmentStateSnapshot(SelectionCandidate oldSegmentSelectionCandidate,
@@ -68,6 +81,7 @@ public class SegmentStateSnapshot {
     _newSegmentSelectionCandidate = newSegmentSelectionCandidate;
   }
 
+  // Create a segment state snapshot based on some in-memory states to be used for routing.
   public static SegmentStateSnapshot createSnapshot(String tableNameWithType,
       Map<String, List<String>> segmentToOnlineInstancesMap,
       Map<String, BaseInstanceSelector.SegmentState> newSegmentState, Set<String> enabledInstance,
@@ -80,6 +94,7 @@ public class SegmentStateSnapshot {
     return snapshot;
   }
 
+  // Calculate online instance map for routing and unavailable segments from old segment states.
   private static SelectionCandidate calculateOldSegmentSelectionCandidate(String tableNameWithType,
       Map<String, List<String>> segmentToOnlineInstancesMap, Set<String> enabledInstance, BrokerMetrics brokerMetrics) {
     // Generate a new map from segment to enabled ONLINE/CONSUMING instances and a new set of unavailable segments (no
@@ -109,12 +124,12 @@ public class SegmentStateSnapshot {
               + " segment as unavailable)", segment, tableNameWithType, onlineInstancesForSegment);
       unavailableSegments.add(segment);
       brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
-      // TODO: check whether we need to put null.
       segmentToEnabledInstancesMap.put(segment, null);
     }
     return new SelectionCandidate(segmentToEnabledInstancesMap, unavailableSegments);
   }
 
+  // Calculate candidate instance map for routing from old segment states.
   private static SelectionCandidate calculateNewSegmentSelectionCandidate(
       Map<String, BaseInstanceSelector.SegmentState> newSegmentState, Set<String> enabledInstance) {
     Map<String, List<Pair<String, Boolean>>> newSegmentToCandidateInstanceMap = new HashMap<>();
@@ -138,7 +153,7 @@ public class SegmentStateSnapshot {
     return new SelectionCandidate(newSegmentToCandidateInstanceMap, null);
   }
 
-  public List<Pair<String, Boolean>> getCandidates(String segment) {
+  @Nullable public List<Pair<String, Boolean>> getCandidates(String segment) {
     List<Pair<String, Boolean>> candidates = _newSegmentSelectionCandidate.getCandidates(segment);
     if (candidates != null) {
       return candidates;

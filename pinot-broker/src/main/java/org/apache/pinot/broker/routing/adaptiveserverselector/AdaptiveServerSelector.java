@@ -32,17 +32,19 @@ public interface AdaptiveServerSelector {
    * Picks the best server to route a query from the list of candidate servers.
    *
    * @param serverCandidates Candidate servers from which the best server should be chosen.
-   * @return server identifier
+   * @return server identifier and whether server is online
    */
   Pair<String, Boolean> select(List<Pair<String, Boolean>> serverCandidates);
 
   /**
+   * Note that this method is test only.
+   *
    * Returns the ranking of servers ordered from best to worst along with the absolute scores based on which the
    * servers are ranked. Based on the implementation of the interface, the score could refer to different things. For
    * NumInFlightReqSelector, score is the number of inflight requests. For LatencySelector, score is the EMA latency.
    * For HybridSelector, score is the hybridScore which is computed by combining latency and # inflight requests.
    *
-   * @return List of servers along with their values ranked from best to worst.
+   * @return List of servers with online flags along with their values ranked from best to worst.
    */
   List<Pair<Pair<String, Boolean>, Double>> fetchAllServerRankingsWithScores();
 
@@ -52,7 +54,7 @@ public interface AdaptiveServerSelector {
    * above "fetchAllServerRankingsWithScores" API, ranking for all the servers are fetched. This can become
    * problematic if a broker is routing to multiple  server tenants but a query needs to touch only a single server
    * tenant. This API helps fetch ranking only for a subset of servers.
-   * @return List of servers along with their values ranked from best to worst.
+   * @return List of servers with online flags along with their values ranked from best to worst.
    */
   List<Pair<Pair<String, Boolean>, Double>> fetchServerRankingsWithScores(List<Pair<String, Boolean>> serverCandidates);
 }
