@@ -42,12 +42,14 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public String select(List<String> serverCandidates) {
-    String selectedServer = null;
+  public Pair<String, Boolean> select(List<Pair<String, Boolean>> serverCandidates) {
+    Pair<String, Boolean> selectedServer = null;
     int minNumInFlightRequests = Integer.MAX_VALUE;
 
     // TODO: If two or more servers have same number of in flight requests, break the tie intelligently.
-    for (String server : serverCandidates) {
+    for (Pair<String, Boolean> instance : serverCandidates) {
+      String server = instance.getLeft();
+      boolean onlineFlag = instance.getRight();
       Integer numInFlightRequests = _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(server);
 
       // No stats for this server. That means this server hasn't received any queries yet.
@@ -59,7 +61,7 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
 
       if (numInFlightRequests < minNumInFlightRequests) {
         minNumInFlightRequests = numInFlightRequests;
-        selectedServer = server;
+        selectedServer = ImmutablePair.of(server, onlineFlag);
       }
     }
 
@@ -67,12 +69,13 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public List<Pair<String, Double>> fetchAllServerRankingsWithScores() {
+  public List<Pair<Pair<String, Boolean>, Double>> fetchAllServerRankingsWithScores() {
     List<Pair<String, Integer>> tempPairList = _serverRoutingStatsManager.fetchNumInFlightRequestsForAllServers();
 
-    List<Pair<String, Double>> pairList = new ArrayList<>();
+    List<Pair<Pair<String, Boolean>, Double>> pairList = new ArrayList<>();
     for (Pair<String, Integer> p : tempPairList) {
-      Pair<String, Double> pair = new ImmutablePair<>(p.getLeft(), new Double(p.getRight()));
+      Pair<Pair<String, Boolean>, Double> pair =
+          ImmutablePair.of(ImmutablePair.of(p.getLeft(), true), (double) p.getRight());
       pairList.add(pair);
     }
 
@@ -87,14 +90,15 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public List<Pair<String, Double>> fetchServerRankingsWithScores(List<String> serverCandidates) {
-    List<Pair<String, Double>> pairList = new ArrayList<>();
+  public List<Pair<Pair<String, Boolean>, Double>> fetchServerRankingsWithScores(
+      List<Pair<String, Boolean>> serverCandidates) {
+    List<Pair<Pair<String, Boolean>, Double>> pairList = new ArrayList<>();
     if (serverCandidates.size() == 0) {
       return pairList;
     }
 
-    for (String server : serverCandidates) {
-      Integer score = _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(server);
+    for (Pair<String, Boolean> server : serverCandidates) {
+      Integer score = _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(server.getLeft());
       if (score == null) {
         score = -1;
       }

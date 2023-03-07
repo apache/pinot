@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -59,7 +60,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore);
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
   }
@@ -84,44 +85,43 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap,
-      Map<String, SegmentState> newSegmentToCandidateInstanceMap, Map<String, String> queryOptions,
-      long nowMillis) {
+  protected Map<String, String> select(List<String> segments, int requestId, SegmentStateSnapshot snapshot,
+      Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
     for (int iteration = 0; iteration < instancePartitions.getNumReplicaGroups(); iteration++) {
       int replicaGroup = (replicaGroupSelected + iteration) % instancePartitions.getNumReplicaGroups();
       try {
-        return tryAssigning(segmentToEnabledInstancesMap, instancePartitions, replicaGroup);
+        return tryAssigning(snapshot, instancePartitions, replicaGroup);
       } catch (Exception e) {
         LOGGER.warn("Unable to select replica-group {} for table: {}", replicaGroup, _tableNameWithType, e);
       }
     }
-    throw new RuntimeException(String.format("Unable to find any replica-group to serve table: %s",
-        _tableNameWithType));
+    throw new RuntimeException(
+        String.format("Unable to find any replica-group to serve table: %s", _tableNameWithType));
   }
 
   /**
    * Returns a map from the segmentName to the corresponding server in the given replica-group. If the is not enabled,
    * we throw an exception.
    */
-  private Map<String, String> tryAssigning(Map<String, List<String>> segmentToEnabledInstancesMap,
-      InstancePartitions instancePartitions, int replicaId) {
+  private Map<String, String> tryAssigning(SegmentStateSnapshot snapshot, InstancePartitions instancePartitions,
+      int replicaId) {
     Set<String> instanceLookUpSet = new HashSet<>();
     for (int partition = 0; partition < instancePartitions.getNumPartitions(); partition++) {
       List<String> instances = instancePartitions.getInstances(partition, replicaId);
       instanceLookUpSet.addAll(instances);
     }
     Map<String, String> result = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : segmentToEnabledInstancesMap.entrySet()) {
+    for (Map.Entry<String, List<Pair<String, Boolean>>> entry : snapshot.getOldSegmentCandidates().entrySet()) {
       String segmentName = entry.getKey();
       boolean found = false;
-      for (String enabledInstanceForSegment : entry.getValue()) {
-        if (instanceLookUpSet.contains(enabledInstanceForSegment)) {
+      for (Pair<String, Boolean> enabledInstanceForSegment : entry.getValue()) {
+        String instance = enabledInstanceForSegment.getLeft();
+        if (instanceLookUpSet.contains(instance)) {
           found = true;
-          result.put(segmentName, enabledInstanceForSegment);
+          result.put(segmentName, instance);
           break;
         }
       }

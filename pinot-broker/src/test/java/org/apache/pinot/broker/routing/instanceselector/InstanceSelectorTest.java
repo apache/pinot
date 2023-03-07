@@ -41,12 +41,20 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -57,8 +65,33 @@ import static org.testng.Assert.fail;
 
 
 public class InstanceSelectorTest {
-  private final static List<String> SEGMENTS = Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4",
-      "segment5", "segment6", "segment7", "segment8", "segment9", "segment10", "segment11");
+  private AutoCloseable _mocks;
+
+  @Mock
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_propertyStore.get(any(), any(), anyInt(), anyBoolean())).thenAnswer((invocation) -> {
+      List<String> paths = invocation.getArgument(0);
+      List<ZNRecord> records = new ArrayList<>();
+      for (int i = 0; i < paths.size(); i++) {
+        records.add(null);
+      }
+      return records;
+    });
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
+  }
+
+  private final static List<String> SEGMENTS =
+      Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
+          "segment8", "segment9", "segment10", "segment11");
 
   @Test
   public void testInstanceSelectorFactory() {
@@ -107,10 +140,10 @@ public class InstanceSelectorTest {
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     AdaptiveServerSelector adaptiveServerSelector = null;
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector(offlineTableName, brokerMetrics,
-        adaptiveServerSelector);
+    BalancedInstanceSelector balancedInstanceSelector =
+        new BalancedInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
         new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, propertyStore);
 
@@ -202,8 +235,8 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment1, instance2);
     expectedBalancedInstanceSelectorResult.put(segment2, instance1);
     expectedBalancedInstanceSelectorResult.put(segment3, instance3);
-    InstanceSelector.SelectionResult selectionResult = balancedInstanceSelector.select(brokerRequest, segments,
-        requestId);
+    InstanceSelector.SelectionResult selectionResult =
+        balancedInstanceSelector.select(brokerRequest, segments, requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
@@ -632,7 +665,7 @@ public class InstanceSelectorTest {
     AdaptiveServerSelector adaptiveServerSelector = null;
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -661,7 +694,7 @@ public class InstanceSelectorTest {
     List<String> segments = getSegments();
     // add all segments to both idealStateSegmentAssignment and externalViewSegmentAssignment maps and also to online
     // segments
-    for (String segment: segments) {
+    for (String segment : segments) {
       idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
       externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
       onlineSegments.add(segment);
@@ -714,7 +747,7 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -744,7 +777,7 @@ public class InstanceSelectorTest {
 
     // add all segments to both idealStateSegmentAssignment and externalViewSegmentAssignment maps and also to online
     // segments
-    for (String segment: segments) {
+    for (String segment : segments) {
       idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
       externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
       onlineSegments.add(segment);
@@ -796,7 +829,7 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -826,7 +859,7 @@ public class InstanceSelectorTest {
 
     // add all segments to both idealStateSegmentAssignment and externalViewSegmentAssignment maps and also to online
     // segments
-    for (String segment: segments) {
+    for (String segment : segments) {
       idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
       externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
       onlineSegments.add(segment);
@@ -837,13 +870,13 @@ public class InstanceSelectorTest {
     // 2nd query should go to next replica group
 
     Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
-    for (String segment: segments) {
+    for (String segment : segments) {
       expectedReplicaGroupInstanceSelectorResult.put(segment, instance0);
     }
     InstanceSelector.SelectionResult selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments, 0);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
 
-    for (String segment: segments) {
+    for (String segment : segments) {
       expectedReplicaGroupInstanceSelectorResult.put(segment, instance1);
     }
     selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments, 1);
@@ -856,9 +889,7 @@ public class InstanceSelectorTest {
     // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
     List<String> replicaGroup0 = ImmutableList.of("instance-0", "instance-1");
     List<String> replicaGroup1 = ImmutableList.of("instance-2", "instance-3");
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of(
-        "0_0", replicaGroup0,
-        "0_1", replicaGroup1);
+    Map<String, List<String>> partitionToInstances = ImmutableMap.of("0_0", replicaGroup0, "0_1", replicaGroup1);
     InstancePartitions instancePartitions = new InstancePartitions(offlineTableName);
     instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
     instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));
@@ -967,8 +998,8 @@ public class InstanceSelectorTest {
     String offlineTableName = "testTable_OFFLINE";
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     AdaptiveServerSelector adaptiveServerSelector = null;
-    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector(offlineTableName, brokerMetrics,
-        adaptiveServerSelector);
+    BalancedInstanceSelector balancedInstanceSelector =
+        new BalancedInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
@@ -1158,10 +1189,10 @@ public class InstanceSelectorTest {
       strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
       selectionResult = balancedInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
-      assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+      // segment1 and segment0 are considered old therefore we should report it as unavailable.
+      assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
       selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
-      // For strict replica group, segment1 and segment0 are old so we should report it as unavailable.
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
 
       // Disable the OFFLINE instance, both segments should be unavailable

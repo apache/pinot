@@ -290,8 +290,8 @@ public class ServerRoutingStatsManager {
   /**
    * Returns a list containing each server and the corresponding EMA latency seen for queries on the server.
    */
-  public List<Pair<String, Double>> fetchEMALatencyForAllServers() {
-    List<Pair<String, Double>> response = new ArrayList<>();
+  public List<Pair<Pair<String, Boolean>, Double>> fetchEMALatencyForAllServers() {
+    List<Pair<Pair<String, Boolean>, Double>> response = new ArrayList<>();
     if (!_isEnabled) {
       return response;
     }
@@ -305,7 +305,7 @@ public class ServerRoutingStatsManager {
       double latency = stats.getLatencyEMA();
       stats.getServerReadLock().unlock();
 
-      response.add(new ImmutablePair<>(server, latency));
+      response.add(new ImmutablePair<>(ImmutablePair.of(server, true), latency));
     }
 
     return response;
@@ -336,8 +336,8 @@ public class ServerRoutingStatsManager {
    * Returns a list containing each server and the corresponding Hybrid score for each server. The Hybrid score is
    * calculated based on https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf.
    */
-  public List<Pair<String, Double>> fetchHybridScoreForAllServers() {
-    List<Pair<String, Double>> response = new ArrayList<>();
+  public List<Pair<Pair<String, Boolean>, Double>> fetchHybridScoreForAllServers() {
+    List<Pair<Pair<String, Boolean>, Double>> response = new ArrayList<>();
     if (!_isEnabled) {
       return response;
     }
@@ -351,7 +351,7 @@ public class ServerRoutingStatsManager {
       double score = stats.computeHybridScore();
       stats.getServerReadLock().unlock();
 
-      response.add(new ImmutablePair<>(server, score));
+      response.add(new ImmutablePair<>(ImmutablePair.of(server, true), score));
     }
 
     return response;

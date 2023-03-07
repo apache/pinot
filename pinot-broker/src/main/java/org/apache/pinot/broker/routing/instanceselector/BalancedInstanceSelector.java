@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
@@ -37,7 +41,6 @@ import org.apache.pinot.common.utils.HashUtil;
  *    Step1: Process seg1. Fetch server rankings. Pick the best server.
  *    Step2: Process seg2. Fetch server rankings (could have changed or not since Step 1). Pick the best server.
  *    Step3: Process seg3. Fetch server rankings (could have changed or not since Step 2). Pick the best server.
-
  * <p>If AdaptiveServerSelection is disabled, the selection algorithm will always evenly distribute the traffic to all
  * replicas of each segment, and will try to select different replica id for each segment. The algorithm is very
  * light-weight and will do best effort to balance the number of segments served by each selected server instance.
@@ -45,32 +48,38 @@ import org.apache.pinot.common.utils.HashUtil;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   public BalancedInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore);
+  }
+
+  public BalancedInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      Clock clock) {
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
   }
 
   @Override
-  Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap,
-      Map<String, SegmentState> newSegmentToCandidateInstancesMap, Map<String, String> queryOptions,
-      long nowMillis) {
+  protected Map<String, String> select(List<String> segments, int requestId, SegmentStateSnapshot snapshot,
+      Map<String, String> queryOptions) {
+
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (String segment : segments) {
-      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
+      List<Pair<String, Boolean>> enabledInstances = snapshot.getCandidates(segment);
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
       if (enabledInstances == null) {
         continue;
       }
 
-      String selectedServer;
+      Pair<String, Boolean> selectedServer;
       if (_adaptiveServerSelector != null) {
         selectedServer = _adaptiveServerSelector.select(enabledInstances);
       } else {
         selectedServer = enabledInstances.get(requestId++ % enabledInstances.size());
       }
-
-      segmentToSelectedInstanceMap.put(segment, selectedServer);
+      if (selectedServer.getRight()) {
+        segmentToSelectedInstanceMap.put(segment, selectedServer.getLeft());
+      }
     }
 
     return segmentToSelectedInstanceMap;
