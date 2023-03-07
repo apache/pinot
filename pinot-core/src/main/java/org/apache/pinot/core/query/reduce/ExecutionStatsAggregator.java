@@ -19,14 +19,11 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -36,14 +33,11 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private final Map<String, Map<String, String>> _operatorStats = new HashMap<>();
-  private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final Map<DataTable.MetadataKey, Object> _aggregatedStats = new HashMap<>();
 
@@ -61,8 +55,9 @@ public class ExecutionStatsAggregator {
       Map<Integer, String> exceptions) {
 
     // Reduce on trace info.
-    if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName())) {
-      _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
+    if (_enableTrace && routingInstance != null) {
+      _traceInfo.put(routingInstance.getShortName(),
+          metadata.getOrDefault(DataTable.MetadataKey.TRACE_INFO.getName(), ""));
     }
 
     String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
@@ -98,14 +93,17 @@ public class ExecutionStatsAggregator {
         }
         case STRING: {
           try {
-            boolean boolVal = Boolean.parseBoolean(value);
-            boolean existingBoolVal =
-                Boolean.parseBoolean((String) _aggregatedStats.getOrDefault(metadataKey, "false"));
-            _aggregatedStats.put(metadataKey, String.valueOf(existingBoolVal | boolVal));
+            if (!isBooleanString(value)) {
+              _aggregatedStats.merge(metadataKey, value,
+                  (a, b) -> a + DataTable.MetadataKey.MULTI_VALUE_STRING_SEPARATOR + b);
+            } else {
+              boolean boolVal = Boolean.parseBoolean(value);
+              boolean existingBoolVal =
+                  Boolean.parseBoolean((String) _aggregatedStats.getOrDefault(metadataKey, "false"));
+              _aggregatedStats.put(metadataKey, String.valueOf(existingBoolVal | boolVal));
+            }
           } catch (Exception e) {
-            List<String> list = (List<String>) _aggregatedStats.getOrDefault(metadataKey, new ArrayList<>());
-            list.add(value);
-            _aggregatedStats.put(metadataKey, list);
+            throw new RuntimeException(String.format("Unsupported data type for key: %s value: %s", key, value), e);
           }
           break;
         }
@@ -115,16 +113,14 @@ public class ExecutionStatsAggregator {
       }
     }
 
-    String tableNamesStr = metadata.get(DataTable.MetadataKey.TABLE.getName());
-    if (tableNamesStr != null) {
-      List<String> tableNames = Arrays.stream(tableNamesStr.split("::")).collect(Collectors.toList());
-      _tableNames.addAll(tableNames);
-    }
-
     // Reduce on exceptions.
     for (int key : exceptions.keySet()) {
       _processingExceptions.add(new QueryProcessingException(key, exceptions.get(key)));
     }
+  }
+
+  private boolean isBooleanString(String value) {
+    return Objects.equals(value, "true") || Objects.equals(value, "false");
   }
 
   public void setStats(BrokerResponseNative brokerResponseNative) {
@@ -143,38 +139,6 @@ public class ExecutionStatsAggregator {
     }
 
     brokerResponseNative.setAggregatedStats(_aggregatedStats);
-
-    // Set execution statistics.
-
-    // OFFLINE/REALTIME
-    String tableName = _tableNames.isEmpty() ? rawTableName : _tableNames.iterator().next();
-    TableType tableType = null;
-    if (tableName != null && tableName.isEmpty()) {
-      tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    }
-
-    if (tableType == TableType.OFFLINE) {
-      brokerResponseNative.setOfflineThreadCpuTimeNs(getLongValue(DataTable.MetadataKey.THREAD_CPU_TIME_NS));
-      brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(
-          getLongValue(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS));
-      brokerResponseNative.setOfflineResponseSerializationCpuTimeNs(
-          getLongValue(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS));
-      brokerResponseNative.setOfflineTotalCpuTimeNs(
-          brokerResponseNative.getOfflineThreadCpuTimeNs() + brokerResponseNative.getOfflineSystemActivitiesCpuTimeNs()
-              + brokerResponseNative.getOfflineResponseSerializationCpuTimeNs()
-              + brokerResponseNative.getOfflineThreadCpuTimeNs());
-    }
-
-    if (tableType == TableType.REALTIME) {
-      brokerResponseNative.setRealtimeThreadCpuTimeNs(getLongValue(DataTable.MetadataKey.THREAD_CPU_TIME_NS));
-      brokerResponseNative.setRealtimeSystemActivitiesCpuTimeNs(
-          getLongValue(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS));
-      brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(
-          getLongValue(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS));
-      brokerResponseNative.setRealtimeTotalCpuTimeNs(brokerResponseNative.getRealtimeThreadCpuTimeNs()
-          + brokerResponseNative.getRealtimeSystemActivitiesCpuTimeNs()
-          + brokerResponseNative.getRealtimeResponseSerializationCpuTimeNs());
-    }
 
     // Update broker metrics.
     if (brokerMetrics != null && rawTableName != null) {
@@ -217,7 +181,6 @@ public class ExecutionStatsAggregator {
       @Nullable BrokerMetrics brokerMetrics) {
     setStats(rawTableName, brokerResponseStats, brokerMetrics);
     brokerResponseStats.setOperatorStats(_operatorStats);
-    brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
 
   private long getLongValue(DataTable.MetadataKey metadataKey) {

@@ -32,7 +32,9 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -62,12 +64,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private int _numServersQueried = 0;
   private int _numServersResponded = 0;
   private int _numRowsResultSet = 0;
-  private long _offlineSystemActivitiesCpuTimeNs = 0L;
-  private long _realtimeSystemActivitiesCpuTimeNs = 0L;
-  private long _offlineResponseSerializationCpuTimeNs = 0L;
-  private long _realtimeResponseSerializationCpuTimeNs = 0L;
-  private long _offlineTotalCpuTimeNs = 0L;
-  private long _realtimeTotalCpuTimeNs = 0L;
+  private String _tableName = null;
+  private TableType _tableType = null;
   private ResultTable _resultTable;
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
@@ -110,102 +108,148 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setAggregatedStats(Map<DataTable.MetadataKey, Object> aggregatedStats) {
     _aggregatedStats = aggregatedStats;
+    _tableName = (String) _aggregatedStats.get(DataTable.MetadataKey.TABLE);
+    if (_tableName != null && !_tableName.isEmpty()) {
+      _tableType = TableNameBuilder.getTableTypeFromTableName(_tableName);
+    }
   }
 
   @JsonProperty("offlineSystemActivitiesCpuTimeNs")
   @Override
   public long getOfflineSystemActivitiesCpuTimeNs() {
-    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, 0L);
+    if (_tableType == TableType.OFFLINE) {
+      return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, 0L);
+    } else {
+      return 0L;
+    }
   }
 
   @JsonProperty("offlineSystemActivitiesCpuTimeNs")
   @Override
   public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
-    _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
+    if (_tableType == TableType.OFFLINE) {
+      _aggregatedStats.put(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, offlineSystemActivitiesCpuTimeNs);
+    }
   }
 
   @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
   @Override
   public long getRealtimeSystemActivitiesCpuTimeNs() {
-    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, 0L);
+    if (_tableType == TableType.REALTIME) {
+      return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, 0L);
+    } else {
+      return 0L;
+    }
   }
 
   @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
   @Override
   public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
-    _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
+    if (_tableType == TableType.REALTIME) {
+      _aggregatedStats.put(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, realtimeSystemActivitiesCpuTimeNs);
+    }
   }
 
   @JsonProperty("offlineThreadCpuTimeNs")
   @Override
   public long getOfflineThreadCpuTimeNs() {
-    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.THREAD_CPU_TIME_NS, 0L);
+    if (_tableType == TableType.OFFLINE) {
+      return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.THREAD_CPU_TIME_NS, 0L);
+    } else {
+      return 0L;
+    }
   }
 
   @JsonProperty("offlineThreadCpuTimeNs")
   @Override
   public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
-    _aggregatedStats.put(DataTable.MetadataKey.THREAD_CPU_TIME_NS, timeUsedMs);
+    if (_tableType == TableType.OFFLINE) {
+      _aggregatedStats.put(DataTable.MetadataKey.THREAD_CPU_TIME_NS, timeUsedMs);
+    }
   }
 
   @JsonProperty("realtimeThreadCpuTimeNs")
   @Override
   public long getRealtimeThreadCpuTimeNs() {
-    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.THREAD_CPU_TIME_NS, 0L);
+    if (_tableType == TableType.REALTIME) {
+      return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.THREAD_CPU_TIME_NS, 0L);
+    } else {
+      return 0L;
+    }
   }
 
   @JsonProperty("realtimeThreadCpuTimeNs")
   @Override
   public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
-    _aggregatedStats.put(DataTable.MetadataKey.THREAD_CPU_TIME_NS, timeUsedMs);
+    if (_tableType == TableType.REALTIME) {
+      _aggregatedStats.put(DataTable.MetadataKey.THREAD_CPU_TIME_NS, timeUsedMs);
+    }
   }
 
   @JsonProperty("offlineResponseSerializationCpuTimeNs")
   @Override
   public long getOfflineResponseSerializationCpuTimeNs() {
-    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS, 0L);
+    if (_tableType == TableType.REALTIME) {
+      return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS, 0L);
+    } else {
+      return 0L;
+    }
   }
 
   @JsonProperty("offlineResponseSerializationCpuTimeNs")
   @Override
   public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
-    _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
+    if (_tableType == TableType.OFFLINE) {
+      _aggregatedStats.put(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS, offlineResponseSerializationCpuTimeNs);
+    }
   }
 
   @JsonProperty("realtimeResponseSerializationCpuTimeNs")
   @Override
   public long getRealtimeResponseSerializationCpuTimeNs() {
-    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS, 0L);
+    if (_tableType == TableType.REALTIME) {
+      return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS, 0L);
+    } else {
+      return 0L;
+    }
   }
 
   @JsonProperty("realtimeResponseSerializationCpuTimeNs")
   @Override
   public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
-    _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
+    if (_tableType == TableType.REALTIME) {
+      _aggregatedStats.put(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS, realtimeResponseSerializationCpuTimeNs);
+    }
   }
 
   @JsonProperty("offlineTotalCpuTimeNs")
   @Override
   public long getOfflineTotalCpuTimeNs() {
-    return getOfflineSystemActivitiesCpuTimeNs() + getOfflineThreadCpuTimeNs() + getOfflineResponseSerializationCpuTimeNs();
+    return getOfflineSystemActivitiesCpuTimeNs() + getOfflineThreadCpuTimeNs()
+        + getOfflineResponseSerializationCpuTimeNs();
   }
 
   @JsonProperty("offlineTotalCpuTimeNs")
   @Override
   public void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs) {
-    _offlineTotalCpuTimeNs = offlineTotalCpuTimeNs;
+    if (_tableType == TableType.OFFLINE) {
+      _aggregatedStats.put(DataTable.MetadataKey.THREAD_CPU_TIME_NS, offlineTotalCpuTimeNs);
+    }
   }
 
   @JsonProperty("realtimeTotalCpuTimeNs")
   @Override
   public long getRealtimeTotalCpuTimeNs() {
-    return getRealtimeSystemActivitiesCpuTimeNs() + getRealtimeThreadCpuTimeNs() + getRealtimeResponseSerializationCpuTimeNs();
+    return getRealtimeSystemActivitiesCpuTimeNs() + getRealtimeThreadCpuTimeNs()
+        + getRealtimeResponseSerializationCpuTimeNs();
   }
 
   @JsonProperty("realtimeTotalCpuTimeNs")
   @Override
   public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
-    _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
+    if (_tableType == TableType.REALTIME) {
+      _aggregatedStats.put(DataTable.MetadataKey.THREAD_CPU_TIME_NS, realtimeTotalCpuTimeNs);
+    }
   }
 
   @JsonProperty("numSegmentsPrunedByBroker")
@@ -277,7 +321,8 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("explainPlanNumEmptyFilterSegments")
   @Override
   public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
-    _aggregatedStats.put(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS, explainPlanNumEmptyFilterSegments);
+    _aggregatedStats.put(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS,
+        explainPlanNumEmptyFilterSegments);
   }
 
   @JsonProperty("explainPlanNumMatchAllFilterSegments")
@@ -289,7 +334,8 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("explainPlanNumMatchAllFilterSegments")
   @Override
   public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
-    _aggregatedStats.put(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS, explainPlanNumMatchAllFilterSegments);
+    _aggregatedStats.put(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS,
+        explainPlanNumMatchAllFilterSegments);
   }
 
   @JsonProperty("resultTable")
@@ -421,6 +467,7 @@ public class BrokerResponseNative implements BrokerResponse {
   public long getNumConsumingSegmentsProcessed() {
     return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED, 0L);
   }
+
   @JsonProperty("numConsumingSegmentsProcessed")
   public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
     _aggregatedStats.put(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED, numConsumingSegmentsProcessed);
@@ -462,12 +509,13 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numGroupsLimitReached")
   @Override
   public boolean isNumGroupsLimitReached() {
-    return (Boolean) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, false);
+    return Boolean.parseBoolean(
+        (String) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, "false"));
   }
 
   @JsonProperty("numGroupsLimitReached")
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
-    _aggregatedStats.put(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
+    _aggregatedStats.put(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, String.valueOf(numGroupsLimitReached));
   }
 
   @JsonProperty("timeUsedMs")

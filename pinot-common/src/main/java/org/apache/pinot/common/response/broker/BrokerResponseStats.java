@@ -23,9 +23,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -100,7 +102,13 @@ public class BrokerResponseStats extends BrokerResponseNative {
 
   @JsonProperty("tableNames")
   public List<String> getTableNames() {
-    return _tableNames;
+    String tableNames = (String) _aggregatedStats.get(DataTable.MetadataKey.TABLE);
+    if (tableNames == null || tableNames.isEmpty()) {
+      return new ArrayList<>();
+    } else {
+      return Arrays.stream(tableNames.split(DataTable.MetadataKey.MULTI_VALUE_STRING_SEPARATOR)).distinct().collect(
+          Collectors.toList());
+    }
   }
 
   @JsonProperty("tableNames")

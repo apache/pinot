@@ -137,6 +137,7 @@ public interface DataTable {
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
     private static final int MAX_ID = 31;
+    public static final String MULTI_VALUE_STRING_SEPARATOR = "::";
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
