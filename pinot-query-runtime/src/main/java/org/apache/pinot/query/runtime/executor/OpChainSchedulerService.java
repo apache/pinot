@@ -19,6 +19,8 @@
 package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -43,10 +45,12 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
+  private final Set<Long> _cancelledRequests;
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
     _scheduler = scheduler;
     _workerPool = workerPool;
+    _cancelledRequests = new HashSet<>();
   }
 
   @Override
@@ -60,6 +64,9 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
       throws Exception {
     while (isRunning()) {
       OpChain operatorChain = _scheduler.next(DEFAULT_SCHEDULER_NEXT_WAIT_MS, TimeUnit.MILLISECONDS);
+      if (_cancelledRequests.contains(operatorChain.getId().getRequestId())) {
+        cancelOpChain(operatorChain, new Exception("CANCELLED"));
+      }
       if (operatorChain == null) {
         continue;
       }
@@ -125,6 +132,15 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
         operatorChain,
         operatorChain.getReceivingMailbox(),
         _scheduler.size());
+  }
+
+  /**
+   * Async cancel a request. Request will not be fully cancelled until the next time opChain is being polled.
+   *
+   * @param requestId requestId to be cancelled.
+   */
+  public final void cancel(long requestId) {
+    _cancelledRequests.add(requestId);
   }
 
   /**

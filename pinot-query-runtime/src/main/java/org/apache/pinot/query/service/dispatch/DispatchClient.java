@@ -21,6 +21,7 @@ package org.apache.pinot.query.service.dispatch;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 import java.util.function.Consumer;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -37,6 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 class DispatchClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(DispatchClient.class);
+  private static final StreamObserver<Worker.CancelResponse> _aVoid = null;
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
@@ -57,6 +59,15 @@ class DispatchClient {
       LOGGER.error("Query Dispatch failed at client-side", e);
       callback.accept(new AsyncQueryDispatchResponse(
           virtualServer, stageId, Worker.QueryResponse.getDefaultInstance(), e));
+    }
+  }
+
+  public void cancel(long requestId) {
+    try {
+      Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder().setRequestId(requestId).build();
+      _dispatchStub.cancel(cancelRequest, _aVoid);
+    } catch (Exception e) {
+      LOGGER.error("Query Cancellation failed at client-side", e);
     }
   }
 }

@@ -174,6 +174,10 @@ public class QueryRunner {
     }
   }
 
+  public void cancel(long requestId) {
+    _scheduler.cancel(requestId);
+  }
+
   public ExecutorService getQueryWorkerExecutorService() {
     return _queryWorkerExecutorService;
   }
