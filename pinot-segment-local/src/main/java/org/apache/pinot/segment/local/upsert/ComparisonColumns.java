@@ -33,6 +33,10 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
     return _values;
   }
 
+  public int getComparableIndex() {
+    return _comparableIndex;
+  }
+
   @Override
   public int compareTo(ComparisonColumns other) {
     // _comparisonColumns should only at most one non-null comparison value. If not, it is the user's responsibility.
