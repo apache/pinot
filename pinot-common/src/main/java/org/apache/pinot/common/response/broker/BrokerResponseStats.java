@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -44,9 +45,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class BrokerResponseStats extends BrokerResponseNative {
 
-  private long _numBlocks = 0;
-  private long _numRows = 0;
-  private long _stageExecutionTimeMs = 0;
   private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
@@ -57,32 +55,32 @@ public class BrokerResponseStats extends BrokerResponseNative {
 
   @JsonProperty("numBlocks")
   public long getNumBlocks() {
-    return _numBlocks;
+    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_BLOCKS, 0L);
   }
 
   @JsonProperty("numBlocks")
   public void setNumBlocks(long numBlocks) {
-    _numBlocks = numBlocks;
+    _aggregatedStats.put(DataTable.MetadataKey.NUM_BLOCKS, numBlocks);
   }
 
   @JsonProperty("numRows")
   public long getNumRows() {
-    return _numRows;
+    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_ROWS, 0L);
   }
 
   @JsonProperty("numRows")
   public void setNumRows(long numRows) {
-    _numRows = numRows;
+    _aggregatedStats.put(DataTable.MetadataKey.NUM_BLOCKS, numRows);
   }
 
   @JsonProperty("stageExecutionTimeMs")
   public long getStageExecutionTimeMs() {
-    return _stageExecutionTimeMs;
+    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS, 0L);
   }
 
   @JsonProperty("stageExecutionTimeMs")
   public void setStageExecutionTimeMs(long stageExecutionTimeMs) {
-    _stageExecutionTimeMs = stageExecutionTimeMs;
+    _aggregatedStats.put(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS, stageExecutionTimeMs);
   }
 
   public String toJsonString()

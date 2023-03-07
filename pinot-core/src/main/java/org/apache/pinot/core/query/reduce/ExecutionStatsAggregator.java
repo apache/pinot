@@ -142,40 +142,9 @@ public class ExecutionStatsAggregator {
       brokerResponseNative.getTraceInfo().putAll(_traceInfo);
     }
 
+    brokerResponseNative.setAggregatedStats(_aggregatedStats);
+
     // Set execution statistics.
-    brokerResponseNative.setNumDocsScanned(getLongValue(DataTable.MetadataKey.NUM_DOCS_SCANNED));
-    brokerResponseNative.setNumEntriesScannedInFilter(
-        getLongValue(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER));
-    brokerResponseNative.setNumEntriesScannedPostFilter(
-        getLongValue(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER));
-    brokerResponseNative.setNumSegmentsQueried(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED));
-    brokerResponseNative.setNumSegmentsProcessed(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED));
-    brokerResponseNative.setNumSegmentsMatched(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED));
-    brokerResponseNative.setTotalDocs(getLongValue(DataTable.MetadataKey.TOTAL_DOCS));
-    brokerResponseNative.setNumGroupsLimitReached(Boolean.parseBoolean(
-        (String) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, "false")));
-
-    brokerResponseNative.setNumSegmentsPrunedByServer(
-        getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER));
-    brokerResponseNative.setNumSegmentsPrunedInvalid(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID));
-    brokerResponseNative.setNumSegmentsPrunedByLimit(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT));
-    brokerResponseNative.setNumSegmentsPrunedByValue(getLongValue(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE));
-    brokerResponseNative.setExplainPlanNumEmptyFilterSegments(
-        getLongValue(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS));
-    brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(
-        getLongValue(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS));
-
-    brokerResponseNative.setNumConsumingSegmentsQueried(
-        getLongValue(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
-    brokerResponseNative.setNumConsumingSegmentsProcessed(
-        getLongValue(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED));
-    brokerResponseNative.setNumConsumingSegmentsMatched(
-        getLongValue(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED));
-
-    if (_aggregatedStats.containsKey(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS)) {
-      brokerResponseNative.setMinConsumingFreshnessTimeMs(
-          getLongValue(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS));
-    }
 
     // OFFLINE/REALTIME
     String tableName = _tableNames.isEmpty() ? rawTableName : _tableNames.iterator().next();
@@ -247,10 +216,6 @@ public class ExecutionStatsAggregator {
   public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
       @Nullable BrokerMetrics brokerMetrics) {
     setStats(rawTableName, brokerResponseStats, brokerMetrics);
-
-    brokerResponseStats.setNumBlocks(getLongValue(DataTable.MetadataKey.NUM_BLOCKS));
-    brokerResponseStats.setNumRows(getLongValue(DataTable.MetadataKey.NUM_ROWS));
-    brokerResponseStats.setStageExecutionTimeMs(getLongValue(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS));
     brokerResponseStats.setOperatorStats(_operatorStats);
     brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
