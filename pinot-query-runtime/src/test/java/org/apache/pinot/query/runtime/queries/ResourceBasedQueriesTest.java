@@ -239,7 +239,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       for (Integer stageId : executionStatsAggregatorMap.keySet()) {
         if (stageId > 0) {
           BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
-          executionStatsAggregatorMap.get(stageId).setStageLevelStats(null, brokerResponseStats, null);
+          executionStatsAggregatorMap.get(stageId).setStageLevelStats(null, brokerResponseStats, null, true);
           brokerResponseNative.addStageStat(stageId, brokerResponseStats);
         }
       }

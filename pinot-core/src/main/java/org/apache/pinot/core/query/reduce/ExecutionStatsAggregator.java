@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -77,6 +78,9 @@ public class ExecutionStatsAggregator {
   private int _numBlocks = 0;
   private int _numRows = 0;
   private long _stageExecutionTimeMs = 0;
+  private long _stageExecStartTimeMs = -1;
+  private long _stageExecEndTimeMs = -1;
+  private int _stageExecutionUnit = 0;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -256,6 +260,21 @@ public class ExecutionStatsAggregator {
     String operatorExecutionTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName());
     if (operatorExecutionTimeString != null) {
       _stageExecutionTimeMs += Long.parseLong(operatorExecutionTimeString);
+      _stageExecutionUnit += 1;
+    }
+
+    String operatorExecStartTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName());
+    if (operatorExecStartTimeString != null) {
+      long operatorExecStartTime = Long.parseLong(operatorExecStartTimeString);
+      _stageExecStartTimeMs = _stageExecStartTimeMs == -1 ? operatorExecStartTime
+          : Math.min(operatorExecStartTime, _stageExecStartTimeMs);
+    }
+
+    String operatorExecEndTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName());
+    if (operatorExecEndTimeString != null) {
+      long operatorExecEndTime = Long.parseLong(operatorExecEndTimeString);
+      _stageExecEndTimeMs = _stageExecEndTimeMs == -1 ? operatorExecEndTime
+          : Math.max(operatorExecEndTime, _stageExecEndTimeMs);
     }
   }
 
@@ -338,13 +357,19 @@ public class ExecutionStatsAggregator {
   }
 
   public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
-      @Nullable BrokerMetrics brokerMetrics) {
+      @Nullable BrokerMetrics brokerMetrics, boolean traceEnabled) {
     setStats(rawTableName, brokerResponseStats, brokerMetrics);
 
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
     brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
-    brokerResponseStats.setOperatorStats(_operatorStats);
+    brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
+    brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
+    if (traceEnabled) {
+      brokerResponseStats.setOperatorStats(_operatorStats);
+    } else {
+      brokerResponseStats.setOperatorStats(Collections.emptyMap());
+    }
     brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
 
