@@ -141,25 +141,25 @@ public class S3Config {
     if (value != null) {
       Duration pv = parseDuration(value);
       httpClientBuilder.socketTimeout(pv);
-      LOGGER.debug("Set socketTimeout to {}sec for http client builder", pv.toSeconds());
+      LOGGER.debug("Set socketTimeout to {}ms for http client builder", pv.toMillis());
     }
     value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIMEOUT);
     if (value != null) {
       Duration pv = parseDuration(value);
       httpClientBuilder.connectionTimeout(pv);
-      LOGGER.debug("Set connectionTimeout to {}sec for http client builder", pv.toSeconds());
+      LOGGER.debug("Set connectionTimeout to {}ms for http client builder", pv.toMillis());
     }
     value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE);
     if (value != null) {
       Duration pv = parseDuration(value);
       httpClientBuilder.connectionTimeToLive(pv);
-      LOGGER.debug("Set connectionTimeToLive to {}sec for http client builder", pv.toSeconds());
+      LOGGER.debug("Set connectionTimeToLive to {}ms for http client builder", pv.toMillis());
     }
     value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT);
     if (value != null) {
       Duration pv = parseDuration(value);
       httpClientBuilder.connectionAcquisitionTimeout(pv);
-      LOGGER.debug("Set connectionAcquisitionTimeout to {}sec for http client builder", pv.toSeconds());
+      LOGGER.debug("Set connectionAcquisitionTimeout to {}ms for http client builder", pv.toMillis());
     }
     return httpClientBuilder;
   }
