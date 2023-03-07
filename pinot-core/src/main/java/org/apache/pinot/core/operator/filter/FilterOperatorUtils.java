@@ -63,15 +63,6 @@ public class FilterOperatorUtils {
      */
     BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
         int numDocs);
-
-    /**
-     * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
-     * inverted index first in order to reduce the number of documents to be processed.
-     * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
-     * removed from the list before calling this method.
-     */
-    void reorderAndFilterChildOperators(QueryContext queryContext,
-        List<BaseFilterOperator> filterOperators);
   }
 
   public static class DefaultImplementation implements Implementation {
@@ -182,8 +173,14 @@ public class FilterOperatorUtils {
       return new NotFilterOperator(filterOperator, numDocs);
     }
 
-    @Override
-    public void reorderAndFilterChildOperators(QueryContext queryContext, List<BaseFilterOperator> filterOperators) {
+
+    /**
+     * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
+     * inverted index first in order to reduce the number of documents to be processed.
+     * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
+     * removed from the list before calling this method.
+     */
+    protected void reorderAndFilterChildOperators(QueryContext queryContext, List<BaseFilterOperator> filterOperators) {
       filterOperators.sort(new Comparator<BaseFilterOperator>() {
         @Override
         public int compare(BaseFilterOperator o1, BaseFilterOperator o2) {
