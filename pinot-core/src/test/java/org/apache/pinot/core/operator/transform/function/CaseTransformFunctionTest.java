@@ -113,7 +113,7 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
-  public void testCaseTransformFunctionWithFloatResults() {
+  public void testCaseTransformFunctionWithDoubleResults() {
     double[] expectedFloatResults = new double[NUM_ROWS];
     Arrays.fill(expectedFloatResults, 100);
     testCaseQueryWithDoubleResults("true", expectedFloatResults);

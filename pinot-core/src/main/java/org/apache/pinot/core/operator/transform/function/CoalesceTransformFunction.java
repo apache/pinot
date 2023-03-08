@@ -89,8 +89,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    * @return compatible data type.
    */
   private static DataType getCompatibleType(DataType left, DataType right) {
-    if (left.isNumeric()) {
-      Preconditions.checkState(right.isNumeric(), "Data type " + left + " is not compatible with ", right);
+    if (left.isNumeric() && right.isNumeric()) {
       if (left == DataType.BIG_DECIMAL || right == DataType.BIG_DECIMAL) {
         return DataType.BIG_DECIMAL;
       }
