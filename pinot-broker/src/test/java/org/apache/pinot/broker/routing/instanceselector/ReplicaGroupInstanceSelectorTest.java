@@ -26,7 +26,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -582,7 +581,7 @@ public class ReplicaGroupInstanceSelectorTest {
 
     // No selection because the external view is not in ideal state.
     int requestId = 0;
-    Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
+    Map<String, String> expectedReplicaGroupInstanceSelectorResult = ImmutableMap.of();
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
