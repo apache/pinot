@@ -57,6 +57,8 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
       @Nullable NullValueVectorReader nullValueReader, int batchSize) {
+    _batchSize = batchSize;
+    _batch = new int[_batchSize];
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
     _readerContext = _reader.createContext();
@@ -67,13 +69,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     _valueMatcher = getValueMatcher(nullBitmap);
     _cardinality = dataSource.getDataSourceMetadata().getCardinality();
-    _batchSize = batchSize;
-    _batch = new int[_batchSize];
   }
 
   // for testing
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
       @Nullable NullValueVectorReader nullValueReader) {
+    _batchSize = BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE;
+    _batch = new int[_batchSize];
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
@@ -84,8 +86,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     _valueMatcher = getValueMatcher(nullBitmap);
     _cardinality = -1;
-    _batchSize = BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE;
-    _batch = new int[_batchSize];
   }
 
   @Override
