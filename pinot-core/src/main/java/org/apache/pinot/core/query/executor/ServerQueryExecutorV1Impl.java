@@ -47,13 +47,12 @@ import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils;
-import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
-import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -416,7 +415,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       int[] operatorId = {3};
       ExplainPlanRows explainPlanRows = new ExplainPlanRows();
       // Get the segment explain plan for a single segment
-      getSegmentExplainPlanRowData(child, explainPlanRows, operatorId, 2);
+      if (child != null) {
+        child.explainPlan(explainPlanRows, operatorId, 2);
+      }
       int numRows = explainPlanRows.getExplainPlanRowData().size();
       if (numRows > 0) {
         operatorDepthToRowDataMap.putIfAbsent(numRows, new ArrayList<>());
@@ -456,72 +457,52 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return operatorDepthToRowDataMap;
   }
 
-  /**
-   * Get the list of Explain Plan rows for a single segment
-   */
-  private static void getSegmentExplainPlanRowData(Operator node, ExplainPlanRows explainPlanRows, int[] globalId,
-      int parentId) {
-    if (node == null) {
-      return;
-    }
-
-    String explainPlanString = node.toExplainString();
-    if (explainPlanString != null) {
-      ExplainPlanRowData explainPlanRowData = new ExplainPlanRowData(explainPlanString, globalId[0], parentId);
-      parentId = globalId[0]++;
-      explainPlanRows.appendExplainPlanRowData(explainPlanRowData);
-      if (node instanceof EmptyFilterOperator) {
-        explainPlanRows.setHasEmptyFilter(true);
-      }
-      if (node instanceof MatchAllFilterOperator) {
-        explainPlanRows.setHasMatchAllFilter(true);
-      }
-    }
-
-    List<Operator> children = node.getChildOperators();
-    for (Operator child : children) {
-      getSegmentExplainPlanRowData(child, explainPlanRows, globalId, parentId);
-    }
-  }
-
   public static InstanceResponseBlock executeExplainQuery(Plan queryPlan, QueryContext queryContext) {
     ExplainResultsBlock explainResults = new ExplainResultsBlock();
-    List<? extends Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
-    assert childOperators.size() == 1;
-    Operator root = childOperators.get(0);
-    Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap;
-    int numEmptyFilterSegments = 0;
-    int numMatchAllFilterSegments = 0;
+    InstanceResponseOperator responseOperator = (InstanceResponseOperator) queryPlan.getPlanNode().run();
 
-    // Get the list of unique explain plans
-    operatorDepthToRowDataMap = getAllSegmentsUniqueExplainPlanRowData(root);
-    List<ExplainPlanRows> listOfExplainPlans = new ArrayList<>();
-    operatorDepthToRowDataMap.forEach((key, value) -> listOfExplainPlans.addAll(value));
+    try {
+      responseOperator.prefetchAll();
 
-    // Setup the combine root's explain string
-    explainResults.addOperator(root.toExplainString(), 2, 1);
+      List<? extends Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
+      assert childOperators.size() == 1;
+      Operator root = childOperators.get(0);
+      Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap;
+      int numEmptyFilterSegments = 0;
+      int numMatchAllFilterSegments = 0;
 
-    // Walk through all the explain plans and create the entries in the explain plan output for each plan
-    for (ExplainPlanRows explainPlanRows : listOfExplainPlans) {
-      numEmptyFilterSegments +=
-          explainPlanRows.isHasEmptyFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
-      numMatchAllFilterSegments +=
-          explainPlanRows.isHasMatchAllFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
-      explainResults.addOperator(
-          String.format(ExplainPlanRows.PLAN_START_FORMAT, explainPlanRows.getNumSegmentsMatchingThisPlan()),
-          ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
-      for (ExplainPlanRowData explainPlanRowData : explainPlanRows.getExplainPlanRowData()) {
-        explainResults.addOperator(explainPlanRowData.getExplainPlanString(), explainPlanRowData.getOperatorId(),
-            explainPlanRowData.getParentId());
+      // Get the list of unique explain plans
+      operatorDepthToRowDataMap = getAllSegmentsUniqueExplainPlanRowData(root);
+      List<ExplainPlanRows> listOfExplainPlans = new ArrayList<>();
+      operatorDepthToRowDataMap.forEach((key, value) -> listOfExplainPlans.addAll(value));
+
+      // Setup the combine root's explain string
+      explainResults.addOperator(root.toExplainString(), 2, 1);
+
+      // Walk through all the explain plans and create the entries in the explain plan output for each plan
+      for (ExplainPlanRows explainPlanRows : listOfExplainPlans) {
+        numEmptyFilterSegments +=
+            explainPlanRows.isHasEmptyFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        numMatchAllFilterSegments +=
+            explainPlanRows.isHasMatchAllFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        explainResults.addOperator(
+            String.format(ExplainPlanRows.PLAN_START_FORMAT, explainPlanRows.getNumSegmentsMatchingThisPlan()),
+            ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
+        for (ExplainPlanRowData explainPlanRowData : explainPlanRows.getExplainPlanRowData()) {
+          explainResults.addOperator(explainPlanRowData.getExplainPlanString(), explainPlanRowData.getOperatorId(),
+              explainPlanRowData.getParentId());
+        }
       }
-    }
 
-    InstanceResponseBlock instanceResponse = new InstanceResponseBlock(explainResults, queryContext);
-    instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
-        String.valueOf(numEmptyFilterSegments));
-    instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
-        String.valueOf(numMatchAllFilterSegments));
-    return instanceResponse;
+      InstanceResponseBlock instanceResponse = new InstanceResponseBlock(explainResults, queryContext);
+      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
+          String.valueOf(numEmptyFilterSegments));
+      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
+          String.valueOf(numMatchAllFilterSegments));
+      return instanceResponse;
+    } finally {
+      responseOperator.releaseAll();
+    }
   }
 
   /**

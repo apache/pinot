@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -193,7 +194,7 @@ public class AggregateOperatorTest {
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    AggregateOperator.Merger merger = Mockito.mock(AggregateOperator.Merger.class);
+    AggregationUtils.Merger merger = Mockito.mock(AggregationUtils.Merger.class);
     Mockito.when(merger.merge(Mockito.any(), Mockito.any())).thenReturn(12d);
     Mockito.when(merger.initialize(Mockito.any(), Mockito.any())).thenReturn(1d);
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
