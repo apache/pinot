@@ -35,11 +35,6 @@ public class H3IndexType implements IndexType<Object, IndexReader, IndexCreator>
 
   @Override
   public String getId() {
-    return "h3";
-  }
-
-  @Override
-  public String getIndexName() {
     return "h3_index";
   }
 

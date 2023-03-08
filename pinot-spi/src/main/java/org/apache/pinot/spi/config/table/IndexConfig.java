@@ -16,34 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.config.table;
 
-package org.apache.pinot.segment.local.segment.index.dictionary;
-
-import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.IndexCreator;
-import org.apache.pinot.segment.spi.index.IndexReader;
-import org.apache.pinot.segment.spi.index.IndexType;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class DictionaryIndexType implements IndexType<Object, IndexReader, IndexCreator> {
-  public static final DictionaryIndexType INSTANCE = new DictionaryIndexType();
+/**
+ * This is the base class used to configure indexes.
+ *
+ * The common logic between all indexes is that they can be enabled or disabled.
+ *
+ * Indexes that do not require extra configuration can directly use this class.
+ */
+public class IndexConfig extends BaseJsonConfig {
+  public static final IndexConfig ENABLED = new IndexConfig(true);
+  public static final IndexConfig DISABLED = new IndexConfig(false);
+  private final boolean _enabled;
 
-  private DictionaryIndexType() {
+  @JsonCreator
+  public IndexConfig(@JsonProperty("enabled") boolean enabled) {
+    _enabled = enabled;
   }
 
-  @Override
-  public String getId() {
-    return "dictionary";
-  }
-
-  @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Dict.FILE_EXTENSION;
-  }
-
-  @Override
-  public String toString() {
-    return getId();
+  public boolean isEnabled() {
+    return _enabled;
   }
 }

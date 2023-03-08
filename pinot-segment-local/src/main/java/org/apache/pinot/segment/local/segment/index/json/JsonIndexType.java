@@ -34,11 +34,6 @@ public class JsonIndexType implements IndexType<Object, IndexReader, IndexCreato
 
   @Override
   public String getId() {
-    return "json";
-  }
-
-  @Override
-  public String getIndexName() {
     return "json_index";
   }
 

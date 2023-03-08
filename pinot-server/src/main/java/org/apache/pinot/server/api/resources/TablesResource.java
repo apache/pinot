@@ -260,7 +260,7 @@ public class TablesResource {
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
             for (Map.Entry<IndexType<?, ?, ?>, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
-              String indexName = entry.getKey().getIndexName();
+              String indexName = entry.getKey().getId();
               Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
               Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + entry.getValue();
               columnIndexSizes.put(indexName, indexSize);

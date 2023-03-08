@@ -136,7 +136,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public PinotDataBuffer newBuffer(String column, IndexType<?, ?, ?> type, long sizeBytes)
       throws IOException {
-    return allocNewBufferInternal(column, type, sizeBytes, type.getIndexName().toLowerCase() + ".create");
+    return allocNewBufferInternal(column, type, sizeBytes, type.getId().toLowerCase() + ".create");
   }
 
   @Override
@@ -439,7 +439,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   private static void persistIndexMap(IndexEntry entry, PrintWriter writer) {
     String colName = entry._key._name;
-    String idxType = entry._key._type.getIndexName();
+    String idxType = entry._key._type.getId();
 
     String startKey = getKey(colName, idxType, true);
     StringBuilder sb = new StringBuilder();

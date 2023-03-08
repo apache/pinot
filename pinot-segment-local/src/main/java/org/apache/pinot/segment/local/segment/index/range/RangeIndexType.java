@@ -40,11 +40,6 @@ public class RangeIndexType implements IndexType<Object, IndexReader, IndexCreat
 
   @Override
   public String getId() {
-    return "range";
-  }
-
-  @Override
-  public String getIndexName() {
     return "range_index";
   }
 

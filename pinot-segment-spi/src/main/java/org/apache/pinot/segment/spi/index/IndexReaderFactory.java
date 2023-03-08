@@ -22,7 +22,9 @@ package org.apache.pinot.segment.spi.index;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public interface IndexReaderFactory<R extends IndexReader> {
@@ -32,6 +34,22 @@ public interface IndexReaderFactory<R extends IndexReader> {
    * indexes may require the column to be dictionary based.
    */
   @Nullable
-  R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+  R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+      ColumnMetadata metadata)
       throws IOException, IndexReaderConstraintException;
+
+  abstract class Default<C extends IndexConfig, R extends IndexReader> implements IndexReaderFactory<R> {
+
+    protected abstract IndexType<C, R, ?> getIndexType();
+
+    protected abstract R createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata, C indexConfig)
+        throws IOException, IndexReaderConstraintException;
+
+    @Override
+    public R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+        ColumnMetadata metadata)
+        throws IOException, IndexReaderConstraintException {
+      throw new UnsupportedOperationException("To be implemented in a future PR");
+    }
+  }
 }

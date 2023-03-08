@@ -34,11 +34,6 @@ public class FstIndexType implements IndexType<Object, IndexReader, IndexCreator
 
   @Override
   public String getId() {
-    return "fst";
-  }
-
-  @Override
-  public String getIndexName() {
     return "fst_index";
   }
 

@@ -35,11 +35,6 @@ public class ForwardIndexType implements IndexType<Object, IndexReader, IndexCre
 
   @Override
   public String getId() {
-    return "forward";
-  }
-
-  @Override
-  public String getIndexName() {
     return "forward_index";
   }
 

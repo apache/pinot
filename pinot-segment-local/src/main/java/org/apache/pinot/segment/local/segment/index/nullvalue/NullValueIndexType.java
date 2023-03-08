@@ -35,11 +35,6 @@ public class NullValueIndexType implements IndexType<Object, IndexReader, IndexC
 
   @Override
   public String getId() {
-    return "nullable";
-  }
-
-  @Override
-  public String getIndexName() {
     return "nullvalue_vector";
   }
 
