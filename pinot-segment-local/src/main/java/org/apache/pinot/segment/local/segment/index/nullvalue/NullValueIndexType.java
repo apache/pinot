@@ -19,12 +19,24 @@
 
 package org.apache.pinot.segment.local.segment.index.nullvalue;
 
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
-public class NullValueIndexType implements IndexType<Object, IndexReader, IndexCreator> {
+public class NullValueIndexType implements IndexType<IndexConfig, IndexReader, IndexCreator> {
 
   public static final NullValueIndexType INSTANCE = new NullValueIndexType();
 
@@ -34,6 +46,43 @@ public class NullValueIndexType implements IndexType<Object, IndexReader, IndexC
   @Override
   public String getId() {
     return "nullvalue_vector";
+  }
+
+  @Override
+  public Class<IndexConfig> getIndexConfigClass() {
+    return IndexConfig.class;
+  }
+
+  @Override
+  public IndexConfig getDefaultConfig() {
+    return IndexConfig.DISABLED;
+  }
+
+  @Override
+  public IndexConfig getConfig(TableConfig tableConfig, Schema schema) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public IndexCreator createIndexCreator(IndexCreationContext context, IndexConfig indexConfig)
+      throws Exception {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public IndexReaderFactory<IndexReader> getReaderFactory() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
+      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
   }
 
   @Override
