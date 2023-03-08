@@ -159,7 +159,7 @@ public class ControllerConfTest {
   }
 
   @Test
-  public void shouldBeAbleToSetDataDir(){
+  public void shouldBeAbleToSetDataDir() {
     Map<String, Object> controllerConfig = new HashMap<>();
     ControllerConf conf = new ControllerConf(controllerConfig);
     Assert.assertEquals(conf.getDataDir(), null);
