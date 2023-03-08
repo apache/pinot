@@ -156,7 +156,6 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|tier name") @QueryParam("type") @Nullable String type,
       @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun) {
     Map<String, InstancePartitions> instancePartitionsMap = new TreeMap<>();
-    instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
