@@ -41,13 +41,16 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
+  // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
+  // See https://github.com/apache/pinot/issues/10331
+  private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
   private final Server _server;
   private final QueryRunner _queryRunner;
   private final ExecutorService _executorService;
 
   public QueryServer(int port, QueryRunner queryRunner) {
-    _server = ServerBuilder.forPort(port).addService(this).build();
+    _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
     _queryRunner = queryRunner;
     _executorService = queryRunner.getExecutorService();
     LOGGER.info("Initialized QueryServer on port: {}", port);

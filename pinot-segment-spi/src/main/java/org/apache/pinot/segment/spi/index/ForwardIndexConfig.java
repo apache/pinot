@@ -113,7 +113,10 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public Builder withLegacyProperties(Map<String, Map<String, String>> propertiesByCol, String colName) {
       if (propertiesByCol != null) {
-        withLegacyProperties(propertiesByCol.get(colName));
+        Map<String, String> colProps = propertiesByCol.get(colName);
+        if (colProps != null) {
+          withLegacyProperties(colProps);
+        }
       }
       return this;
     }

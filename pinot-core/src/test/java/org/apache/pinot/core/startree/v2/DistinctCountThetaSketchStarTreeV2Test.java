@@ -16,48 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.creator.impl.fwd;
+package org.apache.pinot.core.startree.v2;
 
-import java.io.IOException;
-import org.apache.pinot.spi.data.FieldSpec;
+import java.util.Random;
+import org.apache.datasketches.theta.Sketch;
+import org.apache.pinot.segment.local.aggregator.DistinctCountThetaSketchValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+
+import static org.testng.Assert.assertEquals;
 
 
-/**
- * Forward index creator for dictionary-encoded single and multi-value columns with forward index disabled.
- * This is a no-op.
- */
-public class NoOpForwardIndexCreator extends AbstractForwardIndexCreator {
-  private final boolean _isSingleValue;
+public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, Sketch> {
 
-  public NoOpForwardIndexCreator(boolean isSingleValue) {
-    _isSingleValue = isSingleValue;
+  @Override
+  ValueAggregator<Object, Sketch> getValueAggregator() {
+    return new DistinctCountThetaSketchValueAggregator();
   }
 
   @Override
-  public boolean isDictionaryEncoded() {
-    return true;
+  DataType getRawValueType() {
+    return DataType.INT;
   }
 
   @Override
-  public boolean isSingleValue() {
-    return _isSingleValue;
+  Object getRandomRawValue(Random random) {
+    return random.nextInt(100);
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
-    return FieldSpec.DataType.INT;
-  }
-
-  @Override
-  public void putDictId(int dictId) {
-  }
-
-  @Override
-  public void putDictIdMV(int[] dictIds) {
-  }
-
-  @Override
-  public void close()
-      throws IOException {
+  void assertAggregatedValue(Sketch starTreeResult, Sketch nonStarTreeResult) {
+    assertEquals(starTreeResult.getEstimate(), nonStarTreeResult.getEstimate());
   }
 }

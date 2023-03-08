@@ -24,7 +24,6 @@ import java.io.IOException;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.NoOpForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
@@ -65,24 +64,17 @@ public class ForwardIndexCreatorFactory {
       }
     } else {
       // Dictionary enabled columns
-      if (context.forwardIndexDisabled() && !context.isSorted()) {
-        // Forward index disabled columns which aren't sorted
-        // Sorted columns treat this option as a no-op
-        return new NoOpForwardIndexCreator(context.getFieldSpec().isSingleValueField());
-      } else {
-        // Forward index enabled columns
-        if (context.getFieldSpec().isSingleValueField()) {
-          if (context.isSorted()) {
-            return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), colName,
-                context.getCardinality());
-          } else {
-            return new SingleValueUnsortedForwardIndexCreator(context.getIndexDir(), colName,
-                context.getCardinality(), context.getTotalDocs());
-          }
+      if (context.getFieldSpec().isSingleValueField()) {
+        if (context.isSorted()) {
+          return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), colName,
+              context.getCardinality());
         } else {
-          return new MultiValueUnsortedForwardIndexCreator(context.getIndexDir(), colName,
-              context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
+          return new SingleValueUnsortedForwardIndexCreator(context.getIndexDir(), colName,
+              context.getCardinality(), context.getTotalDocs());
         }
+      } else {
+        return new MultiValueUnsortedForwardIndexCreator(context.getIndexDir(), colName,
+            context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
       }
     }
   }

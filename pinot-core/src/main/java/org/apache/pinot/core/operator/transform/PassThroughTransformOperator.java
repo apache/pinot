@@ -23,24 +23,18 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.PassThroughTransformBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
  * Class for evaluating pass through transform expressions.
  */
 public class PassThroughTransformOperator extends TransformOperator {
-
   private static final String EXPLAIN_NAME = "TRANSFORM_PASSTHROUGH";
 
-  /**
-   * Constructor for the class
-   *
-   * @param projectionOperator Projection operator
-   * @param expressions Collection of expressions to evaluate
-   */
-  public PassThroughTransformOperator(ProjectionOperator projectionOperator,
+  public PassThroughTransformOperator(QueryContext queryContext, ProjectionOperator projectionOperator,
       Collection<ExpressionContext> expressions) {
-    super(projectionOperator, expressions);
+    super(queryContext, projectionOperator, expressions);
   }
 
   @Override
@@ -53,9 +47,8 @@ public class PassThroughTransformOperator extends TransformOperator {
     }
   }
 
-
   @Override
-  public String toExplainString() {
-    return toExplainString(EXPLAIN_NAME);
+  public String getExplainName() {
+    return EXPLAIN_NAME;
   }
 }
