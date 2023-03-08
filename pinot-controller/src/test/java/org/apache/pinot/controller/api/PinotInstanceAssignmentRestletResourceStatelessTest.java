@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -164,9 +165,10 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     InstanceAssignmentConfig tierInstanceAssignmentConfig = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false));
-    offlineTableConfig.setInstanceAssignmentConfigMap(
-        Map.of(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig, TIER_NAME,
-            tierInstanceAssignmentConfig));
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig);
+    instanceAssignmentConfigMap.put(TIER_NAME, tierInstanceAssignmentConfig);
+    offlineTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     _helixResourceManager.setExistingTableConfig(offlineTableConfig);
 
     // tier instance partitions should be generated
