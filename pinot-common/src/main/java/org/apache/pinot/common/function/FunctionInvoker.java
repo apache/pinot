@@ -32,8 +32,8 @@ import org.apache.pinot.common.utils.PinotDataType;
  */
 public class FunctionInvoker {
   private final Method _method;
-  // If false, the function should return null if any of its argument is null
-  // Otherwise, the function should deal with null in its own definition.
+  // If true, the function should return null if any of its argument is null
+  // Otherwise, the function should deal with null in its own implementation.
   private final boolean _isNullIntolerant;
 
   private final Class<?>[] _parameterClasses;
