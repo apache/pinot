@@ -34,6 +34,6 @@ public class StandardIndexes {
 
   public static IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator> bloomFilter() {
     return (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("bloom");
+        IndexService.getInstance().getIndexTypeByIdOrThrow("bloom_filter");
   }
 }

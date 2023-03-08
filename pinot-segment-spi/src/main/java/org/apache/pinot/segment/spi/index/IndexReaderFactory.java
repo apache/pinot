@@ -42,11 +42,11 @@ public interface IndexReaderFactory<R extends IndexReader> {
 
     protected abstract IndexType<C, R, ?> getIndexType();
 
-    protected abstract R read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, C indexConfig)
+    protected abstract R createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata, C indexConfig)
         throws IOException, IndexReaderConstraintException;
 
     @Override
-    public R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+    public R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
         ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
       throw new UnsupportedOperationException("To be implemented in a future PR");

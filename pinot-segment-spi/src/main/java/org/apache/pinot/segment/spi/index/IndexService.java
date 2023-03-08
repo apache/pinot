@@ -80,13 +80,4 @@ public class IndexService {
     return getIndexTypeById(indexId)
         .orElseThrow(() -> new IllegalArgumentException("Unknown index id: " + indexId));
   }
-
-  public Optional<IndexType<?, ?, ?>> getIndexTypeByName(String indexName) {
-    return getAllIndexes().stream().filter(indexType -> indexType.getIndexName().equalsIgnoreCase(indexName)).findAny();
-  }
-
-  public IndexType<?, ?, ?> getIndexTypeByNameOrThrow(String indexId) {
-    return getIndexTypeByName(indexId)
-        .orElseThrow(() -> new IllegalArgumentException("Unknown index id: " + indexId));
-  }
 }

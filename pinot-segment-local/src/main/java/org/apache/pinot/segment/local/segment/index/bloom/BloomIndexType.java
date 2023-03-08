@@ -44,11 +44,6 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
 
   @Override
   public String getId() {
-    return "bloom";
-  }
-
-  @Override
-  public String getIndexName() {
     return "bloom_filter";
   }
 
@@ -63,7 +58,7 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
   }
 
   @Override
-  public BloomFilterConfig deserialize(TableConfig tableConfig, Schema schema) {
+  public BloomFilterConfig getConfig(TableConfig tableConfig, Schema schema) {
     throw new UnsupportedOperationException("To be implemented in a future PR");
   }
 
@@ -90,7 +85,7 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
       }
 
       @Override
-      protected BloomFilterReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+      protected BloomFilterReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
           BloomFilterConfig indexConfig) {
         return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
       }
