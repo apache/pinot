@@ -411,13 +411,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       throws Exception {
     int numServers = 3;
     for (int i = 0; i < numServers; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+      addFakeServerInstanceToAutoJoinHelixCluster(
+          "replicaAssignment" + NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
     }
-    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, NO_TIER_NAME, numServers, numServers, 0));
+    _helixResourceManager.createServerTenant(
+        new Tenant(TenantRole.SERVER, "replicaAssignment" + NO_TIER_NAME, numServers, numServers, 0));
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setServerTenant(NO_TIER_NAME).build();
+            .setServerTenant("replicaAssignment" + NO_TIER_NAME).build();
     // Create the table
     _helixResourceManager.addTable(tableConfig);
 
@@ -441,9 +443,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     // add 6 nodes tierA
     for (int i = 0; i < 6; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
+      addFakeServerInstanceToAutoJoinHelixCluster(
+          "replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
     }
-    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, TIER_A_NAME, 6, 6, 0));
+    _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, "replicaAssignment" + TIER_A_NAME, 6, 6, 0));
     // rebalance is NOOP and no change in assignment caused by new instances
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
@@ -453,7 +456,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // add tier config
     tableConfig.setTierConfigsList(Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "0d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE", null, null)));
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "replicaAssignment" + TIER_A_NAME + "_OFFLINE", null, null)));
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment
@@ -465,13 +468,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (Map.Entry<String, Map<String, String>> entry : tierSegmentAssignment.entrySet()) {
       Map<String, String> instanceStateMap = entry.getValue();
       for (String instance : instanceStateMap.keySet()) {
-        assertTrue(instance.startsWith(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX));
+        assertTrue(instance.startsWith("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX));
       }
     }
 
     // Test rebalance with tier instance assignment
     InstanceTagPoolConfig tagPoolConfig =
-        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TIER_A_NAME), false, 0, null);
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME), false, 0,
+            null);
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
         new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0, false);
     tableConfig.setInstanceAssignmentConfigMap(Collections.singletonMap(TIER_A_NAME,
@@ -487,12 +491,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Math.abs("testTable_OFFLINE".hashCode()) % 6 = 2
     // [i2, i3, i4, i5, i0, i1]
     //  r0  r1  r2  r0  r1  r2
-    assertEquals(instancePartitions.getInstances(0, 0), Arrays.asList(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 2,
-        TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 5));
-    assertEquals(instancePartitions.getInstances(0, 1), Arrays.asList(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 3,
-        TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 0));
-    assertEquals(instancePartitions.getInstances(0, 2), Arrays.asList(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 4,
-        TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(0, 0),
+        Arrays.asList("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 2,
+            "replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(0, 1),
+        Arrays.asList("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 3,
+            "replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(0, 2),
+        Arrays.asList("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 4,
+            "replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 1));
 
     // The assignment are based on replica-group 0 and mirrored to all the replica-groups, so server of index 0, 1, 5
     // should have the same segments assigned, and server of index 2, 3, 4 should have the same segments assigned, each
@@ -503,15 +510,21 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       String segmentName = SEGMENT_NAME_PREFIX + i;
       Map<String, String> instanceStateMap = newSegmentAssignment.get(segmentName);
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
-      if (instanceStateMap.containsKey(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 0)) {
+      if (instanceStateMap.containsKey("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 0)) {
         numSegmentsOnServer0++;
-        assertEquals(instanceStateMap.get(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 0), ONLINE);
-        assertEquals(instanceStateMap.get(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 1), ONLINE);
-        assertEquals(instanceStateMap.get(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 5), ONLINE);
+        assertEquals(instanceStateMap.get("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 0),
+            ONLINE);
+        assertEquals(instanceStateMap.get("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 1),
+            ONLINE);
+        assertEquals(instanceStateMap.get("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 5),
+            ONLINE);
       } else {
-        assertEquals(instanceStateMap.get(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 2), ONLINE);
-        assertEquals(instanceStateMap.get(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 3), ONLINE);
-        assertEquals(instanceStateMap.get(TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 4), ONLINE);
+        assertEquals(instanceStateMap.get("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 2),
+            ONLINE);
+        assertEquals(instanceStateMap.get("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 3),
+            ONLINE);
+        assertEquals(instanceStateMap.get("replicaAssignment" + TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + 4),
+            ONLINE);
       }
     }
     assertEquals(numSegmentsOnServer0, numSegments / 2);
