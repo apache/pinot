@@ -199,12 +199,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   public void cancel(Throwable t) {
     super.cancel(t);
     for (MailboxIdentifier sendingMailbox : _sendingMailbox) {
-      ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService
-          .getReceivingMailboxIfPresent(sendingMailbox);
-      if (receivingMailbox != null) {
-        receivingMailbox.cancel();
-        _mailboxService.releaseReceivingMailbox(sendingMailbox);
-      }
+      _mailboxService.releaseReceivingMailbox(sendingMailbox);
     }
   }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 
@@ -61,12 +60,6 @@ public interface MailboxService<T> {
    * @return a receiving mailbox.
    */
   ReceivingMailbox<T> getReceivingMailbox(MailboxIdentifier mailboxId);
-
-  /**
-   * Same as {@link #getReceivingMailbox} but this would return null if the mailbox isn't already created.
-   */
-  @Nullable
-  ReceivingMailbox<T> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId);
 
   /**
    * Return a sending-mailbox for the given {@link MailboxIdentifier}. The returned {@link SendingMailbox} is

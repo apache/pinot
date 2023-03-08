@@ -64,11 +64,6 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   }
 
   @Override
-  public boolean isClosed() {
-    return _transferStream != null && _transferStream.isCompleted();
-  }
-
-  @Override
   public void cancel(Throwable t) {
     if (isInitialized() && !_transferStream.isCancelled()) {
       _transferStream.cancel();

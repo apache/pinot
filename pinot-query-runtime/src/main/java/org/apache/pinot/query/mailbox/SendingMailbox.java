@@ -64,12 +64,6 @@ public interface SendingMailbox<T> {
   boolean isInitialized();
 
   /**
-   * A SendingMailbox is considered closed if it has been initialized and it has released all references to the
-   * underlying channel.
-   */
-  boolean isClosed();
-
-  /**
    * Allows terminating the underlying channel.
    */
   void cancel(Throwable t);

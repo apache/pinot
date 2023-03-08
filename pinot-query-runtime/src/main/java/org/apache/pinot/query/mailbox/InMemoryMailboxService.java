@@ -27,7 +27,6 @@ import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.slf4j.Logger;
@@ -103,12 +102,6 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
       LOGGER.error(String.format("Error getting in-memory receiving mailbox=%s", mailboxId), e);
       throw new RuntimeException(e);
     }
-  }
-
-  @Nullable
-  @Override
-  public ReceivingMailbox<TransferableBlock> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId) {
-    return _receivingMailboxCache.getIfPresent(mailboxId.toString());
   }
 
   @Override

@@ -106,19 +106,11 @@ public abstract class BlockExchange {
   // Called when the OpChain gracefully returns.
   // TODO: This is a no-op right now.
   public void close() {
-    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-      if (sendingMailbox.isInitialized() && !sendingMailbox.isClosed()) {
-        LOGGER.info("SendingMailbox={} was not closed presumably because receiver hasn't completed processing",
-            sendingMailbox.getMailboxId());
-      }
-    }
   }
 
   public void cancel(Throwable t) {
-    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-      if (sendingMailbox.isInitialized() && !sendingMailbox.isClosed()) {
-        sendingMailbox.cancel(t);
-      }
+    for (SendingMailbox<TransferableBlock> sendingMailbox : _sendingMailboxes) {
+      sendingMailbox.cancel(t);
     }
   }
 }

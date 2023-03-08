@@ -66,6 +66,10 @@ public interface ReceivingMailbox<T> {
    *
    * This API should ensure that the underlying channel is "released" if it hasn't been already. If the channel has
    * already been released, the API shouldn't throw and instead return gracefully.
+   *
+   * <p>
+   *   This method may be called multiple times, so implementations should ensure this is idempotent.
+   * </p>
    */
   void cancel();
 }

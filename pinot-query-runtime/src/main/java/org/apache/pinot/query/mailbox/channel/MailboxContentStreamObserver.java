@@ -49,7 +49,7 @@ import static java.lang.Math.max;
 public class MailboxContentStreamObserver implements StreamObserver<Mailbox.MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
   private static final int DEFAULT_MAX_PENDING_MAILBOX_CONTENT = 5;
-  private static final long DEFAULT_QUEUE_POLL_TIMEOUT_MS = 120_000;
+  private static final long DEFAULT_QUEUE_OFFER_TIMEOUT_MS = 120_000;
   private static final Mailbox.MailboxContent DEFAULT_ERROR_MAILBOX_CONTENT;
 
   static {
@@ -123,7 +123,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
       // when the receiving end receives a message put it in the mailbox queue.
       try {
-        if (!_receivingBuffer.offer(mailboxContent, DEFAULT_QUEUE_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        if (!_receivingBuffer.offer(mailboxContent, DEFAULT_QUEUE_OFFER_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
           RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
           LOGGER.error(e.getMessage());
           _errorContent = createErrorContent(e);
@@ -170,10 +170,16 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     _responseObserver.onCompleted();
   }
 
+  /**
+   * @return true if all data has been received via {@link #poll()}.
+   */
   public boolean hasConsumedAllData() {
     return _isCompleted.get() && _receivingBuffer.isEmpty();
   }
 
+  /**
+   * @return true if either OnError or OnCompleted has been called, i.e. the gRPC stream has finished.
+   */
   public boolean hasStreamFinished() {
     return _streamFinished;
   }

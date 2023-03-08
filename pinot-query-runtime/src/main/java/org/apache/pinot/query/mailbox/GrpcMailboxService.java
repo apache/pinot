@@ -27,7 +27,6 @@ import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
@@ -133,15 +132,6 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
       LOGGER.error(String.format("Error getting receiving mailbox: %s", mailboxId), e);
       throw new RuntimeException(e);
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Nullable
-  @Override
-  public ReceivingMailbox<TransferableBlock> getReceivingMailboxIfPresent(MailboxIdentifier mailboxId) {
-    return _receivingMailboxCache.getIfPresent(mailboxId.toString());
   }
 
   /**

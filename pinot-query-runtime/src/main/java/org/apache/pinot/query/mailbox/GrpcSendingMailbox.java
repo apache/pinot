@@ -80,16 +80,6 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     return _initialized.get();
   }
 
-  /**
-   * As required by {@link SendingMailbox#isClosed()}, we return true only if this mailbox is done sending all the
-   * data and has released all underlying resources. To check whether all resources have been released, i.e. the
-   * underlying gRPC stream has been closed, we use {@link MailboxStatusStreamObserver#isFinished()}.
-   */
-  @Override
-  public boolean isClosed() {
-    return _initialized.get() && _statusObserver.isFinished();
-  }
-
   @Override
   public void cancel(Throwable t) {
     if (_initialized.get() && !_statusObserver.isFinished()) {
