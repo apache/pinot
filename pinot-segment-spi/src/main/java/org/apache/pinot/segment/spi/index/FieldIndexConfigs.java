@@ -21,14 +21,15 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -75,6 +76,15 @@ public class FieldIndexConfigs {
         .collect(Collectors.toMap(entry -> entry.getKey().getId(), serializer));
   }
 
+  @Override
+  public String toString() {
+    try {
+      return JsonUtils.objectToString(this);
+    } catch (JsonProcessingException e) {
+      return "Unserializable value due to " + e.getMessage();
+    }
+  }
+
   public static class Builder {
     private final Map<IndexType, IndexConfig> _configMap;
 
@@ -86,12 +96,12 @@ public class FieldIndexConfigs {
       _configMap = new HashMap<>(other._configMap);
     }
 
-    public <C extends IndexConfig, I extends IndexType<C, ?, ?>> Builder add(I indexType, @Nullable C config) {
+    public <C extends IndexConfig, I extends IndexType<C, ?, ?>> Builder add(I indexType, C config) {
       _configMap.put(indexType, config);
       return this;
     }
 
-    public Builder addUnsafe(IndexType<?, ?, ?> indexType, @Nullable IndexConfig config) {
+    public Builder addUnsafe(IndexType<?, ?, ?> indexType, IndexConfig config) {
       _configMap.put(indexType, config);
       return this;
     }

@@ -41,22 +41,18 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
 
   /**
    * The unique id that identifies this index type.
-   * In case there is more than one implementation for a given index, then all should share the same id in order to be
-   * correctly registered in the {@link IndexService}.
-   * This is also the value being used as the default toString implementation and the one used as keys when config is
-   * specified.
+   * <p>The returned value for each index should be constant across different Pinot versions as it is used as:</p>
    *
-   * <p>Therefore the returned value for each index should be constant across different Pinot versions.</p>
+   * <ul>
+   *   <li>They key used when the index is registered in IndexService.</li>
+   *   <li>The internal identification in v1 files and metadata persisted on disk.</li>
+   *   <li>The default toString implementation.</li>
+   *   <li>The key that identifies the index config in the indexes section inside
+   *   {@link org.apache.pinot.spi.config.table.FieldConfig}, although specific index types may choose to read other
+   *   names (for example, <code>inverted_index</code> may read <code>inverted</code> key.</li>
+   * </ul>
    */
   String getId();
-
-  /**
-   * Returns an internal name used in some parts of the code (mainly in format v1 and metadata) that is persisted on
-   * disk.
-   *
-   * <p>Therefore the returned value for each index should be constant across different Pinot versions.</p>
-   */
-  String getIndexName();
 
   Class<C> getIndexConfigClass();
 
@@ -65,7 +61,7 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   C getDefaultConfig();
 
-  C deserialize(TableConfig tableConfig, Schema schema);
+  C getConfig(TableConfig tableConfig, Schema schema);
 
   /**
    * Transforms a config object into a Jackson {@link JsonNode}.
