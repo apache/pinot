@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index;
 
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 
 
@@ -29,7 +30,7 @@ public interface IndexHandler {
   /**
    * Adds new indices and removes obsolete indices.
    */
-  void updateIndices(SegmentDirectory.Writer segmentWriter)
+  void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception;
 
   /**

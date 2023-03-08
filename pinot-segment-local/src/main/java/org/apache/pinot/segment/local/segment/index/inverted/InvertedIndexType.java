@@ -33,11 +33,6 @@ public class InvertedIndexType
 
   @Override
   public String getId() {
-    return "inverted";
-  }
-
-  @Override
-  public String getIndexName() {
     return "inverted_index";
   }
 

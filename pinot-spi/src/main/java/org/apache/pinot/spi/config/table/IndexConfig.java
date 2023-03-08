@@ -16,33 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.config.table;
 
-package org.apache.pinot.segment.local.segment.index.range;
-
-import org.apache.pinot.segment.spi.index.IndexCreator;
-import org.apache.pinot.segment.spi.index.IndexReader;
-import org.apache.pinot.segment.spi.index.IndexType;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class RangeIndexType implements IndexType<Object, IndexReader, IndexCreator> {
+/**
+ * This is the base class used to configure indexes.
+ *
+ * The common logic between all indexes is that they can be enabled or disabled.
+ *
+ * Indexes that do not require extra configuration can directly use this class.
+ */
+public class IndexConfig extends BaseJsonConfig {
+  public static final IndexConfig ENABLED = new IndexConfig(true);
+  public static final IndexConfig DISABLED = new IndexConfig(false);
+  private final boolean _enabled;
 
-  /**
-   * The default range index version used when not specified in the TableConfig.
-   *
-   * This value should be equal to the one used in {@link org.apache.pinot.spi.config.table.IndexingConfig}
-   */
-  public static final RangeIndexType INSTANCE = new RangeIndexType();
-
-  RangeIndexType() {
+  @JsonCreator
+  public IndexConfig(@JsonProperty("enabled") boolean enabled) {
+    _enabled = enabled;
   }
 
-  @Override
-  public String getId() {
-    return "range_index";
-  }
-
-  @Override
-  public String toString() {
-    return getId();
+  public boolean isEnabled() {
+    return _enabled;
   }
 }

@@ -36,11 +36,6 @@ public class DictionaryIndexType implements IndexType<Object, IndexReader, Index
   }
 
   @Override
-  public String getIndexName() {
-    return "dictionary";
-  }
-
-  @Override
   public String toString() {
     return getId();
   }

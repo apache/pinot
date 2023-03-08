@@ -31,11 +31,6 @@ public class TextIndexType implements IndexType<Object, IndexReader, IndexCreato
 
   @Override
   public String getId() {
-    return "text";
-  }
-
-  @Override
-  public String getIndexName() {
     return "text_index";
   }
 
