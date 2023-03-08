@@ -440,7 +440,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   private static void persistIndexMap(IndexEntry entry, PrintWriter writer) {
     String colName = entry._key._name;
-    String idxType = entry._key._type.getIndexName();
+    String idxType = entry._key._type.getId();
 
     String startKey = getKey(colName, idxType, true);
     StringBuilder sb = new StringBuilder();

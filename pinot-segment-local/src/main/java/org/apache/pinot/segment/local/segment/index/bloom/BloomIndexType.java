@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
@@ -46,17 +47,12 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class BloomIndexType
-    implements IndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>,
-               ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
+    extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>
+    implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
   public static final BloomIndexType INSTANCE = new BloomIndexType();
 
   @Override
   public String getId() {
-    return "bloom";
-  }
-
-  @Override
-  public String getIndexName() {
     return "bloom_filter";
   }
 
@@ -113,7 +109,7 @@ public class BloomIndexType
       }
 
       @Override
-      protected BloomFilterReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+      protected BloomFilterReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
           BloomFilterConfig indexConfig) {
         return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
       }

@@ -27,12 +27,12 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 public abstract class AbstractTextIndexCreator implements TextIndexCreator {
 
   @Override
-  public void addSingleValueCell(@Nonnull Object value, int dictId) {
+  public void add(@Nonnull Object value, int dictId) {
     add((String) value);
   }
 
   @Override
-  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  public void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
     int length = values.length;
     if (values instanceof String[]) {
       add((String[]) values, length);

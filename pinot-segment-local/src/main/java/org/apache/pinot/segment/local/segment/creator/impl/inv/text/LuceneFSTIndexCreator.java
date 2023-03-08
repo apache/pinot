@@ -91,13 +91,13 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void addSingleValueCell(@Nonnull Object value, int dictId)
+  public void add(@Nonnull Object value, int dictId)
       throws IOException {
     // This method should do nothing
   }
 
   @Override
-  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
+  public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
       throws IOException {
     // This method should do nothing
   }

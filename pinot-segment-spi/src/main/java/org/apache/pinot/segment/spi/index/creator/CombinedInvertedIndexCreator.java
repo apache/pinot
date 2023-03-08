@@ -32,7 +32,7 @@ public interface CombinedInvertedIndexCreator
   FieldSpec.DataType getDataType();
 
   @Override
-  default void addSingleValueCell(@Nonnull Object value, int dictId) {
+  default void add(@Nonnull Object value, int dictId) {
     if (dictId >= 0) {
       add(dictId);
     } else {
@@ -56,7 +56,7 @@ public interface CombinedInvertedIndexCreator
   }
 
   @Override
-  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
     if (dictIds != null) {
       add(dictIds, dictIds.length);
     } else {

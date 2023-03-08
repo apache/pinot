@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIn
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
@@ -49,8 +50,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class JsonIndexType implements IndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator>,
-                                      ConfigurableFromIndexLoadingConfig<JsonIndexConfig> {
+public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator>
+    implements ConfigurableFromIndexLoadingConfig<JsonIndexConfig> {
   public static final JsonIndexType INSTANCE = new JsonIndexType();
 
   private JsonIndexType() {
@@ -58,11 +59,6 @@ public class JsonIndexType implements IndexType<JsonIndexConfig, JsonIndexReader
 
   @Override
   public String getId() {
-    return "json";
-  }
-
-  @Override
-  public String getIndexName() {
     return "json_index";
   }
 
@@ -115,7 +111,7 @@ public class JsonIndexType implements IndexType<JsonIndexConfig, JsonIndexReader
 
   public static JsonIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata)
       throws IndexReaderConstraintException {
-    return ReaderFactory.read(dataBuffer, columnMetadata);
+    return ReaderFactory.createIndexReader(dataBuffer, columnMetadata);
   }
 
   @Override
@@ -141,12 +137,13 @@ public class JsonIndexType implements IndexType<JsonIndexConfig, JsonIndexReader
     }
 
     @Override
-    protected JsonIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, JsonIndexConfig indexConfig)
+    protected JsonIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        JsonIndexConfig indexConfig)
         throws IndexReaderConstraintException {
-      return read(dataBuffer, metadata);
+      return createIndexReader(dataBuffer, metadata);
     }
 
-    public static JsonIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
+    public static JsonIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
         throws IndexReaderConstraintException {
       if (!metadata.getFieldSpec().isSingleValueField()) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), JsonIndexType.INSTANCE,

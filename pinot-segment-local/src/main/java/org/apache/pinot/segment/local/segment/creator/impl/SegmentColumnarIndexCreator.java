@@ -377,7 +377,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
     for (IndexCreator creator : creatorsByIndex.values()) {
-      creator.addSingleValueCell(value, dictId);
+      creator.add(value, dictId);
     }
   }
 
@@ -386,7 +386,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     int[] dictId = dictionaryCreator != null ? dictionaryCreator.indexOfMV(values) : null;
     for (IndexCreator creator : creatorsByIndex.values()) {
-      creator.addMultiValueCell(values, dictId);
+      creator.add(values, dictId);
     }
   }
 

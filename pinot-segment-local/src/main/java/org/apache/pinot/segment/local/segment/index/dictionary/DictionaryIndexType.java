@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -72,8 +73,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class DictionaryIndexType
-    implements IndexType<DictionaryIndexConfig, Dictionary, SegmentDictionaryCreator>,
-               ConfigurableFromIndexLoadingConfig<DictionaryIndexConfig> {
+    extends AbstractIndexType<DictionaryIndexConfig, Dictionary, SegmentDictionaryCreator>
+    implements ConfigurableFromIndexLoadingConfig<DictionaryIndexConfig> {
   public static final DictionaryIndexType INSTANCE = new DictionaryIndexType();
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
 
@@ -82,11 +83,6 @@ public class DictionaryIndexType
 
   @Override
   public String getId() {
-    return "dictionary";
-  }
-
-  @Override
-  public String getIndexName() {
     return "dictionary";
   }
 
@@ -264,7 +260,8 @@ public class DictionaryIndexType
       }
 
       @Override
-      protected Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
+      protected Dictionary createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+          DictionaryIndexConfig indexConfig)
           throws IOException, IndexReaderConstraintException {
         return DictionaryIndexType.INSTANCE.read(dataBuffer, metadata, indexConfig);
       }

@@ -283,7 +283,7 @@ public class IndexLoadingConfig {
   private <C extends IndexConfig> ColumnConfigDeserializer<C> getDeserializer(IndexType<C, ?, ?> indexType) {
     ColumnConfigDeserializer<C> deserializer;
 
-    ColumnConfigDeserializer<C> stdDeserializer = indexType.getDeserializer();
+    ColumnConfigDeserializer<C> stdDeserializer = indexType::getConfig;
     if (indexType instanceof ConfigurableFromIndexLoadingConfig) {
       @SuppressWarnings("unchecked")
       Map<String, C> fromIndexLoadingConfig =

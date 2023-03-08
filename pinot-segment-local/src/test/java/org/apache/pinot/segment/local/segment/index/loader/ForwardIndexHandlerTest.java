@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -53,7 +54,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -366,7 +366,7 @@ public class ForwardIndexHandlerTest {
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
     config.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _forwardIndexDisabledColumns);
-    config.disableIndexOn(StandardIndexes.forward(), _forwardIndexDisabledColumns);
+    config.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED, _forwardIndexDisabledColumns);
     config.setIndexOn(StandardIndexes.range(), new RangeIndexConfig(2),
         DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

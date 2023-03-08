@@ -28,12 +28,12 @@ import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReade
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -42,7 +42,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class NullValueIndexType implements IndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
+public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
 
   public static final NullValueIndexType INSTANCE = new NullValueIndexType();
 
@@ -51,11 +51,6 @@ public class NullValueIndexType implements IndexType<IndexConfig, NullValueVecto
 
   @Override
   public String getId() {
-    return "nullable";
-  }
-
-  @Override
-  public String getIndexName() {
     return "nullvalue_vector";
   }
 
@@ -96,8 +91,8 @@ public class NullValueIndexType implements IndexType<IndexConfig, NullValueVecto
     return new IndexReaderFactory<NullValueVectorReader>() {
       @Nullable
       @Override
-      public NullValueVectorReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-          ColumnMetadata metadata)
+      public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
+          FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
           throws IOException {
         // For historical and test reasons, NullValueIndexType doesn't really care about its config
         // if there is a buffer for this index, it is read even if the config explicitly ask to disable it.

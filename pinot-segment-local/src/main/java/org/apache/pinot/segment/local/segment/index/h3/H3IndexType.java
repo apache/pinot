@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.segment.index.readers.geospatial.Immutable
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
@@ -51,8 +52,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class H3IndexType implements IndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>,
-                                    ConfigurableFromIndexLoadingConfig<H3IndexConfig> {
+public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>
+  implements ConfigurableFromIndexLoadingConfig<H3IndexConfig> {
 
   public static final H3IndexType INSTANCE = new H3IndexType();
 
@@ -61,11 +62,6 @@ public class H3IndexType implements IndexType<H3IndexConfig, H3IndexReader, GeoS
 
   @Override
   public String getId() {
-    return "h3";
-  }
-
-  @Override
-  public String getIndexName() {
     return "h3_index";
   }
 
@@ -114,7 +110,8 @@ public class H3IndexType implements IndexType<H3IndexConfig, H3IndexReader, GeoS
       }
 
       @Override
-      protected H3IndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, H3IndexConfig indexConfig) {
+      protected H3IndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+          H3IndexConfig indexConfig) {
         return new ImmutableH3IndexReader(dataBuffer);
       }
     };

@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReaderImpl
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
@@ -54,8 +55,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class RangeIndexType implements IndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>,
-                                       ConfigurableFromIndexLoadingConfig<RangeIndexConfig> {
+public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>
+  implements ConfigurableFromIndexLoadingConfig<RangeIndexConfig> {
 
   /**
    * The default range index version used when not specified in the TableConfig.
@@ -70,11 +71,6 @@ public class RangeIndexType implements IndexType<RangeIndexConfig, RangeIndexRea
 
   @Override
   public String getId() {
-    return "range";
-  }
-
-  @Override
-  public String getIndexName() {
     return "range_index";
   }
 
@@ -169,7 +165,8 @@ public class RangeIndexType implements IndexType<RangeIndexConfig, RangeIndexRea
     }
 
     @Override
-    protected RangeIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, RangeIndexConfig indexConfig)
+    protected RangeIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        RangeIndexConfig indexConfig)
         throws IndexReaderConstraintException {
       return read(dataBuffer, metadata);
     }

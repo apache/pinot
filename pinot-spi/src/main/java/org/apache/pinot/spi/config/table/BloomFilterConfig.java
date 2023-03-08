@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 
 public class BloomFilterConfig extends IndexConfig {
@@ -66,5 +67,26 @@ public class BloomFilterConfig extends IndexConfig {
 
   public boolean isLoadOnHeap() {
     return _loadOnHeap;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    BloomFilterConfig that = (BloomFilterConfig) o;
+    return Double.compare(that._fpp, _fpp) == 0 && _maxSizeInBytes == that._maxSizeInBytes
+        && _loadOnHeap == that._loadOnHeap && isEnabled() == that.isEnabled();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _fpp, _maxSizeInBytes, _loadOnHeap, isEnabled());
   }
 }

@@ -59,13 +59,13 @@ import javax.annotation.Nullable;
  */
 public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreator {
   @Override
-  default void addSingleValueCell(@Nonnull Object value, int dictId) {
+  default void add(@Nonnull Object value, int dictId) {
     Preconditions.checkArgument(dictId >= 0, "A dictionary id is required");
     add(dictId);
   }
 
   @Override
-  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
     Preconditions.checkArgument(dictIds != null, "A dictionary id is required");
     add(dictIds, dictIds.length);
   }

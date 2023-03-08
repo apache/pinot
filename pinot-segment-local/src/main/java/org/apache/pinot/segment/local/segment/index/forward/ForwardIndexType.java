@@ -34,13 +34,13 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -52,8 +52,8 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class ForwardIndexType
-    implements IndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>,
-               ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
+    extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
+    implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
 
   public static final ForwardIndexType INSTANCE = new ForwardIndexType();
 
@@ -62,11 +62,6 @@ public class ForwardIndexType
 
   @Override
   public String getId() {
-    return "forward";
-  }
-
-  @Override
-  public String getIndexName() {
     return "forward_index";
   }
 
@@ -230,11 +225,12 @@ public class ForwardIndexType
 
   public ForwardIndexReader read(SegmentDirectory.Reader directory, ColumnMetadata metadata)
       throws IOException {
-    return ForwardIndexReaderFactory.read(directory.getIndexFor(metadata.getColumnName(), this), metadata);
+    PinotDataBuffer buffer = directory.getIndexFor(metadata.getColumnName(), this);
+    return ForwardIndexReaderFactory.createIndexReader(buffer, metadata);
   }
 
   public ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    return ForwardIndexReaderFactory.read(dataBuffer, metadata);
+    return ForwardIndexReaderFactory.createIndexReader(dataBuffer, metadata);
   }
 
   @Override

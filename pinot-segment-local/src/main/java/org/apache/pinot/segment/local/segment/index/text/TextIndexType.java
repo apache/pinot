@@ -40,13 +40,13 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -60,8 +60,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader, TextIndexCreator>,
-                                      ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
+public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexReader, TextIndexCreator>
+    implements ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
   public static final TextIndexType INSTANCE = new TextIndexType();
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
 
@@ -70,11 +70,6 @@ public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader
 
   @Override
   public String getId() {
-    return "text";
-  }
-
-  @Override
-  public String getIndexName() {
     return "text_index";
   }
 
@@ -165,8 +160,8 @@ public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader
     return new IndexReaderFactory<TextIndexReader>() {
       @Nullable
       @Override
-      public TextIndexReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-          ColumnMetadata metadata)
+      public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
+          FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
           throws IndexReaderConstraintException {
         if (fieldIndexConfigs == null) {
           return null;

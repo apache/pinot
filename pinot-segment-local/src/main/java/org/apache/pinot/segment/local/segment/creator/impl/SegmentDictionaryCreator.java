@@ -68,13 +68,13 @@ public class SegmentDictionaryCreator implements IndexCreator {
     _useVarLengthDictionary = useVarLengthDictionary;
   }
   @Override
-  public void addSingleValueCell(@Nonnull Object value, int dictId)
+  public void add(@Nonnull Object value, int dictId)
       throws IOException {
     throw new UnsupportedOperationException("Dictionary indexes should not be build as a normal index");
   }
 
   @Override
-  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
+  public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("Dictionary indexes should not be build as a normal index");
   }

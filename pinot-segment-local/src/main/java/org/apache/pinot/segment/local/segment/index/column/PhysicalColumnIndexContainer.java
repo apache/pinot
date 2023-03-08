@@ -53,7 +53,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       if (segmentReader.hasIndexFor(columnName, indexType)) {
         IndexReaderFactory<?> readerProvider = indexType.getReaderFactory();
         try {
-          IndexReader reader = readerProvider.read(segmentReader, fieldIndexConfigs, metadata);
+          IndexReader reader = readerProvider.createIndexReader(segmentReader, fieldIndexConfigs, metadata);
           if (reader != null) {
             _readersByIndex.put(indexType, reader);
           }

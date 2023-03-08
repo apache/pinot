@@ -35,12 +35,12 @@ import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexR
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
@@ -55,8 +55,8 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class InvertedIndexType
-    implements IndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>,
-               ConfigurableFromIndexLoadingConfig<IndexConfig> {
+    extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>
+    implements ConfigurableFromIndexLoadingConfig<IndexConfig> {
   public static final InvertedIndexType INSTANCE = new InvertedIndexType();
 
   private InvertedIndexType() {
@@ -64,11 +64,6 @@ public class InvertedIndexType
 
   @Override
   public String getId() {
-    return "inverted";
-  }
-
-  @Override
-  public String getIndexName() {
     return "inverted_index";
   }
 
@@ -123,7 +118,7 @@ public class InvertedIndexType
   @Override
   @Nullable
   public InvertedIndexReader getIndexReader(ColumnIndexContainer indexContainer) {
-    InvertedIndexReader reader = IndexType.super.getIndexReader(indexContainer);
+    InvertedIndexReader reader = super.getIndexReader(indexContainer);
     if (reader != null) {
       return reader;
     }
@@ -146,7 +141,7 @@ public class InvertedIndexType
 
   public InvertedIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws IOException {
-    return new ReaderFactory().read(segmentReader, columnMetadata);
+    return new ReaderFactory().createIndexReader(segmentReader, columnMetadata);
   }
 
   @Override
@@ -157,17 +152,17 @@ public class InvertedIndexType
 
   public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
     @Override
-    public InvertedIndexReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-        ColumnMetadata metadata)
+    public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
         throws IOException {
       if (fieldIndexConfigs == null || !fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
         return null;
       }
-      return read(segmentReader, metadata);
+      return createIndexReader(segmentReader, metadata);
     }
 
 
-    public InvertedIndexReader read(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata)
+    public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata)
         throws IOException {
       if (!metadata.hasDictionary()) {
         throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "

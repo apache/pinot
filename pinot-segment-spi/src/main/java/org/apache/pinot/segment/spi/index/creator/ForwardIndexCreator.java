@@ -32,7 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public interface ForwardIndexCreator extends IndexCreator {
 
   @Override
-  default void addSingleValueCell(@Nonnull Object cellValue, int dictId) {
+  default void add(@Nonnull Object cellValue, int dictId) {
     if (dictId >= 0) {
       putDictId(dictId);
     } else {
@@ -72,7 +72,7 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addMultiValueCell(@Nonnull Object[] cellValues, @Nullable int[] dictIds)
+  default void add(@Nonnull Object[] cellValues, @Nullable int[] dictIds)
       throws IOException {
     if (dictIds != null) {
       putDictIdMV(dictIds);

@@ -133,9 +133,9 @@ public class TablesResourceTest extends BaseResourceTest {
       Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 2);
       Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 2);
       Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column1")
-          .containsKey(StandardIndexes.dictionary().getIndexName()));
+          .containsKey(StandardIndexes.dictionary().getId()));
       Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column2")
-          .containsKey(StandardIndexes.forward().getIndexName()));
+          .containsKey(StandardIndexes.forward().getId()));
     }
 
     // No such table

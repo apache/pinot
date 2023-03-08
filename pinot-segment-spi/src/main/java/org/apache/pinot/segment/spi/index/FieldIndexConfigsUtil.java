@@ -34,7 +34,7 @@ public class FieldIndexConfigsUtil {
   }
 
   public static Map<String, FieldIndexConfigs> createIndexConfigsByColName(TableConfig tableConfig, Schema schema) {
-    return createIndexConfigsByColName(tableConfig, schema, IndexType::getDeserializer);
+    return createIndexConfigsByColName(tableConfig, schema, DefaultDeserializerProvider.INSTANCE);
   }
 
   public static Map<String, FieldIndexConfigs> createIndexConfigsByColName(
@@ -93,5 +93,14 @@ public class FieldIndexConfigsUtil {
           return config != null && config.isEnabled();
         })
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getConfig(indexType)));
+  }
+
+  private static class DefaultDeserializerProvider implements DeserializerProvider {
+    public static final DefaultDeserializerProvider INSTANCE = new DefaultDeserializerProvider();
+
+    @Override
+    public <C extends IndexConfig> ColumnConfigDeserializer<C> get(IndexType<C, ?, ?> indexType) {
+      return indexType::getConfig;
+    }
   }
 }

@@ -36,6 +36,7 @@ import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
@@ -56,8 +57,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, TextIndexCreator>,
-                                     ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
+public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, TextIndexCreator>
+    implements ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
   public static final FstIndexType INSTANCE = new FstIndexType();
 
   private FstIndexType() {
@@ -65,11 +66,6 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
 
   @Override
   public String getId() {
-    return "fst";
-  }
-
-  @Override
-  public String getIndexName() {
     return "fst_index";
   }
 
@@ -133,7 +129,7 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
 
   public static TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
       throws IndexReaderConstraintException, IOException {
-    return INSTANCE.getReaderFactory().read(dataBuffer, metadata);
+    return INSTANCE.getReaderFactory().createIndexReader(dataBuffer, metadata);
   }
 
   @Override
@@ -153,7 +149,7 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
       return FstIndexType.INSTANCE;
     }
 
-    protected TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
+    protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
         throws IndexReaderConstraintException, IOException {
       if (!metadata.hasDictionary()) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), FstIndexType.INSTANCE,
@@ -168,9 +164,10 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
     }
 
     @Override
-    protected TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, FstIndexConfig indexConfig)
+    protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        FstIndexConfig indexConfig)
         throws IndexReaderConstraintException, IOException {
-      return read(dataBuffer, metadata);
+      return createIndexReader(dataBuffer, metadata);
     }
   }
 

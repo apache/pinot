@@ -16,42 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
+package org.apache.pinot.segment.spi.index;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.IndexCreator;
-import org.locationtech.jts.geom.Geometry;
+import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.mockito.Mockito;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
-/**
- * Index creator for geospatial index.
- */
-public interface GeoSpatialIndexCreator extends IndexCreator {
+public class FieldIndexConfigsTest {
 
-  Geometry deserialize(byte[] bytes);
-
-  @Override
-  default void add(@Nonnull Object value, int dictId)
+  @Test
+  public void testToString()
       throws IOException {
-    add(deserialize((byte[]) value));
+    IndexType index1 = Mockito.mock(IndexType.class);
+    Mockito.when(index1.getId()).thenReturn("index1");
+    Mockito.when(index1.serialize(Mockito.any())).thenCallRealMethod();
+    IndexConfig indexConf = new IndexConfig(true);
+    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+        .add(index1, indexConf)
+        .build();
+
+    Assert.assertEquals(fieldIndexConfigs.toString(), "{\"index1\":"
+        + JsonUtils.objectToString(indexConf) + "}");
   }
-
-  @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds)
-      throws IOException {
-  }
-
-  /**
-   * Adds the next geospatial value.
-   */
-  void add(Geometry geometry)
-      throws IOException;
-
-  /**
-   * Seals the index and flushes it to disk.
-   */
-  void seal()
-      throws IOException;
 }

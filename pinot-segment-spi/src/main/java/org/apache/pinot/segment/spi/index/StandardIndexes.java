@@ -41,57 +41,58 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 
 
+@SuppressWarnings("unchecked")
 public class StandardIndexes {
   private StandardIndexes() {
   }
 
   public static IndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator> forward() {
     return (IndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("forward");
+        IndexService.getInstance().getOrThrow("forward_index");
   }
 
   public static IndexType<DictionaryIndexConfig, Dictionary, ?> dictionary() {
     return (IndexType<DictionaryIndexConfig, Dictionary, ?>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("dictionary");
+        IndexService.getInstance().getOrThrow("dictionary");
   }
 
   public static IndexType<IndexConfig, NullValueVectorReader, ?> nullValueVector() {
     return (IndexType<IndexConfig, NullValueVectorReader, ?>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("nullable");
+        IndexService.getInstance().getOrThrow("nullvalue_vector");
   }
 
   public static IndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator> bloomFilter() {
     return (IndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("bloom");
+        IndexService.getInstance().getOrThrow("bloom_filter");
   }
 
   public static IndexType<FstIndexConfig, TextIndexReader, TextIndexCreator> fst() {
     return (IndexType<FstIndexConfig, TextIndexReader, TextIndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("fst");
+        IndexService.getInstance().getOrThrow("fst_index");
   }
 
   public static IndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator> inverted() {
     return (IndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("inverted");
+        IndexService.getInstance().getOrThrow("inverted_index");
   }
 
   public static IndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator> json() {
     return (IndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("json");
+        IndexService.getInstance().getOrThrow("json_index");
   }
 
   public static IndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator> range() {
     return (IndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("range");
+        IndexService.getInstance().getOrThrow("range_index");
   }
 
   public static IndexType<TextIndexConfig, TextIndexReader, TextIndexCreator> text() {
     return (IndexType<TextIndexConfig, TextIndexReader, TextIndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("text");
+        IndexService.getInstance().getOrThrow("text_index");
   }
 
   public static IndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator> h3() {
     return (IndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("h3");
+        IndexService.getInstance().getOrThrow("h3_index");
   }
 }

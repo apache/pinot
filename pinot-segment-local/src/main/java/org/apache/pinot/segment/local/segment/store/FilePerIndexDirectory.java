@@ -131,7 +131,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
           "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
               .toString());
     }
-    PinotDataBuffer buffer = mapForReads(file, key._type.getIndexName() + ".reader");
+    PinotDataBuffer buffer = mapForReads(file, key._type.getId() + ".reader");
     _indexBuffers.put(key, buffer);
     return buffer;
   }
