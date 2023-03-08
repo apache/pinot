@@ -92,10 +92,6 @@ public class ExecutionStatsAggregator {
 
   public synchronized void aggregate(@Nullable ServerRoutingInstance routingInstance, Map<String, String> metadata,
       Map<Integer, String> exceptions) {
-    // Reduce on trace info.
-    if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName())) {
-      _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
-    }
 
     String tableNamesStr = metadata.get(DataTable.MetadataKey.TABLE.getName());
     String tableName = null;
@@ -110,12 +106,21 @@ public class ExecutionStatsAggregator {
     }
 
     TableType tableType = null;
+    String instanceName = null;
     if (routingInstance != null) {
       tableType = routingInstance.getTableType();
+      instanceName = routingInstance.getShortName();;
     } else if (tableName != null) {
       tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      instanceName = tableName;
     } else {
       tableType = null;
+      instanceName = null;
+    }
+
+    // Reduce on trace info.
+    if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName()) && instanceName != null) {
+      _traceInfo.put(instanceName, metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
     }
 
     String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
@@ -357,7 +362,7 @@ public class ExecutionStatsAggregator {
   }
 
   public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
-      @Nullable BrokerMetrics brokerMetrics, boolean traceEnabled) {
+      @Nullable BrokerMetrics brokerMetrics) {
     setStats(rawTableName, brokerResponseStats, brokerMetrics);
 
     brokerResponseStats.setNumBlocks(_numBlocks);
@@ -365,7 +370,7 @@ public class ExecutionStatsAggregator {
     brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
     brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
     brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
-    if (traceEnabled) {
+    if (_enableTrace) {
       brokerResponseStats.setOperatorStats(_operatorStats);
     } else {
       brokerResponseStats.setOperatorStats(Collections.emptyMap());

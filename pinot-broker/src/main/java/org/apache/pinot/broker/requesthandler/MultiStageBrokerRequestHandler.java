@@ -209,9 +209,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         //TODO: Only using first table to assign broker metrics
         // find a way to split metrics in case of multiple table
         String rawTableName = TableNameBuilder.extractRawTableName(tableNames.get(0));
-        entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics, traceEnabled);
+        entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
       } else {
-        entry.getValue().setStageLevelStats(null, brokerResponseStats, null, traceEnabled);
+        entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
       }
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
