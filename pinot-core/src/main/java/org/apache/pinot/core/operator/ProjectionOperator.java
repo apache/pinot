@@ -64,11 +64,10 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
       return null;
     } else {
       Tracing.activeRecording().setNumChildren(_dataSourceMap.size());
-      _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), docIdSetBlock.getSearchableLength());
+      _dataBlockCache.initNewBlock(docIdSetBlock.getDocIds(), docIdSetBlock.getLength());
       return new ProjectionBlock(_dataSourceMap, _dataBlockCache);
     }
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

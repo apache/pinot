@@ -223,10 +223,11 @@ public class AggregationFunctionUtils {
     // If it is, populate the corresponding filter operator and corresponding transform operator
     assert aggregationFunctions != null;
     for (Pair<AggregationFunction, FilterContext> inputPair : aggregationFunctions) {
-      if (inputPair.getLeft() != null) {
-        FilterContext currentFilterExpression = inputPair.getRight();
+      AggregationFunction aggFunc = inputPair.getLeft();
+      FilterContext currentFilterExpression = inputPair.getRight();
+      if (currentFilterExpression != null) {
         if (filterContextToAggFuncsMap.get(currentFilterExpression) != null) {
-          filterContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(inputPair.getLeft());
+          filterContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(aggFunc);
           continue;
         }
         Pair<FilterPlanNode, BaseFilterOperator> filterPlanOpPair =
@@ -241,10 +242,10 @@ public class AggregationFunctionUtils {
         // fetching the relevant TransformOperator when resolving blocks during aggregation
         // execution
         List<AggregationFunction> aggFunctionList = new ArrayList<>();
-        aggFunctionList.add(inputPair.getLeft());
+        aggFunctionList.add(aggFunc);
         filterContextToAggFuncsMap.put(currentFilterExpression, Pair.of(aggFunctionList, newTransformOperator));
       } else {
-        nonFilteredAggregationFunctions.add(inputPair.getLeft());
+        nonFilteredAggregationFunctions.add(aggFunc);
       }
     }
     // Convert to array since FilteredGroupByOperator expects it
@@ -255,8 +256,11 @@ public class AggregationFunctionUtils {
       }
       aggToTransformOpList.add(Pair.of(aggregationFunctionList.toArray(new AggregationFunction[0]), pair.getRight()));
     }
-    aggToTransformOpList.add(
-        Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
+
+    if (!nonFilteredAggregationFunctions.isEmpty()) {
+      aggToTransformOpList.add(
+          Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
+    }
 
     return aggToTransformOpList;
   }
