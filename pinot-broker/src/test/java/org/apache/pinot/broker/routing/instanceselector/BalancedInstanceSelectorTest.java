@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -141,8 +142,7 @@ public class BalancedInstanceSelectorTest {
   public void testNewSegmentFromZKMetadataSelection() {
     String oldSeg = "segment0";
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime =
-        List.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -154,17 +154,20 @@ public class BalancedInstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg, ImmutableList.of(instance0, instance1)),
-        Map.entry(newSeg, ImmutableList.of(instance0, instance1)));
+    Map<String, List<String>> idealSateMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(instance0, instance1));
+      put(newSeg, ImmutableList.of(instance0, instance1));
+    }};
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
     // External view for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance1:online]
-    Map<String, List<Pair<String, String>>> externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of(Pair.of(instance1, ONLINE))));
+    Map<String, List<Pair<String, String>>> externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of(Pair.of(instance1, ONLINE)));
+    }};
     ExternalView externalView = createExternalView(externalViewMap);
 
     BalancedInstanceSelector replicaGroupInstanceSelector =
@@ -174,8 +177,10 @@ public class BalancedInstanceSelectorTest {
     // First selection, we select instance0 for newSeg, and we exclude it and not report error.
     // We don't mark instance0 as unavailable for segment0 either.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg, instance0), Map.entry(newSeg, instance1));
+    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance0);
+      put(newSeg, instance1);
+    }};
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -183,8 +188,9 @@ public class BalancedInstanceSelectorTest {
 
     // Second selection, we select instance0 for newSeg, we serve the newSeg and not report error;
     requestId = 1;
-    expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg, instance1));
+    expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance1);
+    }};
     selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -195,8 +201,10 @@ public class BalancedInstanceSelectorTest {
     // Upon re-initialization, newly old segments can only serve from online instance
     replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
     requestId = 0;
-    expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg, instance0), Map.entry(newSeg, instance1));
+    expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance0);
+      put(newSeg, instance1);
+    }};
     selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -204,8 +212,10 @@ public class BalancedInstanceSelectorTest {
     requestId = 1;
     selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-    expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg, instance1), Map.entry(newSeg, instance1));
+    expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance1);
+      put(newSeg, instance1);
+    }};
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
@@ -217,8 +227,7 @@ public class BalancedInstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -230,17 +239,20 @@ public class BalancedInstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg, ImmutableList.of(instance0, instance1)),
-        Map.entry(newSeg, ImmutableList.of(instance0, instance1)));
+    Map<String, List<String>> idealSateMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(instance0, instance1));
+      put(newSeg, ImmutableList.of(instance0, instance1));
+    }};
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
     // External view for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> []
-    Map<String, List<Pair<String, String>>> externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of()));
+    Map<String, List<Pair<String, String>>> externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of());
+    }};
     ExternalView externalView = createExternalView(externalViewMap);
 
     BalancedInstanceSelector replicaGroupInstanceSelector =
@@ -249,7 +261,9 @@ public class BalancedInstanceSelectorTest {
 
     // We don't mark segment as unavailable.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult = Map.ofEntries(Map.entry(oldSeg, instance0));
+    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+          put(oldSeg, instance0);
+        }};
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -271,8 +285,7 @@ public class BalancedInstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -284,17 +297,21 @@ public class BalancedInstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg, ImmutableList.of(instance0, instance1)),
-        Map.entry(newSeg, ImmutableList.of(instance0, instance1)));
+    Map<String, List<String>> idealSateMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(instance0, instance1));
+      put(newSeg, ImmutableList.of(instance0, instance1));
+    }};
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
     // External view for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> []
-    Map<String, List<Pair<String, String>>> externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of()));
+    Map<String, List<Pair<String, String>>> externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of());
+    }};
+
     ExternalView externalView = createExternalView(externalViewMap);
 
     BalancedInstanceSelector replicaGroupInstanceSelector =
@@ -303,16 +320,19 @@ public class BalancedInstanceSelectorTest {
 
     // We don't mark segment as unavailable.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult = Map.ofEntries(Map.entry(oldSeg, instance0));
+    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+          put(oldSeg, instance0);
+        }};
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Report error instance for segment1 since segment1 becomes old and we should report the error.
-    externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of(Pair.of(instance0, ERROR))));
+    externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of(Pair.of(instance0, ERROR)));
+    }};
     externalView = createExternalView(externalViewMap);
     replicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult =
@@ -321,13 +341,16 @@ public class BalancedInstanceSelectorTest {
     assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
 
     // Get segment1 back online in instance1
-    externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of(Pair.of(instance0, ERROR), Pair.of(instance1, ONLINE))));
+    externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of(Pair.of(instance0, ERROR), Pair.of(instance1, ONLINE)));
+    }};
     externalView = createExternalView(externalViewMap);
     replicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
-    expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg, instance0), Map.entry(newSeg, instance1));
+    expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance0);
+      put(newSeg, instance1);
+    }};
     selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -341,8 +364,7 @@ public class BalancedInstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -354,17 +376,20 @@ public class BalancedInstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg, ImmutableList.of(instance0, instance1)),
-        Map.entry(newSeg, ImmutableList.of(instance0, instance1)));
+    Map<String, List<String>> idealSateMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(instance0, instance1));
+      put(newSeg, ImmutableList.of(instance0, instance1));
+    }};
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
     // External view for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> []
-    Map<String, List<Pair<String, String>>> externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of()));
+    Map<String, List<Pair<String, String>>> externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of());
+    }};
     ExternalView externalView = createExternalView(externalViewMap);
 
     BalancedInstanceSelector replicaGroupInstanceSelector =
@@ -373,23 +398,27 @@ public class BalancedInstanceSelectorTest {
 
     // We don't mark segment as unavailable.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult = Map.ofEntries(Map.entry(oldSeg, instance0));
+    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance0);
+    }};
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Segment1 is not old anymore with state converge.
-    externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))));
+    externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+    }};
     externalView = createExternalView(externalViewMap);
     replicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
 
     // Segment1 becomes unavailable.
-    externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of()));
+    externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of());
+    }};
     externalView = createExternalView(externalViewMap);
     replicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
 
@@ -415,17 +444,20 @@ public class BalancedInstanceSelectorTest {
     String instance1 = "instance1";
     Set<String> enabledInstances = ImmutableSet.of(instance0, instance1);
 
-    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg0, ImmutableList.of(instance0, instance1)),
-        Map.entry(oldSeg1, ImmutableList.of(instance0, instance1)));
+    Map<String, List<String>> idealSateMap = new HashMap<>() {{
+      put(oldSeg0, ImmutableList.of(instance0, instance1));
+      put(oldSeg1, ImmutableList.of(instance0, instance1));
+    }};
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
     // External view for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<Pair<String, String>>> externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(oldSeg1, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))));
+    Map<String, List<Pair<String, String>>> externalViewMap = new HashMap<>() {{
+      put(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(oldSeg1, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+    }};
     ExternalView externalView = createExternalView(externalViewMap);
     BalancedInstanceSelector replicaGroupInstanceSelector =
         new BalancedInstanceSelector(TABLE_NAME, _brokerMetrics, null, _propertyStore, _mutableClock);
@@ -434,19 +466,25 @@ public class BalancedInstanceSelectorTest {
     // Add a new segment to ideal state with missing external view.
     String newSeg = "segment2";
     onlineSegments = ImmutableSet.of(oldSeg0, oldSeg1, newSeg);
-    idealSateMap = Map.ofEntries(Map.entry(oldSeg0, ImmutableList.of(instance0, instance1)),
-        Map.entry(oldSeg1, ImmutableList.of(instance0, instance1)),
-        Map.entry(newSeg, ImmutableList.of(instance0, instance1)));
+    idealSateMap = new HashMap<>() {{
+      put(oldSeg0, ImmutableList.of(instance0, instance1));
+      put(oldSeg1, ImmutableList.of(instance0, instance1));
+      put(newSeg, ImmutableList.of(instance0, instance1));
+    }};
+
     idealState = createIdealState(idealSateMap);
-    externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(oldSeg1, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))));
+    externalViewMap = new HashMap<>() {{
+      put(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(oldSeg1, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+    }};
     externalView = createExternalView(externalViewMap);
     replicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
 
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg0, instance0), Map.entry(oldSeg1, instance1));
+    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg0, instance0);
+      put(oldSeg1, instance1);
+    }};
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -468,8 +506,7 @@ public class BalancedInstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime =
-        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
@@ -481,17 +518,21 @@ public class BalancedInstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg, ImmutableList.of(instance0, instance1)),
-        Map.entry(newSeg, ImmutableList.of(instance0, instance1)));
+    Map<String, List<String>> idealSateMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(instance0, instance1));
+      put(newSeg, ImmutableList.of(instance0, instance1));
+    }};
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
     // External view for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online]
-    Map<String, List<Pair<String, String>>> externalViewMap = Map.ofEntries(
-        Map.entry(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))),
-        Map.entry(newSeg, ImmutableList.of(Pair.of(instance0, ONLINE))));
+    Map<String, List<Pair<String, String>>> externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+      put(newSeg, ImmutableList.of(Pair.of(instance0, ONLINE)));
+    }};
+
     ExternalView externalView = createExternalView(externalViewMap);
 
     BalancedInstanceSelector replicaGroupInstanceSelector =
@@ -500,8 +541,9 @@ public class BalancedInstanceSelectorTest {
 
     // First selection, we select instance1 for newSeg.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg, instance0));
+    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance0);
+    }};
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -509,8 +551,10 @@ public class BalancedInstanceSelectorTest {
 
     requestId = 1;
     // Second selection, we select instance0 for newSeg.
-    expectedBalancedInstanceSelectorResult =
-        Map.ofEntries(Map.entry(oldSeg, instance1), Map.entry(newSeg, instance0));
+    expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance1);
+      put(newSeg, instance0);
+    }};
     selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
@@ -523,7 +567,9 @@ public class BalancedInstanceSelectorTest {
     selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     // We don't include instance0 in selection anymore.
-    expectedBalancedInstanceSelectorResult = Map.ofEntries(Map.entry(oldSeg, instance1));
+    expectedBalancedInstanceSelectorResult = new HashMap<>() {{
+      put(oldSeg, instance1);
+    }};
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
@@ -534,8 +580,8 @@ public class BalancedInstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(oldSeg,
-            _mutableClock.millis() - CommonConstants.Helix.StateModel.NEW_SEGMENT_EXPIRATION_MILLIS - 100),
+    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(
+        Pair.of(oldSeg, _mutableClock.millis() - CommonConstants.Helix.StateModel.NEW_SEGMENT_EXPIRATION_MILLIS - 100),
         Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
@@ -549,17 +595,21 @@ public class BalancedInstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap = Map.ofEntries(Map.entry(oldSeg, ImmutableList.of(instance0, instance1)),
-        Map.entry(newSeg, ImmutableList.of(instance0, instance1)));
+    Map<String, List<String>> idealSateMap = new HashMap() {{
+      put(oldSeg, ImmutableList.of(instance0, instance1));
+      put(newSeg, ImmutableList.of(instance0, instance1));
+    }};
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
     // External view for two segments
     //   [segment0] -> [instance2: online]
     //   [segment1] -> [instance2: online]
-    Map<String, List<Pair<String, String>>> externalViewMap =
-        Map.ofEntries(Map.entry(oldSeg, ImmutableList.of(Pair.of(instance2, ONLINE))),
-            Map.entry(newSeg, ImmutableList.of(Pair.of(instance2, ONLINE))));
+    Map<String, List<Pair<String, String>>> externalViewMap = new HashMap<>() {{
+      put(oldSeg, ImmutableList.of(Pair.of(instance2, ONLINE)));
+      put(newSeg, ImmutableList.of(Pair.of(instance2, ONLINE)));
+    }};
+
     ExternalView externalView = createExternalView(externalViewMap);
 
     BalancedInstanceSelector replicaGroupInstanceSelector =
@@ -568,7 +618,7 @@ public class BalancedInstanceSelectorTest {
 
     // No selection because the external view is not in ideal state.
     int requestId = 0;
-    Map<String, String> expectedBalancedInstanceSelectorResult = Map.ofEntries();
+    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>();
     InstanceSelector.SelectionResult selectionResult =
         replicaGroupInstanceSelector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
