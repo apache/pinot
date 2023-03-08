@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -143,6 +144,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
   private ServerMetrics _serverMetrics;
   private QueryExecutor _queryExecutor;
+  private QueryExecutor _queryExecutorWithPrefetchEnabled;
   private BrokerReduceService _brokerReduceService;
 
   @Override
@@ -319,13 +321,58 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, _serverMetrics);
 
+    PinotConfiguration prefetchEnabledConf = new PinotConfiguration(queryExecutorConfig);
+    prefetchEnabledConf.setProperty(ServerQueryExecutorV1Impl.ENABLE_PREFETCH, "true");
+    _queryExecutorWithPrefetchEnabled = new ServerQueryExecutorV1Impl();
+    _queryExecutorWithPrefetchEnabled.init(prefetchEnabledConf, instanceDataManager, _serverMetrics);
+
     // Create the BrokerReduceService
     _brokerReduceService = new BrokerReduceService(new PinotConfiguration(
         Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
   }
 
+  private ResultTable getPrefetchEnabledResulTable(ResultTable resultTable) {
+    // TODO does not work for cases where different segments have different plans (more than 1 PLAN_START rows)
+    List<Object[]> newRows = new ArrayList<>();
+    int acquireOpParentId = -1;
+
+    Iterator<Object[]> it = resultTable.getRows().iterator();
+    // After each PLAN_START, we need to add ACQUIRE_RELEASE_COLUMNS_SEGMENT (unles ALL_SEGMENTS_PRUNED_ON_SERVER),
+    // and all following op should have their ids incremented
+
+    while (it.hasNext()) {
+      Object[] row = it.next();
+      String op = row[0].toString();
+      newRows.add(row);
+      acquireOpParentId = Math.max(acquireOpParentId, (int) row[1]);
+      if (op.startsWith("PLAN_START")) {
+        newRows.add(new Object[]{"ACQUIRE_RELEASE_COLUMNS_SEGMENT", acquireOpParentId + 1, acquireOpParentId});
+        break;
+      }
+    }
+
+    while (it.hasNext()) {
+      Object[] row = it.next();
+      String op = row[0].toString();
+      newRows.add(new Object[]{row[0].toString(), ((int) row[1] + 1), ((int) row[2]) + 1});
+    }
+
+    return new ResultTable(resultTable.getDataSchema(), newRows);
+  }
+
   /** Checks the correctness of EXPLAIN PLAN output. */
   private void check(String query, ResultTable expected) {
+    check(query, expected, false);
+  }
+
+  private void check(String query, ResultTable expected, boolean checkPrefetchEnabled) {
+    checkWithQueryExecutor(query, expected, _queryExecutor);
+    if (checkPrefetchEnabled) {
+      checkWithQueryExecutor(query, getPrefetchEnabledResulTable(expected), _queryExecutorWithPrefetchEnabled);
+    }
+  }
+
+  private void checkWithQueryExecutor(String query, ResultTable expected, QueryExecutor queryExecutor) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
 
     int segmentsForServer1 = _segmentNames.size() / 2;
@@ -343,10 +390,10 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     brokerRequest.getPinotQuery().getDataSource().setTableName(OFFLINE_TABLE_NAME);
     InstanceRequest instanceRequest1 = new InstanceRequest(0L, brokerRequest);
     instanceRequest1.setSearchSegments(indexSegmentsForServer1);
-    InstanceResponseBlock instanceResponse1 = _queryExecutor.execute(getQueryRequest(instanceRequest1), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse1 = queryExecutor.execute(getQueryRequest(instanceRequest1), QUERY_RUNNERS);
     InstanceRequest instanceRequest2 = new InstanceRequest(0L, brokerRequest);
     instanceRequest2.setSearchSegments(indexSegmentsForServer2);
-    InstanceResponseBlock instanceResponse2 = _queryExecutor.execute(getQueryRequest(instanceRequest2), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse2 = queryExecutor.execute(getQueryRequest(instanceRequest2), QUERY_RUNNERS);
 
     // Broker side
     // Use 2 Threads for 2 data-tables
@@ -401,7 +448,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTable(DATA_SCHEMA, result1), true);
 
     String query2 = "EXPLAIN PLAN FOR SELECT 'mickey' FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
@@ -414,7 +461,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT()", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTable(DATA_SCHEMA, result2), true);
 
     String query3 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable LIMIT 100";
     List<Object[]> result3 = new ArrayList<>();
@@ -427,7 +474,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 5, 4});
     result3.add(new Object[]{"DOC_ID_SET", 6, 5});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTable(DATA_SCHEMA, result3), true);
 
     String query4 = "EXPLAIN PLAN FOR SELECT DISTINCT invertedIndexCol1, noIndexCol1 FROM testTable LIMIT 100";
     List<Object[]> result4 = new ArrayList<>();
@@ -440,7 +487,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 5, 4});
     result4.add(new Object[]{"DOC_ID_SET", 6, 5});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTable(DATA_SCHEMA, result4), true);
   }
 
   @Test
@@ -2403,6 +2450,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   public void tearDown() {
     _brokerReduceService.shutDown();
     _queryExecutor.shutDown();
+    _queryExecutorWithPrefetchEnabled.shutDown();
     for (IndexSegment segment : _indexSegments) {
       segment.destroy();
     }

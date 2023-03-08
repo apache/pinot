@@ -39,7 +39,7 @@ import org.apache.calcite.tools.RelBuilderFactory;
  * Special rule for Pinot, this rule is fixed to always insert an exchange or sort exchange below the WINDOW node.
  * TODO:
  *     1. Add support for more than one window group
- *     2. Add support for functions other than aggregation functions (AVG, COUNT, MAX, MIN, SUM)
+ *     2. Add support for functions other than aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
  *     3. Add support for custom frames
  */
 public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
@@ -47,8 +47,9 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       new PinotWindowExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   // Supported window functions
+  // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
   private static final Set<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND = ImmutableSet.of(SqlKind.SUM, SqlKind.SUM0,
-      SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT);
+      SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.OTHER_FUNCTION);
 
   public PinotWindowExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalWindow.class, any()), factory, null);

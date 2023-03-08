@@ -138,7 +138,7 @@ public class PinotQueryResource {
     if (Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
       if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl);
+        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl, traceEnabled);
       } else {
         throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
             + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
@@ -161,7 +161,7 @@ public class PinotQueryResource {
   }
 
   private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String endpointUrl) {
+      String endpointUrl, String traceEnabled) {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
@@ -185,7 +185,7 @@ public class PinotQueryResource {
 
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
-    return sendRequestToBroker(query, instanceId, "false", queryOptions, httpHeaders);
+    return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,

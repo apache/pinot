@@ -272,11 +272,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           continue;
         }
 
-        if (newNoDictColumns.contains(column)) {
-          columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_FORWARD_INDEX));
-        } else {
-          columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_FORWARD_INDEX));
-        }
+        columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_FORWARD_INDEX));
       } else if (existingForwardIndexDisabledColumns.contains(column)
           && newForwardIndexDisabledColumns.contains(column)) {
         // Forward index is disabled for the existing column and should remain disabled based on the latest config
