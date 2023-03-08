@@ -23,7 +23,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -38,14 +40,14 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "traceInfo", "operatorIds", "tableNames"})
+    "traceInfo", "operatorStats", "tableNames"})
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class BrokerResponseStats extends BrokerResponseNative {
 
   private int _numBlocks = 0;
   private int _numRows = 0;
   private long _stageExecutionTimeMs = 0;
-  private List<String> _operatorIds = new ArrayList<>();
+  private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
   @Override
@@ -88,14 +90,14 @@ public class BrokerResponseStats extends BrokerResponseNative {
     return JsonUtils.objectToString(this);
   }
 
-  @JsonProperty("operatorIds")
-  public List<String> getOperatorIds() {
-    return _operatorIds;
+  @JsonProperty("operatorStats")
+  public Map<String, Map<String, String>> getOperatorStats() {
+    return _operatorStats;
   }
 
-  @JsonProperty("operatorIds")
-  public void setOperatorIds(List<String> operatorIds) {
-    _operatorIds = operatorIds;
+  @JsonProperty("operatorStats")
+  public void setOperatorStats(Map<String, Map<String, String>> operatorStats) {
+    _operatorStats = operatorStats;
   }
 
   @JsonProperty("tableNames")

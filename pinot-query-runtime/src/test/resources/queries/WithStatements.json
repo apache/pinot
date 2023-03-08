@@ -97,6 +97,61 @@
         ]
       },
       {
+        "description": "'with' statement using window functions using empty OVER()",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 11],
+          ["a", 1, 11],
+          ["b", 2, 11]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() and empty filter on outer SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol > 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() with filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} WHERE intCol < 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 6],
+          ["a", 1, 6],
+          ["b", 2, 6]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() with empty filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} WHERE intCol > 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 4],
+          ["a", 1, 4],
+          ["b", 2, 2]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY and empty filter on outer SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol > 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY with filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} WHERE intCol > 1) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 3],
+          ["b", 2, 2]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY with empty filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} WHERE intCol > 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": []
+      },
+      {
         "ignored": true,
         "comment": "materialized is not supported",
         "description": "'with materializaed' or not flag",

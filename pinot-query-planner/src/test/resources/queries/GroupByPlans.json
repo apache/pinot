@@ -8,7 +8,7 @@
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalExchange(distribution=[hash[0]])",
-          "\n    LogicalAggregate(group=[{2}], EXPR$1=[$SUM0($1)])",
+          "\n    LogicalAggregate(group=[{3}], EXPR$1=[$SUM0($2)])",
           "\n      LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -22,7 +22,7 @@
           "\n  LogicalProject(col1=[$0], EXPR$1=[$1], $f2=[$1], $f3=[$2], EXPR$3=[$3], EXPR$4=[$4])",
           "\n    LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)], agg#1=[$SUM0($2)], EXPR$3=[MAX($3)], EXPR$4=[MIN($4)])",
           "\n      LogicalExchange(distribution=[hash[0]])",
-          "\n        LogicalAggregate(group=[{2}], EXPR$1=[$SUM0($1)], agg#1=[COUNT()], EXPR$3=[MAX($1)], EXPR$4=[MIN($1)])",
+          "\n        LogicalAggregate(group=[{3}], EXPR$1=[$SUM0($2)], agg#1=[COUNT()], EXPR$3=[MAX($2)], EXPR$4=[MIN($2)])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -35,8 +35,8 @@
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalExchange(distribution=[hash[0]])",
           "\n    LogicalAggregate(group=[{2}], EXPR$1=[$SUM0($1)])",
-          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n        LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -50,8 +50,8 @@
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalExchange(distribution=[hash[0]])",
           "\n    LogicalAggregate(group=[{2}], EXPR$1=[COUNT()])",
-          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n        LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -64,8 +64,8 @@
           "\nLogicalAggregate(group=[{0, 1}], EXPR$2=[$SUM0($2)])",
           "\n  LogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalAggregate(group=[{0, 2}], EXPR$2=[$SUM0($1)])",
-          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n        LogicalFilter(condition=[AND(>=($1, 0), =($2, 'a'))])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($3, 'a'))])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -82,8 +82,8 @@
           "\n        LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)], EXPR$2=[$SUM0($2)], agg#2=[MAX($3)], agg#3=[MIN($4)])",
           "\n          LogicalExchange(distribution=[hash[0]])",
           "\n            LogicalAggregate(group=[{2}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], agg#2=[MAX($1)], agg#3=[MIN($1)])",
-          "\n              LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n                LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n              LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n                LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n                  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -100,8 +100,8 @@
           "\n        LogicalAggregate(group=[{0}], count=[$SUM0($1)], SUM=[$SUM0($2)], agg#2=[MAX($3)], agg#3=[MIN($4)])",
           "\n          LogicalExchange(distribution=[hash[0]])",
           "\n            LogicalAggregate(group=[{2}], count=[COUNT()], SUM=[$SUM0($1)], agg#2=[MAX($1)], agg#3=[MIN($1)])",
-          "\n              LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n                LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n              LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n                LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n                  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -113,7 +113,7 @@
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalExchange(distribution=[hash[0]])",
-          "\n    LogicalProject(col1=[$2], col3=[$1])",
+          "\n    LogicalProject(col1=[$3], col3=[$2])",
           "\n      LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -126,7 +126,7 @@
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($1):DOUBLE NOT NULL, $2)])",
           "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
           "\n    LogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col1=[$2], col3=[$1])",
+          "\n      LogicalProject(col1=[$3], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -140,7 +140,7 @@
           "\n  LogicalProject(col1=[$0], EXPR$1=[$1], $f2=[$1], $f3=[$2], EXPR$3=[$3], EXPR$4=[$4])",
           "\n    LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)], agg#1=[COUNT()], EXPR$3=[MAX($1)], EXPR$4=[MIN($1)])",
           "\n      LogicalExchange(distribution=[hash[0]])",
-          "\n        LogicalProject(col1=[$2], col3=[$1])",
+          "\n        LogicalProject(col1=[$3], col3=[$2])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -152,8 +152,8 @@
           "Execution Plan",
           "\nLogicalAggregate(group=[{2}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalExchange(distribution=[hash[2]])",
-          "\n    LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n      LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n    LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -165,8 +165,8 @@
           "Execution Plan",
           "\nLogicalAggregate(group=[{2}], EXPR$1=[$SUM0($1)], EXPR$2=[MAX($1)])",
           "\n  LogicalExchange(distribution=[hash[2]])",
-          "\n    LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n      LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n    LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -179,8 +179,8 @@
           "Execution Plan",
           "\nLogicalAggregate(group=[{2}], EXPR$1=[COUNT()])",
           "\n  LogicalExchange(distribution=[hash[2]])",
-          "\n    LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n      LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n    LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -192,8 +192,8 @@
           "Execution Plan",
           "\nLogicalAggregate(group=[{0, 2}], EXPR$2=[$SUM0($1)])",
           "\n  LogicalExchange(distribution=[hash[0, 2]])",
-          "\n    LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n      LogicalFilter(condition=[AND(>=($1, 0), =($2, 'a'))])",
+          "\n    LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n      LogicalFilter(condition=[AND(>=($2, 0), =($3, 'a'))])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -209,8 +209,8 @@
           "\n      LogicalProject(col1=[$0], EXPR$1=[$1], EXPR$2=[$2], $f3=[$3], $f4=[$4], $f5=[$2])",
           "\n        LogicalAggregate(group=[{2}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], agg#2=[MAX($1)], agg#3=[MIN($1)])",
           "\n          LogicalExchange(distribution=[hash[2]])",
-          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n              LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n            LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n              LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n                LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -226,8 +226,8 @@
           "\n      LogicalProject(col1=[$0], EXPR$1=[$1], $f2=[$2], $f3=[$3], $f4=[$1], $f5=[$4])",
           "\n        LogicalAggregate(group=[{2}], EXPR$1=[$SUM0($1)], agg#1=[MAX($1)], agg#2=[MIN($1)], agg#3=[COUNT()])",
           "\n          LogicalExchange(distribution=[hash[2]])",
-          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n              LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n            LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n              LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n                LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -243,8 +243,8 @@
           "\n      LogicalProject(col1=[$0], count=[$1], SUM=[$2], $f3=[$3], $f4=[$4], $f5=[$2])",
           "\n        LogicalAggregate(group=[{2}], count=[COUNT()], SUM=[$SUM0($1)], agg#2=[MAX($1)], agg#3=[MIN($1)])",
           "\n          LogicalExchange(distribution=[hash[2]])",
-          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
-          "\n              LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n            LogicalProject(col2=[$1], col3=[$2], col1=[$3])",
+          "\n              LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n                LogicalTableScan(table=[[a]])",
           "\n"
         ]

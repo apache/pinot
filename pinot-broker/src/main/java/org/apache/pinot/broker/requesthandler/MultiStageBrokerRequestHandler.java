@@ -54,7 +54,7 @@ import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
-import org.apache.pinot.query.service.QueryDispatcher;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -169,10 +169,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
 
+    boolean traceEnabled = Boolean.parseBoolean(
+        request.has(CommonConstants.Broker.Request.TRACE) ? request.get(CommonConstants.Broker.Request.TRACE).asText()
+            : "false");
+
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
     for (Integer stageId: queryPlan.getStageMetadataMap().keySet()) {
-      stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(false));
+      stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
     }
 
     try {

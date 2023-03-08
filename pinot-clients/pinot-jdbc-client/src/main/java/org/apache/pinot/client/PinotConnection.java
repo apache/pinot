@@ -24,7 +24,9 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
@@ -38,11 +40,16 @@ import org.slf4j.LoggerFactory;
 public class PinotConnection extends AbstractBaseConnection {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
+  protected static final String[] POSSIBLE_QUERY_OPTIONS = {
+    QueryOptionKey.ENABLE_NULL_HANDLING,
+    QueryOptionKey.USE_MULTISTAGE_ENGINE
+  };
   private org.apache.pinot.client.Connection _session;
   private boolean _closed;
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
-  private final boolean _enableNullHandling;
+  private final Map<String, Object> _queryOptions = new HashMap<String, Object>();
+
   public static final String BROKER_LIST = "brokers";
 
   PinotConnection(String controllerURL, PinotClientTransport transport, String tenant,
@@ -67,15 +74,49 @@ public class PinotConnection extends AbstractBaseConnection {
     }
     _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
 
-    _enableNullHandling = Boolean.parseBoolean(properties.getProperty(QueryOptionKey.ENABLE_NULL_HANDLING));
+    for (String possibleQueryOption: POSSIBLE_QUERY_OPTIONS) {
+      Object property = properties.getProperty(possibleQueryOption);
+      if (property != null) {
+        _queryOptions.put(possibleQueryOption, parseOptionValue(property));
+      }
+    }
+  }
+
+  private Object parseOptionValue(Object value) {
+    if (value instanceof String) {
+      String str = (String) value;
+
+      try {
+        Long numVal = Long.valueOf(str);
+        if (numVal != null) {
+            return numVal;
+        }
+      } catch (NumberFormatException e) {
+      }
+
+      try {
+          Double numVal = Double.valueOf(str);
+          if (numVal != null) {
+              return numVal;
+          }
+      } catch (NumberFormatException e) {
+      }
+
+      Boolean boolVal = Boolean.valueOf(str.toLowerCase());
+      if (boolVal != null) {
+          return boolVal;
+      }
+    }
+
+    return value;
   }
 
   public org.apache.pinot.client.Connection getSession() {
     return _session;
   }
 
-  public boolean isNullHandlingEnabled() {
-    return _enableNullHandling;
+  public Map<String, Object> getQueryOptions() {
+    return _queryOptions;
   }
 
   private List<String> getBrokerList(String controllerURL, String tenant) {

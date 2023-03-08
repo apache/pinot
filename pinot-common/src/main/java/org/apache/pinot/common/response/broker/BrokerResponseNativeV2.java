@@ -81,7 +81,7 @@ public class BrokerResponseNativeV2 extends BrokerResponseNative {
   }
 
   public void addStageStat(Integer stageId, BrokerResponseStats brokerResponseStats) {
-    if (!brokerResponseStats.getOperatorIds().isEmpty()) {
+    if (!brokerResponseStats.getOperatorStats().isEmpty()) {
       _stageIdStats.put(stageId, brokerResponseStats);
     }
   }

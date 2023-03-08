@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-  private final List<String> _operatorIds = new ArrayList<>();
+  private final Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final boolean _enableTrace;
@@ -89,7 +89,7 @@ public class ExecutionStatsAggregator {
   public synchronized void aggregate(@Nullable ServerRoutingInstance routingInstance, Map<String, String> metadata,
       Map<Integer, String> exceptions) {
     // Reduce on trace info.
-    if (_enableTrace) {
+    if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName())) {
       _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
     }
 
@@ -116,7 +116,11 @@ public class ExecutionStatsAggregator {
 
     String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
     if (operatorId != null) {
-      _operatorIds.add(operatorId);
+      if (_enableTrace) {
+        _operatorStats.put(operatorId, metadata);
+      } else {
+        _operatorStats.put(operatorId, new HashMap<>());
+      }
     }
 
     // Reduce on exceptions.
@@ -340,7 +344,7 @@ public class ExecutionStatsAggregator {
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
     brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
-    brokerResponseStats.setOperatorIds(_operatorIds);
+    brokerResponseStats.setOperatorStats(_operatorStats);
     brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
 
