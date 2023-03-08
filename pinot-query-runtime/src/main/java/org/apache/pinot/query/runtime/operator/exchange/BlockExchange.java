@@ -77,7 +77,7 @@ public abstract class BlockExchange {
   public void send(TransferableBlock block)
       throws Exception {
     if (block.isEndOfStreamBlock()) {
-      for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+      for (SendingMailbox<TransferableBlock> sendingMailbox : _sendingMailboxes) {
         sendBlock(sendingMailbox, block);
       }
       return;

@@ -67,7 +67,7 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
               if (notification.wasEvicted()) {
                 // TODO: This should be tied with query deadline, but for that we need to know the query deadline
                 //  when the GrpcReceivingMailbox is initialized in MailboxContentStreamObserver.
-                LOGGER.info("Removing dangling GrpcReceivingMailbox: {}", notification.getKey());
+                LOGGER.warn("Removing dangling GrpcReceivingMailbox: {}", notification.getKey());
                 notification.getValue().cancel();
               }
             }

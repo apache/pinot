@@ -33,6 +33,7 @@ public class PlanRequestContext {
   protected final MailboxService<TransferableBlock> _mailboxService;
   protected final long _requestId;
   protected final int _stageId;
+  // TODO: Timeout is not needed since deadline is already present.
   private final long _timeoutMs;
   private final long _deadlineMs;
   protected final VirtualServerAddress _server;
