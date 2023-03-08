@@ -23,9 +23,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -44,9 +47,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class BrokerResponseStats extends BrokerResponseNative {
 
-  private int _numBlocks = 0;
-  private int _numRows = 0;
-  private long _stageExecutionTimeMs = 0;
   private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
@@ -56,33 +56,33 @@ public class BrokerResponseStats extends BrokerResponseNative {
   }
 
   @JsonProperty("numBlocks")
-  public int getNumBlocks() {
-    return _numBlocks;
+  public long getNumBlocks() {
+    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_BLOCKS, 0L);
   }
 
   @JsonProperty("numBlocks")
-  public void setNumBlocks(int numBlocks) {
-    _numBlocks = numBlocks;
+  public void setNumBlocks(long numBlocks) {
+    _aggregatedStats.put(DataTable.MetadataKey.NUM_BLOCKS, numBlocks);
   }
 
   @JsonProperty("numRows")
-  public int getNumRows() {
-    return _numRows;
+  public long getNumRows() {
+    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.NUM_ROWS, 0L);
   }
 
   @JsonProperty("numRows")
-  public void setNumRows(int numRows) {
-    _numRows = numRows;
+  public void setNumRows(long numRows) {
+    _aggregatedStats.put(DataTable.MetadataKey.NUM_BLOCKS, numRows);
   }
 
   @JsonProperty("stageExecutionTimeMs")
   public long getStageExecutionTimeMs() {
-    return _stageExecutionTimeMs;
+    return (Long) _aggregatedStats.getOrDefault(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS, 0L);
   }
 
   @JsonProperty("stageExecutionTimeMs")
   public void setStageExecutionTimeMs(long stageExecutionTimeMs) {
-    _stageExecutionTimeMs = stageExecutionTimeMs;
+    _aggregatedStats.put(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS, stageExecutionTimeMs);
   }
 
   public String toJsonString()
@@ -102,7 +102,13 @@ public class BrokerResponseStats extends BrokerResponseNative {
 
   @JsonProperty("tableNames")
   public List<String> getTableNames() {
-    return _tableNames;
+    String tableNames = (String) _aggregatedStats.get(DataTable.MetadataKey.TABLE);
+    if (tableNames == null || tableNames.isEmpty()) {
+      return new ArrayList<>();
+    } else {
+      return Arrays.stream(tableNames.split(DataTable.MetadataKey.MULTI_VALUE_STRING_SEPARATOR)).distinct().collect(
+          Collectors.toList());
+    }
   }
 
   @JsonProperty("tableNames")
