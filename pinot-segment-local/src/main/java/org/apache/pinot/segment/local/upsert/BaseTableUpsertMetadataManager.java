@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
@@ -35,7 +36,7 @@ import org.apache.pinot.spi.data.Schema;
 public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetadataManager {
   protected String _tableNameWithType;
   protected List<String> _primaryKeyColumns;
-  protected String _comparisonColumn;
+  protected List<String> _comparisonColumns;
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
@@ -54,9 +55,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     Preconditions.checkArgument(!CollectionUtils.isEmpty(_primaryKeyColumns),
         "Primary key columns must be configured for upsert enabled table: %s", _tableNameWithType);
 
-    _comparisonColumn = upsertConfig.getComparisonColumn();
-    if (_comparisonColumn == null) {
-      _comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    _comparisonColumns = upsertConfig.getComparisonColumns();
+    if (_comparisonColumns == null) {
+      _comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
     }
 
     _hashFunction = upsertConfig.getHashFunction();
@@ -67,7 +68,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
           "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
       _partialUpsertHandler =
           new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
-              _comparisonColumn);
+              _comparisonColumns);
     }
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();

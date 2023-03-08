@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -94,6 +95,36 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
       // default null value based on column's data type
       builder.setMaxNumberOfMultiValues(1);
     }
+
+    FieldSpec fieldSpec = context.getFieldSpec();
+    Object defaultNullValue = fieldSpec.getDefaultNullValue();
+    switch (fieldSpec.getDataType().getStoredType()) {
+      case INT:
+        builder.setMinValue((int) defaultNullValue).setMaxValue((int) defaultNullValue);
+        break;
+      case LONG:
+        builder.setMinValue((long) defaultNullValue).setMaxValue((long) defaultNullValue);
+        break;
+      case FLOAT:
+        builder.setMinValue((float) defaultNullValue).setMaxValue((float) defaultNullValue);
+        break;
+      case DOUBLE:
+        builder.setMinValue((double) defaultNullValue).setMaxValue((double) defaultNullValue);
+        break;
+      case BIG_DECIMAL:
+        builder.setMinValue((BigDecimal) defaultNullValue).setMaxValue((BigDecimal) defaultNullValue);
+        break;
+      case STRING:
+        builder.setMinValue((String) defaultNullValue).setMaxValue((String) defaultNullValue);
+        break;
+      case BYTES:
+        builder.setMinValue(new ByteArray((byte[]) defaultNullValue))
+            .setMaxValue(new ByteArray((byte[]) defaultNullValue));
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+
     return builder.build();
   }
 }

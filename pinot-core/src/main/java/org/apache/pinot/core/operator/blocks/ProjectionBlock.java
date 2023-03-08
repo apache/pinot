@@ -21,9 +21,6 @@ package org.apache.pinot.core.operator.blocks;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
@@ -54,26 +51,6 @@ public class ProjectionBlock implements Block {
 
   public BlockValSet getBlockValueSet(String column) {
     return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
-  }
-
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
   }
 
   /**

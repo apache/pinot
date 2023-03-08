@@ -21,9 +21,9 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 
 
@@ -38,7 +38,7 @@ public class TestFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(new FilterBlockDocIdSet() {
+    return new FilterBlock(new BlockDocIdSet() {
       @Override
       public BlockDocIdIterator iterator() {
         return new BlockDocIdIterator() {
