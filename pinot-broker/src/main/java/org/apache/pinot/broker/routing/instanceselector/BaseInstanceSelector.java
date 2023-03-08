@@ -36,6 +36,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
@@ -187,9 +188,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       if (record == null) {
         continue;
       }
-      long creationTimeMillis = record.getLongField(CommonConstants.Segment.CREATION_TIME, -1);
+      SegmentZKMetadata metadata = new SegmentZKMetadata(record);
+      long creationTimeMillis = metadata.getCreationTime();
+      String segmentName = metadata.getSegmentName();
       if (CommonConstants.Helix.StateModel.isNewSegment(creationTimeMillis, nowMillis)) {
-        newSegmentState.put(potentialNewSegments.get(i), new SegmentState(creationTimeMillis));
+        newSegmentState.put(segmentName, new SegmentState(creationTimeMillis));
       }
     }
     return newSegmentState;
