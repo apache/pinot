@@ -39,6 +39,7 @@ public class OperatorStats {
 
   private int _numBlock = 0;
   private int _numRows = 0;
+  private long _startTimeMs = -1;
   private final Map<String, String> _executionStats;
 
   public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress, String operatorType) {
@@ -50,6 +51,7 @@ public class OperatorStats {
   }
 
   public void startTimer() {
+    _startTimeMs = _startTimeMs == -1 ? System.currentTimeMillis() : _startTimeMs;
     if (!_executeStopwatch.isRunning()) {
       _executeStopwatch.start();
     }
@@ -79,6 +81,11 @@ public class OperatorStats {
     _executionStats.putIfAbsent(DataTable.MetadataKey.NUM_ROWS.getName(), String.valueOf(_numRows));
     _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName(),
         String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
+    // wall time are recorded slightly longer than actual execution but it is OK.
+    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName(),
+        String.valueOf(_startTimeMs));
+    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName(),
+        String.valueOf(System.currentTimeMillis()));
     return _executionStats;
   }
 

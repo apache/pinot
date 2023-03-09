@@ -595,7 +595,8 @@ public final class TableConfigUtils {
       return;
     }
     for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
-      Preconditions.checkState(!tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType),
+      Preconditions.checkState(
+          !tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString()),
           String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
               instancePartitionsType));
     }
