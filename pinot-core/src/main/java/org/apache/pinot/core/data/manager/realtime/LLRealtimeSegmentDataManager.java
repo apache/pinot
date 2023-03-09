@@ -807,6 +807,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         }
       }
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
+      // Skip build the segment jar if there is no deepstore uri to upload to.
       _segmentBuildDescriptor = buildSegmentInternal(true);
     } finally {
       _leaseExtender.removeSegment(_segmentNameStr);
@@ -941,16 +942,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        File segmentTarFile = new File(dataDir, _segmentNameStr + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-        try {
-          TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
-        } catch (IOException e) {
-          String errorMessage =
-              String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);
-          _segmentLogger.error(errorMessage, e);
-          _realtimeTableDataManager
-              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-          return null;
+        File segmentTarFile = null;
+        if (!_tableConfig.getValidationConfig().isSegmentUploadToDeepStoreDisabled()) {
+          segmentTarFile = new File(dataDir, _segmentNameStr + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+          try {
+            TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+          } catch (IOException e) {
+            String errorMessage =
+                String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);
+            _segmentLogger.error(errorMessage, e);
+            _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+            return null;
+          }
+        } else {
+          _segmentLogger.info("Skip taring segment file because segment upload to deep store is disabled");
         }
 
         File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
@@ -998,7 +1003,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
     File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
-    if (segmentTarFile == null || !segmentTarFile.exists()) {
+    // Even segment tar file is null, we continue if there is no deep store uri.
+    if (!peerDownloadEnabledWithoutDeepstoreUri() && (segmentTarFile == null || !segmentTarFile.exists())) {
       throw new RuntimeException("Segment file does not exist: " + segmentTarFile);
     }
     SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl, isSplitCommit);
@@ -1012,6 +1018,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     removeSegmentFile();
     return true;
+  }
+
+  private boolean peerDownloadEnabledWithoutDeepstoreUri() {
+    return this._tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null;
+        // && there is no deep store uri configured on the server.
   }
 
   protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
