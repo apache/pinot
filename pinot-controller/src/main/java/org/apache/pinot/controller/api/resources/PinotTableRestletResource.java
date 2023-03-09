@@ -683,7 +683,7 @@ public class PinotTableRestletResource {
           });
           return new RebalanceResult(RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
-              dryRunResult.getSegmentAssignment());
+              dryRunResult.getTierInstanceAssignment(), dryRunResult.getSegmentAssignment());
         } else {
           // If dry-run failed or is no-op, return the dry-run result
           return dryRunResult;
