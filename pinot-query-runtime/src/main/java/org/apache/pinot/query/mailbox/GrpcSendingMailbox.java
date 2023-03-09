@@ -86,7 +86,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
       LOGGER.warn("GrpcSendingMailbox={} cancelling stream", _mailboxId);
       try {
         _mailboxContentStreamObserver.onError(Status.fromThrowable(
-            new RuntimeException("Cancelled by the caller")).asRuntimeException());
+            new RuntimeException("Cancelled by the sender")).asRuntimeException());
       } catch (Exception e) {
         // TODO: We don't necessarily need to log this since this is relatively quite likely to happen. Logging this
         //  anyways as info for now so we can see how frequently this happens.
