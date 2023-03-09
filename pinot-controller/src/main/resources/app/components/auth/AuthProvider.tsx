@@ -20,7 +20,7 @@
 import { AuthLocalStorageKeys, AuthWorkflow } from 'Models';
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useHistory, useLocation } from 'react-router';
-import { baseApi, getAxiosErrorInterceptor, getAxiosRequestInterceptor } from '../../utils/axios-config';
+import { baseApi, getAxiosErrorInterceptor, getAxiosRequestInterceptor, getAxiosResponseInterceptor, transformApi } from '../../utils/axios-config';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import { AppLoadingIndicator } from '../AppLoadingIndicator';
 
@@ -41,10 +41,10 @@ export const AuthProvider = ({ children }) => {
     const [autoLogout, setAutoLogout] = useState<boolean>(false);
     const history = useHistory();
     const location = useLocation();
-    const [axiosRequestInterceptorId, setAxiosRequestInterceptorId] =
-        useState(0);
-    const [axiosResponseInterceptorId, setAxiosResponseInterceptorId] =
-        useState(0);
+    const [axiosRequestInterceptorIds, setAxiosRequestInterceptorIds] =
+        useState([0, 1]);
+    const [axiosResponseInterceptorIds, setAxiosResponseInterceptorIds] =
+        useState([0, 1]);
     const oidcSignInFormRef = React.useRef<HTMLFormElement>(null);
 
     useEffect(() => {
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        if(loading || authenticated) {
+        if (loading || authenticated) {
             return;
         }
 
@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }) => {
     }, [loading, authenticated]);
 
     useEffect(() => {
-        if(!autoLogout) {
+        if (!autoLogout) {
             return;
         }
 
@@ -75,22 +75,22 @@ export const AuthProvider = ({ children }) => {
             authInfoResponse && authInfoResponse.workflow
                 ? authInfoResponse.workflow
                 : AuthWorkflow.NONE;
-        
+
         // set auth workflow
         setAuthWorkflow(authWorkFlowInternal);
 
-        if(authWorkFlowInternal === AuthWorkflow.NONE) {
+        if (authWorkFlowInternal === AuthWorkflow.NONE) {
             // No authentication required
             setAuthenticated(true);
         }
 
-        if(authWorkFlowInternal === AuthWorkflow.BASIC) {
+        if (authWorkFlowInternal === AuthWorkflow.BASIC) {
             // basic auth is handled by login page
         }
 
-        if(authWorkFlowInternal === AuthWorkflow.OIDC) {
-            const issuer = 
-            authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : '';
+        if (authWorkFlowInternal === AuthWorkflow.OIDC) {
+            const issuer =
+                authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : '';
 
             setAuthorizationEndpoint(`${issuer}/auth`);
             setRedirectUri(
@@ -104,7 +104,7 @@ export const AuthProvider = ({ children }) => {
                     : ''
             );
         }
-        
+
         // auth loading complete
         setLoading(false);
     }
@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }) => {
     const initOidcAuth = () => {
         // access token already available in the localStorage
         const accessToken = getAuthLocalStorageValue(AuthLocalStorageKeys.AccessToken);
-        if(accessToken) {
+        if (accessToken) {
             setAccessToken(accessToken);
             initAxios(accessToken);
             setAuthenticated(true);
@@ -122,7 +122,7 @@ export const AuthProvider = ({ children }) => {
 
         // access token available in hash params
         const accessTokenFromHashParam = PinotMethodUtils.getAccessTokenFromHashParams();
-        if(accessTokenFromHashParam) {
+        if (accessTokenFromHashParam) {
             const accessToken = `Bearer ${accessTokenFromHashParam}`;
             setAccessToken(accessToken);
             setAuthLocalStorageValue(AuthLocalStorageKeys.AccessToken, accessToken);
@@ -142,7 +142,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     const submitLoginForm = () => {
-        if(clientId && authorizationEndpoint && redirectUri && oidcSignInFormRef && oidcSignInFormRef.current) {
+        if (clientId && authorizationEndpoint && redirectUri && oidcSignInFormRef && oidcSignInFormRef.current) {
             oidcSignInFormRef.current.submit();
         }
     }
@@ -156,27 +156,40 @@ export const AuthProvider = ({ children }) => {
 
     const initAxios = (accessToken: string) => {
         // Clear existing interceptors
-        baseApi.interceptors.request.eject(axiosRequestInterceptorId);
-        baseApi.interceptors.response.eject(axiosResponseInterceptorId);
+        baseApi.interceptors.request.eject(axiosRequestInterceptorIds[0]);
+        baseApi.interceptors.response.eject(axiosResponseInterceptorIds[0]);
+
+        transformApi.interceptors.request.eject(axiosRequestInterceptorIds[1]);
+        transformApi.interceptors.response.eject(axiosResponseInterceptorIds[1]);
+
+        const requestInterceptorId1 = baseApi.interceptors.request.use(
+            getAxiosRequestInterceptor(accessToken),
+            getAxiosErrorInterceptor(handleUnauthenticatedAccess)
+        );
+
+        const requestInterceptorId2 = transformApi.interceptors.request.use(
+            getAxiosRequestInterceptor(accessToken),
+            getAxiosErrorInterceptor(handleUnauthenticatedAccess)
+        );
+
+        const responseInterceptor1 = baseApi.interceptors.response.use(
+            getAxiosResponseInterceptor(),
+            getAxiosErrorInterceptor(handleUnauthenticatedAccess)
+        );
+
+        const responseInterceptor2 = transformApi.interceptors.response.use(
+            getAxiosResponseInterceptor(),
+            getAxiosErrorInterceptor(handleUnauthenticatedAccess)
+        );
 
         // Set new interceptors
-        setAxiosRequestInterceptorId(
-            baseApi.interceptors.request.use(
-                getAxiosRequestInterceptor(accessToken), 
-                getAxiosErrorInterceptor(handleUnauthenticatedAccess)
-            )
-        );
-        setAxiosResponseInterceptorId(
-            baseApi.interceptors.response.use(
-                getAxiosRequestInterceptor(),
-                getAxiosErrorInterceptor(handleUnauthenticatedAccess)
-            )
-        );
+        setAxiosRequestInterceptorIds([requestInterceptorId1, requestInterceptorId2]);
+        setAxiosResponseInterceptorIds([responseInterceptor1, responseInterceptor2]);
     }
 
     const redirectToApp = () => {
         const redirectLocation = getAuthLocalStorageValue(AuthLocalStorageKeys.RedirectLocation);
-        if(redirectLocation && redirectLocation !== "/login" && redirectLocation !== "/logout") {
+        if (redirectLocation && redirectLocation !== "/login" && redirectLocation !== "/logout") {
             history.push(redirectLocation);
         }
     }
@@ -253,5 +266,3 @@ const AuthProviderContext = createContext<AuthProviderContextProps>(
 export const useAuthProvider = (): AuthProviderContextProps => {
     return useContext(AuthProviderContext);
 };
-
-
