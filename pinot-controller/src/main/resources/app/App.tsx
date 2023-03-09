@@ -35,7 +35,7 @@ export const App = () => {
   const history = useHistory();
 
   React.useEffect(() => {
-    // authentication handled by 
+    // authentication already handled by authProvider
     if (authenticated) {
       setIsAuthenticated(true);
     }

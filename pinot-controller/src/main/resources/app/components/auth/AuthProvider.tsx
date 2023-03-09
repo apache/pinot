@@ -88,6 +88,7 @@ export const AuthProvider = ({ children }) => {
             // basic auth is handled by login page
         }
 
+        // set OIDC auth details 
         if (authWorkFlowInternal === AuthWorkflow.OIDC) {
             const issuer =
                 authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : '';
@@ -142,6 +143,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     const submitLoginForm = () => {
+        // submit auth login form
         if (clientId && authorizationEndpoint && redirectUri && oidcSignInFormRef && oidcSignInFormRef.current) {
             oidcSignInFormRef.current.submit();
         }
@@ -154,7 +156,9 @@ export const AuthProvider = ({ children }) => {
         setAutoLogout(true);
     }
 
+    // initialize axios instance with authToken
     const initAxios = (accessToken: string) => {
+
         // Clear existing interceptors
         baseApi.interceptors.request.eject(axiosRequestInterceptorIds[0]);
         baseApi.interceptors.response.eject(axiosResponseInterceptorIds[0]);
@@ -187,9 +191,11 @@ export const AuthProvider = ({ children }) => {
         setAxiosResponseInterceptorIds([responseInterceptor1, responseInterceptor2]);
     }
 
+    // redirect to app with appropriate location after login
     const redirectToApp = () => {
         const redirectLocation = getAuthLocalStorageValue(AuthLocalStorageKeys.RedirectLocation);
         if (redirectLocation && redirectLocation !== "/login" && redirectLocation !== "/logout") {
+            setAuthLocalStorageValue(AuthLocalStorageKeys.RedirectLocation, "");
             history.push(redirectLocation);
         }
     }
@@ -212,50 +218,45 @@ export const AuthProvider = ({ children }) => {
         return <AppLoadingIndicator />
     }
 
-    if (authWorkflow === AuthWorkflow.OIDC) {
-        return (
-            <AuthProviderContext.Provider value={authProvider}>
-                {children}
-
-                <div>
-                    {/* Login form */}
-                    <form
-                        hidden
-                        // When the user is automatically logged out, attaching automatic-logout=true
-                        // query parameter displays appropriate message to the user (dex only)
-                        action={`${authorizationEndpoint && authorizationEndpoint
-                            }?automatic-logout=${autoLogout}`
-                        }
-                        method="post"
-                        ref={oidcSignInFormRef}
-                    >
-                        <input
-                            readOnly
-                            name="response_type"
-                            value="token id_token"
-                        />
-                        <input readOnly name="client_id" value={clientId} />
-                        <input
-                            readOnly
-                            name="redirect_uri"
-                            value={redirectUri}
-                        />
-                        <input
-                            readOnly
-                            name="scope"
-                            value="openid email profile groups"
-                        />
-                        <input readOnly name="state" value="true-redirect-uri" />
-                        <input readOnly name="nonce" value="random_string" />
-                        <input type="submit" value="" />
-                    </form>
-                </div>
-            </AuthProviderContext.Provider>
-        )
-    }
 
     return (
-        <>{children}</>
+        <AuthProviderContext.Provider value={authProvider}>
+            {children}
+
+            {authWorkflow === AuthWorkflow.OIDC && (<div>
+                {/* Login form */}
+                <form
+                    hidden
+                    // When the user is automatically logged out, attaching automatic-logout=true
+                    // query parameter displays appropriate message to the user (dex only)
+                    action={`${authorizationEndpoint && authorizationEndpoint
+                        }?automatic-logout=${autoLogout}`
+                    }
+                    method="post"
+                    ref={oidcSignInFormRef}
+                >
+                    <input
+                        readOnly
+                        name="response_type"
+                        value="token id_token"
+                    />
+                    <input readOnly name="client_id" value={clientId} />
+                    <input
+                        readOnly
+                        name="redirect_uri"
+                        value={redirectUri}
+                    />
+                    <input
+                        readOnly
+                        name="scope"
+                        value="openid email profile groups"
+                    />
+                    <input readOnly name="state" value="true-redirect-uri" />
+                    <input readOnly name="nonce" value="random_string" />
+                    <input type="submit" value="" />
+                </form>
+            </div>)}
+        </AuthProviderContext.Provider>
     )
 }
 
