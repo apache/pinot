@@ -110,5 +110,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void cancel(Worker.CancelRequest request, StreamObserver<Worker.CancelResponse> responseObserver) {
     _queryRunner.cancel(request.getRequestId());
+    responseObserver.onCompleted();
   }
 }
