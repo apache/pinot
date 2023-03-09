@@ -17,8 +17,6 @@
  * under the License.
  */
 
-/* eslint-disable no-console */
-
 import axios from 'axios';
 import { AuthWorkflow } from 'Models';
 import app_state from '../app_state';
@@ -70,16 +68,21 @@ export const getAxiosErrorInterceptor = (
     return rejectedResponseInterceptor;
 };
 
-const handleResponse = (response: any) => {
-    if (isDev) {
-        console.log(response);
-    }
-    return response;
+// Returns axios fulfilled response interceptor
+export const getAxiosResponseInterceptor = (): (<T>(
+    response: T
+) => T | Promise<T>) => {
+    const fulfilledResponseInterceptor = <T>(response: T): T | Promise<T> => {
+        // Forward the fulfilled response
+        return response;
+    };
+
+    return fulfilledResponseInterceptor;
 };
 
 export const baseApi = axios.create({ baseURL: '/' });
 baseApi.interceptors.request.use(getAxiosRequestInterceptor(), getAxiosErrorInterceptor());
-baseApi.interceptors.response.use(handleResponse, getAxiosErrorInterceptor());
+baseApi.interceptors.response.use(getAxiosResponseInterceptor(), getAxiosErrorInterceptor());
 
 // baseApi axios instance does not throw an error when API fails hence the control will never go to catch block
 // changing the handleError method of baseApi will cause current UI to break (as UI might have not handle error properly)
@@ -87,4 +90,4 @@ baseApi.interceptors.response.use(handleResponse, getAxiosErrorInterceptor());
 // NOTE: It is an add-on utility and can be used in case you want to handle/show UI when API fails.
 export const baseApiWithErrors = axios.create({ baseURL: '/' });
 baseApiWithErrors.interceptors.request.use(getAxiosRequestInterceptor());
-baseApiWithErrors.interceptors.response.use(handleResponse);
+baseApiWithErrors.interceptors.response.use(getAxiosResponseInterceptor());

@@ -165,7 +165,7 @@ declare module 'Models' {
     OIDC = 'OIDC',
   }
 
-  export enum AuthLocalStorageKeys {
+  export const enum AuthLocalStorageKeys {
     RedirectLocation = "redirectLocation",
     AccessToken = "AccessToken",
   }

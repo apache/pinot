@@ -17,12 +17,10 @@
  * under the License.
  */
 
-import { AuthWorkflow } from 'Models';
+import { AuthLocalStorageKeys, AuthWorkflow } from 'Models';
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useHistory, useLocation } from 'react-router';
-import { AuthLocalStorageKeys } from '../../interfaces/auth.interfaces';
-import { baseApi } from '../../utils/axios-config';
-import { getFulfilledResponseInterceptorV1, getRejectedResponseInterceptorV1, getRequestInterceptorV1 } from '../../utils/axios.util';
+import { baseApi, getAxiosErrorInterceptor, getAxiosRequestInterceptor } from '../../utils/axios-config';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import { AppLoadingIndicator } from '../AppLoadingIndicator';
 
@@ -164,14 +162,14 @@ export const AuthProvider = ({ children }) => {
         // Set new interceptors
         setAxiosRequestInterceptorId(
             baseApi.interceptors.request.use(
-                getRequestInterceptorV1(accessToken), 
-                getRejectedResponseInterceptorV1(handleUnauthenticatedAccess)
+                getAxiosRequestInterceptor(accessToken), 
+                getAxiosErrorInterceptor(handleUnauthenticatedAccess)
             )
         );
         setAxiosResponseInterceptorId(
             baseApi.interceptors.response.use(
-                getFulfilledResponseInterceptorV1(),
-                getRejectedResponseInterceptorV1(handleUnauthenticatedAccess)
+                getAxiosRequestInterceptor(),
+                getAxiosErrorInterceptor(handleUnauthenticatedAccess)
             )
         );
     }
@@ -252,7 +250,7 @@ const AuthProviderContext = createContext<AuthProviderContextProps>(
     {} as AuthProviderContextProps
 );
 
-export const useAuthProviderV1 = (): AuthProviderContextProps => {
+export const useAuthProvider = (): AuthProviderContextProps => {
     return useContext(AuthProviderContext);
 };
 

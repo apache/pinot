@@ -23,7 +23,7 @@ import Layout from './components/Layout';
 import RouterData from './router';
 import PinotMethodUtils from './utils/PinotMethodUtils';
 import app_state from './app_state';
-import { useAuthProviderV1 } from './components/auth/AuthProvider';
+import { useAuthProvider } from './components/auth/AuthProvider';
 import { AppLoadingIndicator } from './components/AppLoadingIndicator';
 
 export const App = () => {
@@ -31,7 +31,7 @@ export const App = () => {
   const [loading, setLoading] = React.useState(true);
   const [isAuthenticated, setIsAuthenticated] = React.useState(null);
   const [role, setRole] = React.useState('');
-  const {authenticated} = useAuthProviderV1();
+  const {authenticated} = useAuthProvider();
 
   React.useEffect(() => {
     // authentication handled by 
