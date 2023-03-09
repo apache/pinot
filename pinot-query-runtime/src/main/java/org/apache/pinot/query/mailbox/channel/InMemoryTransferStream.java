@@ -26,6 +26,7 @@ import org.apache.pinot.query.mailbox.InMemoryMailboxService;
 import org.apache.pinot.query.mailbox.InMemoryReceivingMailbox;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
 public class InMemoryTransferStream {
@@ -66,7 +67,13 @@ public class InMemoryTransferStream {
   @Nullable
   public TransferableBlock poll()
       throws InterruptedException {
-    Preconditions.checkState(!_isCancelled, "poll failed since InMemoryTransferStream is cancelled");
+    if (_isCancelled) {
+      return TransferableBlockUtils.getErrorTransferableBlock(
+          new RuntimeException("InMemoryTransferStream is cancelled"));
+    } else if (System.currentTimeMillis() > _deadlineMs) {
+      return TransferableBlockUtils.getErrorTransferableBlock(
+          new RuntimeException("Deadline reached for in-memory transfer stream"));
+    }
     return _queue.poll();
   }
 
