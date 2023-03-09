@@ -183,7 +183,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       segmentZKMetadataPaths.add(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segment));
     }
     List<ZNRecord> znRecords = propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (int i = 0; i < potentialNewSegments.size(); i++) {
+    for (int i = 0; i < znRecords.size(); i++) {
       ZNRecord record = znRecords.get(i);
       if (record == null) {
         continue;
