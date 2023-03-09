@@ -25,13 +25,14 @@ import PinotMethodUtils from './utils/PinotMethodUtils';
 import app_state from './app_state';
 import { useAuthProvider } from './components/auth/AuthProvider';
 import { AppLoadingIndicator } from './components/AppLoadingIndicator';
+import { AuthWorkflow } from 'Models';
 
 export const App = () => {
   const [clusterName, setClusterName] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [isAuthenticated, setIsAuthenticated] = React.useState(null);
   const [role, setRole] = React.useState('');
-  const { authenticated } = useAuthProvider();
+  const { authenticated, authWorkflow } = useAuthProvider();
   const history = useHistory();
 
   React.useEffect(() => {
@@ -39,7 +40,13 @@ export const App = () => {
     if (authenticated) {
       setIsAuthenticated(true);
     }
-  }, [authenticated])
+  }, [authenticated]);
+
+  React.useEffect(() => {
+    if(authWorkflow === AuthWorkflow.BASIC) {
+      setLoading(false);
+    }
+  }, [authWorkflow])
 
   const fetchUserRole = async () => {
     const userListResponse = await PinotMethodUtils.getUserList();
