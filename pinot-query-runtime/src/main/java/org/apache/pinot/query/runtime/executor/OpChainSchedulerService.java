@@ -46,8 +46,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
-  private final Cache<Long, Void> _cancelledRequests;
-  private final Void _aVoid = null;
+  private final Cache<Long, Long> _cancelledRequests;
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
     this(scheduler, workerPool, QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
@@ -146,7 +145,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    * @param requestId requestId to be cancelled.
    */
   public final void cancel(long requestId) {
-    _cancelledRequests.put(requestId, _aVoid);
+    _cancelledRequests.put(requestId, requestId);
   }
 
   /**

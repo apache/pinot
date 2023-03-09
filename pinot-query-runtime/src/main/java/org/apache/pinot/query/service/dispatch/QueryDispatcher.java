@@ -114,20 +114,8 @@ public class QueryDispatcher {
     }
   }
 
-  private ResultTable runReducer(long requestId, QueryPlan queryPlan, int reduceStageId, long timeoutMs,
-      MailboxService<TransferableBlock> mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap) {
-    MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
-    MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
-        queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
-        reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(),
-        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
-    List<DataBlock> resultDataBlocks =
-        reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, queryPlan);
-    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
-        queryPlan.getQueryStageMap().get(0).getDataSchema());
-  }
-
-  public int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
+  @VisibleForTesting
+  int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
@@ -181,17 +169,28 @@ public class QueryDispatcher {
     return reduceStageId;
   }
 
+  @VisibleForTesting
+  public static ResultTable runReducer(long requestId, QueryPlan queryPlan, int reduceStageId, long timeoutMs,
+      MailboxService<TransferableBlock> mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap) {
+    MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
+    MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
+        queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
+        reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(),
+        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
+    List<DataBlock> resultDataBlocks =
+        reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, queryPlan);
+    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
+        queryPlan.getQueryStageMap().get(0).getDataSchema());
+  }
+
+  @VisibleForTesting
   public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
       VirtualServer serverInstance) {
     return new DistributedStagePlan(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
         queryPlan.getStageMetadataMap());
   }
 
-  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs) {
-    return reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, null, null);
-  }
-
-  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
+  private static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
       @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap, QueryPlan queryPlan) {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
@@ -229,7 +228,7 @@ public class QueryDispatcher {
     throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
   }
 
-  public static ResultTable toResultTable(List<DataBlock> queryResult, List<Pair<Integer, String>> fields,
+  private static ResultTable toResultTable(List<DataBlock> queryResult, List<Pair<Integer, String>> fields,
       DataSchema sourceSchema) {
     List<Object[]> resultRows = new ArrayList<>();
     DataSchema resultSchema = toResultSchema(sourceSchema, fields);
@@ -275,8 +274,7 @@ public class QueryDispatcher {
     return new DataSchema(colNames, colTypes);
   }
 
-  @VisibleForTesting
-  public static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
+  private static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
       List<VirtualServer> sendingInstances, long jobId, int stageId, int reducerStageId, DataSchema dataSchema,
       VirtualServerAddress server, long timeoutMs) {
     // timeout is set for reduce stage
@@ -293,8 +291,7 @@ public class QueryDispatcher {
     _dispatchClientMap.clear();
   }
 
-  @VisibleForTesting
-  DispatchClient getOrCreateDispatchClient(String host, int port) {
+  private DispatchClient getOrCreateDispatchClient(String host, int port) {
     String key = String.format("%s_%d", host, port);
     return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(host, port));
   }

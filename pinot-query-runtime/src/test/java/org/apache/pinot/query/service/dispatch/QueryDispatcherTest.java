@@ -117,6 +117,58 @@ public class QueryDispatcherTest extends QueryTestSet {
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
     }
+    dispatcher.shutdown();
+  }
+
+  @Test
+  public void testQueryDispatcherCancelWhenQueryServerCallsOnError()
+      throws Exception {
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
+    Mockito.doAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
+        observer.onError(new RuntimeException("foo"));
+        return null;
+      }
+    }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    QueryDispatcher dispatcher = new QueryDispatcher();
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    try {
+      dispatcher.submitAndReduce(requestId, queryPlan, null, 10_000L, new HashMap<>(), null);
+      Assert.fail("Method call above should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Error executing query"));
+    }
+    for (QueryServer queryServer : _queryServerMap.values()) {
+      Mockito.verify(queryServer, Mockito.times(1)).cancel(Mockito.argThat(a -> a.getRequestId() == requestId),
+          Mockito.any());
+    }
+    dispatcher.shutdown();
+  }
+
+  @Test
+  public void testQueryDispatcherCancelWhenQueryReducerThrowsError()
+      throws Exception {
+    String sql = "SELECT * FROM a";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    QueryDispatcher dispatcher = new QueryDispatcher();
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    try {
+      // will throw b/c mailboxService is null
+      dispatcher.submitAndReduce(requestId, queryPlan, null, 10_000L, new HashMap<>(), null);
+      Assert.fail("Method call above should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Error executing query"));
+    }
+    for (QueryServer queryServer : _queryServerMap.values()) {
+      Mockito.verify(queryServer, Mockito.times(1)).cancel(Mockito.argThat(a -> a.getRequestId() == requestId),
+          Mockito.any());
+    }
+    dispatcher.shutdown();
   }
 
   @Test
@@ -141,6 +193,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
     }
+    dispatcher.shutdown();
   }
 
   @Test
@@ -168,6 +221,7 @@ public class QueryDispatcherTest extends QueryTestSet {
           || e.getMessage().contains("Error dispatching query"));
     }
     neverClosingLatch.countDown();
+    dispatcher.shutdown();
   }
 
   @Test
@@ -181,5 +235,6 @@ public class QueryDispatcherTest extends QueryTestSet {
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Timed out waiting"));
     }
+    dispatcher.shutdown();
   }
 }
