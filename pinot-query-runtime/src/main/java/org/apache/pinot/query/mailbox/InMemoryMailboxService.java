@@ -106,6 +106,10 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
 
   @Override
   public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
-    _receivingMailboxCache.invalidate(mailboxId.toString());
+    InMemoryReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
+    if (receivingMailbox != null) {
+      receivingMailbox.cancel();
+      _receivingMailboxCache.invalidate(mailboxId.toString());
+    }
   }
 }
