@@ -8,6 +8,10 @@
     {
       "name": "description",
       "dataType": "STRING"
+    },
+    {
+      "name": "otherComparisonColumn",
+      "dataType": "LONG"
     }
   ],
   "timeFieldSpec": {

@@ -35,6 +35,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
@@ -84,7 +85,32 @@ public class QueryRunner {
   private String _hostname;
   private int _port;
   private VirtualServerAddress _rootServer;
-  private ExecutorService _executorService;
+  // Query worker threads are used for (1) running intermediate stage operators (2) running segment level operators
+  /**
+   * Query worker threads are used for:
+   * <ol>
+   *   <li>
+   *     Running intermediate stage operators (v2 engine operators).
+   *   </li>
+   *   <li>
+   *     Running per-segment operators submitted in {@link BaseCombineOperator}.
+   *   </li>
+   * </ol>
+   */
+  private ExecutorService _queryWorkerExecutorService;
+  /**
+   * Query runner threads are used for:
+   * <ol>
+   *   <li>
+   *     Merging results in BaseCombineOperator for leaf stages. Results are provided by per-segment operators run in
+   *     worker threads
+   *   </li>
+   *   <li>
+   *     Building the OperatorChain and submitting to the scheduler for non-leaf stages (intermediate stages).
+   *   </li>
+   * </ol>
+   */
+  private ExecutorService _queryRunnerExecutorService;
   private OpChainSchedulerService _scheduler;
 
   /**
@@ -103,10 +129,13 @@ public class QueryRunner {
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-      _executorService = Executors.newFixedThreadPool(
+      _queryWorkerExecutorService = Executors.newFixedThreadPool(
           ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("query_worker_on_" + _port + "_port"));
-      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _executorService);
+      _queryRunnerExecutorService = Executors.newFixedThreadPool(
+          ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
+          new NamedThreadFactory("query_runner_on_" + _port + "_port"));
+      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _queryWorkerExecutorService);
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -155,8 +184,7 @@ public class QueryRunner {
       MailboxSendOperator mailboxSendOperator = new MailboxSendOperator(_mailboxService,
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
               sendNode.getStageId(), _rootServer), receivingStageMetadata.getServerInstances(),
-          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _rootServer,
-          serverQueryRequests.get(0).getRequestId(),
+          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _rootServer, requestId,
           sendNode.getStageId(), sendNode.getReceiverStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
@@ -173,8 +201,12 @@ public class QueryRunner {
     }
   }
 
-  public ExecutorService getExecutorService() {
-    return _executorService;
+  public ExecutorService getQueryWorkerExecutorService() {
+    return _queryWorkerExecutorService;
+  }
+
+  public ExecutorService getQueryRunnerExecutorService() {
+    return _queryRunnerExecutorService;
   }
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,

@@ -103,6 +103,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *       <li>"/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)</li>
  *       <li>"/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment</li>
  *       <li>"/segments/{tableName}/metadata: get the metadata for all segments from the server</li>
+ *       <li>"/segments/{tableName}/zkmetadata: get the zk metadata for all segments of a table</li>
  *       <li>"/segments/{tableName}/{segmentName}/tiers": get storage tier for the segment in the table</li>
  *       <li>"/segments/{tableName}/tiers": get storage tier for all segments in the table</li>
  *     </ul>
@@ -899,6 +900,30 @@ public class PinotSegmentRestletResource {
           Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("segments/{tableName}/zkmetadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the zookeeper metadata for all table segments", notes = "Get the zookeeper metadata for "
+      + "all table segments")
+  public Map<String, Map<String, String>> getZookeeperMetadata(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
+      throws JsonProcessingException {
+    LOGGER.info("Received a request to fetch zookeeper metadata for all segments for table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    Map<String, Map<String, String>> segmentToMetadataMap = new HashMap<>();
+    List<SegmentZKMetadata> segmentZKMetadataList =
+        _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      segmentToMetadataMap.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata.toMap());
+    }
+    return segmentToMetadataMap;
   }
 
   @GET

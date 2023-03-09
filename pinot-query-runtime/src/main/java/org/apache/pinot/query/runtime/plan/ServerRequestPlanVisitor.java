@@ -93,7 +93,9 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
       DistributedStagePlan stagePlan, Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
       TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
     // Before-visit: construct the ServerPlanRequestContext baseline
-    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
+    long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16)
+        + (stagePlan.getStageId() << 8) + (tableType == TableType.REALTIME ? 1 : 0);
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     PinotQuery pinotQuery = new PinotQuery();
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap);
@@ -140,7 +142,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setBrokerId("unknown");
-    instanceRequest.setEnableTrace(false);
+    instanceRequest.setEnableTrace(Boolean.parseBoolean(requestMetadataMap.get(CommonConstants.Broker.Request.TRACE)));
     instanceRequest.setSearchSegments(segmentList);
     instanceRequest.setQuery(brokerRequest);
 

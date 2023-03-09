@@ -81,7 +81,8 @@ public class BrokerResponseNativeV2 extends BrokerResponseNative {
   }
 
   public void addStageStat(Integer stageId, BrokerResponseStats brokerResponseStats) {
-    if (!brokerResponseStats.getOperatorIds().isEmpty()) {
+    // StageExecutionWallTime will always be there, other stats are optional such as OperatorStats
+    if (brokerResponseStats.getStageExecWallTimeMs() != -1) {
       _stageIdStats.put(stageId, brokerResponseStats);
     }
   }

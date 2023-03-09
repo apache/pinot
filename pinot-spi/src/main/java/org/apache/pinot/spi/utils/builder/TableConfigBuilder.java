@@ -109,7 +109,7 @@ public class TableConfigBuilder {
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
-  private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+  private Map<String, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private Map<InstancePartitionsType, String> _instancePartitionsMap;
   private Map<String, SegmentAssignmentConfig> _segmentAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
@@ -169,6 +169,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setRetentionTimeValue(String retentionTimeValue) {
     _retentionTimeValue = retentionTimeValue;
+    return this;
+  }
+
+  public TableConfigBuilder setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
+    _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
     return this;
   }
 
@@ -339,7 +344,7 @@ public class TableConfigBuilder {
   }
 
   public TableConfigBuilder setInstanceAssignmentConfigMap(
-      Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     return this;
   }

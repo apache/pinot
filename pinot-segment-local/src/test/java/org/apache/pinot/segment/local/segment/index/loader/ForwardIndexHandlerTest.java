@@ -1204,9 +1204,15 @@ public class ForwardIndexHandlerTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
     Random rand = new Random();
-    String col1 = _noDictionaryColumns.get(rand.nextInt(_noDictionaryColumns.size()));
+    String col1;
+    do {
+      col1 = _noDictionaryColumns.get(rand.nextInt(_noDictionaryColumns.size()));
+    } while (FORWARD_INDEX_DISABLED_RAW_COLUMNS.contains(col1));
     indexLoadingConfig.removeNoDictionaryColumns(col1);
-    String col2 = _noDictionaryColumns.get(rand.nextInt(_noDictionaryColumns.size()));
+    String col2;
+    do {
+      col2 = _noDictionaryColumns.get(rand.nextInt(_noDictionaryColumns.size()));
+    } while (FORWARD_INDEX_DISABLED_RAW_COLUMNS.contains(col2) || col2.equals(col1));
     indexLoadingConfig.removeNoDictionaryColumns(col2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);

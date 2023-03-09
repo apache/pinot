@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.MVScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
-public final class MVScanDocIdSet implements FilterBlockDocIdSet {
+public final class MVScanDocIdSet implements BlockDocIdSet {
   private final MVScanDocIdIterator _docIdIterator;
 
   public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {

@@ -62,7 +62,7 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
-  private final String _upsertComparisonColumn;
+  private final List<String> _upsertComparisonColumns;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _consumerDir;
@@ -77,7 +77,7 @@ public class RealtimeSegmentConfig {
       Map<String, H3IndexConfig> h3IndexConfigs, SegmentZKMetadata segmentZKMetadata, boolean offHeap,
       PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory, String partitionColumn,
       PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled,
-      String consumerDir, UpsertConfig.Mode upsertMode, String upsertComparisonColumn,
+      String consumerDir, UpsertConfig.Mode upsertMode, List<String> upsertComparisonColumns,
       PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, List<FieldConfig> fieldConfigList,
       List<AggregationConfig> ingestionAggregationConfigs) {
@@ -106,7 +106,7 @@ public class RealtimeSegmentConfig {
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
-    _upsertComparisonColumn = upsertComparisonColumn;
+    _upsertComparisonColumns = upsertComparisonColumns;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
@@ -222,8 +222,8 @@ public class RealtimeSegmentConfig {
     return _partitionDedupMetadataManager != null;
   }
 
-  public String getUpsertComparisonColumn() {
-    return _upsertComparisonColumn;
+  public List<String> getUpsertComparisonColumns() {
+    return _upsertComparisonColumns;
   }
 
   public PartitionUpsertMetadataManager getPartitionUpsertMetadataManager() {
@@ -268,7 +268,7 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
-    private String _upsertComparisonColumn;
+    private List<String> _upsertComparisonColumns;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
@@ -410,8 +410,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setUpsertComparisonColumn(String upsertComparisonColumn) {
-      _upsertComparisonColumn = upsertComparisonColumn;
+    public Builder setUpsertComparisonColumns(List<String> upsertComparisonColumns) {
+      _upsertComparisonColumns = upsertComparisonColumns;
       return this;
     }
 
@@ -440,7 +440,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexConfigs, _h3IndexConfigs, _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _partitionUpsertMetadataManager,
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumns, _partitionUpsertMetadataManager,
           _partitionDedupMetadataManager, _fieldConfigList, _ingestionAggregationConfigs);
     }
   }

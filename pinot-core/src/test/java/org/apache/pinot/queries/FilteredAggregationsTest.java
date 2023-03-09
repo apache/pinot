@@ -94,6 +94,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     invertedIndexCols.add(INT_COL_NAME);
 
     indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
+    indexLoadingConfig.setRangeIndexColumns(invertedIndexCols);
     ImmutableSegment firstImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
     ImmutableSegment secondImmutableSegment =
@@ -445,5 +446,31 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         "SELECT AVG(INT_COL) testAvg, SUM(INT_COL) testSum FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL "
             + "ORDER BY testAvg";
     testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testSameNumScannedFilteredAggMatchAll() {
+    // For a single filtered aggregation, the same number of docs should be scanned regardless of which portions of
+    // the filter are in the filter expression Vs. the main predicate i.e. the applied filters are commutative.
+    String filterQuery =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) testSum FROM MyTable";
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL) testSum FROM MyTable WHERE INT_COL > 25000";
+    long filterQueryDocsScanned = getBrokerResponse(filterQuery).getNumDocsScanned();
+    long nonFilterQueryDocsScanned = getBrokerResponse(nonFilterQuery).getNumDocsScanned();
+    assertEquals(filterQueryDocsScanned, nonFilterQueryDocsScanned);
+  }
+
+  @Test
+  public void testSameNumScannedFilteredAgg() {
+    // For a single filtered aggregation, the same number of docs should be scanned regardless of which portions of
+    // the filter are in the filter expression Vs. the main predicate i.e. the applied filters are commutative.
+    String filterQuery =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) testSum FROM MyTable WHERE INT_COL < 1000000";
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL) testSum FROM MyTable WHERE INT_COL > 25000 AND INT_COL < 1000000";
+    long filterQueryDocsScanned = getBrokerResponse(filterQuery).getNumDocsScanned();
+    long nonFilterQueryDocsScanned = getBrokerResponse(nonFilterQuery).getNumDocsScanned();
+    assertEquals(filterQueryDocsScanned, nonFilterQueryDocsScanned);
   }
 }

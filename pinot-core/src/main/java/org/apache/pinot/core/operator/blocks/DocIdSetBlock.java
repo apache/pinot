@@ -19,48 +19,27 @@
 package org.apache.pinot.core.operator.blocks;
 
 import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
+import org.apache.pinot.core.operator.DocIdSetOperator;
 
 
+/**
+ * The {@code DocIdSetBlock} contains a block of document ids (sorted), and is returned from {@link DocIdSetOperator}.
+ * Each {@code DocIdSetOperator} can return multiple {@code DocIdSetBlock}s.
+ */
 public class DocIdSetBlock implements Block {
+  private final int[] _docIds;
+  private final int _length;
 
-  private final int[] _docIdArray;
-  private final int _searchableLength;
-
-  public DocIdSetBlock(int[] docIdSet, int searchableLength) {
-    _docIdArray = docIdSet;
-    _searchableLength = searchableLength;
+  public DocIdSetBlock(int[] docIds, int length) {
+    _docIds = docIds;
+    _length = length;
   }
 
-  public int[] getDocIdSet() {
-    return _docIdArray;
+  public int[] getDocIds() {
+    return _docIds;
   }
 
-  public int getSearchableLength() {
-    return _searchableLength;
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    return new ArrayBasedDocIdSet(_docIdArray, _searchableLength);
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
+  public int getLength() {
+    return _length;
   }
 }

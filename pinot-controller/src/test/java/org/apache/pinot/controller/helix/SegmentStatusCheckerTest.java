@@ -696,6 +696,69 @@ public class SegmentStatusCheckerTest {
     noSegmentsInternal(-1);
   }
 
+  @Test
+  public void lessThanOnePercentSegmentsUnavailableTest()
+          throws Exception {
+    String tableName = "myTable_OFFLINE";
+    int numSegments = 200;
+    List<String> allTableNames = new ArrayList<String>();
+    allTableNames.add(tableName);
+    TableConfig tableConfig =
+            new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNumReplicas(1).build();
+
+    IdealState idealState = new IdealState(tableName);
+    for (int i = 0; i < numSegments; i++) {
+      idealState.setPartitionState("myTable_" + i, "pinot1", "ONLINE");
+    }
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    ExternalView externalView = new ExternalView(tableName);
+    externalView.setState("myTable_0", "pinot1", "OFFLINE");
+    for (int i = 1; i < numSegments; i++) {
+      externalView.setState("myTable_" + i, "pinot1", "ONLINE");
+    }
+
+    {
+      _helixResourceManager = mock(PinotHelixResourceManager.class);
+      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+      when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
+    }
+    {
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
+      SegmentLineage segmentLineage = new SegmentLineage(tableName);
+      when(_helixPropertyStore.get(eq("/SEGMENT_LINEAGE/" + tableName), any(), eq(AccessOption.PERSISTENT)))
+              .thenReturn(segmentLineage.toZNRecord());
+    }
+    {
+      _config = mock(ControllerConf.class);
+      when(_config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(_config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+    }
+    {
+      _leadControllerManager = mock(LeadControllerManager.class);
+      when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
+    PinotMetricUtils.cleanUp();
+    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    _controllerMetrics = new ControllerMetrics(_metricsRegistry);
+    _segmentStatusChecker =
+            new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+                    _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
+    _segmentStatusChecker.start();
+    _segmentStatusChecker.run();
+    Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
+            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 99);
+  }
+
   public void noSegmentsInternal(final int nReplicas)
       throws Exception {
     final String tableName = "myTable_REALTIME";
