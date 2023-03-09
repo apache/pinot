@@ -458,7 +458,7 @@ public class IndexLoadingConfig {
 
   @VisibleForTesting
   public void removeInvertedIndexColumns(String... invertedIndexColumns) {
-    Arrays.asList(invertedIndexColumns).forEach(_invertedIndexColumns::remove);
+    removeInvertedIndexColumns(Arrays.asList(invertedIndexColumns));
   }
 
   @VisibleForTesting

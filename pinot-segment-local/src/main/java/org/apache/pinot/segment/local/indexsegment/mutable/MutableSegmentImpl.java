@@ -245,6 +245,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
+    // Here we create a copy of no dictionary columns because we are going to mutate the set some lines bellow
     Set<String> noDictionaryColumns = new HashSet<>(config.getNoDictionaryColumns());
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     Set<String> textIndexColumns = config.getTextIndexColumns();
