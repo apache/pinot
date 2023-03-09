@@ -19,12 +19,13 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapWriter;
 
 
 /**
@@ -62,21 +63,22 @@ public class RegexpLikePredicateEvaluatorFactory {
   }
 
   private static final class DictionaryBasedRegexpLikePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
-    // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
-    // within the scope of a single thread.
-    final Matcher _matcher;
+    final Pattern _pattern;
     final Dictionary _dictionary;
+    RoaringBitmap _matchingDictIdsBitmap;
     int[] _matchingDictIds;
 
     public DictionaryBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate);
       _dictionary = dictionary;
-      _matcher = regexpLikePredicate.getPattern().matcher("");
+      _pattern = regexpLikePredicate.getPattern();
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _matcher.reset(_dictionary.getStringValue(dictId)).find();
+      // delay scanning the dictionary until planning is complete
+      ensureDictionaryScanned();
+      return _matchingDictIdsBitmap.contains(dictId);
     }
 
     @Override
@@ -95,16 +97,24 @@ public class RegexpLikePredicateEvaluatorFactory {
     @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
-        IntList matchingDictIds = new IntArrayList();
-        int dictionarySize = _dictionary.length();
-        for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          if (applySV(dictId)) {
-            matchingDictIds.add(dictId);
-          }
-        }
-        _matchingDictIds = matchingDictIds.toIntArray();
+        ensureDictionaryScanned();
+        _matchingDictIds = _matchingDictIdsBitmap.toArray();
       }
       return _matchingDictIds;
+    }
+
+    private void ensureDictionaryScanned() {
+      if (_matchingDictIdsBitmap == null) {
+        RoaringBitmapWriter<RoaringBitmap> writer = RoaringBitmapWriter.writer().runCompress(false).get();
+        Matcher matcher = _pattern.matcher("");
+        for (int dictId = 0; dictId < _dictionary.length(); dictId++) {
+          String value = _dictionary.getStringValue(dictId);
+          if (matcher.reset(value).find()) {
+            writer.add(dictId);
+          }
+        }
+        _matchingDictIdsBitmap = writer.get();
+      }
     }
   }
 
