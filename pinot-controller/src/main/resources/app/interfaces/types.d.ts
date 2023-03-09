@@ -165,6 +165,11 @@ declare module 'Models' {
     OIDC = 'OIDC',
   }
 
+  export enum AuthLocalStorageKeys {
+    RedirectLocation = "redirectLocation",
+    AccessToken = "AccessToken",
+  }
+
   export type TableList = {
     tables: Array<string>
   }
