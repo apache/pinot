@@ -18,28 +18,13 @@
  */
 
 import * as React from 'react';
-import * as ReactDOM from 'react-dom';
-import { CircularProgress, createStyles, makeStyles, MuiThemeProvider } from '@material-ui/core';
-import { Switch, Route, HashRouter as Router, Redirect } from 'react-router-dom';
-import theme from './theme';
+import { Switch, Route, Redirect } from 'react-router-dom';
 import Layout from './components/Layout';
 import RouterData from './router';
 import PinotMethodUtils from './utils/PinotMethodUtils';
-import CustomNotification from './components/CustomNotification';
-import { NotificationContextProvider } from './components/Notification/NotificationContextProvider';
 import app_state from './app_state';
-import { AuthWorkflow } from 'Models';
-import { useAuthProviderV1 } from './components/auth/AuthProviderWrapper';
-
-const useStyles = makeStyles(() =>
-  createStyles({
-    loader: {
-      position: 'fixed',
-      left: '50%',
-      top: '30%'
-    },
-  })
-);
+import { useAuthProviderV1 } from './components/auth/AuthProvider';
+import { AppLoadingIndicator } from './components/AppLoadingIndicator';
 
 export const App = () => {
   const [clusterName, setClusterName] = React.useState('');
@@ -49,6 +34,7 @@ export const App = () => {
   const {authenticated} = useAuthProviderV1();
 
   React.useEffect(() => {
+    // authentication handled by 
     if(authenticated) {
       setIsAuthenticated(true);
     }
@@ -126,13 +112,11 @@ export const App = () => {
     )
   };
 
-  const classes = useStyles();
-
   return (
     <>
       {/* Non-OIDC/authenticated workflow */}
       {loading ? (
-        <CircularProgress className={classes.loader} size={80} />
+        <AppLoadingIndicator />
       ) : (
         <Switch>
           {getRouterData().map(({ path, Component }, key) => (

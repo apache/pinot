@@ -1,3 +1,22 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 import { AuthWorkflow } from 'Models';
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useHistory, useLocation } from 'react-router';
@@ -20,84 +39,80 @@ export const AuthProvider = ({ children }) => {
     const [authWorkflow, setAuthWorkflow] = useState<AuthWorkflow | null>(null);
     const [accessToken, setAccessToken] = useState<string>("");
     const [authenticated, setAuthenticated] = useState<boolean>(false);
-    const oidcSignInFormRef = React.useRef<HTMLFormElement>(null);
     const [authorizationEndpoint, setAuthorizationEndpoint] = useState<string | null>(null);
     const [autoLogout, setAutoLogout] = useState<boolean>(false);
     const history = useHistory();
     const location = useLocation();
-    const [loginTrigger, setLoginTrigger] = useState<boolean>(false);
     const [axiosRequestInterceptorId, setAxiosRequestInterceptorId] =
         useState(0);
     const [axiosResponseInterceptorId, setAxiosResponseInterceptorId] =
         useState(0);
+    const oidcSignInFormRef = React.useRef<HTMLFormElement>(null);
 
     useEffect(() => {
-        getAuthInfo();
+        initAuthDetails();
     }, []);
 
     useEffect(() => {
-        if(!authWorkflow) {
-            return;
-        }
-
-        if(authWorkflow === AuthWorkflow.NONE) {
-            setAuthenticated(true);
-
-            return;
-        }
-
-        if(authWorkflow === AuthWorkflow.BASIC) {
+        if(loading || authenticated) {
             return;
         }
 
         initOidcAuth();
-    }, [authWorkflow]);
+    }, [loading, authenticated]);
 
     useEffect(() => {
-        if(!loginTrigger) {
+        if(!autoLogout) {
             return;
         }
 
-        // login
-        if(clientId && authorizationEndpoint && oidcSignInFormRef && oidcSignInFormRef.current) {
-            oidcSignInFormRef.current.submit();
-        }
-    }, [loginTrigger]);
+        submitLoginForm();
+    }, [autoLogout])
 
-    const getAuthInfo = async () => {
-        // fetch auth info
+    const initAuthDetails = async () => {
+        // fetch auth info details
         const authInfoResponse = await PinotMethodUtils.getAuthInfo();
 
-        const authWorkFlow =
-        authInfoResponse && authInfoResponse.workflow
-            ? authInfoResponse.workflow
-            : AuthWorkflow.NONE;
-
-        const issuer = 
-            authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : ''
-        setAuthorizationEndpoint(`${issuer}/auth`);
-
-        // Redirect URI, if available
-        setRedirectUri(
-            authInfoResponse && authInfoResponse.redirectUri
-                ? authInfoResponse.redirectUri
-                : ''
-        );
-        // Client Id, if available
-        setClientId(
-            authInfoResponse && authInfoResponse.clientId
-                ? authInfoResponse.clientId
-                : ''
-        );
-
-        setLoading(false);
-
-         // Authentication workflow
-         setAuthWorkflow(authWorkFlow);
+        const authWorkFlowInternal =
+            authInfoResponse && authInfoResponse.workflow
+                ? authInfoResponse.workflow
+                : AuthWorkflow.NONE;
         
-    };
+        // set auth workflow
+        setAuthWorkflow(authWorkFlowInternal);
+
+        if(authWorkFlowInternal === AuthWorkflow.NONE) {
+            // No authentication required
+            setAuthenticated(true);
+        }
+
+        if(authWorkFlowInternal === AuthWorkflow.BASIC) {
+            // basic auth is handled by login page
+        }
+
+        if(authWorkFlowInternal === AuthWorkflow.OIDC) {
+            const issuer = 
+            authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : '';
+
+            setAuthorizationEndpoint(`${issuer}/auth`);
+            setRedirectUri(
+                authInfoResponse && authInfoResponse.redirectUri
+                    ? authInfoResponse.redirectUri
+                    : ''
+            );
+            setClientId(
+                authInfoResponse && authInfoResponse.clientId
+                    ? authInfoResponse.clientId
+                    : ''
+            );
+        }
+        
+        // auth loading complete
+        setLoading(false);
+    }
 
     const initOidcAuth = () => {
+        // access token already available in the localStorage
         const accessToken = getAuthLocalStorageValue(AuthLocalStorageKeys.AccessToken);
         if(accessToken) {
             setAccessToken(accessToken);
@@ -107,6 +122,7 @@ export const AuthProvider = ({ children }) => {
             return;
         }
 
+        // access token available in hash params
         const accessTokenFromHashParam = PinotMethodUtils.getAccessTokenFromHashParams();
         if(accessTokenFromHashParam) {
             const accessToken = `Bearer ${accessTokenFromHashParam}`;
@@ -119,9 +135,18 @@ export const AuthProvider = ({ children }) => {
             return;
         }
 
+        // no access token available
         const redirectPathAfterLogin = location.pathname;
+        // save current path to redirect after login
         setAuthLocalStorageValue(AuthLocalStorageKeys.RedirectLocation, redirectPathAfterLogin);
-        setLoginTrigger(true);
+        // login
+        submitLoginForm();
+    }
+
+    const submitLoginForm = () => {
+        if(clientId && authorizationEndpoint && redirectUri && oidcSignInFormRef && oidcSignInFormRef.current) {
+            oidcSignInFormRef.current.submit();
+        }
     }
 
     const handleUnauthenticatedAccess = () => {
@@ -129,7 +154,6 @@ export const AuthProvider = ({ children }) => {
         setAuthLocalStorageValue(AuthLocalStorageKeys.RedirectLocation, "");
 
         setAutoLogout(true);
-        setLoginTrigger(true);
     }
 
     const initAxios = (accessToken: string) => {
@@ -208,7 +232,7 @@ export const AuthProvider = ({ children }) => {
                         <input
                             readOnly
                             name="scope"
-                            value="openid email"
+                            value="openid email profile groups"
                         />
                         <input readOnly name="state" value="true-redirect-uri" />
                         <input readOnly name="nonce" value="random_string" />
