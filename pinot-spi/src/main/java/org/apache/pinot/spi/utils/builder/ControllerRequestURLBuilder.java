@@ -401,7 +401,7 @@ public class ControllerRequestURLBuilder {
     return url;
   }
 
-  public String forInstancePartitions(String tableName, @Nullable InstancePartitionsType instancePartitionsType) {
+  public String forInstancePartitions(String tableName, @Nullable String instancePartitionsType) {
     String url = StringUtil.join("/", _baseUrl, "tables", tableName, "instancePartitions");
     if (instancePartitionsType != null) {
       url += "?type=" + instancePartitionsType;
