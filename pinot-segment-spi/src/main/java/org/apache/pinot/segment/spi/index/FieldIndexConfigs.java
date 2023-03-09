@@ -19,8 +19,6 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
@@ -35,9 +33,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /**
  * FieldIndexConfigs are a map like structure that relates index types with their configuration, providing a type safe
  * interface.
- *
- * This class can be serialized into a JSON object whose keys are the index type ids using Jackson, but cannot be
- * serialized back. A custom Jackson deserializer could be provided if needed.
  */
 public class FieldIndexConfigs {
 
@@ -53,7 +48,6 @@ public class FieldIndexConfigs {
    * Returns the configuration associated with the given index type, which will be null if there is no configuration for
    * that index type.
    */
-  @JsonIgnore
   public <C extends IndexConfig, I extends IndexType<C, ?, ?>> C getConfig(I indexType) {
     IndexConfig config = _configMap.get(indexType);
     if (config == null) {
@@ -62,15 +56,9 @@ public class FieldIndexConfigs {
     return (C) config;
   }
 
-  /*
-  This is used by Jackson when this object is serialized. Each entry of the map will be directly contained in the
-  JSON object, with the key name as the key in the JSON object and the result of serializing the key value as the value
-  in the JSON object.
-   */
-  @JsonAnyGetter
   public Map<String, JsonNode> unwrapIndexes() {
     Function<Map.Entry<IndexType, IndexConfig>, JsonNode> serializer =
-        entry -> entry.getKey().serialize(entry.getValue());
+        entry -> entry.getValue().toJsonNode();
     return _configMap.entrySet().stream()
         .filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(entry -> entry.getKey().getId(), serializer));
@@ -79,7 +67,7 @@ public class FieldIndexConfigs {
   @Override
   public String toString() {
     try {
-      return JsonUtils.objectToString(this);
+      return JsonUtils.objectToString(unwrapIndexes());
     } catch (JsonProcessingException e) {
       return "Unserializable value due to " + e.getMessage();
     }

@@ -35,7 +35,6 @@ public class FieldIndexConfigsTest {
       throws IOException {
     IndexType index1 = Mockito.mock(IndexType.class);
     Mockito.when(index1.getId()).thenReturn("index1");
-    Mockito.when(index1.serialize(Mockito.any())).thenCallRealMethod();
     IndexConfig indexConf = new IndexConfig(true);
     FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
         .add(index1, indexConf)
