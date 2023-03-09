@@ -27,8 +27,8 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public final class MVScanDocIdSet implements BlockDocIdSet {
   private final MVScanDocIdIterator _docIdIterator;
 
-  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
-    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, batchSize);
+  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs);
   }
 
   @Override

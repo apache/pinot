@@ -64,7 +64,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
       return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled,
           _batchSize));
     } else {
-      return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _batchSize));
+      return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs));
     }
   }
 

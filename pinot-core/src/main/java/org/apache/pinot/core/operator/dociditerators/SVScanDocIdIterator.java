@@ -178,7 +178,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private ValueMatcher getValueMatcher(@Nullable ImmutableRoaringBitmap nullBitmap) {
     if (_reader.isDictionaryEncoded()) {
-      return nullBitmap == null ? new DictIdMatcher() : new DictIdMatcherAndNullHandler(nullBitmap, _batchSize);
+      return nullBitmap == null ? new DictIdMatcher() : new DictIdMatcherAndNullHandler(nullBitmap);
     } else {
       switch (_reader.getStoredType()) {
         case INT:
@@ -295,12 +295,11 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private class DictIdMatcherAndNullHandler implements ValueMatcher {
 
-    private final int[] _buffer;
+    private final int[] _buffer = new int[_batchSize];
     private final ImmutableRoaringBitmap _nullBitmap;
 
-    public DictIdMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap, int batchSize) {
+    public DictIdMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
       _nullBitmap = nullBitmap;
-      _buffer = new int[batchSize];
     }
 
     @Override
