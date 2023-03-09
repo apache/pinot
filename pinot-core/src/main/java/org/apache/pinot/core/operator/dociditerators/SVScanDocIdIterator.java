@@ -53,12 +53,10 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
-  private final int _batchSize;
 
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
       @Nullable NullValueVectorReader nullValueReader, int batchSize) {
-    _batchSize = batchSize;
-    _batch = new int[_batchSize];
+    _batch = new int[batchSize];
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
     _readerContext = _reader.createContext();
@@ -74,8 +72,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   // for testing
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
       @Nullable NullValueVectorReader nullValueReader) {
-    _batchSize = BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE;
-    _batch = new int[_batchSize];
+    _batch = new int[BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE];
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
@@ -143,7 +140,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
           .runCompress(false)
           .get();
     }
-    int[] buffer = new int[_batchSize];
+    int[] buffer = new int[_batch.length];
     while (docIdIterator.hasNext()) {
       int limit = docIdIterator.nextBatch(buffer);
       if (limit > 0) {
@@ -279,7 +276,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private class DictIdMatcher implements ValueMatcher {
 
-    private final int[] _buffer = new int[_batchSize];
+    private final int[] _buffer = new int[_batch.length];
 
     @Override
     public boolean doesValueMatch(int docId) {
@@ -295,7 +292,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private class DictIdMatcherAndNullHandler implements ValueMatcher {
 
-    private final int[] _buffer = new int[_batchSize];
+    private final int[] _buffer = new int[_batch.length];
     private final ImmutableRoaringBitmap _nullBitmap;
 
     public DictIdMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
@@ -323,7 +320,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private class IntMatcher implements ValueMatcher {
 
-    private final int[] _buffer = new int[_batchSize];
+    private final int[] _buffer = new int[_batch.length];
 
     @Override
     public boolean doesValueMatch(int docId) {
@@ -340,7 +337,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private class IntMatcherAndNullHandler implements ValueMatcher {
 
     private final ImmutableRoaringBitmap _nullBitmap;
-    private final int[] _buffer = new int[_batchSize];
+    private final int[] _buffer = new int[_batch.length];
 
     public IntMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
       _nullBitmap = nullBitmap;
@@ -364,7 +361,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private class LongMatcher implements ValueMatcher {
 
-    private final long[] _buffer = new long[_batchSize];
+    private final long[] _buffer = new long[_batch.length];
 
     @Override
     public boolean doesValueMatch(int docId) {
@@ -381,7 +378,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private class LongMatcherAndNullHandler implements ValueMatcher {
 
     private final ImmutableRoaringBitmap _nullBitmap;
-    private final long[] _buffer = new long[_batchSize];
+    private final long[] _buffer = new long[_batch.length];
 
     public LongMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
       _nullBitmap = nullBitmap;
@@ -405,7 +402,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private class FloatMatcher implements ValueMatcher {
 
-    private final float[] _buffer = new float[_batchSize];
+    private final float[] _buffer = new float[_batch.length];
 
     @Override
     public boolean doesValueMatch(int docId) {
@@ -422,7 +419,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private class FloatMatcherAndNullHandler implements ValueMatcher {
 
     private final ImmutableRoaringBitmap _nullBitmap;
-    private final float[] _buffer = new float[_batchSize];
+    private final float[] _buffer = new float[_batch.length];
 
     public FloatMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
       _nullBitmap = nullBitmap;
@@ -446,7 +443,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private class DoubleMatcher implements ValueMatcher {
 
-    private final double[] _buffer = new double[_batchSize];
+    private final double[] _buffer = new double[_batch.length];
 
     @Override
     public boolean doesValueMatch(int docId) {
@@ -463,7 +460,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private class DoubleMatcherAndNullHandler implements ValueMatcher {
 
     private final ImmutableRoaringBitmap _nullBitmap;
-    private final double[] _buffer = new double[_batchSize];
+    private final double[] _buffer = new double[_batch.length];
 
     public DoubleMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
       _nullBitmap = nullBitmap;
