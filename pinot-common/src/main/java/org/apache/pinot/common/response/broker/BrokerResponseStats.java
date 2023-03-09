@@ -33,11 +33,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 //  same metadataKey
 // TODO: Replace member fields with a simple map of <MetadataKey, Object>
 // TODO: Add a subStat field, stage level subStats will contain each operator stats
-@JsonPropertyOrder({"exceptions", "numBlocks", "numRows", "stageExecutionTimeMs", "numServersQueried",
-    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
-    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
-    "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
-    "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+@JsonPropertyOrder({"exceptions", "numBlocks", "numRows", "stageExecutionTimeMs", "stageExecutionUnit",
+    "stageExecWallTimeMs", "stageExecEndTimeMs", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
+    "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+    "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "traceInfo", "operatorStats", "tableNames"})
@@ -47,6 +47,8 @@ public class BrokerResponseStats extends BrokerResponseNative {
   private int _numBlocks = 0;
   private int _numRows = 0;
   private long _stageExecutionTimeMs = 0;
+  private int _stageExecutionUnit = 0;
+  private long _stageExecWallTimeMs = -1;
   private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
@@ -83,6 +85,26 @@ public class BrokerResponseStats extends BrokerResponseNative {
   @JsonProperty("stageExecutionTimeMs")
   public void setStageExecutionTimeMs(long stageExecutionTimeMs) {
     _stageExecutionTimeMs = stageExecutionTimeMs;
+  }
+
+  @JsonProperty("stageExecWallTimeMs")
+  public long getStageExecWallTimeMs() {
+    return _stageExecWallTimeMs;
+  }
+
+  @JsonProperty("stageExecWallTimeMs")
+  public void setStageExecWallTimeMs(long stageExecWallTimeMs) {
+    _stageExecWallTimeMs = stageExecWallTimeMs;
+  }
+
+  @JsonProperty("stageExecutionUnit")
+  public long getStageExecutionUnit() {
+    return _stageExecutionUnit;
+  }
+
+  @JsonProperty("stageExecutionUnit")
+  public void setStageExecutionUnit(int stageExecutionUnit) {
+    _stageExecutionUnit = stageExecutionUnit;
   }
 
   public String toJsonString()
