@@ -225,7 +225,7 @@ export const AuthProvider = ({ children }) => {
                         <input
                             readOnly
                             name="redirect_uri"
-                            value={"http://localhost:8080" || redirectUri}
+                            value={redirectUri}
                         />
                         <input
                             readOnly

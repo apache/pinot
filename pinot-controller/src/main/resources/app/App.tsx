@@ -18,7 +18,7 @@
  */
 
 import * as React from 'react';
-import { Switch, Route, Redirect } from 'react-router-dom';
+import { Switch, Route, Redirect, useHistory } from 'react-router-dom';
 import Layout from './components/Layout';
 import RouterData from './router';
 import PinotMethodUtils from './utils/PinotMethodUtils';
@@ -31,21 +31,22 @@ export const App = () => {
   const [loading, setLoading] = React.useState(true);
   const [isAuthenticated, setIsAuthenticated] = React.useState(null);
   const [role, setRole] = React.useState('');
-  const {authenticated} = useAuthProvider();
+  const { authenticated } = useAuthProvider();
+  const history = useHistory();
 
   React.useEffect(() => {
     // authentication handled by 
-    if(authenticated) {
+    if (authenticated) {
       setIsAuthenticated(true);
     }
   }, [authenticated])
 
-  const fetchUserRole = async()=>{
+  const fetchUserRole = async () => {
     const userListResponse = await PinotMethodUtils.getUserList();
     let userObj = userListResponse.users;
     let userData = [];
     for (let key in userObj) {
-      if(userObj.hasOwnProperty(key)){
+      if (userObj.hasOwnProperty(key)) {
         userData.push(userObj[key]);
       }
     }
@@ -77,8 +78,8 @@ export const App = () => {
   };
 
   const getRouterData = () => {
-    if(app_state.queryConsoleOnlyView){
-      return RouterData.filter((routeObj)=>{return routeObj.path === '/query'});
+    if (app_state.queryConsoleOnlyView) {
+      return RouterData.filter((routeObj) => { return routeObj.path === '/query' });
     }
     if (app_state.hideQueryConsoleTab) {
       return RouterData.filter((routeObj) => routeObj.path !== '/query');
@@ -95,9 +96,14 @@ export const App = () => {
   }, [isAuthenticated]);
 
   const loginRender = (Component, props) => {
+    if(isAuthenticated) {
+      history.push("/");
+      return;
+    }
+
     return (
       <div className="p-8">
-        <Component {...props} setIsAuthenticated={setIsAuthenticated}/>
+        <Component {...props} setIsAuthenticated={setIsAuthenticated} />
       </div>
     )
   };
@@ -112,39 +118,36 @@ export const App = () => {
     )
   };
 
+  if (loading) {
+    return <AppLoadingIndicator />;
+  }
+
   return (
-    <>
-      {/* Non-OIDC/authenticated workflow */}
-      {loading ? (
-        <AppLoadingIndicator />
-      ) : (
-        <Switch>
-          {getRouterData().map(({ path, Component }, key) => (
-            <Route
-              exact
-              path={path}
-              key={key}
-              render={(props) => {
-                if (path === '/login') {
-                  return loginRender(Component, props);
-                } else if (isAuthenticated) {
-                  // default render
-                  return componentRender(Component, props, role);
-                } else {
-                  return <Redirect to="/login" />;
-                }
-              }}
-            />
-          ))}
-          <Route path="*">
-            <Redirect
-              to={PinotMethodUtils.getURLWithoutAccessToken(
-                app_state.queryConsoleOnlyView ? '/query' : '/'
-              )}
-            />
-          </Route>
-        </Switch>
-      )}
-    </>
+    <Switch>
+      {getRouterData().map(({ path, Component }, key) => (
+        <Route
+          exact
+          path={path}
+          key={key}
+          render={(props) => {
+            if (path === '/login') {
+              return loginRender(Component, props);
+            } else if (isAuthenticated) {
+              // default render
+              return componentRender(Component, props, role);
+            } else {
+              return <Redirect to="/login" />;
+            }
+          }}
+        />
+      ))}
+      <Route path="*">
+        <Redirect
+          to={PinotMethodUtils.getURLWithoutAccessToken(
+            app_state.queryConsoleOnlyView ? '/query' : '/'
+          )}
+        />
+      </Route>
+    </Switch>
   );
 };

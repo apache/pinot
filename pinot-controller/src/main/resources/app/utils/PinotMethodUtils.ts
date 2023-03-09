@@ -1002,7 +1002,7 @@ const verifyAuth = (authToken) => {
 
 const getAccessTokenFromHashParams = () => {
   let accessToken = '';
-  const hashParam = removeAllLeadingForwardSlash(location.hash);
+  const hashParam = removeAllLeadingForwardSlash(location.hash.substring(1));
   
   const urlSearchParams = new URLSearchParams(hashParam);
   if (urlSearchParams.has('access_token')) {
