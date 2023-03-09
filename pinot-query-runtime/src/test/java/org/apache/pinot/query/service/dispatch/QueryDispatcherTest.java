@@ -143,6 +143,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
     }
+    // wait just a little, until the cancel is being called.
+    Thread.sleep(50);
     for (QueryServer queryServer : _queryServerMap.values()) {
       Mockito.verify(queryServer, Mockito.times(1)).cancel(Mockito.argThat(a -> a.getRequestId() == requestId),
           Mockito.any());
@@ -164,6 +166,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
     }
+    // wait just a little, until the cancel is being called.
+    Thread.sleep(50);
     for (QueryServer queryServer : _queryServerMap.values()) {
       Mockito.verify(queryServer, Mockito.times(1)).cancel(Mockito.argThat(a -> a.getRequestId() == requestId),
           Mockito.any());
