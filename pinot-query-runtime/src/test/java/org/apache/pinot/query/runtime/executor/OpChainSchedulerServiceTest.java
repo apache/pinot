@@ -183,7 +183,7 @@ public class OpChainSchedulerServiceTest {
   }
 
   @Test
-  public void shouldCallCloseOnOperatorsThatReturnErrorBlock()
+  public void shouldCallCancelOnOperatorsThatReturnErrorBlock()
       throws InterruptedException {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
@@ -196,7 +196,7 @@ public class OpChainSchedulerServiceTest {
     Mockito.doAnswer(inv -> {
       latch.countDown();
       return null;
-    }).when(_operatorA).close();
+    }).when(_operatorA).cancel(Mockito.any());
 
     scheduler.startAsync().awaitRunning();
     scheduler.register(opChain);

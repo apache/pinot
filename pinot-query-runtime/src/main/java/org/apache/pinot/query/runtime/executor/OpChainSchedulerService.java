@@ -68,6 +68,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
         @Override
         public void runJob() {
           boolean isFinished = false;
+          boolean returnedErrorBlock = false;
           Throwable thrown = null;
           try {
             LOGGER.trace("({}): Executing", operatorChain);
@@ -88,6 +89,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
             } else {
               isFinished = true;
               if (result.isErrorBlock()) {
+                returnedErrorBlock = true;
                 LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
                     result.getDataBlock().getExceptions());
               } else {
@@ -99,11 +101,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
             LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
             thrown = e;
           } finally {
-            if (isFinished) {
-              closeOpChain(operatorChain);
-            } else if (thrown != null) {
-              // TODO: It would make sense to cancel OpChains if they returned an error-block.
+            if (returnedErrorBlock || thrown != null) {
               cancelOpChain(operatorChain, thrown);
+            } else if (isFinished) {
+              closeOpChain(operatorChain);
             }
           }
         }
