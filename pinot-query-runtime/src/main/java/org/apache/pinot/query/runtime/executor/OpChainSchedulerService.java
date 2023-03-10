@@ -58,10 +58,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     this(scheduler, workerPool, DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS);
   }
 
-  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long releaseTimeoutMs) {
+  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long cancelRetentionMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
-    _cancelledRequests = CacheBuilder.newBuilder().expireAfterWrite(releaseTimeoutMs, TimeUnit.MILLISECONDS).build();
+    _cancelledRequests = CacheBuilder.newBuilder().expireAfterWrite(cancelRetentionMs, TimeUnit.MILLISECONDS).build();
   }
 
   @Override
