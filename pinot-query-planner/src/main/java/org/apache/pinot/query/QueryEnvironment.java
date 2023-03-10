@@ -20,7 +20,6 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Properties;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
@@ -79,7 +78,6 @@ public class QueryEnvironment {
   private final HepProgram _hepProgram;
 
   // Pinot extensions
-  private final Collection<RelOptRule> _logicalRuleSet;
   private final WorkerManager _workerManager;
   private final TableCache _tableCache;
 
@@ -110,14 +108,12 @@ public class QueryEnvironment {
             .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true)))
         .build();
 
-    // optimizer rules
-    _logicalRuleSet = PinotQueryRuleSets.LOGICAL_OPT_RULES;
-
     // optimizer
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
-    for (RelOptRule relOptRule : _logicalRuleSet) {
+    for (RelOptRule relOptRule : PinotQueryRuleSets.LOGICAL_OPT_RULES) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
     _hepProgram = hepProgramBuilder.build();
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.calcite.rel.rules;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collection;
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
@@ -115,4 +116,12 @@ public class PinotQueryRuleSets {
           PinotAggregateExchangeNodeInsertRule.INSTANCE,
           PinotWindowExchangeNodeInsertRule.INSTANCE
       );
+
+  public static final Collection<RelOptRule> FILTER_PUSHDOWN_RULES = ImmutableList.of(
+      CoreRules.FILTER_INTO_JOIN,
+      CoreRules.FILTER_AGGREGATE_TRANSPOSE,
+      CoreRules.FILTER_SET_OP_TRANSPOSE,
+      CoreRules.FILTER_PROJECT_TRANSPOSE,
+      PinotFilterExchangeTransposeRule.INSTANCE
+  );
 }
