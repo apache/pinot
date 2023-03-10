@@ -70,7 +70,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
 
   private boolean isNewSegment(String segment, Map<String, SegmentState> newSegmentStateMap, long nowMillis) {
-    SegmentState state = newSegmentStateMap.getOrDefault(segment, null);
+    SegmentState state = newSegmentStateMap.get(segment);
     return state != null && state.isNew(nowMillis);
   }
 

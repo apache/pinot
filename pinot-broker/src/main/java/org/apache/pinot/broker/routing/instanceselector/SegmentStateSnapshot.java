@@ -144,8 +144,6 @@ public class SegmentStateSnapshot {
       }
       if (!enabledInstancesForSegment.isEmpty()) {
         newSegmentToCandidateInstanceMap.put(segment, enabledInstancesForSegment);
-      } else {
-        newSegmentToCandidateInstanceMap.put(segment, null);
       }
     }
     return new SelectionCandidate(newSegmentToCandidateInstanceMap, null);
@@ -161,10 +159,6 @@ public class SegmentStateSnapshot {
 
   public Map<String, List<Pair<String, Boolean>>> getOldSegmentCandidates() {
     return _oldSegmentSelectionCandidate.getAllCandidates();
-  }
-
-  public Map<String, List<Pair<String, Boolean>>> getNewSegmentCandidates() {
-    return _newSegmentSelectionCandidate.getAllCandidates();
   }
 
   public Set<String> getUnavailableSegments() {
