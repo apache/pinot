@@ -42,7 +42,7 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    * <p>The returned value for each index should be constant across different Pinot versions as it is used as:</p>
    *
    * <ul>
-   *   <li>They key used when the index is registered in IndexService.</li>
+   *   <li>The key used when the index is registered in IndexService.</li>
    *   <li>The internal identification in v1 files and metadata persisted on disk.</li>
    *   <li>The default toString implementation.</li>
    *   <li>The key that identifies the index config in the indexes section inside
