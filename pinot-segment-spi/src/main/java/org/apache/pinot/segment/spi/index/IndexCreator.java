@@ -28,11 +28,14 @@ import javax.annotation.Nullable;
 /**
  * The interface used to create indexes.
  *
- * The lifecycle for an IndexCreator is to be created, receive one or more calls to either
- * {@link #add(Object, int)} or {@link #add(Object[], int[])} (but not
- * mix them),
- * a call to {@link #seal()} and finally be closed. Calls to add cell methods must be done in document id order,
- * starting from the first document id.
+ * The lifecycle for an IndexCreator is:
+ * <ol>
+ *   <li>To be created.</li>
+ *   <li>Zero or more calls to either {@link #add(Object, int)} or {@link #add(Object[], int[])} (but not mix them).
+ *   Calls to add methods must be done in document id order, starting from the first document id.</li>
+ *   <li>A call to {@link #seal()}</li>
+ *   <li>A call to {@link #close()}</li>
+ * </ol>
  */
 public interface IndexCreator extends Closeable {
   /**
