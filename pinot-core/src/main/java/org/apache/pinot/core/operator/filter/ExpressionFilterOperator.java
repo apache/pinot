@@ -26,7 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -49,15 +51,18 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
     _numDocs = numDocs;
 
-    _dataSourceMap = new HashMap<>();
     Set<String> columns = new HashSet<>();
     ExpressionContext lhs = predicate.getLhs();
     lhs.getColumns(columns);
-    for (String column : columns) {
-      _dataSourceMap.put(column, segment.getDataSource(column));
-    }
-
-    _transformFunction = TransformFunctionFactory.get(lhs, _dataSourceMap, queryContext);
+    int mapCapacity = HashUtil.getHashMapCapacity(columns.size());
+    _dataSourceMap = new HashMap<>(mapCapacity);
+    Map<String, ColumnContext> columnContextMap = new HashMap<>(mapCapacity);
+    columns.forEach(column -> {
+      DataSource dataSource = segment.getDataSource(column);
+      _dataSourceMap.put(column, dataSource);
+      columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
+    });
+    _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, queryContext);
     _predicateEvaluator =
         PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
             _transformFunction.getResultMetadata().getDataType());
@@ -69,7 +74,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public List<Operator> getChildOperators() {
+  public List<Operator<?>> getChildOperators() {
     return Collections.emptyList();
   }
 

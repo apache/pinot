@@ -21,9 +21,9 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
@@ -34,7 +34,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
   protected List<TransformFunction> _arguments;
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     _arguments = arguments;
     int numArguments = arguments.size();
     if (numArguments <= 1) {
@@ -57,16 +57,16 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
-    System.arraycopy(_arguments.get(0).transformToIntValuesSV(projectionBlock), 0, _intValuesSV, 0, numDocs);
+    System.arraycopy(_arguments.get(0).transformToIntValuesSV(valueBlock), 0, _intValuesSV, 0, numDocs);
     int numArguments = _arguments.size();
     for (int i = 1; i < numArguments; i++) {
       TransformFunction transformFunction = _arguments.get(i);
-      int[] results = transformFunction.transformToIntValuesSV(projectionBlock);
+      int[] results = transformFunction.transformToIntValuesSV(valueBlock);
       for (int j = 0; j < numDocs; j++) {
         _intValuesSV[j] = getLogicalFuncResult(_intValuesSV[j], results[j]);
       }

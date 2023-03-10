@@ -21,10 +21,10 @@ package org.apache.pinot.core.plan;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -78,8 +78,8 @@ public class DistinctPlanNode implements PlanNode {
       }
     }
 
-    TransformOperator transformOperator =
-        new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new DistinctOperator(_indexSegment, distinctAggregationFunction, transformOperator, _queryContext);
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+    return new DistinctOperator(_indexSegment, distinctAggregationFunction, projectOperator, _queryContext);
   }
 }

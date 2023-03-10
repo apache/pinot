@@ -30,9 +30,10 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.JsonPathCache;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluator;
 import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluators;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -81,7 +82,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(
@@ -125,25 +126,25 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToIntValuesSV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToIntValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _intValuesSV);
       return _intValuesSV;
     }
     // operating on the output of another transform so can't pass the evaluation down to the storage
-    return transformTransformedValuesToIntValuesSV(projectionBlock);
+    return transformTransformedValuesToIntValuesSV(valueBlock);
   }
 
-  private int[] transformTransformedValuesToIntValuesSV(ProjectionBlock projectionBlock) {
+  private int[] transformTransformedValuesToIntValuesSV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
@@ -168,24 +169,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_longValuesSV == null) {
       _longValuesSV = new long[numDocs];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToLongValuesSV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToLongValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _longValuesSV);
       return _longValuesSV;
     }
-    return transformTransformedValuesToLongValuesSV(projectionBlock);
+    return transformTransformedValuesToLongValuesSV(valueBlock);
   }
 
-  private long[] transformTransformedValuesToLongValuesSV(ProjectionBlock projectionBlock) {
+  private long[] transformTransformedValuesToLongValuesSV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
@@ -211,24 +212,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_floatValuesSV == null) {
       _floatValuesSV = new float[numDocs];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToFloatValuesSV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToFloatValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _floatValuesSV);
       return _floatValuesSV;
     }
-    return transformTransformedValuesToFloatValuesSV(projectionBlock);
+    return transformTransformedValuesToFloatValuesSV(valueBlock);
   }
 
-  private float[] transformTransformedValuesToFloatValuesSV(ProjectionBlock projectionBlock) {
+  private float[] transformTransformedValuesToFloatValuesSV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
@@ -253,24 +254,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[numDocs];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToDoubleValuesSV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToDoubleValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _doubleValuesSV);
       return _doubleValuesSV;
     }
-    return transformTransformedValuesToDoubleValuesSV(projectionBlock);
+    return transformTransformedValuesToDoubleValuesSV(valueBlock);
   }
 
-  private double[] transformTransformedValuesToDoubleValuesSV(ProjectionBlock projectionBlock) {
+  private double[] transformTransformedValuesToDoubleValuesSV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
@@ -295,24 +296,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[numDocs];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToBigDecimalValuesSV(projectionBlock,
-          _jsonPathEvaluator, _bigDecimalValuesSV);
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToBigDecimalValuesSV(
+          (ProjectionBlock) valueBlock, _jsonPathEvaluator, _bigDecimalValuesSV);
       return _bigDecimalValuesSV;
     }
-    return transformTransformedValuesToBigDecimalValuesSV(projectionBlock);
+    return transformTransformedValuesToBigDecimalValuesSV(valueBlock);
   }
 
-  private BigDecimal[] transformTransformedValuesToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+  private BigDecimal[] transformTransformedValuesToBigDecimalValuesSV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
@@ -337,24 +338,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[numDocs];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToStringValuesSV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToStringValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _stringValuesSV);
       return _stringValuesSV;
     }
-    return transformTransformedValuesToStringValuesSV(projectionBlock);
+    return transformTransformedValuesToStringValuesSV(valueBlock);
   }
 
-  private String[] transformTransformedValuesToStringValuesSV(ProjectionBlock projectionBlock) {
+  private String[] transformTransformedValuesToStringValuesSV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
@@ -379,24 +380,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_intValuesMV == null) {
       _intValuesMV = new int[numDocs][];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToIntValuesMV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToIntValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _intValuesMV);
       return _intValuesMV;
     }
-    return transformTransformedValuesToIntValuesMV(projectionBlock);
+    return transformTransformedValuesToIntValuesMV(valueBlock);
   }
 
-  private int[][] transformTransformedValuesToIntValuesMV(ProjectionBlock projectionBlock) {
+  private int[][] transformTransformedValuesToIntValuesMV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       List<Integer> result = null;
       try {
@@ -418,24 +419,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_longValuesMV == null) {
       _longValuesMV = new long[numDocs][];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToLongValuesMV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToLongValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _longValuesMV);
       return _longValuesMV;
     }
-    return transformTransformedValuesToLongValuesMV(projectionBlock);
+    return transformTransformedValuesToLongValuesMV(valueBlock);
   }
 
-  private long[][] transformTransformedValuesToLongValuesMV(ProjectionBlock projectionBlock) {
+  private long[][] transformTransformedValuesToLongValuesMV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       List<Long> result = null;
       try {
@@ -457,24 +458,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_floatValuesMV == null) {
       _floatValuesMV = new float[numDocs][];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToFloatValuesMV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToFloatValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _floatValuesMV);
       return _floatValuesMV;
     }
-    return transformTransformedValuesToFloatValuesMV(projectionBlock);
+    return transformTransformedValuesToFloatValuesMV(valueBlock);
   }
 
-  private float[][] transformTransformedValuesToFloatValuesMV(ProjectionBlock projectionBlock) {
+  private float[][] transformTransformedValuesToFloatValuesMV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       List<Float> result = null;
       try {
@@ -496,24 +497,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_doubleValuesMV == null) {
       _doubleValuesMV = new double[numDocs][];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToDoubleValuesMV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToDoubleValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _doubleValuesMV);
       return _doubleValuesMV;
     }
-    return transformTransformedToDoubleValuesMV(projectionBlock);
+    return transformTransformedToDoubleValuesMV(valueBlock);
   }
 
-  private double[][] transformTransformedToDoubleValuesMV(ProjectionBlock projectionBlock) {
+  private double[][] transformTransformedToDoubleValuesMV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       List<Double> result = null;
       try {
@@ -535,24 +536,24 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_stringValuesMV == null || _stringValuesMV.length < numDocs) {
       _stringValuesMV = new String[numDocs][];
     }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToStringValuesMV(projectionBlock,
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToStringValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _stringValuesMV);
       return _stringValuesMV;
     }
-    return transformTransformedValuesToStringValuesMV(projectionBlock);
+    return transformTransformedValuesToStringValuesMV(valueBlock);
   }
 
-  private String[][] transformTransformedValuesToStringValuesMV(ProjectionBlock projectionBlock) {
+  private String[][] transformTransformedValuesToStringValuesMV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       List<String> result = null;
       try {
