@@ -59,7 +59,7 @@ public class SegmentStateSnapshot {
     }
 
     public List<Pair<String, Boolean>> getCandidates(String segment) {
-      return _instanceMap.getOrDefault(segment, null);
+      return _instanceMap.get(segment);
     }
 
     Map<String, List<Pair<String, Boolean>>> getAllCandidates() {
@@ -108,11 +108,9 @@ public class SegmentStateSnapshot {
       String segment = entry.getKey();
       List<String> onlineInstancesForSegment = entry.getValue();
       List<Pair<String, Boolean>> enabledInstancesForSegment = new ArrayList<>();
-      List<Boolean> onlineFlagsForSegment = new ArrayList<>();
       for (String onlineInstance : onlineInstancesForSegment) {
         if (enabledInstance.contains(onlineInstance)) {
           enabledInstancesForSegment.add(ImmutablePair.of(onlineInstance, true));
-          onlineFlagsForSegment.add(true);
         }
       }
       if (!enabledInstancesForSegment.isEmpty()) {
@@ -163,6 +161,10 @@ public class SegmentStateSnapshot {
 
   public Map<String, List<Pair<String, Boolean>>> getOldSegmentCandidates() {
     return _oldSegmentSelectionCandidate.getAllCandidates();
+  }
+
+  public Map<String, List<Pair<String, Boolean>>> getNewSegmentCandidates() {
+    return _newSegmentSelectionCandidate.getAllCandidates();
   }
 
   public Set<String> getUnavailableSegments() {

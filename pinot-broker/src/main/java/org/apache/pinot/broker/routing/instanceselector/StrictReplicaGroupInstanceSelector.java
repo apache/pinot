@@ -102,8 +102,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    */
   @Override
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> instanceToSegmentsMap,
-      Map<String, SegmentState> newSegmentStateMap, long nowMillis) {
+      Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap,
+      long nowMillis) {
     // TODO: Add support for AdaptiveServerSelection.
     // Iterate over the ideal state to fill up 'idealStateSegmentToInstancesMap' which is a map from segment to set of
     // instances hosting the segment in the ideal state
@@ -135,9 +135,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         String state = instanceStateEntry.getValue();
         if (SegmentStateModel.isOnline(state)) {
           tempOnlineInstances.add(instance);
-        } else if (state.equals(SegmentStateModel.OFFLINE)) {
-          instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
-        } else {
+        } else if (!state.equals(SegmentStateModel.ONLINE)) {
           // error or dropped state should not be considered as new anymore.
           newSegmentStateMap.remove(segment);
         }
@@ -186,7 +184,6 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         // Some instances are unavailable, add the remaining instances as online instance
         if (!unavailableInstances.contains(instance)) {
           onlineInstances.add(instance);
-          instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
         }
       }
       segmentToOnlineInstancesMap.put(segment, onlineInstances);

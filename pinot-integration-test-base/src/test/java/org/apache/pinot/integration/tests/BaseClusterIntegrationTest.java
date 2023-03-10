@@ -617,7 +617,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          return getCurrentCountStarResult(tableName) == countStarResult;
+          long curCount = getCurrentCountStarResult(tableName);
+          return curCount == countStarResult;
         } catch (Exception e) {
           return null;
         }

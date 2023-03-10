@@ -22,7 +22,6 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -206,7 +205,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _newSegmentStates = getNewSegmentsFromZK(_tableNameWithType, potentialNewSegments, _propertyStore, nowMillis);
     int segmentMapCapacity = HashUtil.getHashMapCapacity(onlineSegments.size());
     _segmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
-    _instanceToSegmentsMap = new HashMap<>();
     onAssignmentChange(idealState, externalView, onlineSegments, nowMillis, false);
   }
 
@@ -219,21 +217,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   @Override
   public void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
     _enabledInstances = enabledInstances;
-
-    // Update all segments served by the changed instances
-    Set<String> segmentsToUpdate = new HashSet<>();
-    for (String instance : changedInstances) {
-      List<String> segments = _instanceToSegmentsMap.get(instance);
-      if (segments != null) {
-        segmentsToUpdate.addAll(segments);
-      }
-    }
-
-    // Directly return if no segment needs to be updated
-    if (segmentsToUpdate.isEmpty()) {
-      return;
-    }
-
     // Update the map from segment to enabled ONLINE/CONSUMING instances and set of unavailable segments (no enabled
     // instance or all enabled instances are in ERROR state)
     _segmentStateSnapshot =
@@ -266,11 +249,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
     _segmentToOnlineInstancesMap.clear();
-    _instanceToSegmentsMap.clear();
 
     // Update the cached maps
-    updateSegmentMaps(idealState, externalView, onlineSegments, _segmentToOnlineInstancesMap, _instanceToSegmentsMap,
-        _newSegmentStates, nowMillis);
+    updateSegmentMaps(idealState, externalView, onlineSegments, _segmentToOnlineInstancesMap, _newSegmentStates,
+        nowMillis);
 
     _segmentStateSnapshot =
         SegmentStateSnapshot.createSnapshot(_tableNameWithType, _segmentToOnlineInstancesMap, _newSegmentStates,
@@ -282,8 +264,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    */
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> instanceToSegmentsMap,
-      Map<String, SegmentState> newSegmentStateMap, long nowMillis) {
+      Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap,
+      long nowMillis) {
     // NOTE: Segments with missing external view are considered as new.
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
     // Iterate over the ideal state instead of the external view since this will cover segment with missing external
@@ -312,7 +294,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         String externalViewState = instanceStateEntry.getValue();
         // Do not track instances in ERROR state
         if (!externalViewState.equals(SegmentStateModel.ERROR)) {
-          instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
           if (SegmentStateModel.isOnline(externalViewState)) {
             onlineInstances.add(instance);
           }
@@ -321,7 +302,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           newSegmentStateMap.remove(segment);
         }
       }
-      SegmentState state = newSegmentStateMap.getOrDefault(segment, null);
+      SegmentState state = newSegmentStateMap.get(segment);
       boolean isNewSegment = false;
       if (state != null && state.isNew(nowMillis)) {
         if (onlineInstances.size() == idealStateInstanceStateMap.size()) {

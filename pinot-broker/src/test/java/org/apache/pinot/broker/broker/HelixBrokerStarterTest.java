@@ -155,16 +155,17 @@ public class HelixBrokerStarterTest extends ControllerTest {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + OFFLINE_TABLE_NAME);
     RoutingTable routingTable = routingManager.getRoutingTable(brokerRequest, 0);
     assertNotNull(routingTable);
-    // All segments are new, so we don't have segments to route or unavailable segments to report.
-    assertEquals(routingTable.getServerInstanceToSegmentsMap().size(), 0);
-    assertTrue(routingTable.getUnavailableSegments().isEmpty());
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().size(), NUM_SERVERS);
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().size(), NUM_OFFLINE_SEGMENTS);
 
     // Add a new segment into the OFFLINE table
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
 
-    assertEquals(routingTable.getServerInstanceToSegmentsMap().size(), 0);
-    assertTrue(routingTable.getUnavailableSegments().isEmpty());
+    TestUtils.waitForCondition(aVoid ->
+        routingManager.getRoutingTable(brokerRequest, 0).getServerInstanceToSegmentsMap()
+            .values().iterator().next().size() == NUM_OFFLINE_SEGMENTS + 1, 30_000L, "Failed to add the new segment "
+        + "into the routing table");
     // Add a new table with different broker tenant
     String newRawTableName = "newTable";
     String newOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(newRawTableName);

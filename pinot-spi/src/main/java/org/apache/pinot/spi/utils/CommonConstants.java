@@ -122,7 +122,7 @@ public class CommonConstants {
         public static final String ERROR = "ERROR";
         public static final String CONSUMING = "CONSUMING";
         public static boolean isOnline(String state) {
-          return state == ONLINE || state == CONSUMING;
+          return state.equals(ONLINE) || state.equals(CONSUMING);
         }
       }
 
