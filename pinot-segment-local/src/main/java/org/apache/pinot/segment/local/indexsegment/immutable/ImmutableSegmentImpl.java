@@ -102,10 +102,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _validDocIds = validDocIds;
   }
 
-  public void setValidDocIds(ThreadSafeMutableRoaringBitmap validDocIds) {
-    _validDocIds = validDocIds;
-  }
-
   @Nullable
   public MutableRoaringBitmap loadValidDocIdsFromSnapshot() {
     File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
