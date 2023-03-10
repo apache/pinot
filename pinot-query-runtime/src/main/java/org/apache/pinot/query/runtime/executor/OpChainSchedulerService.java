@@ -27,7 +27,6 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,21 +40,28 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("UnstableApiUsage")
 public class OpChainSchedulerService extends AbstractExecutionThreadService {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
-  // Default time scheduler is allowed to wait for a runnable OpChain to be available
+  /**
+   * Default time scheduler is allowed to wait for a runnable OpChain to be available.
+   */
   private static final long DEFAULT_SCHEDULER_NEXT_WAIT_MS = 100;
+  /**
+   * Default cancel signal retention, this should be set to several times larger than
+   * {@link org.apache.pinot.query.service.QueryConfig#DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS}.
+   */
+  private static final long DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
   private final Cache<Long, Long> _cancelledRequests;
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
-    this(scheduler, workerPool, QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
+    this(scheduler, workerPool, DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS);
   }
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long releaseTimeoutMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
-    _cancelledRequests = CacheBuilder.newBuilder().expireAfterAccess(releaseTimeoutMs, TimeUnit.MILLISECONDS).build();
+    _cancelledRequests = CacheBuilder.newBuilder().expireAfterWrite(releaseTimeoutMs, TimeUnit.MILLISECONDS).build();
   }
 
   @Override
