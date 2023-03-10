@@ -124,6 +124,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (validDocIds != null && validDocIds.isEmpty()) {
         _logger.info("Skip adding segment: {} without valid doc, current primary key count: {}",
             segment.getSegmentName(), getNumPrimaryKeys());
+       immutableSegmentImpl.setValidDocIds(new ThreadSafeMutableRoaringBitmap());
         return;
       }
     } else {
