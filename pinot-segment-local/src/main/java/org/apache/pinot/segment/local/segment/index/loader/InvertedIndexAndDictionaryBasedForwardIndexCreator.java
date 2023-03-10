@@ -281,7 +281,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
       IndexCreationContext.Forward context =
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
-              .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
+              .withColumnMetadata(_columnMetadata).withForwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
               .withLengthOfLongestEntry(lengthOfLongestEntry).build()
               .forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());
 
@@ -360,7 +360,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
       IndexCreationContext.Forward context =
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
-              .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
+              .withColumnMetadata(_columnMetadata).withForwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
               .withTotalNumberOfEntries(_nextValueId).withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
               .withMaxRowLengthInBytes(maxRowLengthInBytes[0]).withLengthOfLongestEntry(lengthOfLongestEntry)
               .build().forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());
