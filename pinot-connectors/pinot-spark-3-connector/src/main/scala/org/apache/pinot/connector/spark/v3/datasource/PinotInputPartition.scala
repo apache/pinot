@@ -23,6 +23,16 @@ import org.apache.pinot.connector.spark.common.partition.PinotSplit
 import org.apache.spark.sql.connector.read.InputPartition
 import org.apache.spark.sql.types.StructType
 
+/**
+ * PinotInputPartition: Implements Spark's InputPartition which convey partition related information
+ * from Spark master to executors. This class is serialized and sent across the network so it should
+ * be kept lean for good performance.
+ *
+ * @param schema        Schema for the scan/read operation. This can be a subset of the tables schema
+ * @param partitionId   Integer which is used as requestId when sending query to Pinot servers
+ * @param pinotSplit    An instance of PinotSplit which encapsulates segment and query information
+ * @param dataSourceOptions PinotDataSourceReadOptions instance created for the read
+ */
 case class PinotInputPartition(
     schema: StructType,
     partitionId: Int,

@@ -25,6 +25,13 @@ import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownF
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 
+/**
+ * PinotScanBuilder: Implementation of Spark DataSourceV2 API's ScanBuilder interface.
+ * This is the main class in which various push down functionality is implemented.
+ * We currently support pushing down Filters (where clause) and RequiredColumns (selection).
+ *
+ * @param readParameters PinotDataSourceReadOptions instance for the read
+ */
 class PinotScanBuilder(readParameters: PinotDataSourceReadOptions)
   extends ScanBuilder with SupportsPushDownFilters with SupportsPushDownRequiredColumns {
 

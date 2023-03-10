@@ -35,6 +35,14 @@ import org.apache.spark.sql.types.StructType
 
 import scala.collection.mutable.Map
 
+/**
+ * PinotScan implements Spark's 'Scan', which is a logical representation of a scan operation,
+ * and also adds the 'Batch' mixin to support batch reads.
+ *
+ * @param query   An instance of ScanQuery which encapsulates SQL queries to be executed
+ * @param schema
+ * @param readParameters
+ */
 class PinotScan(
     query: ScanQuery,
     schema: StructType,

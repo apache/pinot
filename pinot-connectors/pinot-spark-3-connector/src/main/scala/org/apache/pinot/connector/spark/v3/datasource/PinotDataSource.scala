@@ -27,6 +27,10 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 import java.util
 
+/**
+ * PinotDataSource implements TableProvider interface of Spark DataSourceV2 API
+ * to provide read access to Pinot tables.
+ */
 class PinotDataSource extends TableProvider with DataSourceRegister {
   override def shortName(): String = "pinot"
 

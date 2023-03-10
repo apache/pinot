@@ -26,6 +26,14 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 import java.util
 
+/**
+ * PinotTable implements Spark's Table interface to expose a logical representation of a
+ * Pinot table. This is the interface where Spark discovers table capabilities such as
+ * 'SupportsRead'. For now Pinot tables only support batch reads.
+ *
+ * @param name    Pinot table name
+ * @param schema  Schema provided by Spark. This can be different than table schema
+ */
 class PinotTable(name: String, schema: StructType) extends Table with SupportsRead {
   override def name(): String = name
 
