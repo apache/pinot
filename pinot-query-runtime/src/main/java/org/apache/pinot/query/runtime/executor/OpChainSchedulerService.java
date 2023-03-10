@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -38,15 +40,28 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("UnstableApiUsage")
 public class OpChainSchedulerService extends AbstractExecutionThreadService {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
-  // Default time scheduler is allowed to wait for a runnable OpChain to be available
+  /**
+   * Default time scheduler is allowed to wait for a runnable OpChain to be available.
+   */
   private static final long DEFAULT_SCHEDULER_NEXT_WAIT_MS = 100;
+  /**
+   * Default cancel signal retention, this should be set to several times larger than
+   * {@link org.apache.pinot.query.service.QueryConfig#DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS}.
+   */
+  private static final long DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
+  private final Cache<Long, Long> _cancelledRequests;
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
+    this(scheduler, workerPool, DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS);
+  }
+
+  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long cancelRetentionMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
+    _cancelledRequests = CacheBuilder.newBuilder().expireAfterWrite(cancelRetentionMs, TimeUnit.MILLISECONDS).build();
   }
 
   @Override
@@ -72,8 +87,11 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
           Throwable thrown = null;
           try {
             LOGGER.trace("({}): Executing", operatorChain);
+            // throw if the operatorChain is cancelled.
+            if (_cancelledRequests.asMap().containsKey(operatorChain.getId().getRequestId())) {
+              throw new InterruptedException("Query was cancelled!");
+            }
             operatorChain.getStats().executing();
-
             // so long as there's work to be done, keep getting the next block
             // when the operator chain returns a NOOP block, then yield the execution
             // of this to another worker
@@ -125,6 +143,15 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
         operatorChain,
         operatorChain.getReceivingMailbox(),
         _scheduler.size());
+  }
+
+  /**
+   * Async cancel a request. Request will not be fully cancelled until the next time opChain is being polled.
+   *
+   * @param requestId requestId to be cancelled.
+   */
+  public final void cancel(long requestId) {
+    _cancelledRequests.put(requestId, requestId);
   }
 
   /**
