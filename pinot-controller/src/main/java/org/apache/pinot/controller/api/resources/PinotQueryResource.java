@@ -180,7 +180,9 @@ public class PinotQueryResource {
     String brokerTenant = getCommonBrokerTenant(tableNames);
     String serverTenant = getCommonServerTenant(tableNames);
     if (brokerTenant == null || serverTenant == null) {
-      return QueryException.TABLES_NOT_ON_SAME_TENANT_ERROR.toString();
+      return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
+          new Exception(String.format("Unable to dispatch multistage query with multiple tables : %s "
+              + "on different tenant", tableNames))).toString();
     }
     List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenant));
 
