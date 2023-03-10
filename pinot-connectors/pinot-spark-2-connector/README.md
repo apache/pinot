@@ -20,7 +20,7 @@
 -->
 # Spark-Pinot Connector
 
-Spark-pinot connector to read and write data from/to Pinot.
+Spark-pinot connector to read data from Pinot.
 
 Detailed read model documentation is here; [Spark-Pinot Connector Read Model](documentation/read_model.md)
 
