@@ -33,13 +33,10 @@ public class PinotQueryRuleSets {
     // do not instantiate.
   }
 
-  public static final Collection<RelOptRule> LOGICAL_OPT_RULES =
+  public static final Collection<RelOptRule> BASIC_RULES =
       Arrays.asList(EnumerableRules.ENUMERABLE_FILTER_RULE, EnumerableRules.ENUMERABLE_JOIN_RULE,
           EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_WINDOW_RULE,
           EnumerableRules.ENUMERABLE_SORT_RULE, EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
-
-          // ------------------------------------------------------------------
-          // Calcite core rules
 
           // push a filter into a join
           CoreRules.FILTER_INTO_JOIN,
@@ -89,39 +86,41 @@ public class PinotQueryRuleSets {
 
           // reduce aggregate functions like AVG, STDDEV_POP etc.
           PinotReduceAggregateFunctionsRule.INSTANCE,
-          CoreRules.AGGREGATE_REDUCE_FUNCTIONS,
-
-          // remove unnecessary sort rule
-          CoreRules.SORT_REMOVE,
-
-          // prune empty results rules
-          PruneEmptyRules.AGGREGATE_INSTANCE, PruneEmptyRules.FILTER_INSTANCE, PruneEmptyRules.JOIN_LEFT_INSTANCE,
-          PruneEmptyRules.JOIN_RIGHT_INSTANCE, PruneEmptyRules.PROJECT_INSTANCE, PruneEmptyRules.SORT_INSTANCE,
-          PruneEmptyRules.UNION_INSTANCE,
-
-          // ------------------------------------------------------------------
-          // Pinot specific rules
-          // ------------------------------------------------------------------
-
-          // ---- rules apply before exchange insertion.
-          PinotFilterExpandSearchRule.INSTANCE,
-
-          // ---- rules that insert exchange.
-          // add an extra exchange for sort
-          PinotSortExchangeNodeInsertRule.INSTANCE,
-          // copy exchanges down, this must be done after SortExchangeNodeInsertRule
-          PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
-
-          PinotJoinExchangeNodeInsertRule.INSTANCE,
-          PinotAggregateExchangeNodeInsertRule.INSTANCE,
-          PinotWindowExchangeNodeInsertRule.INSTANCE
+          CoreRules.AGGREGATE_REDUCE_FUNCTIONS
       );
 
+  // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
+  // single HepInstruction.
   public static final Collection<RelOptRule> FILTER_PUSHDOWN_RULES = ImmutableList.of(
       CoreRules.FILTER_INTO_JOIN,
       CoreRules.FILTER_AGGREGATE_TRANSPOSE,
       CoreRules.FILTER_SET_OP_TRANSPOSE,
-      CoreRules.FILTER_PROJECT_TRANSPOSE,
-      PinotFilterExchangeTransposeRule.INSTANCE
+      CoreRules.FILTER_PROJECT_TRANSPOSE
+  );
+
+  // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
+  public static final Collection<RelOptRule> PRUNE_RULES = ImmutableList.of(
+      CoreRules.PROJECT_MERGE,
+      CoreRules.AGGREGATE_REMOVE,
+      CoreRules.SORT_REMOVE,
+      PruneEmptyRules.AGGREGATE_INSTANCE, PruneEmptyRules.FILTER_INSTANCE, PruneEmptyRules.JOIN_LEFT_INSTANCE,
+      PruneEmptyRules.JOIN_RIGHT_INSTANCE, PruneEmptyRules.PROJECT_INSTANCE, PruneEmptyRules.SORT_INSTANCE,
+      PruneEmptyRules.UNION_INSTANCE
+  );
+
+  // Pinot specific rules that should be run after all other rules
+  public static final Collection<RelOptRule> PINOT_POST_RULES = ImmutableList.of(
+      // ---- rules apply before exchange insertion.
+      PinotFilterExpandSearchRule.INSTANCE,
+
+      // ---- rules that insert exchange.
+      // add an extra exchange for sort
+      PinotSortExchangeNodeInsertRule.INSTANCE,
+      // copy exchanges down, this must be done after SortExchangeNodeInsertRule
+      PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
+
+      PinotJoinExchangeNodeInsertRule.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.INSTANCE,
+      PinotWindowExchangeNodeInsertRule.INSTANCE
   );
 }
