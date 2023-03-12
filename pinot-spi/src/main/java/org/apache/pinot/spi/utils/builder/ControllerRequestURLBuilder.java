@@ -379,26 +379,47 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentListAPI(String tableName) {
-    return forSegmentListAPI(tableName, null, false);
+    return forSegmentListAPI(tableName, null, false, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
 
   public String forSegmentListAPI(String tableName, String tableType) {
-    return forSegmentListAPI(tableName, tableType, false);
+    return forSegmentListAPI(tableName, tableType, false, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
 
-  public String forSegmentListAPI(String tableName, @Nullable String tableType, boolean excludeReplacedSegments) {
-    String url = StringUtil.join("/", _baseUrl, "segments", tableName);
+  public String forSegmentListAPI(String tableName, String tableType, boolean excludeReplacedSegments) {
+    return forSegmentListAPI(tableName, tableType, excludeReplacedSegments, Long.MIN_VALUE, Long.MAX_VALUE, false);
+  }
+
+  public String forSegmentListAPI(String tableName, @Nullable String tableType, boolean excludeReplacedSegments,
+      long startTimestamp, long endTimestamp, boolean excludeOverlapping) {
+    StringBuilder url = new StringBuilder();
+    url.append(StringUtil.join("/", _baseUrl, "segments", tableName));
+
+    StringBuilder parameter = new StringBuilder();
     if (tableType != null) {
-      url += "?type=" + tableType;
-      if (excludeReplacedSegments) {
-        url += "&excludeReplacedSegments=" + excludeReplacedSegments;
-      }
-    } else {
-      if (excludeReplacedSegments) {
-        url += "?excludeReplacedSegments=" + excludeReplacedSegments;
-      }
+      appendUrlParameter(parameter, "type", tableType);
     }
-    return url;
+    if (excludeReplacedSegments) {
+      appendUrlParameter(parameter, "excludeReplacedSegments", "true");
+    }
+    if (startTimestamp != Long.MIN_VALUE) {
+      appendUrlParameter(parameter, "startTimestamp", Long.toString(startTimestamp));
+    }
+    if (endTimestamp != Long.MAX_VALUE) {
+      appendUrlParameter(parameter, "endTimestamp", Long.toString(endTimestamp));
+    }
+    if (excludeOverlapping) {
+      appendUrlParameter(parameter, "excludeOverlapping", "true");
+    }
+    return url.append(parameter).toString();
+  }
+
+  private void appendUrlParameter(StringBuilder url, String urlParameterKey, String urlParameterValue) {
+    if (url.length() == 0) {
+      url.append("?").append(urlParameterKey).append("=").append(urlParameterValue);
+    } else {
+      url.append("&").append(urlParameterKey).append("=").append(urlParameterValue);
+    }
   }
 
   public String forInstancePartitions(String tableName, @Nullable String instancePartitionsType) {

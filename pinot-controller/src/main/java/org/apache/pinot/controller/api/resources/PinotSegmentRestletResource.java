@@ -197,16 +197,36 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to exclude replaced segments in the response, which have been replaced"
           + " specified in the segment lineage entries and cannot be queried from the table")
-      @QueryParam("excludeReplacedSegments") String excludeReplacedSegments) {
-    List<String> tableNamesWithType = ResourceUtils
-        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
-            LOGGER);
+      @QueryParam("excludeReplacedSegments") String excludeReplacedSegments,
+      @ApiParam(value = "Start timestamp (inclusive)") @QueryParam("startTimestamp") @DefaultValue("")
+      String startTimestampStr,
+      @ApiParam(value = "End timestamp (exclusive)") @QueryParam("endTimestamp") @DefaultValue("")
+      String endTimestampStr,
+      @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
+      @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping) {
+    long startTimestamp;
+    long endTimestamp;
+    try {
+      startTimestamp = Strings.isNullOrEmpty(startTimestampStr) ? Long.MIN_VALUE : Long.parseLong(startTimestampStr);
+      endTimestamp = Strings.isNullOrEmpty(endTimestampStr) ? Long.MAX_VALUE : Long.parseLong(endTimestampStr);
+    } catch (NumberFormatException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to parse the start/end timestamp. Please make sure they are in 'millisSinceEpoch' format.",
+          Response.Status.BAD_REQUEST, e);
+    }
+    Preconditions.checkArgument(startTimestamp < endTimestamp,
+        "The value of startTimestamp should be smaller than the one of endTimestamp. Start timestamp: %d. End "
+            + "timestamp: %d", startTimestamp, endTimestamp);
+
+    List<String> tableNamesWithType = ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+        Constants.validateTableType(tableTypeStr), LOGGER);
     boolean shouldExcludeReplacedSegments = Boolean.parseBoolean(excludeReplacedSegments);
     List<Map<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       List<String> segments =
-          _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments);
+          _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments, startTimestamp,
+              endTimestamp, excludeOverlapping);
       resultList.add(Collections.singletonMap(tableType, segments));
     }
     return resultList;
@@ -983,6 +1003,7 @@ public class PinotSegmentRestletResource {
     return tableTierDetails;
   }
 
+  @Deprecated
   @GET
   @Path("segments/{tableName}/select")
   @Produces(MediaType.APPLICATION_JSON)
@@ -1003,8 +1024,16 @@ public class PinotSegmentRestletResource {
           String endTimestampStr,
       @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
       @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping) {
-    long startTimestamp = Strings.isNullOrEmpty(startTimestampStr) ? Long.MIN_VALUE : Long.parseLong(startTimestampStr);
-    long endTimestamp = Strings.isNullOrEmpty(endTimestampStr) ? Long.MAX_VALUE : Long.parseLong(endTimestampStr);
+    long startTimestamp;
+    long endTimestamp;
+    try {
+      startTimestamp = Strings.isNullOrEmpty(startTimestampStr) ? Long.MIN_VALUE : Long.parseLong(startTimestampStr);
+      endTimestamp = Strings.isNullOrEmpty(endTimestampStr) ? Long.MAX_VALUE : Long.parseLong(endTimestampStr);
+    } catch (NumberFormatException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to parse the start/end timestamp. Please make sure they are in 'millisSinceEpoch' format.",
+          Response.Status.BAD_REQUEST, e);
+    }
     Preconditions.checkArgument(startTimestamp < endTimestamp,
         "The value of startTimestamp should be smaller than the one of endTimestamp. Start timestamp: %d. End "
             + "timestamp: %d",
@@ -1016,8 +1045,9 @@ public class PinotSegmentRestletResource {
     List<Map<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      List<String> segments = _pinotHelixResourceManager
-          .getSegmentsForTableWithTimestamps(tableNameWithType, startTimestamp, endTimestamp, excludeOverlapping);
+      List<String> segments =
+          _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, true, startTimestamp, endTimestamp,
+              excludeOverlapping);
       resultList.add(Collections.singletonMap(tableType, segments));
     }
     return resultList;

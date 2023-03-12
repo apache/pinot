@@ -739,36 +739,26 @@ public class PinotHelixResourceManager {
    * @return List of segment names
    */
   public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments) {
-    IdealState idealState = getTableIdealState(tableNameWithType);
-    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-    List<String> segments = new ArrayList<>(idealState.getPartitionSet());
-    return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
+    return getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
 
   /**
-   * Returns the segments for the given table from the property store. This API is useful to track the orphan segments
-   * that are removed from the ideal state but not the property store.
-   */
-  public List<String> getSegmentsFromPropertyStore(String tableNameWithType) {
-    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
-  }
-
-  /**
-   * Returns the segments for the given table based on the start and end timestamp from the ideal state.
+   * Returns the segments for the given table from the ideal state.
    *
-   * @param tableNameWithType  Table name with type suffix
+   * @param tableNameWithType Table name with type suffix
+   * @param shouldExcludeReplacedSegments whether to return the list of segments that doesn't contain replaced segments.
    * @param startTimestamp  start timestamp in milliseconds (inclusive)
    * @param endTimestamp  end timestamp in milliseconds (exclusive)
    * @param excludeOverlapping  whether to exclude the segments overlapping with the timestamps
+   * @return List of segment names
    */
-  public List<String> getSegmentsForTableWithTimestamps(String tableNameWithType, long startTimestamp,
-      long endTimestamp, boolean excludeOverlapping) {
+  public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments,
+      long startTimestamp, long endTimestamp, boolean excludeOverlapping) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-    Set<String> segments = idealState.getPartitionSet();
-    // If no start and end timestamp specified, just select all the segments.
+    List<String> segments = new ArrayList<>(idealState.getPartitionSet());
     if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
-      return excludeReplacedSegments(tableNameWithType, new ArrayList<>(segments));
+      return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
     } else {
       List<String> selectedSegments = new ArrayList<>();
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
@@ -779,8 +769,17 @@ public class PinotHelixResourceManager {
           selectedSegments.add(segmentName);
         }
       }
-      return excludeReplacedSegments(tableNameWithType, selectedSegments);
+      return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, selectedSegments)
+          : selectedSegments;
     }
+  }
+
+  /**
+   * Returns the segments for the given table from the property store. This API is useful to track the orphan segments
+   * that are removed from the ideal state but not the property store.
+   */
+  public List<String> getSegmentsFromPropertyStore(String tableNameWithType) {
+    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
   }
 
   /**
