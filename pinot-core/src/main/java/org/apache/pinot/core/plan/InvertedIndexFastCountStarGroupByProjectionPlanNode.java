@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -34,7 +35,9 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.Pairs;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements PlanNode {
@@ -42,11 +45,14 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
   private final Map<String, DataSource> _dataSourceMap;
 
   private static class CountStarForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
-    private final InvertedIndexReader<ImmutableRoaringBitmap> _invIndex;
+    private final InvertedIndexReader _invIndex;
+    private final BaseFilterOperator _filterOperator;
     private final long _size;
 
-    public CountStarForwardIndexReader(InvertedIndexReader<ImmutableRoaringBitmap> invertedIndexReader, long size) {
+    public CountStarForwardIndexReader(InvertedIndexReader invertedIndexReader, BaseFilterOperator filterOperator,
+        long size) {
       _invIndex = invertedIndexReader;
+      _filterOperator = filterOperator;
       _size = size;
     }
 
@@ -72,7 +78,15 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
 
     @Override
     public long getLong(int docId, ForwardIndexReaderContext context) {
-      return _invIndex.getDocIds(docId).getLongCardinality();
+      Object docIds = _invIndex.getDocIds(docId);
+      MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+      if (docIds instanceof Pairs.IntPair) {
+        bitmap.add(((Pairs.IntPair) docIds).getLeft(), ((Pairs.IntPair) docIds).getRight() + 1L);
+      } else if (docIds instanceof ImmutableRoaringBitmap) {
+        bitmap = ((ImmutableRoaringBitmap) docIds).toMutableRoaringBitmap();
+      }
+
+      return ImmutableRoaringBitmap.andCardinality(bitmap, _filterOperator.getBitmaps().reduce());
     }
 
     @Override
@@ -144,17 +158,18 @@ public class InvertedIndexFastCountStarGroupByProjectionPlanNode implements Plan
     }
   }
 
-  public InvertedIndexFastCountStarGroupByProjectionPlanNode(DataSource dataSource) {
+  public InvertedIndexFastCountStarGroupByProjectionPlanNode(DataSource dataSource, BaseFilterOperator filterOperator) {
     _dataSource = dataSource;
 
     _dataSourceMap = new HashMap<>();
     _dataSourceMap.put(_dataSource.getDataSourceMetadata().getFieldSpec().getName(),
         new StarTreeDataSource(_dataSource.getDataSourceMetadata().getFieldSpec(), _dataSource.getDictionary().length(),
             new DictionaryBasedForwardIndexReader(_dataSource.getDictionary()), null));
+
     _dataSourceMap.put(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(), new StarTreeDataSource(
         new DimensionFieldSpec(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(),
             DimensionFieldSpec.DataType.LONG, true), dataSource.getDictionary().length(),
-        new CountStarForwardIndexReader((InvertedIndexReader<ImmutableRoaringBitmap>) _dataSource.getInvertedIndex(),
+        new CountStarForwardIndexReader(_dataSource.getInvertedIndex(), filterOperator,
             dataSource.getDictionary().length()), null));
   }
 
