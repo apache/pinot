@@ -29,6 +29,8 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher.*;
+import static org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher.DEFAULT_RETRY_DELAY_SCALE_FACTOR;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR;
@@ -94,6 +96,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Key of whether to use streamed server segment download-untar
   private static final String ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = "segment.stream.download.untar";
   private static final boolean DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = false;
+
+  // Whether to retry untar failures
+  private static final String RETRY_SEGMENT_DOWNLOAD_UNTAR_FAILURE = "retry.segment.download.untar.failure";
+  private static final boolean DEFAULT_RETRY_SEGMENT_DOWNLOAD_UNTAR_FAILURE = false;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -264,6 +270,28 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public long getStreamSegmentDownloadUntarRateLimit() {
     return _instanceDataManagerConfiguration.getProperty(STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT,
         DEFAULT_STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT);
+  }
+
+  @Override
+  public boolean isRetrySegmentDownloadUntarFailure() {
+    return _instanceDataManagerConfiguration.getProperty(RETRY_SEGMENT_DOWNLOAD_UNTAR_FAILURE,
+        DEFAULT_RETRY_SEGMENT_DOWNLOAD_UNTAR_FAILURE);
+  }
+
+  @Override
+  public int getRetryWaitMs() {
+    return _instanceDataManagerConfiguration.getProperty(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);
+  }
+
+  @Override
+  public int getRetryCount() {
+    return _instanceDataManagerConfiguration.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
+  }
+
+  @Override
+  public int getRetryDelayScaleFactor() {
+    return _instanceDataManagerConfiguration.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY,
+        DEFAULT_RETRY_DELAY_SCALE_FACTOR);
   }
 
   @Override

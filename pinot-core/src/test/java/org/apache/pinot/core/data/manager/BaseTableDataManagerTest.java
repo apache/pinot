@@ -67,16 +67,12 @@ import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -694,6 +690,32 @@ public class BaseTableDataManagerTest {
     }
   }
 
+  @Test
+  public void testUntarAndMoveSegmentWithRetries()
+      throws IOException {
+    BaseTableDataManager tmgr = createTableManagerWithRetries();
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-untar-failure-retries");
+
+    // All input and intermediate files are put in the tempRootDir.
+    File tempTar = new File(tempRootDir, "seg01_retry" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempInputDir = new File(tempRootDir, "seg01_input_retry");
+    FileUtils.write(new File(tempInputDir, "retry.txt"), "checking retry failures in untar");
+    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
+    FileUtils.deleteQuietly(tempInputDir);
+
+    SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
+    BaseTableDataManager spiedTmgr = Mockito.spy(tmgr);
+    doThrow(IOException.class).when(spiedTmgr).untarAndMoveSegment("seg01_retry", tempTar, tempRootDir);
+    File downloadTar = new File(tempRootDir, "seg01_retry" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    try {
+      doReturn(downloadTar).when(spiedTmgr).downloadAndDecrypt("seg01_retry", zkmd, tempRootDir);
+    } catch (Exception e) {
+      //expected
+    }
+    Assert.assertThrows(AttemptsExceededException.class,
+        () -> spiedTmgr.untarAndMoveSegmentWithRetries("seg01_retry", tempTar, tempRootDir, zkmd));
+  }
+
   // Has to be public class for the class loader to work.
   public static class FakePinotCrypter implements PinotCrypter {
     private File _origFile;
@@ -730,6 +752,18 @@ public class BaseTableDataManagerTest {
     tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
         new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null,
         new TableDataManagerParams(0, false, -1));
+    tableDataManager.start();
+    return tableDataManager;
+  }
+
+  private static BaseTableDataManager createTableManagerWithRetries() {
+    TableDataManagerConfig config = createDefaultTableDataManagerConfig();
+
+    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
+    tableDataManager.init(config, "retryInstance", mock(ZkHelixPropertyStore.class),
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new TableDataManagerParams(0, false,
+            true, 3, 10, 2, -1));
     tableDataManager.start();
     return tableDataManager;
   }
