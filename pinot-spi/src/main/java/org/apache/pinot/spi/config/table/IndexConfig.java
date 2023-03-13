@@ -16,25 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
+package org.apache.pinot.spi.config.table;
 
-import org.apache.pinot.segment.spi.index.IndexReader;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 /**
- * Interface for bloom filter reader.
+ * This is the base class used to configure indexes.
+ *
+ * The common logic between all indexes is that they can be enabled or disabled.
+ *
+ * Indexes that do not require extra configuration can directly use this class.
  */
-public interface BloomFilterReader extends IndexReader {
+public class IndexConfig extends BaseJsonConfig {
+  public static final IndexConfig ENABLED = new IndexConfig(true);
+  public static final IndexConfig DISABLED = new IndexConfig(false);
+  private final boolean _enabled;
 
-  /**
-   * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.
-   */
-  boolean mightContain(String value);
+  @JsonCreator
+  public IndexConfig(@JsonProperty("enabled") boolean enabled) {
+    _enabled = enabled;
+  }
 
-  /**
-   * Returns {@code true} if the value with the given hash might have been put in this bloom filer, {@code false}
-   * otherwise.
-   * <p>This method is provided to prevent hashing the same value multiple times.
-   */
-  boolean mightContain(long hash1, long hash2);
+  public boolean isEnabled() {
+    return _enabled;
+  }
 }
