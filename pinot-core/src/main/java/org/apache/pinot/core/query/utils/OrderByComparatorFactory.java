@@ -38,17 +38,13 @@ public class OrderByComparatorFactory {
   }
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
-      TransformResultMetadata[] orderByExpressionMetadata, boolean reverse, boolean nullHandlingEnabled) {
-    return getComparator(orderByExpressions, orderByExpressionMetadata, reverse, nullHandlingEnabled, 0,
+      TransformResultMetadata[] orderByExpressionMetadata, boolean nullHandlingEnabled) {
+    return getComparator(orderByExpressions, orderByExpressionMetadata, nullHandlingEnabled, 0,
         orderByExpressions.size());
   }
 
-  /**
-   * @param reverse if false, the comparator will order in the direction indicated by the
-   * {@link OrderByExpressionContext#isAsc()}. Otherwise, it will be in the opposite direction.
-   */
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
-      TransformResultMetadata[] orderByExpressionMetadata, boolean reverse, boolean nullHandlingEnabled, int from,
+      TransformResultMetadata[] orderByExpressionMetadata, boolean nullHandlingEnabled, int from,
       int to) {
     Preconditions.checkArgument(to <= orderByExpressions.size(),
         "Trying to access %sth position of orderByExpressions with size %s", to, orderByExpressions.size());
@@ -76,13 +72,11 @@ public class OrderByComparatorFactory {
     FieldSpec.DataType[] storedTypes = new FieldSpec.DataType[numValuesToCompare];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numValuesToCompare];
-    int ascMult = reverse ? -1 : 1;
-    int descMult = reverse ? 1 : -1;
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
       storedTypes[i] = orderByExpressionMetadata[valueIndex].getDataType().getStoredType();
-      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? ascMult : descMult;
+      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? 1 : -1;
     }
 
     if (nullHandlingEnabled) {

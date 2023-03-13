@@ -18,56 +18,61 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
   private final Consumer<MailboxIdentifier> _gotMailCallback;
-  private final String _mailboxId;
+  private final JsonMailboxIdentifier _mailboxId;
 
-  // TODO: changed to 2-way communication channel.
-  private BlockingQueue<TransferableBlock> _queue;
+  private Supplier<InMemoryTransferStream> _transferStreamProvider;
+  private InMemoryTransferStream _transferStream;
 
-  public InMemorySendingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue,
+  public InMemorySendingMailbox(String mailboxId, Supplier<InMemoryTransferStream> transferStreamProvider,
       Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxId = mailboxId;
-    _queue = queue;
+    _mailboxId = JsonMailboxIdentifier.parse(mailboxId);
+    _transferStreamProvider = transferStreamProvider;
     _gotMailCallback = gotMailCallback;
   }
 
   @Override
-  public void open() {
-  }
-
-  @Override
   public String getMailboxId() {
-    return _mailboxId;
+    return _mailboxId.toString();
   }
 
   @Override
   public void send(TransferableBlock data)
-      throws UnsupportedOperationException {
-    if (!_queue.offer(data)) {
-      // this should never happen, since we use a LinkedBlockingQueue
-      // which does not have capacity bounds
-      throw new IllegalStateException("Failed to insert into in-memory mailbox " + _mailboxId);
+      throws Exception {
+    if (!isInitialized()) {
+      initialize();
     }
-    _gotMailCallback.accept(JsonMailboxIdentifier.parse(_mailboxId));
+    _transferStream.send(data);
+    _gotMailCallback.accept(_mailboxId);
   }
 
   @Override
-  public void complete() {
+  public void complete() throws Exception {
+    _transferStream.complete();
   }
 
   @Override
-  public void waitForFinish(long timeout, TimeUnit unit)
-      throws InterruptedException {
+  public boolean isInitialized() {
+    return _transferStream != null;
   }
 
   @Override
   public void cancel(Throwable t) {
+    if (isInitialized() && !_transferStream.isCancelled()) {
+      _transferStream.cancel();
+    }
+  }
+
+  private void initialize() {
+    if (_transferStream == null) {
+      _transferStream = _transferStreamProvider.get();
+    }
   }
 }

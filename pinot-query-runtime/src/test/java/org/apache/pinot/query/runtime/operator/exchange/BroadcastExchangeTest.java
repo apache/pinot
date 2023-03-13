@@ -57,7 +57,8 @@ public class BroadcastExchangeTest {
   }
 
   @Test
-  public void shouldBroadcast() {
+  public void shouldBroadcast()
+      throws Exception {
     // Given:
     ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
