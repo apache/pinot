@@ -34,7 +34,8 @@ class BroadcastExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
+  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+      throws Exception {
     for (SendingMailbox mailbox : destinations) {
       sendBlock(mailbox, block);
     }

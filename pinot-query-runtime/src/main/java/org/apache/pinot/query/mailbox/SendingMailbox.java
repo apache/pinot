@@ -18,20 +18,15 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.concurrent.TimeUnit;
+import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 
 
 /**
- * Mailbox is used to send and receive data.
+ * Mailbox that's used to send data.
  *
- * Mailbox should be instantiated on both side of MailboxServer.
- *
- * @param <T> type of data carried over the mailbox.
+ * @param <T> unit of data sent in one {@link #send} call.
  */
 public interface SendingMailbox<T> {
-
-  void open();
-
   /**
    * get the unique identifier for the mailbox.
    *
@@ -40,19 +35,36 @@ public interface SendingMailbox<T> {
   String getMailboxId();
 
   /**
-   * send a data packet through the mailbox.
-   * @param data
-   * @throws UnsupportedOperationException
+   * Send a single unit of data to a receiver. Note that SendingMailbox are required to acquire resources lazily in
+   * this call and they should <b>not</b> acquire any resources when they are created. This method should throw if there
+   * was an error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
   void send(T data)
-      throws UnsupportedOperationException;
+      throws Exception;
 
   /**
-   * Complete delivery of the current mailbox.
+   * Called when there is no more data to be sent by the {@link BlockExchange}. This is also a signal for the
+   * SendingMailbox that the sender is done sending data from its end. Note that this doesn't mean that the receiver
+   * has received all the data.
+   *
+   * <p>
+   * <b>Note:</b> While this is similar to a close() method that's usually provided with objects that hold releasable
+   * resources, the key difference is that a SendingMailbox cannot completely release the resources on its end
+   * gracefully, since it would be waiting for the receiver to ack that it has received all the data. See
+   * {@link #cancel} which can allow callers to force release the underlying resources.
+   * </p>
    */
-  void complete();
+  void complete()
+      throws Exception;
 
-  void waitForFinish(long timeout, TimeUnit unit) throws InterruptedException;
+  /**
+   * A SendingMailbox is considered initialized after it has acquired a reference to the underlying channel that will
+   * be used to send data to the receiver.
+   */
+  boolean isInitialized();
 
+  /**
+   * Allows terminating the underlying channel.
+   */
   void cancel(Throwable t);
 }

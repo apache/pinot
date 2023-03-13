@@ -16,31 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index;
+package org.apache.pinot.query.service.dispatch;
 
-import java.io.IOException;
-import org.apache.pinot.spi.config.table.IndexConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.mockito.Mockito;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
+import io.grpc.stub.StreamObserver;
+import org.apache.pinot.common.proto.Worker;
 
 
-public class FieldIndexConfigsTest {
+/**
+ * A no-op {@link StreamObserver} for cancellation requests.
+ */
+class CancelObserver implements StreamObserver<Worker.CancelResponse> {
+  @Override
+  public void onNext(Worker.CancelResponse cancelResponse) {
+  }
 
-  @Test
-  public void testToString()
-      throws IOException {
-    IndexType index1 = Mockito.mock(IndexType.class);
-    Mockito.when(index1.getId()).thenReturn("index1");
-    IndexConfig indexConf = new IndexConfig(true);
-    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
-        .add(index1, indexConf)
-        .build();
+  @Override
+  public void onError(Throwable throwable) {
+  }
 
-    Assert.assertEquals(fieldIndexConfigs.toString(), "{\"index1\":"
-        + JsonUtils.objectToString(indexConf) + "}");
+  @Override
+  public void onCompleted() {
   }
 }
