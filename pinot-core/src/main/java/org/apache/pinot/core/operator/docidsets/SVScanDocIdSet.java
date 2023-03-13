@@ -29,9 +29,9 @@ public final class SVScanDocIdSet implements BlockDocIdSet {
   private final SVScanDocIdIterator _docIdIterator;
 
   public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
-      boolean nullHandlingEnabled) {
+      boolean nullHandlingEnabled, int batchSize) {
     NullValueVectorReader nullValueVector = nullHandlingEnabled ? dataSource.getNullValueVector() : null;
-    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, nullValueVector);
+    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, nullValueVector, batchSize);
   }
 
   @Override

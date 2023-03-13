@@ -29,6 +29,8 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -36,6 +38,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * exchanging data across different servers.
  */
 public abstract class BlockExchange {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BlockExchange.class);
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
@@ -44,10 +47,10 @@ public abstract class BlockExchange {
 
   public static BlockExchange getExchange(MailboxService<TransferableBlock> mailboxService,
       List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector,
-      BlockSplitter splitter) {
+      BlockSplitter splitter, long deadlineMs) {
     List<SendingMailbox<TransferableBlock>> sendingMailboxes = new ArrayList<>();
     for (MailboxIdentifier mid : destinations) {
-      sendingMailboxes.add(mailboxService.getSendingMailbox(mid));
+      sendingMailboxes.add(mailboxService.getSendingMailbox(mid, deadlineMs));
     }
     switch (exchangeType) {
       case SINGLETON:
@@ -71,15 +74,19 @@ public abstract class BlockExchange {
     _splitter = splitter;
   }
 
-  public void send(TransferableBlock block) {
+  public void send(TransferableBlock block)
+      throws Exception {
     if (block.isEndOfStreamBlock()) {
-      _sendingMailboxes.forEach(destination -> sendBlock(destination, block));
+      for (SendingMailbox<TransferableBlock> sendingMailbox : _sendingMailboxes) {
+        sendBlock(sendingMailbox, block);
+      }
       return;
     }
     route(_sendingMailboxes, block);
   }
 
-  protected void sendBlock(SendingMailbox<TransferableBlock> sendingMailbox, TransferableBlock block) {
+  protected void sendBlock(SendingMailbox<TransferableBlock> sendingMailbox, TransferableBlock block)
+      throws Exception {
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);
       sendingMailbox.complete();
@@ -93,5 +100,17 @@ public abstract class BlockExchange {
     }
   }
 
-  protected abstract void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block);
+  protected abstract void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+      throws Exception;
+
+  // Called when the OpChain gracefully returns.
+  // TODO: This is a no-op right now.
+  public void close() {
+  }
+
+  public void cancel(Throwable t) {
+    for (SendingMailbox<TransferableBlock> sendingMailbox : _sendingMailboxes) {
+      sendingMailbox.cancel(t);
+    }
+  }
 }

@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -40,6 +39,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.trace.Tracing;
@@ -192,37 +192,70 @@ public class SelectionOperatorUtils {
   /**
    * Merge two partial results for selection queries without <code>ORDER BY</code>. (Server side)
    *
-   * @param mergedRows partial results 1.
-   * @param rowsToMerge partial results 2.
+   * @param mergedBlock partial results 1.
+   * @param blockToMerge partial results 2.
    * @param selectionSize size of the selection.
    */
-  public static void mergeWithoutOrdering(Collection<Object[]> mergedRows, Collection<Object[]> rowsToMerge,
+  public static void mergeWithoutOrdering(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge,
       int selectionSize) {
-    Iterator<Object[]> iterator = rowsToMerge.iterator();
-    int numMergedRows = 0;
-    while (mergedRows.size() < selectionSize && iterator.hasNext()) {
-      mergedRows.add(iterator.next());
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows);
-      numMergedRows++;
+    List<Object[]> mergedRows = mergedBlock.getRows();
+    List<Object[]> rowsToMerge = blockToMerge.getRows();
+    int numRowsToMerge = Math.min(selectionSize - mergedRows.size(), rowsToMerge.size());
+    if (numRowsToMerge > 0) {
+      mergedRows.addAll(rowsToMerge.subList(0, numRowsToMerge));
     }
   }
 
   /**
    * Merge two partial results for selection queries with <code>ORDER BY</code>. (Server side)
-   * TODO: Should use type compatible comparator to compare the rows
    *
-   * @param mergedRows partial results 1.
-   * @param rowsToMerge partial results 2.
+   * @param mergedBlock partial results 1 (sorted).
+   * @param blockToMerge partial results 2 (sorted).
    * @param maxNumRows maximum number of rows need to be stored.
    */
-  public static void mergeWithOrdering(PriorityQueue<Object[]> mergedRows, Collection<Object[]> rowsToMerge,
+  public static void mergeWithOrdering(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge,
       int maxNumRows) {
-    int numMergedRows = 0;
-    for (Object[] row : rowsToMerge) {
-      addToPriorityQueue(row, mergedRows, maxNumRows);
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows);
-      numMergedRows++;
+    List<Object[]> sortedRows1 = mergedBlock.getRows();
+    List<Object[]> sortedRows2 = blockToMerge.getRows();
+    Comparator<? super Object[]> comparator = mergedBlock.getComparator();
+    assert comparator != null;
+    int numSortedRows1 = sortedRows1.size();
+    int numSortedRows2 = sortedRows2.size();
+    if (numSortedRows1 == 0) {
+      mergedBlock.setRows(sortedRows2);
+      return;
     }
+    if (numSortedRows2 == 0 || (numSortedRows1 == maxNumRows
+        && comparator.compare(sortedRows1.get(numSortedRows1 - 1), sortedRows2.get(0)) <= 0)) {
+      return;
+    }
+    int numRowsToMerge = Math.min(numSortedRows1 + numSortedRows2, maxNumRows);
+    List<Object[]> mergedRows = new ArrayList<>(numRowsToMerge);
+    int i1 = 0;
+    int i2 = 0;
+    int numMergedRows = 0;
+    while (i1 < numSortedRows1 && i2 < numSortedRows2 && numMergedRows < numRowsToMerge) {
+      Object[] row1 = sortedRows1.get(i1);
+      Object[] row2 = sortedRows2.get(i2);
+      if (comparator.compare(row1, row2) <= 0) {
+        mergedRows.add(row1);
+        i1++;
+      } else {
+        mergedRows.add(row2);
+        i2++;
+      }
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows++);
+    }
+    if (numMergedRows < numRowsToMerge) {
+      if (i1 < numSortedRows1) {
+        assert i2 == numSortedRows2;
+        mergedRows.addAll(sortedRows1.subList(i1, i1 + numRowsToMerge - numMergedRows));
+      } else {
+        assert i1 == numSortedRows1;
+        mergedRows.addAll(sortedRows2.subList(i2, i2 + numRowsToMerge - numMergedRows));
+      }
+    }
+    mergedBlock.setRows(mergedRows);
   }
 
   /**

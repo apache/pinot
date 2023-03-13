@@ -19,21 +19,41 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import java.time.Duration;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class InMemoryMailboxService implements MailboxService<TransferableBlock> {
-  // channel manager
+  private static final Logger LOGGER = LoggerFactory.getLogger(InMemoryMailboxService.class);
+  private static final Duration DANGLING_RECEIVING_MAILBOX_EXPIRY = Duration.ofMinutes(5);
   private final String _hostname;
   private final int _mailboxPort;
   private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
 
-  private final ConcurrentHashMap<String, ReceivingMailbox> _receivingMailbox = new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, BlockingQueue> _mailboxQueue = new ConcurrentHashMap<>();
+  private final Cache<String, InMemoryReceivingMailbox> _receivingMailboxCache =
+      CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY.toMinutes(), TimeUnit.MINUTES)
+          .removalListener(new RemovalListener<String, InMemoryReceivingMailbox>() {
+            @Override
+            public void onRemoval(RemovalNotification<String, InMemoryReceivingMailbox> notification) {
+              if (notification.wasEvicted()) {
+                LOGGER.info("Evicting dangling InMemoryReceivingMailbox: {}", notification.getKey());
+                // TODO: This should be tied to the query deadline. Unlike GrpcMailboxService, the change here is
+                //  simpler.
+                notification.getValue().cancel();
+              }
+            }
+          })
+          .build();
 
   public InMemoryMailboxService(String hostname, int mailboxPort,
       Consumer<MailboxIdentifier> receivedMailContentCallback) {
@@ -64,25 +84,32 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return _mailboxPort;
   }
 
-  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+  @Override
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    String mId = mailboxId.toString();
-    // for now, we use an unbounded blocking queue as the means of communication between
-    // in memory mailboxes - the reason for this is that unless we implement flow control,
-    // blocks will sit in memory either way (blocking the sender from sending doesn't prevent
-    // more blocks from being generated from upstream). on the other hand, having a capacity
-    // for the queue causes the sending thread to occupy a task pool thread and prevents other
-    // threads (most importantly, the receiving thread) from running - which can cause unnecessary
-    // failure situations
-    // TODO: when we implement flow control, we should swap this out with a bounded abstraction
     return new InMemorySendingMailbox(mailboxId.toString(),
-        _mailboxQueue.computeIfAbsent(mId, id -> new LinkedBlockingQueue<>()), getReceivedMailContentCallback());
+        () -> new InMemoryTransferStream(mailboxId, this, deadlineMs),
+        getReceivedMailContentCallback());
   }
 
+  @Override
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    BlockingQueue mailboxQueue = _mailboxQueue.computeIfAbsent(mId, id -> new LinkedBlockingQueue<>());
-    return _receivingMailbox.computeIfAbsent(mId, id -> new InMemoryReceivingMailbox(mId, mailboxQueue));
+    try {
+      return _receivingMailboxCache.get(mId, () -> new InMemoryReceivingMailbox(mId));
+    } catch (ExecutionException e) {
+      LOGGER.error(String.format("Error getting in-memory receiving mailbox=%s", mailboxId), e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
+    InMemoryReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
+    if (receivingMailbox != null) {
+      receivingMailbox.cancel();
+      _receivingMailboxCache.invalidate(mailboxId.toString());
+    }
   }
 }

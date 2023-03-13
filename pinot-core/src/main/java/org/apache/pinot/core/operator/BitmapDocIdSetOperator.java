@@ -52,6 +52,11 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     _docIdBuffer = new int[Math.min(numDocs, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
   }
 
+  public BitmapDocIdSetOperator(IntIterator intIterator, int[] docIdBuffer) {
+    _intIterator = intIterator;
+    _docIdBuffer = docIdBuffer;
+  }
+
   public BitmapDocIdSetOperator(ImmutableBitmapDataProvider bitmap, int[] docIdBuffer) {
     _intIterator = bitmap.getIntIterator();
     _docIdBuffer = docIdBuffer;
