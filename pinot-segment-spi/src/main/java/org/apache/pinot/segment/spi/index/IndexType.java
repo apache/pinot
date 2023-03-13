@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.index;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -28,7 +27,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -44,7 +42,7 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    * <p>The returned value for each index should be constant across different Pinot versions as it is used as:</p>
    *
    * <ul>
-   *   <li>They key used when the index is registered in IndexService.</li>
+   *   <li>The key used when the index is registered in IndexService.</li>
    *   <li>The internal identification in v1 files and metadata persisted on disk.</li>
    *   <li>The default toString implementation.</li>
    *   <li>The key that identifies the index config in the indexes section inside
@@ -62,13 +60,6 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   C getDefaultConfig();
 
   Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
-
-  /**
-   * Transforms a config object into a Jackson {@link JsonNode}.
-   */
-  default JsonNode serialize(C config) {
-    return JsonUtils.objectToJsonNode(config);
-  }
 
   /**
    * Optional method that can be implemented to ignore the index creation.

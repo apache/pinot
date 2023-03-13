@@ -54,7 +54,8 @@ public class SingletonExchangeTest {
   }
 
   @Test
-  public void shouldRouteSingleton() {
+  public void shouldRouteSingleton()
+      throws Exception {
     // Given:
     ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
 

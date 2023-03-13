@@ -207,7 +207,7 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withforwardIndexDisabled(boolean forwardIndexDisabled) {
+    public Builder withForwardIndexDisabled(boolean forwardIndexDisabled) {
       _forwardIndexDisabled = forwardIndexDisabled;
       return this;
     }

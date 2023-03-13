@@ -264,7 +264,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
-          .withforwardIndexDisabled(false)
+          .withForwardIndexDisabled(false)
           .withDictionary(_dictionaryEnabled)
           .withLengthOfLongestEntry(lengthOfLongestEntry)
           .build();
@@ -345,7 +345,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
-          .withforwardIndexDisabled(false)
+          .withForwardIndexDisabled(false)
           .withDictionary(_dictionaryEnabled)
           .withTotalNumberOfEntries(_nextValueId)
           .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
