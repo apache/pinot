@@ -93,17 +93,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema, long requestId, int stageId,
-      VirtualServerAddress virtualServerAddress) {
-    this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
-        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
-        requestId, stageId, virtualServerAddress);
-  }
-
-  public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
-      List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
-      List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
-      int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
       DataSchema resultSchema, DataSchema inputSchema, OperatorExecutionContext context) {
     this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
         upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
