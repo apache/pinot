@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import * as React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Switch, Route, Redirect, useHistory } from 'react-router-dom';
 import Layout from './components/Layout';
 import RouterData from './router';
@@ -28,21 +28,21 @@ import { AppLoadingIndicator } from './components/AppLoadingIndicator';
 import { AuthWorkflow } from 'Models';
 
 export const App = () => {
-  const [clusterName, setClusterName] = React.useState('');
-  const [loading, setLoading] = React.useState(true);
-  const [isAuthenticated, setIsAuthenticated] = React.useState(null);
-  const [role, setRole] = React.useState('');
+  const [clusterName, setClusterName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const [role, setRole] = useState('');
   const { authenticated, authWorkflow } = useAuthProvider();
   const history = useHistory();
 
-  React.useEffect(() => {
+  useEffect(() => {
     // authentication already handled by authProvider
     if (authenticated) {
       setIsAuthenticated(true);
     }
   }, [authenticated]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if(authWorkflow === AuthWorkflow.BASIC) {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export const App = () => {
     return RouterData;
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated) {
       fetchClusterConfig();
       fetchClusterName();
