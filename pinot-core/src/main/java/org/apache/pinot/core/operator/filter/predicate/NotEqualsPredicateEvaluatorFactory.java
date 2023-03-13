@@ -58,7 +58,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based NOT_EQ predicate evaluator
    */
-  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NotEqPredicate notEqPredicate,
+  public static NeqRawPredicateEvaluator newRawValueBasedEvaluator(NotEqPredicate notEqPredicate,
       DataType dataType) {
     String value = notEqPredicate.getValue();
     switch (dataType) {
@@ -158,8 +158,8 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static abstract class NeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
-    public NeqPredicateEvaluator(Predicate predicate) {
+  public static abstract class NeqRawPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    public NeqRawPredicateEvaluator(Predicate predicate) {
       super(predicate);
     }
 
@@ -176,7 +176,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class IntRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
+  private static final class IntRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final int _nonMatchingValue;
 
     IntRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, int nonMatchingValue) {
@@ -218,7 +218,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class LongRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
+  private static final class LongRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final long _nonMatchingValue;
 
     LongRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, long nonMatchingValue) {
@@ -260,7 +260,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class FloatRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
+  private static final class FloatRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final float _nonMatchingValue;
 
     FloatRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, float nonMatchingValue) {
@@ -302,7 +302,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class DoubleRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
+  private static final class DoubleRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final double _nonMatchingValue;
 
     DoubleRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, double nonMatchingValue) {
@@ -344,7 +344,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class BigDecimalRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
+  private static final class BigDecimalRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final BigDecimal _nonMatchingValue;
 
     BigDecimalRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, BigDecimal nonMatchingValue) {
@@ -373,7 +373,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class StringRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
+  private static final class StringRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final String _nonMatchingValue;
 
     StringRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, String nonMatchingValue) {
@@ -402,7 +402,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class BytesRawValueBasedNeqPredicateEvaluator extends NeqPredicateEvaluator {
+  private static final class BytesRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final byte[] _nonMatchingValue;
 
     BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, byte[] nonMatchingValue) {

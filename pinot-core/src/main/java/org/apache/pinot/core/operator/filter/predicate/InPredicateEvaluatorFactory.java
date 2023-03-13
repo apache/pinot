@@ -71,7 +71,7 @@ public class InPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based IN predicate evaluator
    */
-  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(InPredicate inPredicate,
+  public static InRawPredicateEvaluator newRawValueBasedEvaluator(InPredicate inPredicate,
       DataType dataType) {
     switch (dataType) {
       case INT: {
@@ -209,8 +209,8 @@ public class InPredicateEvaluatorFactory {
     }
   }
 
-  private static abstract class InPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
-    public InPredicateEvaluator(Predicate predicate) {
+  public static abstract class InRawPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    public InRawPredicateEvaluator(Predicate predicate) {
       super(predicate);
     }
 
@@ -220,7 +220,7 @@ public class InPredicateEvaluatorFactory {
     public abstract <R> R accept(MultiValueVisitor<R> visitor);
   }
 
-  private static final class IntRawValueBasedInPredicateEvaluator extends InPredicateEvaluator {
+  private static final class IntRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     final IntSet _matchingValues;
 
     IntRawValueBasedInPredicateEvaluator(InPredicate inPredicate, IntSet matchingValues) {
@@ -262,7 +262,7 @@ public class InPredicateEvaluatorFactory {
     }
   }
 
-  private static final class LongRawValueBasedInPredicateEvaluator extends InPredicateEvaluator {
+  private static final class LongRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     final LongSet _matchingValues;
 
     LongRawValueBasedInPredicateEvaluator(InPredicate inPredicate, LongSet matchingValues) {
@@ -304,7 +304,7 @@ public class InPredicateEvaluatorFactory {
     }
   }
 
-  private static final class FloatRawValueBasedInPredicateEvaluator extends InPredicateEvaluator {
+  private static final class FloatRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     final FloatSet _matchingValues;
 
     FloatRawValueBasedInPredicateEvaluator(InPredicate inPredicate, FloatSet matchingValues) {
@@ -346,7 +346,7 @@ public class InPredicateEvaluatorFactory {
     }
   }
 
-  private static final class DoubleRawValueBasedInPredicateEvaluator extends InPredicateEvaluator {
+  private static final class DoubleRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     final DoubleSet _matchingValues;
 
     DoubleRawValueBasedInPredicateEvaluator(InPredicate inPredicate, DoubleSet matchingValues) {
@@ -388,7 +388,7 @@ public class InPredicateEvaluatorFactory {
     }
   }
 
-  private static final class BigDecimalRawValueBasedInPredicateEvaluator extends InPredicateEvaluator {
+  private static final class BigDecimalRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     // Note: BigDecimal's compareTo is not consistent with equals (e.g. compareTo(3.0, 3) returns zero when
     //   equals(3.0, 3) returns false).
     // - HashSet implementation consider both hashCode() and equals() for the key.
@@ -423,7 +423,7 @@ public class InPredicateEvaluatorFactory {
     }
   }
 
-  private static final class StringRawValueBasedInPredicateEvaluator extends InPredicateEvaluator {
+  private static final class StringRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     final Set<String> _matchingValues;
 
     StringRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<String> matchingValues) {
@@ -452,7 +452,7 @@ public class InPredicateEvaluatorFactory {
     }
   }
 
-  private static final class BytesRawValueBasedInPredicateEvaluator extends InPredicateEvaluator {
+  private static final class BytesRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     final Set<ByteArray> _matchingValues;
 
     BytesRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<ByteArray> matchingValues) {

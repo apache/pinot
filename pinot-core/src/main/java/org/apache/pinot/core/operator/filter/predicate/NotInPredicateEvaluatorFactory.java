@@ -71,7 +71,7 @@ public class NotInPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based NOT_IN predicate evaluator
    */
-  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate,
+  public static NotInRawPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate,
       DataType dataType) {
     switch (dataType) {
       case INT: {

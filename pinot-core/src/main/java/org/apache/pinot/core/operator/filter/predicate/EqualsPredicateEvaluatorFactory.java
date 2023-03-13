@@ -62,7 +62,7 @@ public class EqualsPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based EQ predicate evaluator
    */
-  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate,
+  public static EqRawPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate,
       DataType dataType) {
     String value = eqPredicate.getValue();
     switch (dataType) {
@@ -143,8 +143,8 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  public static abstract class EqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
-    public EqPredicateEvaluator(Predicate predicate) {
+  public static abstract class EqRawPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    public EqRawPredicateEvaluator(Predicate predicate) {
       super(predicate);
     }
 
@@ -161,7 +161,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class IntRawValueBasedEqPredicateEvaluator extends EqPredicateEvaluator implements IntValue {
+  private static final class IntRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator implements IntValue {
     final int _matchingValue;
 
     IntRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, int matchingValue) {
@@ -208,7 +208,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class LongRawValueBasedEqPredicateEvaluator extends EqPredicateEvaluator implements LongValue {
+  private static final class LongRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator implements LongValue {
     final long _matchingValue;
 
     LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, long matchingValue) {
@@ -260,7 +260,8 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class FloatRawValueBasedEqPredicateEvaluator extends EqPredicateEvaluator implements FloatValue {
+  private static final class FloatRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator
+      implements FloatValue {
     final float _matchingValue;
 
     FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, float matchingValue) {
@@ -307,7 +308,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class DoubleRawValueBasedEqPredicateEvaluator extends EqPredicateEvaluator
+  private static final class DoubleRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator
       implements DoubleValue {
     final double _matchingValue;
 
@@ -355,7 +356,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class BigDecimalRawValueBasedEqPredicateEvaluator extends EqPredicateEvaluator {
+  private static final class BigDecimalRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator {
     final BigDecimal _matchingValue;
 
     BigDecimalRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, BigDecimal matchingValue) {
@@ -384,7 +385,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class StringRawValueBasedEqPredicateEvaluator extends EqPredicateEvaluator {
+  private static final class StringRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator {
     final String _matchingValue;
 
     StringRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, String matchingValue) {
@@ -413,7 +414,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class BytesRawValueBasedEqPredicateEvaluator extends EqPredicateEvaluator {
+  private static final class BytesRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator {
     final byte[] _matchingValue;
 
     BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, byte[] matchingValue) {
