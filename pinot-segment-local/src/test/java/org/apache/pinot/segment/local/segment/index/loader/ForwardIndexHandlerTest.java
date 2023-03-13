@@ -365,7 +365,7 @@ public class ForwardIndexHandlerTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _forwardIndexDisabledColumns);
+    config.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
     config.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED, _forwardIndexDisabledColumns);
     config.setIndexOn(StandardIndexes.range(), new RangeIndexConfig(2),
         DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
