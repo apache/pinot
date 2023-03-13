@@ -410,10 +410,10 @@ public class FieldSpecTest {
   void testDataTypeVisitor() {
     // a dummy visitor that counts how many ints has it visited and fails when visiting other types
     DataTypeVisitor<Integer> testVisitor = new DataTypeVisitor<Integer>() {
-      int intCounter = 0;
+      int _intCounter = 0;
       @Override
       public Integer visitInt() {
-        return ++intCounter;
+        return ++_intCounter;
       }
 
       private Integer unsupported() {

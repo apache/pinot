@@ -208,7 +208,8 @@ public class EqualsPredicateEvaluatorFactory {
     }
   }
 
-  private static final class LongRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator implements LongValue {
+  private static final class LongRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator
+      implements LongValue {
     final long _matchingValue;
 
     LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, long matchingValue) {
