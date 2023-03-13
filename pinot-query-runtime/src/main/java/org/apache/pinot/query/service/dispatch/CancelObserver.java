@@ -16,37 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.blocks.results;
+package org.apache.pinot.query.service.dispatch;
 
-import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.core.query.request.context.QueryContext;
+import io.grpc.stub.StreamObserver;
+import org.apache.pinot.common.proto.Worker;
 
 
-public class MetadataResultsBlock extends BaseResultsBlock {
-
+/**
+ * A no-op {@link StreamObserver} for cancellation requests.
+ */
+class CancelObserver implements StreamObserver<Worker.CancelResponse> {
   @Override
-  public int getNumRows() {
-    return 0;
-  }
-
-  @Nullable
-  @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public List<Object[]> getRows(QueryContext queryContext) {
-    return null;
+  public void onNext(Worker.CancelResponse cancelResponse) {
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext) {
-    return DataTableBuilderFactory.getEmptyDataTable();
+  public void onError(Throwable throwable) {
+  }
+
+  @Override
+  public void onCompleted() {
   }
 }

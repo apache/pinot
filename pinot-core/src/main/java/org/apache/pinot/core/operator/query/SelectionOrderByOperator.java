@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -80,6 +81,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
   private final List<OrderByExpressionContext> _orderByExpressions;
   private final TransformResultMetadata[] _orderByExpressionMetadata;
   private final int _numRowsToKeep;
+  private final Comparator<Object[]> _comparator;
   private final PriorityQueue<Object[]> _rows;
 
   private int _numDocsScanned = 0;
@@ -103,11 +105,10 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
-    Comparator<Object[]> comparator =
-        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByExpressionMetadata, true,
-            _nullHandlingEnabled);
+    _comparator =
+        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByExpressionMetadata, _nullHandlingEnabled);
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        comparator);
+        _comparator.reversed());
   }
 
   @Override
@@ -183,7 +184,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, _rows);
+    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator);
   }
 
   /**
@@ -303,7 +304,16 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, _rows);
+    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator);
+  }
+
+  private List<Object[]> getSortedRows() {
+    int numRows = _rows.size();
+    Object[][] sortedRows = new Object[numRows][];
+    for (int i = numRows - 1; i >= 0; i--) {
+      sortedRows[i] = _rows.poll();
+    }
+    return Arrays.asList(sortedRows);
   }
 
   @Override

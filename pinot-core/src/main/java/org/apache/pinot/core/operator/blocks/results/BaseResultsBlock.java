@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.blocks.results;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -171,7 +170,7 @@ public abstract class BaseResultsBlock implements Block {
    * Returns the rows for the results. Return {@code null} when the block only contains metadata.
    */
   @Nullable
-  public abstract Collection<Object[]> getRows(QueryContext queryContext);
+  public abstract List<Object[]> getRows(QueryContext queryContext);
 
   /**
    * Returns a data table without metadata or exception attached.

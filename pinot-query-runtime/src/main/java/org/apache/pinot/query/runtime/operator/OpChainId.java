@@ -32,6 +32,10 @@ public class OpChainId {
     _stageId = stageId;
   }
 
+  public long getRequestId() {
+    return _requestId;
+  }
+
   @Override
   public String toString() {
     return String.format("%s_%s_%s", _requestId, _virtualServerId, _stageId);

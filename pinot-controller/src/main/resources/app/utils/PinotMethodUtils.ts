@@ -577,6 +577,7 @@ const getSegmentDetails = (tableName, segmentName) => {
     const segmentMetaDataJson = { ...segmentMetaData }
     delete segmentMetaDataJson.indexes
     delete segmentMetaDataJson.columns
+    const indexes = get(segmentMetaData, 'indexes', {})
 
     return {
       replicaSet: {
@@ -585,7 +586,7 @@ const getSegmentDetails = (tableName, segmentName) => {
       },
       indexes: {
         columns: ['Field Name', 'Bloom Filter', 'Dictionary', 'Forward Index', 'Sorted', 'Inverted Index', 'JSON Index', 'Null Value Vector Reader', 'Range Index'],
-        records: Object.keys(segmentMetaData.indexes).map(fieldName => [
+        records: Object.keys(indexes).map(fieldName => [
           fieldName,
           segmentMetaData.indexes[fieldName]["bloom-filter"] === "YES",
           segmentMetaData.indexes[fieldName]["dictionary"] === "YES",
