@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -74,12 +75,17 @@ public class SegmentDeletionManager {
     RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
+  private interface SegmentDeletionHook {
+    void process(String tableName, List<String> segmentsToDelete);
+  }
+
   private final ScheduledExecutorService _executorService;
   private final String _dataDir;
   private final String _helixClusterName;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
+  private final ConcurrentLinkedQueue<SegmentDeletionHook> _concurrentLinkedQueue;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -88,6 +94,7 @@ public class SegmentDeletionManager {
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
     _defaultDeletedSegmentsRetentionMs = TimeUnit.DAYS.toMillis(deletedSegmentsRetentionInDays);
+    _concurrentLinkedQueue = new ConcurrentLinkedQueue<>();
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -97,6 +104,10 @@ public class SegmentDeletionManager {
         return thread;
       }
     });
+  }
+
+  public void registerSegmentDeletionHook(SegmentDeletionHook segmentDeletionHook) {
+    _concurrentLinkedQueue.add(segmentDeletionHook);
   }
 
   public void stop() {
@@ -185,6 +196,9 @@ public class SegmentDeletionManager {
       //       segments will become orphans and not easy to track because their ZK metadata are already deleted.
       //       Consider removing segments from deep store before cleaning up the ZK metadata.
       removeSegmentsFromStore(tableName, segmentsToDelete, deletedSegmentsRetentionMs);
+      for (SegmentDeletionHook segmentDeletionHook : _concurrentLinkedQueue) {
+        segmentDeletionHook.process(tableName, segmentsToDelete);
+      }
     }
 
     LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
