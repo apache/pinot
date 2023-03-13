@@ -90,7 +90,7 @@ public class HashJoinOperator extends MultiStageOperator {
 
   public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
       DataSchema leftSchema, JoinNode node, OperatorExecutionContext context) {
-    super(context.getRequestId(), context.getStageId(), context.getServer());
+    super(context);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();

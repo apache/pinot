@@ -42,7 +42,7 @@ public class LiteralValueOperator extends MultiStageOperator {
 
   public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
       OperatorExecutionContext context) {
-    super(context.getRequestId(), context.getStageId(), context.getServer());
+    super(context);
     _dataSchema = dataSchema;
     _rexLiteralBlock = constructBlock(rexLiteralRows);
     _isLiteralBlockReturned = false;

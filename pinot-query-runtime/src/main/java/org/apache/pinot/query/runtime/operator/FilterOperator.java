@@ -57,7 +57,7 @@ public class FilterOperator extends MultiStageOperator {
 
   public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
       OperatorExecutionContext context) {
-    super(context.getRequestId(), context.getStageId(), context.getServer());
+    super(context);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);

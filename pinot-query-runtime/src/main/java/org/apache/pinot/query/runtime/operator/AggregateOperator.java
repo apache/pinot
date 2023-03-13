@@ -83,7 +83,7 @@ public class AggregateOperator extends MultiStageOperator {
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
   public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
       List<RexExpression> groupSet, DataSchema inputSchema, OperatorExecutionContext context) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.AggregateAccumulator.MERGERS,
+    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.AggregateAccumulator.AGG_MERGERS,
         context.getRequestId(), context.getStageId(), context.getServer());
   }
 
