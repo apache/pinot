@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,13 @@ public class SortOperator extends MultiStageOperator {
       long requestId, int stageId, VirtualServerAddress serverAddress) {
     this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
         SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, requestId, stageId, serverAddress);
+  }
+
+  public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
+      OperatorExecutionContext context) {
+    this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema, context.getRequestId(),
+        context.getStageId(), context.getServer());
   }
 
   @VisibleForTesting

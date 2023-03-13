@@ -28,6 +28,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +40,11 @@ public class LiteralValueOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
   private final TransferableBlock _rexLiteralBlock;
   private boolean _isLiteralBlockReturned;
+
+  public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
+      OperatorExecutionContext context) {
+    this(dataSchema, rexLiteralRows, context.getRequestId(), context.getStageId(), context.getServer());
+  }
 
   public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
       long requestId, int stageId, VirtualServerAddress serverAddress) {

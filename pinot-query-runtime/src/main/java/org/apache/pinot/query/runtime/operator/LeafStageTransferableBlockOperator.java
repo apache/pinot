@@ -41,6 +41,7 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +67,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private final List<InstanceResponseBlock> _baseResultBlock;
   private final DataSchema _desiredDataSchema;
   private int _currentIndex;
+
+  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
+      OperatorExecutionContext context) {
+    this(baseResultBlock, dataSchema, context.getRequestId(), context.getStageId(), context.getServer());
+  }
 
   public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
       long requestId, int stageId, VirtualServerAddress serverAddress) {

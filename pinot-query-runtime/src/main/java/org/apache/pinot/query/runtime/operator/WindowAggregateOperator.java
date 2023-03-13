@@ -41,6 +41,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
+import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +98,16 @@ public class WindowAggregateOperator extends MultiStageOperator {
     this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
         upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
         requestId, stageId, virtualServerAddress);
+  }
+
+  public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
+      List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
+      List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
+      int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
+      DataSchema resultSchema, DataSchema inputSchema, OperatorExecutionContext context) {
+    this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
+        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
+        context.getRequestId(), context.getStageId(), context.getServer());
   }
 
   @VisibleForTesting

@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
 
 
 /**
@@ -42,6 +43,11 @@ public class OpChain implements AutoCloseable {
     _receivingMailbox = new HashSet<>(receivingMailboxes);
     _id = new OpChainId(requestId, virtualServerId, stageId);
     _stats = new OpChainStats(_id.toString());
+  }
+
+  public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, int virtualServerId,
+      OperatorExecutionContext context) {
+    this(root, receivingMailboxes, virtualServerId, context.getRequestId(), context.getStageId());
   }
 
   public Operator<TransferableBlock> getRoot() {

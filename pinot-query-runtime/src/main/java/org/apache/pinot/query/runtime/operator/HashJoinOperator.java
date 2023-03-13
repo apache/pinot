@@ -40,6 +40,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +88,12 @@ public class HashJoinOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
+
+  public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
+      DataSchema leftSchema, JoinNode node, OperatorExecutionContext context) {
+    this(leftTableOperator, rightTableOperator, leftSchema, node, context.getRequestId(), context.getStageId(),
+        context.getServer());
+  }
 
   public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
       DataSchema leftSchema, JoinNode node, long requestId, int stageId, VirtualServerAddress serverAddress) {

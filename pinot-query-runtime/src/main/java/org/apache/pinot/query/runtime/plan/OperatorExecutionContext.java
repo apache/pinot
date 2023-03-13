@@ -18,38 +18,42 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
-public class PlanRequestContext {
-  protected final MailboxService<TransferableBlock> _mailboxService;
-  protected final long _requestId;
-  protected final int _stageId;
-  // TODO: Timeout is not needed since deadline is already present.
+public class OperatorExecutionContext {
+  private final MailboxService<TransferableBlock> _mailboxService;
+  private final long _requestId;
+  private final int _stageId;
+
+  private final VirtualServerAddress _server;
   private final long _timeoutMs;
   private final long _deadlineMs;
-  protected final VirtualServerAddress _server;
   protected final Map<Integer, StageMetadata> _metadataMap;
-  protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
 
-
-  public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, long deadlineMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
+  public OperatorExecutionContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
+      VirtualServerAddress server, long timeoutMs, long deadlineMs, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
+    _server = server;
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
-    _server = server;
     _metadataMap = metadataMap;
+  }
+
+  public OperatorExecutionContext(PlanRequestContext planRequestContext) {
+    this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
+        planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
+        planRequestContext.getMetadataMap());
+  }
+
+  public MailboxService<TransferableBlock> getMailboxService() {
+    return _mailboxService;
   }
 
   public long getRequestId() {
@@ -60,6 +64,10 @@ public class PlanRequestContext {
     return _stageId;
   }
 
+  public VirtualServerAddress getServer() {
+    return _server;
+  }
+
   public long getTimeoutMs() {
     return _timeoutMs;
   }
@@ -68,27 +76,7 @@ public class PlanRequestContext {
     return _deadlineMs;
   }
 
-  public VirtualServerAddress getServer() {
-    return _server;
-  }
-
   public Map<Integer, StageMetadata> getMetadataMap() {
     return _metadataMap;
-  }
-
-  public MailboxService<TransferableBlock> getMailboxService() {
-    return _mailboxService;
-  }
-
-  public void addReceivingMailboxes(List<MailboxIdentifier> ids) {
-    _receivingMailboxes.addAll(ids);
-  }
-
-  public List<MailboxIdentifier> getReceivingMailboxes() {
-    return ImmutableList.copyOf(_receivingMailboxes);
-  }
-
-  public OperatorExecutionContext getOperatorExecutionContext() {
-    return new OperatorExecutionContext(this);
   }
 }
