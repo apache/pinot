@@ -223,7 +223,10 @@ public class SegmentGeneratorConfig implements Serializable {
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList != null) {
         for (FieldConfig fieldConfig : fieldConfigList) {
-          _columnProperties.put(fieldConfig.getName(), fieldConfig.getProperties());
+          Map<String, String> properties = fieldConfig.getProperties();
+          if (properties != null) {
+            _columnProperties.put(fieldConfig.getName(), Collections.unmodifiableMap(properties));
+          }
         }
       }
 
@@ -250,13 +253,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
-    HashMap<String, Map<String, String>> copy = new HashMap<>();
-    for (Map.Entry<String, Map<String, String>> entry : _columnProperties.entrySet()) {
-      Map<String, String> value = entry.getValue();
-      copy.put(entry.getKey(), value == null ? null : Collections.unmodifiableMap(value));
-    }
-
-    return Collections.unmodifiableMap(copy);
+    return Collections.unmodifiableMap(_columnProperties);
   }
 
   /**
@@ -478,7 +475,11 @@ public class SegmentGeneratorConfig implements Serializable {
 
   @VisibleForTesting
   public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
-    _columnProperties = columnProperties;
+    _columnProperties = new HashMap<>();
+    for (Map.Entry<String, Map<String, String>> entry : columnProperties.entrySet()) {
+      String column = entry.getKey();
+      _columnProperties.put(column, Collections.unmodifiableMap(new HashMap<>(columnProperties.get(column))));
+    }
   }
 
   public void setFSTIndexCreationColumns(List<String> fstIndexCreationColumns) {
