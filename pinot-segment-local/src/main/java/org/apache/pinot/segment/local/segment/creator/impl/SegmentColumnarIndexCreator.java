@@ -218,7 +218,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withColumnIndexCreationInfo(columnIndexCreationInfo)
           .sorted(columnIndexCreationInfo.isSorted())
           .onHeap(segmentCreationSpec.isOnHeap())
-          .withforwardIndexDisabled(forwardIndexDisabled)
+          .withForwardIndexDisabled(forwardIndexDisabled)
           .build();
       // Initialize forward index creator
       ChunkCompressionType chunkCompressionType =

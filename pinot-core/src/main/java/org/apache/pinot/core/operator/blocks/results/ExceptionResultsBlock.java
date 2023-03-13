@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
-import java.util.Collection;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
@@ -51,7 +51,7 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
 
   @Nullable
   @Override
-  public Collection<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows(QueryContext queryContext) {
     return null;
   }
 

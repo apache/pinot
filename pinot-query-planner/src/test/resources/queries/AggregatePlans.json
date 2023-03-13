@@ -2,6 +2,38 @@
   "aggregates_planning_tests": {
     "queries": [
       {
+        "description": "Select AVG aggregation for a BIG_DECIMAL column",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/($0, $1)])",
+          "\n  LogicalProject($f0=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], $f1=[$1])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)])",
+          "\n      LogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()])",
+          "\n          LogicalProject(col4=[$0], col2=[$1], col3=[$2])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select many aggregations for a BIG_DECIMAL column",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg, SUM(a.col4) as sum, MAX(a.col4) as max FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/($0, $1)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $2)], max=[$3])",
+          "\n  LogicalProject($f0=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], $f1=[$1], sum=[$0], max=[$2])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], max=[MAX($2)])",
+          "\n      LogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()], max=[MAX($0)])",
+          "\n          LogicalProject(col4=[$0], col2=[$1], col3=[$2])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select aggregates with filters and select alias",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
@@ -11,8 +43,8 @@
           "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)])",
           "\n      LogicalExchange(distribution=[hash])",
           "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n          LogicalProject(col2=[$0], col3=[$1])",
-          "\n            LogicalFilter(condition=[AND(>=($1, 0), =($0, 'pink floyd'))])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
           "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -25,7 +57,7 @@
           "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:INTEGER, $0)], EXPR$1=[$1])",
           "\n  LogicalAggregate(group=[{}], EXPR$0=[$SUM0($0)], agg#1=[$SUM0($1)])",
           "\n    LogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], EXPR$0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n      LogicalAggregate(group=[{}], EXPR$0=[$SUM0($2)], agg#1=[COUNT()])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -39,8 +71,8 @@
           "\n  LogicalAggregate(group=[{}], EXPR$0=[$SUM0($0)], agg#1=[$SUM0($1)])",
           "\n    LogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], EXPR$0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$0], col3=[$1])",
-          "\n          LogicalFilter(condition=[AND(>=($1, 0), =($0, 'a'))])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -54,8 +86,8 @@
           "\n  LogicalAggregate(group=[{}], sum=[$SUM0($0)], agg#1=[$SUM0($1)])",
           "\n    LogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], sum=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$0], col3=[$1])",
-          "\n          LogicalFilter(condition=[AND(>=($1, 0), =($0, 'pink floyd'))])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -70,8 +102,8 @@
           "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)])",
           "\n      LogicalExchange(distribution=[hash])",
           "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n          LogicalProject(col2=[$0], col3=[$1])",
-          "\n            LogicalFilter(condition=[AND(>=($1, 0), =($0, 'pink floyd'))])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
           "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -85,8 +117,8 @@
           "\n  LogicalAggregate(group=[{}], sum=[$SUM0($0)], agg#1=[$SUM0($1)])",
           "\n    LogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], sum=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$0], col3=[$1])",
-          "\n          LogicalFilter(condition=[AND(>=($1, 0), =($0, 'pink floyd'))])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
         ]

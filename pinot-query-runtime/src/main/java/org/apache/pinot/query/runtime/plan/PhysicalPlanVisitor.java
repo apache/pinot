@@ -43,6 +43,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
+import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
 /**
@@ -79,7 +80,8 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
     return new MailboxSendOperator(context.getMailboxService(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getServer(), context.getRequestId(), node.getStageId(), node.getReceiverStageId());
+        context.getServer(), context.getRequestId(), node.getStageId(), node.getReceiverStageId(),
+        context.getDeadlineMs());
   }
 
   @Override
@@ -92,7 +94,10 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   @Override
   public MultiStageOperator visitWindow(WindowNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    throw new UnsupportedOperationException("Window not yet supported!");
+    return new WindowAggregateOperator(nextOperator, node.getGroupSet(), node.getOrderSet(),
+        node.getOrderSetDirection(), node.getOrderSetNullDirection(), node.getAggCalls(), node.getLowerBound(),
+        node.getUpperBound(), node.getWindowFrameType(), node.getConstants(), node.getDataSchema(),
+        node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId, context.getServer());
   }
 
   @Override

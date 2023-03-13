@@ -75,19 +75,31 @@ public class UpsertUtils {
     };
   }
 
+  public static RecordInfoReader makeRecordReader(IndexSegment segment, List<String> primaryKeyColumns,
+      List<String> comparisonColumns) {
+    if (comparisonColumns.size() > 1) {
+      return new RecordInfoReader(segment, primaryKeyColumns, comparisonColumns);
+    }
+    return new RecordInfoReader(segment, primaryKeyColumns, comparisonColumns.get(0));
+  }
+
   public static class RecordInfoReader implements Closeable {
     public final PrimaryKeyReader _primaryKeyReader;
-    public final PinotSegmentColumnReader _comparisonColumnReader;
+    public final ComparisonColumnReader _comparisonColumnReader;
+
+    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, List<String> comparisonColumns) {
+      _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
+      _comparisonColumnReader = new MultiComparisonColumnReader(segment, comparisonColumns);
+    }
 
     public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, String comparisonColumn) {
       _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
-      _comparisonColumnReader = new PinotSegmentColumnReader(segment, comparisonColumn);
+      _comparisonColumnReader = new SingleComparisonColumnReader(segment, comparisonColumn);
     }
 
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
-      Comparable comparisonValue = (Comparable) getValue(_comparisonColumnReader, docId);
-      return new RecordInfo(primaryKey, docId, comparisonValue);
+      return new RecordInfo(primaryKey, docId, _comparisonColumnReader.getComparisonValue(docId));
     }
 
     @Override
@@ -134,8 +146,65 @@ public class UpsertUtils {
     }
   }
 
-  private static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
+  static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
     Object value = columnReader.getValue(docId);
     return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
+  }
+
+
+  public interface ComparisonColumnReader extends Closeable {
+    Comparable getComparisonValue(int docId);
+  }
+
+  public static class SingleComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
+    private final PinotSegmentColumnReader _comparisonColumnReader;
+
+    public SingleComparisonColumnReader(IndexSegment segment, String comparisonColumn) {
+      _comparisonColumnReader = new PinotSegmentColumnReader(segment, comparisonColumn);
+    }
+
+    @Override
+    public Comparable getComparisonValue(int docId) {
+      return (Comparable) _comparisonColumnReader.getValue(docId);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      _comparisonColumnReader.close();
+    }
+  }
+
+  public static class MultiComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
+    private final PinotSegmentColumnReader[] _comparisonColumnReaders;
+
+    public MultiComparisonColumnReader(IndexSegment segment, List<String> comparisonColumns) {
+      _comparisonColumnReaders = new PinotSegmentColumnReader[comparisonColumns.size()];
+      for (int i = 0; i < comparisonColumns.size(); i++) {
+        _comparisonColumnReaders[i] = new PinotSegmentColumnReader(segment, comparisonColumns.get(i));
+      }
+    }
+
+    public Comparable getComparisonValue(int docId) {
+      Comparable[] comparisonColumns = new Comparable[_comparisonColumnReaders.length];
+
+      for (int i = 0; i < _comparisonColumnReaders.length; i++) {
+        PinotSegmentColumnReader columnReader = _comparisonColumnReaders[i];
+        Comparable comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
+        comparisonColumns[i] = comparisonValue;
+      }
+
+      // Note that the comparable index is negative here to indicate that this instance could be the argument to
+      // ComparisonColumns#compareTo, but should never call compareTo itself.
+      return new ComparisonColumns(comparisonColumns, -1);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      for (PinotSegmentColumnReader comparisonColumnReader : _comparisonColumnReaders) {
+        comparisonColumnReader.close();
+      }
+    }
   }
 }

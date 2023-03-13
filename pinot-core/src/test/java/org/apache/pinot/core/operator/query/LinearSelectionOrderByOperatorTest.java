@@ -19,9 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.pinot.core.operator.query.LinearSelectionOrderByOperator.PartiallySortedListBuilder;
 import org.apache.pinot.core.operator.query.LinearSelectionOrderByOperator.TotallySortedListBuilder;
 import org.testng.annotations.Test;
@@ -67,7 +65,7 @@ public class LinearSelectionOrderByOperatorTest {
   public void testPartiallySortedListBuilder() {
     int maxNumRows = 10;
     Comparator<Object[]> partitionComparator = Comparator.comparingInt(row -> (Integer) row[0]);
-    Comparator<Object[]> unsortedComparator = (row1, row2) -> Integer.compare((Integer) row2[1], (Integer) row1[1]);
+    Comparator<Object[]> unsortedComparator = Comparator.comparingInt(row -> (Integer) row[1]);
 
     // Enough rows collected without tie rows
     PartiallySortedListBuilder listBuilder =
@@ -81,7 +79,7 @@ public class LinearSelectionOrderByOperatorTest {
     List<Object[]> rows = listBuilder.build();
     assertEquals(rows.size(), maxNumRows);
     for (int i = 0; i < maxNumRows; i++) {
-      assertEquals(rows.get(i), new Object[]{i / 2, maxNumRows - i});
+      assertEquals(rows.get(i), new Object[]{i / 2, i % 2 == 0 ? maxNumRows - i - 1 : maxNumRows - i + 1});
     }
 
     // Enough rows collected with tie rows
@@ -98,19 +96,13 @@ public class LinearSelectionOrderByOperatorTest {
     rows = listBuilder.build();
     assertEquals(rows.size(), maxNumRows);
     // For the last partition, should contain unsorted value 0 and 1
-    Set<Integer> unsortedValues = new HashSet<>();
     for (int i = 0; i < maxNumRows; i++) {
       if (i / 2 != lastPartitionValue) {
-        assertEquals(rows.get(i), new Object[]{i / 2, maxNumRows - i});
+        assertEquals(rows.get(i), new Object[]{i / 2, i % 2 == 0 ? maxNumRows - i - 1 : maxNumRows - i + 1});
       } else {
-        Object[] row = rows.get(i);
-        assertEquals(row[0], lastPartitionValue);
-        int unsortedValue = (int) row[1];
-        assertTrue(unsortedValue == 0 || unsortedValue == 1);
-        unsortedValues.add(unsortedValue);
+        assertEquals(rows.get(i), new Object[]{lastPartitionValue, i % 2});
       }
     }
-    assertEquals(unsortedValues.size(), 2);
 
     // Not enough rows collected with tie rows
     listBuilder = new PartiallySortedListBuilder(maxNumRows, partitionComparator, unsortedComparator);
@@ -125,18 +117,12 @@ public class LinearSelectionOrderByOperatorTest {
     rows = listBuilder.build();
     assertEquals(rows.size(), maxNumRows);
     // For the last partition, should contain unsorted value 0 and 1
-    unsortedValues = new HashSet<>();
     for (int i = 0; i < maxNumRows; i++) {
       if (i / 2 != lastPartitionValue) {
-        assertEquals(rows.get(i), new Object[]{i / 2, maxNumRows - i});
+        assertEquals(rows.get(i), new Object[]{i / 2, i % 2 == 0 ? maxNumRows - i - 1 : maxNumRows - i + 1});
       } else {
-        Object[] row = rows.get(i);
-        assertEquals(row[0], lastPartitionValue);
-        int unsortedValue = (int) row[1];
-        assertTrue(unsortedValue == 0 || unsortedValue == 1);
-        unsortedValues.add(unsortedValue);
+        assertEquals(rows.get(i), new Object[]{lastPartitionValue, i % 2});
       }
     }
-    assertEquals(unsortedValues.size(), 2);
   }
 }

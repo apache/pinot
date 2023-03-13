@@ -23,7 +23,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -31,21 +33,23 @@ import org.apache.pinot.spi.utils.JsonUtils;
 //  same metadataKey
 // TODO: Replace member fields with a simple map of <MetadataKey, Object>
 // TODO: Add a subStat field, stage level subStats will contain each operator stats
-@JsonPropertyOrder({"exceptions", "numBlocks", "numRows", "stageExecutionTimeMs", "numServersQueried",
-    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
-    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
-    "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
-    "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+@JsonPropertyOrder({"exceptions", "numBlocks", "numRows", "stageExecutionTimeMs", "stageExecutionUnit",
+    "stageExecWallTimeMs", "stageExecEndTimeMs", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
+    "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+    "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "traceInfo", "operatorIds", "tableNames"})
+    "traceInfo", "operatorStats", "tableNames"})
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class BrokerResponseStats extends BrokerResponseNative {
 
   private int _numBlocks = 0;
   private int _numRows = 0;
   private long _stageExecutionTimeMs = 0;
-  private List<String> _operatorIds = new ArrayList<>();
+  private int _stageExecutionUnit = 0;
+  private long _stageExecWallTimeMs = -1;
+  private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
   @Override
@@ -83,19 +87,39 @@ public class BrokerResponseStats extends BrokerResponseNative {
     _stageExecutionTimeMs = stageExecutionTimeMs;
   }
 
+  @JsonProperty("stageExecWallTimeMs")
+  public long getStageExecWallTimeMs() {
+    return _stageExecWallTimeMs;
+  }
+
+  @JsonProperty("stageExecWallTimeMs")
+  public void setStageExecWallTimeMs(long stageExecWallTimeMs) {
+    _stageExecWallTimeMs = stageExecWallTimeMs;
+  }
+
+  @JsonProperty("stageExecutionUnit")
+  public long getStageExecutionUnit() {
+    return _stageExecutionUnit;
+  }
+
+  @JsonProperty("stageExecutionUnit")
+  public void setStageExecutionUnit(int stageExecutionUnit) {
+    _stageExecutionUnit = stageExecutionUnit;
+  }
+
   public String toJsonString()
       throws IOException {
     return JsonUtils.objectToString(this);
   }
 
-  @JsonProperty("operatorIds")
-  public List<String> getOperatorIds() {
-    return _operatorIds;
+  @JsonProperty("operatorStats")
+  public Map<String, Map<String, String>> getOperatorStats() {
+    return _operatorStats;
   }
 
-  @JsonProperty("operatorIds")
-  public void setOperatorIds(List<String> operatorIds) {
-    _operatorIds = operatorIds;
+  @JsonProperty("operatorStats")
+  public void setOperatorStats(Map<String, Map<String, String>> operatorStats) {
+    _operatorStats = operatorStats;
   }
 
   @JsonProperty("tableNames")

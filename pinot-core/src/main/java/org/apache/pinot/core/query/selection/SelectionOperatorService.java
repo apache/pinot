@@ -55,7 +55,6 @@ import org.roaringbitmap.RoaringBitmap;
  *   </li>
  * </ul>
  */
-@SuppressWarnings("rawtypes")
 public class SelectionOperatorService {
   private final QueryContext _queryContext;
   private final List<String> _selectionColumns;
@@ -65,7 +64,7 @@ public class SelectionOperatorService {
   private final PriorityQueue<Object[]> _rows;
 
   /**
-   * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Inter segment)
+   * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Broker side)
    *
    * @param queryContext Selection order-by query
    * @param dataSchema data schema.
@@ -78,6 +77,8 @@ public class SelectionOperatorService {
     _offset = queryContext.getOffset();
     _numRowsToKeep = _offset + queryContext.getLimit();
     assert queryContext.getOrderByExpressions() != null;
+    // TODO: Do not use type compatible comparator for performance since we don't support different data schema on
+    //       server side combine
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         SelectionOperatorUtils.getTypeCompatibleComparator(queryContext.getOrderByExpressions(), _dataSchema,
             _queryContext.isNullHandlingEnabled()));
@@ -95,6 +96,8 @@ public class SelectionOperatorService {
   /**
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
    * (Broker side)
+   * TODO: Do merge sort after releasing 0.13.0 when server side results are sorted
+   *       Can also consider adding a data table metadata to indicate whether the server side results are sorted
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables, boolean nullHandlingEnabled) {
     for (DataTable dataTable : dataTables) {

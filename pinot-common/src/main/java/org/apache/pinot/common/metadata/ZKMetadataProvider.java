@@ -26,9 +26,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
+import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
+import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SchemaUtils;
@@ -257,6 +259,20 @@ public class ZKMetadataProvider {
       return ConfigUtils.applyConfigWithEnvVariables(userConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting user configuration for user: {}", username, e);
+      return null;
+    }
+  }
+
+  @Nullable
+  public static List<InstancePartitions> getAllInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore) {
+    List<ZNRecord> znRecordss =
+        propertyStore.getChildren(PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, null, AccessOption.PERSISTENT);
+
+    try {
+      return Optional.ofNullable(znRecordss).orElseGet(ArrayList::new).stream().map(InstancePartitions::fromZNRecord)
+          .collect(Collectors.toList());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting instance partitions", e);
       return null;
     }
   }

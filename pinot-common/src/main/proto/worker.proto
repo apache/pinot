@@ -44,6 +44,16 @@ import "plan.proto";
 service PinotQueryWorker {
   // Dispatch a QueryRequest to a PinotQueryWorker
   rpc Submit(QueryRequest) returns (QueryResponse);
+
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+}
+
+message CancelRequest {
+  int64 requestId = 1;
+}
+
+message CancelResponse {
+  // intentionally left empty
 }
 
 // QueryRequest is the dispatched content for a specific query stage on a specific worker.

@@ -91,9 +91,11 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
 
   public static ServerPlanRequestContext build(MailboxService<TransferableBlock> mailboxService,
       DistributedStagePlan stagePlan, Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
-      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
+      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList, long deadlineMs) {
     // Before-visit: construct the ServerPlanRequestContext baseline
-    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
+    long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16)
+        + (stagePlan.getStageId() << 8) + (tableType == TableType.REALTIME ? 1 : 0);
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     PinotQuery pinotQuery = new PinotQuery();
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap);
@@ -105,7 +107,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context =
-        new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs,
+        new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
             new VirtualServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
             timeBoundaryInfo);
 
@@ -140,7 +142,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setBrokerId("unknown");
-    instanceRequest.setEnableTrace(false);
+    instanceRequest.setEnableTrace(Boolean.parseBoolean(requestMetadataMap.get(CommonConstants.Broker.Request.TRACE)));
     instanceRequest.setSearchSegments(segmentList);
     instanceRequest.setQuery(brokerRequest);
 
