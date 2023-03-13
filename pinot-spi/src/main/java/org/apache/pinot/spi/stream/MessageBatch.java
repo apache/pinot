@@ -116,4 +116,12 @@ public interface MessageBatch<T> {
   default boolean isEndOfPartitionGroup() {
     return false;
   }
+
+  /**
+   * We need this to determine ingestion delay when we receive only null messages (Tombstone messages)
+   * @return last metadata for a null message received by the string
+   */
+  default public StreamMessageMetadata getLastTombstoneMetadata() {
+    return null;
+  }
 }

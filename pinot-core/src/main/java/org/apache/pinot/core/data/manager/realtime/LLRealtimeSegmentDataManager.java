@@ -89,6 +89,7 @@ import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -618,14 +619,25 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     updateCurrentDocumentCountMetrics();
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
+      if (messageCount == 0) {
+        // If we did not get any events but got some filtered Messages we assume we are up-to-date
+        // because we have processed all events of interest up to now. With this we avoid a ramping
+        // delay caused by one event followed by a long period of filtered messages.
+        // Extract metadata for last tombstone and compute the ingestion delay from there
+        RowMetadata lastTombstoneMetadata = messagesAndOffsets.getLastTombstoneMetadata();
+        if (lastTombstoneMetadata != null) {
+          // TBD update the latency with what we get from the tombstone metadata
+          updateIngestionDelay(lastTombstoneMetadata);
+        }
+        setIngestionDelayToZero();
+      }
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
             indexedMessageCount, streamMessageCount, _currentOffset);
       }
     } else if (!prematureExit) {
       // Record Pinot ingestion delay as zero since we are up-to-date and no new events
-      long currentTimeMs = System.currentTimeMillis();
-      _realtimeTableDataManager.updateIngestionDelay(currentTimeMs, currentTimeMs, _partitionGroupId);
+      setIngestionDelayToZero();
       if (_segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
@@ -1574,10 +1586,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private void updateIngestionDelay(int indexedMessageCount) {
     if ((indexedMessageCount > 0) && (_lastRowMetadata != null)) {
       // Record Ingestion delay for this partition
-      _realtimeTableDataManager.updateIngestionDelay(_lastRowMetadata.getRecordIngestionTimeMs(),
-          _lastRowMetadata.getFirstStreamRecordIngestionTimeMs(),
-          _partitionGroupId);
+      updateIngestionDelay(_lastRowMetadata);
     }
+  }
+
+  private void updateIngestionDelay(RowMetadata metadata) {
+    _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(),
+        metadata.getFirstStreamRecordIngestionTimeMs(),
+        _partitionGroupId);
+  }
+
+  /*
+   * Sets ingestion delay to zero in situations where we are caught up processing events.
+   */
+  private void setIngestionDelayToZero() {
+    long currentTimeMs = System.currentTimeMillis();
+    _realtimeTableDataManager.updateIngestionDelay(currentTimeMs, currentTimeMs, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
