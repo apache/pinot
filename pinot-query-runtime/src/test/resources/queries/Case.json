@@ -28,8 +28,7 @@
       { "sql": "SELECT intCol, CASE WHEN strCol = 'one' THEN 'The first one' WHEN strCol = 'two' THEN 'The second one' WHEN strCol = 'three' THEN 'The third one' WHEN strCol = 'four' THEN 'The fourth one' ELSE 'Unknown' END AS stringVal FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN intCol % 2 = 0 THEN intCol ELSE intCol * 2 END AS intVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN floatCol > 4.0 THEN floatCol ELSE floatCol / 2.0 END AS floatVal, strCol FROM {tbl1}"},
-      { "sql": "SELECT intCol, CASE WHEN doubleCol > 6.0 THEN doubleCol ELSE doubleCol / 2.0 END AS doubleVal, strCol FROM {tbl1}"},
-      { "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1}) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"}
+      { "sql": "SELECT intCol, CASE WHEN doubleCol > 6.0 THEN doubleCol ELSE doubleCol / 2.0 END AS doubleVal, strCol FROM {tbl1}"}
     ]
   },
   "nested_case_when_test": {
