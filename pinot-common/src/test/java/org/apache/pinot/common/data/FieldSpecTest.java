@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.DataTypeVisitor;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -403,5 +404,86 @@ public class FieldSpecTest {
     }
     jsonString.append('}');
     return jsonString.toString();
+  }
+
+  @Test
+  void testDataTypeVisitor() {
+    // a dummy visitor that counts how many ints has it visited and fails when visiting other types
+    DataTypeVisitor<Integer> testVisitor = new DataTypeVisitor<Integer>() {
+      int intCounter = 0;
+      @Override
+      public Integer visitInt() {
+        return ++intCounter;
+      }
+
+      private Integer unsupported() {
+        throw new UnsupportedOperationException("not expected in test");
+      }
+
+      @Override
+      public Integer visitLong() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitFloat() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitDouble() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitBigDecimal() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitBoolean() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitTimestamp() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitString() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitJson() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitBytes() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitStruct() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitMap() {
+        return unsupported();
+      }
+
+      @Override
+      public Integer visitList() {
+        return unsupported();
+      }
+    };
+
+    Integer result = INT.accept(testVisitor);
+    Assert.assertEquals(result, Integer.valueOf(1));
+
+    Assert.assertThrows(UnsupportedOperationException.class, () -> STRING.accept(testVisitor));
   }
 }
