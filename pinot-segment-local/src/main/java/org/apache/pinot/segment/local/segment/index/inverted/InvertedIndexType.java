@@ -88,7 +88,7 @@ public class InvertedIndexType
     ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
         tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
         (acum, column) -> acum.put(column, IndexConfig.ENABLED));
-    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("inverted", getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.ifIndexingConfig(fromInvertedCols));
   }
 

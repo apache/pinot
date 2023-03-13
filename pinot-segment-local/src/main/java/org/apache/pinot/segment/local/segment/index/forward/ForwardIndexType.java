@@ -143,7 +143,7 @@ public class ForwardIndexType
           }
         }
     );
-    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("forward", getIndexConfigClass())
         .withExclusiveAlternative(fromFieldConfig);
   }
 

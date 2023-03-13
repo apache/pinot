@@ -73,7 +73,7 @@ public class BloomIndexType
 
   @Override
   public ColumnConfigDeserializer<BloomFilterConfig> getDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("bloom", getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(
                     // reads tableConfig.indexingConfig.bloomFilterConfigs

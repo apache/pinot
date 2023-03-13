@@ -96,7 +96,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public ColumnConfigDeserializer<FstIndexConfig> getDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("fst", getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.FST,
             (tableConfig, fieldConfig) -> {

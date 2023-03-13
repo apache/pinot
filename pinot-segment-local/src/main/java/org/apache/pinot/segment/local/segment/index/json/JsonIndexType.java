@@ -87,7 +87,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
         IndexConfigDeserializer.fromCollection(
             tableConfig -> tableConfig.getIndexingConfig().getJsonIndexColumns(),
             (accum, column) -> accum.put(column, new JsonIndexConfig()));
-    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("json", getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(fromJsonIndexCols.withExclusiveAlternative(fromJsonIndexConf)));
   }
