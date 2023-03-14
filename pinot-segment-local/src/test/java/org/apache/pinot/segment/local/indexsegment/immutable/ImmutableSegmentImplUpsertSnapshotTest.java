@@ -118,7 +118,7 @@ public class ImmutableSegmentImplUpsertSnapshotTest {
     ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
     _partitionUpsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager("testTable_REALTIME", 0, Collections.singletonList("column6"),
-            "daysSinceEpoch", HashFunction.NONE, null, true, serverMetrics);
+            Collections.singletonList("daysSinceEpoch"), HashFunction.NONE, null, true, serverMetrics);
 
     _immutableSegmentImpl.enableUpsert(_partitionUpsertMetadataManager, new ThreadSafeMutableRoaringBitmap());
   }

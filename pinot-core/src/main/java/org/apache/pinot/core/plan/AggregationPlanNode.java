@@ -80,18 +80,10 @@ public class AggregationPlanNode implements PlanNode {
    * Build the operator to be used for filtered aggregations
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    // Build the operator chain for the main predicate
-    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
-        AggregationFunctionUtils.buildFilterOperator(_indexSegment, _queryContext);
-    TransformOperator transformOperator =
-        AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext,
-            filterOperatorPair.getRight(), null);
-
-    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
-            filterOperatorPair.getRight(), transformOperator, null);
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs);
+    List<Pair<AggregationFunction[], TransformOperator>> transformOperators =
+        AggregationFunctionUtils.buildFilteredAggregateTransformOperators(_indexSegment, _queryContext);
+    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), transformOperators,
+        _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
   /**

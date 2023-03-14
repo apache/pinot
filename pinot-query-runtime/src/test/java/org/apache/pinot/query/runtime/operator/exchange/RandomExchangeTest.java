@@ -56,7 +56,8 @@ public class RandomExchangeTest {
   }
 
   @Test
-  public void shouldRouteRandomly() {
+  public void shouldRouteRandomly()
+      throws Exception {
     // Given:
     ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 

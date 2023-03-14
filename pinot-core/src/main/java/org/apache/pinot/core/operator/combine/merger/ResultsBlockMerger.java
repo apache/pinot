@@ -44,14 +44,4 @@ public interface ResultsBlockMerger<T extends BaseResultsBlock> {
   default boolean isQuerySatisfied(T resultsBlock) {
     return false;
   }
-
-  /**
-   * Converts the given results block into a mergeable results block.
-   *
-   * <p>This conversion is necessary if a block is used as the first argument for:
-   * {@link ResultsBlockMerger#mergeResultsBlocks(BaseResultsBlock, BaseResultsBlock)}.
-   */
-  default T convertToMergeableBlock(T resultsBlock) {
-    return resultsBlock;
-  }
 }

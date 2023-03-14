@@ -58,7 +58,8 @@ public class BlockExchangeTest {
   }
 
   @Test
-  public void shouldSendEosBlockToAllDestinations() {
+  public void shouldSendEosBlockToAllDestinations()
+      throws Exception {
     // Given:
     List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
@@ -78,7 +79,8 @@ public class BlockExchangeTest {
   }
 
   @Test
-  public void shouldSendDataBlocksOnlyToTargetDestination() {
+  public void shouldSendDataBlocksOnlyToTargetDestination()
+      throws Exception {
     // Given:
     List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
     BlockExchange exchange = new TestBlockExchange(destinations);
@@ -97,7 +99,8 @@ public class BlockExchangeTest {
   }
 
   @Test
-  public void shouldSplitBlocks() {
+  public void shouldSplitBlocks()
+      throws Exception {
     // Given:
     List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
 
@@ -138,7 +141,8 @@ public class BlockExchangeTest {
     }
 
     @Override
-    protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
+    protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+        throws Exception {
       for (SendingMailbox mailbox : destinations) {
         sendBlock(mailbox, block);
       }

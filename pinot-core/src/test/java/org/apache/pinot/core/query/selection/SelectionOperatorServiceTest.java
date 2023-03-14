@@ -22,12 +22,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -38,6 +39,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -168,13 +170,15 @@ public class SelectionOperatorServiceTest {
 
   @Test
   public void testCompatibleRowsMergeWithoutOrdering() {
-    ArrayList<Object[]> mergedRows = new ArrayList<>(2);
+    List<Object[]> mergedRows = new ArrayList<>(2);
     mergedRows.add(_row1);
     mergedRows.add(_row2);
-    Collection<Object[]> rowsToMerge = new ArrayList<>(2);
+    SelectionResultsBlock mergedBlock = new SelectionResultsBlock(_dataSchema, mergedRows);
+    List<Object[]> rowsToMerge = new ArrayList<>(2);
     rowsToMerge.add(_compatibleRow1);
     rowsToMerge.add(_compatibleRow2);
-    SelectionOperatorUtils.mergeWithoutOrdering(mergedRows, rowsToMerge, 3);
+    SelectionResultsBlock blockToMerge = new SelectionResultsBlock(_compatibleDataSchema, rowsToMerge);
+    SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, 3);
     assertEquals(mergedRows.size(), 3);
     assertSame(mergedRows.get(0), _row1);
     assertSame(mergedRows.get(1), _row2);
@@ -183,21 +187,23 @@ public class SelectionOperatorServiceTest {
 
   @Test
   public void testCompatibleRowsMergeWithOrdering() {
-    SelectionOperatorService selectionOperatorService = new SelectionOperatorService(_queryContext, _dataSchema);
-    PriorityQueue<Object[]> mergedRows = selectionOperatorService.getRows();
+    assertNotNull(_queryContext.getOrderByExpressions());
+    Comparator<Object[]> comparator =
+        SelectionOperatorUtils.getTypeCompatibleComparator(_queryContext.getOrderByExpressions(), _dataSchema,
+            _queryContext.isNullHandlingEnabled()).reversed();
     int maxNumRows = _queryContext.getOffset() + _queryContext.getLimit();
-    Collection<Object[]> rowsToMerge1 = new ArrayList<>(2);
-    rowsToMerge1.add(_row1);
-    rowsToMerge1.add(_row2);
-    SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge1, maxNumRows);
-    Collection<Object[]> rowsToMerge2 = new ArrayList<>(2);
-    rowsToMerge2.add(_compatibleRow1);
-    rowsToMerge2.add(_compatibleRow2);
-    SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge2, maxNumRows);
+    SelectionResultsBlock mergedBlock = new SelectionResultsBlock(_dataSchema, Collections.emptyList(), comparator);
+    List<Object[]> rowsToMerge1 = Arrays.asList(_row2, _row1);
+    SelectionResultsBlock blockToMerge1 = new SelectionResultsBlock(_dataSchema, rowsToMerge1, comparator);
+    SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge1, maxNumRows);
+    List<Object[]> rowsToMerge2 = Arrays.asList(_compatibleRow2, _compatibleRow1);
+    SelectionResultsBlock blockToMerge2 = new SelectionResultsBlock(_compatibleDataSchema, rowsToMerge2, comparator);
+    SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge2, maxNumRows);
+    List<Object[]> mergedRows = mergedBlock.getRows();
     assertEquals(mergedRows.size(), 3);
-    assertSame(mergedRows.poll(), _compatibleRow1);
-    assertSame(mergedRows.poll(), _row2);
-    assertSame(mergedRows.poll(), _compatibleRow2);
+    assertSame(mergedRows.get(0), _compatibleRow2);
+    assertSame(mergedRows.get(1), _row2);
+    assertSame(mergedRows.get(2), _compatibleRow1);
   }
 
   @Test

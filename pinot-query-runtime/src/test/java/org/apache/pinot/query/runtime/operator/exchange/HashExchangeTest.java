@@ -63,7 +63,8 @@ public class HashExchangeTest {
   }
 
   @Test
-  public void shouldSplitAndRouteBlocksBasedOnPartitionKey() {
+  public void shouldSplitAndRouteBlocksBasedOnPartitionKey()
+      throws Exception {
     // Given:
     TestSelector selector = new TestSelector(Iterators.forArray(2, 0, 1));
     Mockito.when(_block.getContainer()).thenReturn(ImmutableList.of(new Object[]{0}, new Object[]{1}, new Object[]{2}));

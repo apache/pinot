@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,7 +44,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-  private final List<String> _operatorIds = new ArrayList<>();
+  private final Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final boolean _enableTrace;
@@ -77,6 +78,9 @@ public class ExecutionStatsAggregator {
   private int _numBlocks = 0;
   private int _numRows = 0;
   private long _stageExecutionTimeMs = 0;
+  private long _stageExecStartTimeMs = -1;
+  private long _stageExecEndTimeMs = -1;
+  private int _stageExecutionUnit = 0;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -88,10 +92,6 @@ public class ExecutionStatsAggregator {
 
   public synchronized void aggregate(@Nullable ServerRoutingInstance routingInstance, Map<String, String> metadata,
       Map<Integer, String> exceptions) {
-    // Reduce on trace info.
-    if (_enableTrace) {
-      _traceInfo.put(routingInstance.getShortName(), metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
-    }
 
     String tableNamesStr = metadata.get(DataTable.MetadataKey.TABLE.getName());
     String tableName = null;
@@ -106,17 +106,30 @@ public class ExecutionStatsAggregator {
     }
 
     TableType tableType = null;
+    String instanceName = null;
     if (routingInstance != null) {
       tableType = routingInstance.getTableType();
+      instanceName = routingInstance.getShortName();;
     } else if (tableName != null) {
       tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      instanceName = tableName;
     } else {
       tableType = null;
+      instanceName = null;
+    }
+
+    // Reduce on trace info.
+    if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName()) && instanceName != null) {
+      _traceInfo.put(instanceName, metadata.get(DataTable.MetadataKey.TRACE_INFO.getName()));
     }
 
     String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
     if (operatorId != null) {
-      _operatorIds.add(operatorId);
+      if (_enableTrace) {
+        _operatorStats.put(operatorId, metadata);
+      } else {
+        _operatorStats.put(operatorId, new HashMap<>());
+      }
     }
 
     // Reduce on exceptions.
@@ -252,6 +265,21 @@ public class ExecutionStatsAggregator {
     String operatorExecutionTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName());
     if (operatorExecutionTimeString != null) {
       _stageExecutionTimeMs += Long.parseLong(operatorExecutionTimeString);
+      _stageExecutionUnit += 1;
+    }
+
+    String operatorExecStartTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName());
+    if (operatorExecStartTimeString != null) {
+      long operatorExecStartTime = Long.parseLong(operatorExecStartTimeString);
+      _stageExecStartTimeMs = _stageExecStartTimeMs == -1 ? operatorExecStartTime
+          : Math.min(operatorExecStartTime, _stageExecStartTimeMs);
+    }
+
+    String operatorExecEndTimeString = metadata.get(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName());
+    if (operatorExecEndTimeString != null) {
+      long operatorExecEndTime = Long.parseLong(operatorExecEndTimeString);
+      _stageExecEndTimeMs = _stageExecEndTimeMs == -1 ? operatorExecEndTime
+          : Math.max(operatorExecEndTime, _stageExecEndTimeMs);
     }
   }
 
@@ -340,7 +368,13 @@ public class ExecutionStatsAggregator {
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
     brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
-    brokerResponseStats.setOperatorIds(_operatorIds);
+    brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
+    brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
+    if (_enableTrace) {
+      brokerResponseStats.setOperatorStats(_operatorStats);
+    } else {
+      brokerResponseStats.setOperatorStats(Collections.emptyMap());
+    }
     brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
 

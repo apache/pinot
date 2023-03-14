@@ -296,8 +296,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "      \"table\": [\n" + "        \"a\"\n" + "      ],\n" + "      \"inputs\": []\n" + "    },\n"
             + "    {\n" + "      \"id\": \"1\",\n" + "      \"relOp\": \"LogicalProject\",\n" + "      \"fields\": [\n"
             + "        \"col1\",\n" + "        \"col3\"\n" + "      ],\n" + "      \"exprs\": [\n" + "        {\n"
-            + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        },\n" + "        {\n"
-            + "          \"input\": 1,\n" + "          \"name\": \"$1\"\n" + "        }\n" + "      ]\n" + "    }\n"
+            + "          \"input\": 3,\n" + "          \"name\": \"$3\"\n" + "        },\n" + "        {\n"
+            + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        }\n" + "      ]\n" + "    }\n"
             + "  ]\n" + "}"},
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
             "Execution Plan\n" + "digraph {\n" + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
@@ -305,9 +305,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
                 + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n" + "}\n"},
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1", "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$1])\n" + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
-            + "    LogicalExchange(distribution=[hash[0]])\n" + "      LogicalProject(col1=[$2])\n"
+            + "    LogicalExchange(distribution=[hash[0]])\n" + "      LogicalProject(col1=[$3])\n"
             + "        LogicalTableScan(table=[[a]])\n" + "    LogicalExchange(distribution=[hash[1]])\n"
-            + "      LogicalProject(col3=[$1], col1=[$2])\n" + "        LogicalTableScan(table=[[b]])\n"},
+            + "      LogicalProject(col3=[$2], col1=[$3])\n" + "        LogicalTableScan(table=[[b]])\n"},
     };
   }
 }
