@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -84,13 +83,13 @@ public class AggregationFunctionUtils {
    *          or group-by expressions.
    */
   public static Set<ExpressionContext> collectExpressionsToTransform(AggregationFunction[] aggregationFunctions,
-      @Nullable ExpressionContext[] groupByExpressions) {
+      @Nullable List<ExpressionContext> groupByExpressions) {
     Set<ExpressionContext> expressions = new HashSet<>();
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       expressions.addAll(aggregationFunction.getInputExpressions());
     }
     if (groupByExpressions != null) {
-      expressions.addAll(Arrays.asList(groupByExpressions));
+      expressions.addAll(groupByExpressions);
     }
     return expressions;
   }
@@ -179,97 +178,91 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * Build a filter operator from the given FilterContext.
-   *
-   * It returns the FilterPlanNode to allow reusing plan level components such as predicate
-   * evaluator map
+   * Build pairs of filtered aggregation functions and corresponding transform operator.
    */
-  public static Pair<FilterPlanNode, BaseFilterOperator> buildFilterOperator(IndexSegment indexSegment,
-      QueryContext queryContext, FilterContext filterContext) {
-    FilterPlanNode filterPlanNode = new FilterPlanNode(indexSegment, queryContext, filterContext);
-    return Pair.of(filterPlanNode, filterPlanNode.run());
-  }
+  public static List<Pair<AggregationFunction[], TransformOperator>> buildFilteredAggregateTransformOperators(
+      IndexSegment indexSegment, QueryContext queryContext) {
+    assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null;
 
-  public static Pair<FilterPlanNode, BaseFilterOperator> buildFilterOperator(IndexSegment indexSegment,
-      QueryContext queryContext) {
-    return buildFilterOperator(indexSegment, queryContext, queryContext.getFilter());
-  }
+    BaseFilterOperator mainFilterOperator = new FilterPlanNode(indexSegment, queryContext).run();
 
-  public static TransformOperator buildTransformOperatorForFilteredAggregates(IndexSegment indexSegment,
-      QueryContext queryContext, BaseFilterOperator filterOperator, @Nullable ExpressionContext[] groupByExpressions) {
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    Set<ExpressionContext> expressionsToTransform =
-        collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-    return new TransformPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-        filterOperator).run();
-  }
+    // No need to process sub-filters when main filter has empty result
+    if (mainFilterOperator.isResultEmpty()) {
+      AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+      Set<ExpressionContext> expressions =
+          collectExpressionsToTransform(aggregationFunctions, queryContext.getGroupByExpressions());
+      TransformOperator transformOperator =
+          new TransformPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+              mainFilterOperator).run();
+      return Collections.singletonList(Pair.of(aggregationFunctions, transformOperator));
+    }
 
-  /**
-   * Build pairs of filtered aggregation functions and corresponding transform operator
-   * @param mainPredicateFilterOperator Filter operator corresponding to the main predicate
-   * @param mainTransformOperator Transform operator corresponding to the main predicate
-   */
-  public static List<Pair<AggregationFunction[], TransformOperator>> buildFilteredAggTransformPairs(
-      IndexSegment indexSegment, QueryContext queryContext, BaseFilterOperator mainPredicateFilterOperator,
-      TransformOperator mainTransformOperator, @Nullable ExpressionContext[] groupByExpressions) {
-    Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap = new HashMap<>();
-    List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
-    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions =
-        queryContext.getFilteredAggregationFunctions();
-    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList = new ArrayList<>();
-
-    // For each aggregation function, check if the aggregation function is a filtered agg.
-    // If it is, populate the corresponding filter operator and corresponding transform operator
-    assert aggregationFunctions != null;
-    for (Pair<AggregationFunction, FilterContext> inputPair : aggregationFunctions) {
-      AggregationFunction aggFunc = inputPair.getLeft();
-      FilterContext currentFilterExpression = inputPair.getRight();
-      if (currentFilterExpression != null) {
-        if (filterContextToAggFuncsMap.get(currentFilterExpression) != null) {
-          filterContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(aggFunc);
-          continue;
-        }
-        Pair<FilterPlanNode, BaseFilterOperator> filterPlanOpPair =
-            buildFilterOperator(indexSegment, queryContext, currentFilterExpression);
-        BaseFilterOperator wrappedFilterOperator =
-            new CombinedFilterOperator(mainPredicateFilterOperator, filterPlanOpPair.getRight(),
-                queryContext.getQueryOptions());
-        TransformOperator newTransformOperator =
-            buildTransformOperatorForFilteredAggregates(indexSegment, queryContext, wrappedFilterOperator,
-                groupByExpressions);
-        // For each transform operator, associate it with the underlying expression. This allows
-        // fetching the relevant TransformOperator when resolving blocks during aggregation
-        // execution
-        List<AggregationFunction> aggFunctionList = new ArrayList<>();
-        aggFunctionList.add(aggFunc);
-        filterContextToAggFuncsMap.put(currentFilterExpression, Pair.of(aggFunctionList, newTransformOperator));
+    // For each aggregation function, check if the aggregation function is a filtered aggregate. If so, populate the
+    // corresponding filter operator.
+    Map<FilterContext, Pair<BaseFilterOperator, List<AggregationFunction>>> filterOperators = new HashMap<>();
+    List<AggregationFunction> nonFilteredFunctions = new ArrayList<>();
+    for (Pair<AggregationFunction, FilterContext> functionFilterPair : queryContext.getFilteredAggregationFunctions()) {
+      AggregationFunction aggregationFunction = functionFilterPair.getLeft();
+      FilterContext filter = functionFilterPair.getRight();
+      if (filter != null) {
+        filterOperators.computeIfAbsent(filter, k -> {
+          BaseFilterOperator combinedFilterOperator;
+          BaseFilterOperator subFilterOperator = new FilterPlanNode(indexSegment, queryContext, filter).run();
+          if (mainFilterOperator.isResultMatchingAll()) {
+            combinedFilterOperator = subFilterOperator;
+          } else {
+            if (subFilterOperator.isResultEmpty()) {
+              combinedFilterOperator = subFilterOperator;
+            } else if (subFilterOperator.isResultMatchingAll()) {
+              combinedFilterOperator = mainFilterOperator;
+            } else {
+              combinedFilterOperator =
+                  new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
+            }
+          }
+          return Pair.of(combinedFilterOperator, new ArrayList<>());
+        }).getRight().add(aggregationFunction);
       } else {
-        nonFilteredAggregationFunctions.add(aggFunc);
+        nonFilteredFunctions.add(aggregationFunction);
       }
     }
-    // Convert to array since FilteredGroupByOperator expects it
-    for (Pair<List<AggregationFunction>, TransformOperator> pair : filterContextToAggFuncsMap.values()) {
-      List<AggregationFunction> aggregationFunctionList = pair.getLeft();
-      if (aggregationFunctionList == null) {
-        throw new IllegalStateException("Null aggregation list seen");
+
+    // Create the transform operators
+    List<Pair<AggregationFunction[], TransformOperator>> transformOperators = new ArrayList<>();
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    for (Pair<BaseFilterOperator, List<AggregationFunction>> filterOperatorFunctionsPair : filterOperators.values()) {
+      BaseFilterOperator filterOperator = filterOperatorFunctionsPair.getLeft();
+      if (filterOperator == mainFilterOperator) {
+        // This can happen when the sub filter matches all documents, and we can treat the function as non-filtered
+        nonFilteredFunctions.addAll(filterOperatorFunctionsPair.getRight());
+      } else {
+        AggregationFunction[] aggregationFunctions =
+            filterOperatorFunctionsPair.getRight().toArray(new AggregationFunction[0]);
+        Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
+        TransformOperator transformOperator =
+            new TransformPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+                filterOperator).run();
+        transformOperators.add(Pair.of(aggregationFunctions, transformOperator));
       }
-      aggToTransformOpList.add(Pair.of(aggregationFunctionList.toArray(new AggregationFunction[0]), pair.getRight()));
     }
 
-    if (!nonFilteredAggregationFunctions.isEmpty()) {
-      aggToTransformOpList.add(
-          Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
+    if (!nonFilteredFunctions.isEmpty()) {
+      AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
+      Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
+      TransformOperator transformOperator =
+          new TransformPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+              mainFilterOperator).run();
+      transformOperators.add(Pair.of(aggregationFunctions, transformOperator));
     }
 
-    return aggToTransformOpList;
+    return transformOperators;
   }
 
   public static String getResultColumnName(AggregationFunction aggregationFunction, @Nullable FilterContext filter) {
-      String columnName = aggregationFunction.getResultColumnName();
-      if (filter != null) {
-        columnName += " FILTER(WHERE " + filter + ")";
-      }
-      return columnName;
+    String columnName = aggregationFunction.getResultColumnName();
+    if (filter != null) {
+      columnName += " FILTER(WHERE " + filter + ")";
+    }
+    return columnName;
   }
 }
