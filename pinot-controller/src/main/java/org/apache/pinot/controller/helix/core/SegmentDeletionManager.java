@@ -75,7 +75,7 @@ public class SegmentDeletionManager {
     RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
-  private interface SegmentDeletionHook {
+  public interface SegmentDeletionHook {
     void process(String tableName, List<String> segmentsToDelete);
   }
 
@@ -170,6 +170,10 @@ public class SegmentDeletionManager {
       segmentsToRetryLater.clear();
     }
 
+    for (SegmentDeletionHook segmentDeletionHook : _concurrentLinkedQueue) {
+      segmentDeletionHook.process(tableName, segmentsToDelete);
+    }
+
     if (!segmentsToDelete.isEmpty()) {
       List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
       for (String segmentId : segmentsToDelete) {
@@ -196,9 +200,6 @@ public class SegmentDeletionManager {
       //       segments will become orphans and not easy to track because their ZK metadata are already deleted.
       //       Consider removing segments from deep store before cleaning up the ZK metadata.
       removeSegmentsFromStore(tableName, segmentsToDelete, deletedSegmentsRetentionMs);
-      for (SegmentDeletionHook segmentDeletionHook : _concurrentLinkedQueue) {
-        segmentDeletionHook.process(tableName, segmentsToDelete);
-      }
     }
 
     LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
