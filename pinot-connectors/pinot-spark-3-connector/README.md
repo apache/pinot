@@ -58,7 +58,23 @@ val data = spark.read
 data.show(100)
 ```
 
-For more examples, see `src/test/scala/.../ExampleSparkPinotConnectorTest.scala` 
+## Examples
+
+There are more examples included in `src/test/scala/.../ExampleSparkPinotConnectorTest.scala`.
+You can run the examples locally (e.g. using your IDE) in standalone mode by starting a local Pinot cluster. See: https://docs.pinot.apache.org/basics/getting-started/running-pinot-locally
+
+You can also run the tests in _cluster mode_ using following command:
+```shell
+export SPARK_CLUSTER=<YOUR_YARN_OR_SPARK_CLUSTER>
+
+# Edit the ExampleSparkPinotConnectorTest to get rid of `.master("local")` and rebuild the jar before running this command
+spark-submit \
+    --class org.apache.pinot.connector.spark.v3.datasource.ExampleSparkPinotConnectorTest \
+    --jars ./target/pinot-spark-3-connector-0.13.0-SNAPSHOT-shaded.jar \
+    --master $SPARK_CLUSTER \
+    --deploy-mode cluster \
+  ./target/pinot-spark-3-connector-0.13.0-SNAPSHOT-tests.jar
+```
 
 Spark-Pinot connector uses Spark `DatasourceV2 API`. Please check the Databricks presentation for DatasourceV2 API;
 
