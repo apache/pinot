@@ -182,18 +182,6 @@ public class SegmentGeneratorConfig implements Serializable {
       setStarTreeIndexConfigs(indexingConfig.getStarTreeIndexConfigs());
       setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
 
-      // NOTE: There are 2 ways to configure creating inverted index during segment generation:
-      //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
-      //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
-      // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
-      if (indexingConfig.getInvertedIndexColumns() != null) {
-        Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
-            || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
-          setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, indexingConfig.getInvertedIndexColumns());
-        }
-      }
-
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList != null) {
         for (FieldConfig fieldConfig : fieldConfigList) {
@@ -222,6 +210,21 @@ public class SegmentGeneratorConfig implements Serializable {
     }
 
     _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+
+    if (indexingConfig != null) {
+      // NOTE: There are 2 ways to configure creating inverted index during segment generation:
+      //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
+      //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
+      // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
+      // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
+      if (indexingConfig.getInvertedIndexColumns() != null) {
+        Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
+            || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+          setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, indexingConfig.getInvertedIndexColumns());
+        }
+      }
+    }
   }
 
   public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config, String... columns) {
