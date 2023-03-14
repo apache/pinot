@@ -62,11 +62,32 @@ public class OrFilterOperator extends BaseFilterOperator {
 
   @Override
   public boolean canOptimizeCount() {
+    return isAllChildrenProduceBitmaps();
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    return isAllChildrenProduceBitmaps();
+  }
+
+  private boolean isAllChildrenProduceBitmaps() {
     boolean allChildrenProduceBitmaps = true;
     for (BaseFilterOperator child : _filterOperators) {
       allChildrenProduceBitmaps &= child.canProduceBitmaps();
     }
     return allChildrenProduceBitmaps;
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[_filterOperators.size()];
+    int i = 0;
+    for (BaseFilterOperator child : _filterOperators) {
+      bitmaps[i++] = child.getBitmaps().reduce();
+    }
+
+    ImmutableRoaringBitmap finalBitmap = BufferFastAggregation.or(bitmaps);
+    return new BitmapCollection(finalBitmap.getCardinality(), false, finalBitmap);
   }
 
   @Override

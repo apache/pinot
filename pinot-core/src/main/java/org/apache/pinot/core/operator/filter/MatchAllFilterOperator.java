@@ -24,14 +24,20 @@ import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class MatchAllFilterOperator extends BaseFilterOperator {
   public static final String EXPLAIN_NAME = "FILTER_MATCH_ENTIRE_SEGMENT";
   private final int _numDocs;
+  private final ImmutableRoaringBitmap _bitmap;
 
   public MatchAllFilterOperator(int numDocs) {
     _numDocs = numDocs;
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(0, numDocs + 1);
+    _bitmap = bitmap.toImmutableRoaringBitmap();
   }
 
   @Override
@@ -53,6 +59,16 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   @Override
   public boolean canOptimizeCount() {
     return true;
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    return true;
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    return new BitmapCollection(_bitmap.getCardinality(), false, _bitmap);
   }
 
   @Override
