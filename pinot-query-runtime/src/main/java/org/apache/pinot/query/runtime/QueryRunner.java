@@ -54,6 +54,7 @@ import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperato
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
@@ -209,12 +210,12 @@ public class QueryRunner {
           "RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId() + " Leaf stage v1 processing time:"
               + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
-      StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
-      mailboxSendOperator = new MailboxSendOperator(_mailboxService,
-          new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
-              sendNode.getStageId(), _rootServer), receivingStageMetadata.getServerInstances(),
-          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _rootServer, requestId,
-          sendNode.getStageId(), sendNode.getReceiverStageId(), deadlineMs);
+      OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(),
+          _rootServer, deadlineMs, deadlineMs, distributedStagePlan.getMetadataMap());
+      mailboxSendOperator = new MailboxSendOperator(
+          new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), opChainExecutionContext),
+          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getStageId(),
+          sendNode.getReceiverStageId(), opChainExecutionContext);
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);

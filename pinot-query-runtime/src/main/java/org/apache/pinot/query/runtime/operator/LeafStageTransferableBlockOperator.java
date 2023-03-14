@@ -70,12 +70,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
       OpChainExecutionContext context) {
-    this(baseResultBlock, dataSchema, context.getRequestId(), context.getStageId(), context.getServer());
-  }
-
-  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
-      long requestId, int stageId, VirtualServerAddress serverAddress) {
-    super(requestId, stageId, serverAddress);
+    super(context);
     _baseResultBlock = baseResultBlock;
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);

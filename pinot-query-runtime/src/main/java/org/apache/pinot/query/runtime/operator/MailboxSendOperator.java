@@ -69,32 +69,22 @@ public class MailboxSendOperator extends MultiStageOperator {
     MailboxIdentifier generate(VirtualServer server);
   }
 
-  public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      VirtualServerAddress sendingServer, long jobId, int senderStageId, int receiverStageId, long deadlineMs) {
-    this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        server -> toMailboxId(server, jobId, senderStageId, receiverStageId, sendingServer), BlockExchange::getExchange,
-        jobId, senderStageId, receiverStageId, sendingServer, deadlineMs);
-  }
-
   public MailboxSendOperator(MultiStageOperator dataTableBlockBaseOperator, RelDistribution.Type exchangeType,
       KeySelector<Object[], Object[]> keySelector, int senderStageId, int receiverStageId,
       OpChainExecutionContext context) {
-    this(context.getMailboxService(), dataTableBlockBaseOperator,
-        context.getMetadataMap().get(receiverStageId).getServerInstances(), exchangeType, keySelector,
-        context.getServer(), context.getRequestId(), senderStageId, receiverStageId, context.getDeadlineMs());
+    this(dataTableBlockBaseOperator, exchangeType, keySelector, (server) -> toMailboxId(server, context.getRequestId(),
+        senderStageId, receiverStageId, context.getServer()), BlockExchange::getExchange, receiverStageId, context);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int senderStageId,
-      int receiverStageId, VirtualServerAddress serverAddress, long deadlineMs) {
-    super(jobId, senderStageId, serverAddress);
+  MailboxSendOperator(MultiStageOperator dataTableBlockBaseOperator, RelDistribution.Type exchangeType,
+      KeySelector<Object[], Object[]> keySelector, MailboxIdGenerator mailboxIdGenerator,
+      BlockExchangeFactory blockExchangeFactory, int receiverStageId, OpChainExecutionContext context) {
+    super(context);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
-
+    MailboxService<TransferableBlock> mailboxService = context.getMailboxService();
+    List<VirtualServer> receivingStageInstances =
+        context.getMetadataMap().get(receiverStageId).getServerInstances();
     List<MailboxIdentifier> receivingMailboxes;
     if (exchangeType == RelDistribution.Type.SINGLETON) {
       // TODO: this logic should be moved into SingletonExchange
@@ -121,8 +111,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
 
     BlockSplitter splitter = TransferableBlockUtils::splitBlock;
-    _exchange = blockExchangeFactory.build(mailboxService, receivingMailboxes, exchangeType, keySelector, splitter,
-        deadlineMs);
+    _exchange = blockExchangeFactory.build(context.getMailboxService(), receivingMailboxes, exchangeType, keySelector, splitter,
+        context.getDeadlineMs());
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
         String.format("Exchange type '%s' is not supported yet", exchangeType));
