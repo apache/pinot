@@ -16,15 +16,16 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=11
-ARG OPENJDK_IMAGE=openjdk
 
-FROM ${OPENJDK_IMAGE}:${JAVA_VERSION}-jdk-slim
+ARG JAVA_VERSION=11
+ARG JDK_IMAGE=mcr.microsoft.com/openjdk/jdk
+
+FROM ${JDK_IMAGE}:${JAVA_VERSION}-ubuntu
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim less wget curl git python sysstat procps linux-perf openjdk-11-dbg && \
+    apt-get install -y --no-install-recommends vim less wget curl git python sysstat procps linux-tools-generic && \
     rm -rf /var/lib/apt/lists/*
 
 RUN case `uname -m` in \
