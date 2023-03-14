@@ -29,8 +29,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
@@ -97,8 +98,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
 
-  public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator, ExpressionContext[] groupByExpressions,
-      int numGroupsLimit, int arrayBasedThreshold) {
+  public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
+      ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold) {
     assert numGroupsLimit >= arrayBasedThreshold;
 
     _groupByExpressions = groupByExpressions;
@@ -117,7 +118,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
-      _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
+      ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
+      _dictionaries[i] = columnContext.getDictionary();
+      assert _dictionaries[i] != null;
       int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
       if (_internedDictionaryValues != null && cardinality < MAX_DICTIONARY_INTERN_TABLE_SIZE) {
@@ -130,8 +133,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           cardinalityProduct *= cardinality;
         }
       }
-
-      _isSingleValueColumn[i] = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
+      _isSingleValueColumn[i] = columnContext.isSingleValue();
     }
     // TODO: Clear the holder after processing the query instead of before
     if (longOverflow) {
@@ -175,28 +177,27 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
+  public void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
+      BlockValSet blockValueSet = valueBlock.getBlockValueSet(_groupByExpressions[i]);
       _singleValueDictIds[i] = blockValueSet.getDictionaryIdsSV();
     }
-    _rawKeyHolder.processSingleValue(transformBlock.getNumDocs(), groupKeys);
+    _rawKeyHolder.processSingleValue(valueBlock.getNumDocs(), groupKeys);
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys) {
+  public void generateKeysForBlock(ValueBlock valueBlock, int[][] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
+      BlockValSet blockValueSet = valueBlock.getBlockValueSet(_groupByExpressions[i]);
       if (_isSingleValueColumn[i]) {
         _singleValueDictIds[i] = blockValueSet.getDictionaryIdsSV();
       } else {
         _multiValueDictIds[i] = blockValueSet.getDictionaryIdsMV();
       }
     }
-
-    _rawKeyHolder.processMultiValue(transformBlock.getNumDocs(), groupKeys);
+    _rawKeyHolder.processMultiValue(valueBlock.getNumDocs(), groupKeys);
   }
 
   @Override

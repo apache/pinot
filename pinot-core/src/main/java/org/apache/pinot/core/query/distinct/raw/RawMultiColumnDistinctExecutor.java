@@ -28,7 +28,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorUtils;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -61,13 +61,13 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   }
 
   @Override
-  public boolean process(TransformBlock transformBlock) {
-    int numDocs = transformBlock.getNumDocs();
+  public boolean process(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     int numExpressions = _expressions.size();
     if (!_hasMVExpression) {
       BlockValSet[] blockValSets = new BlockValSet[numExpressions];
       for (int i = 0; i < numExpressions; i++) {
-        blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
+        blockValSets[i] = valueBlock.getBlockValueSet(_expressions.get(i));
       }
       RowBasedBlockValueFetcher valueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       if (_distinctTable.hasOrderBy()) {
@@ -87,7 +87,7 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
       Object[][] svValues = new Object[numExpressions][];
       Object[][][] mvValues = new Object[numExpressions][][];
       for (int i = 0; i < numExpressions; i++) {
-        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressions.get(i));
+        BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expressions.get(i));
         if (blockValueSet.isSingleValue()) {
           svValues[i] = getSVValues(blockValueSet, numDocs);
         } else {

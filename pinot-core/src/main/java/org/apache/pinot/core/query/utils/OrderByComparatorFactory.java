@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -38,26 +38,23 @@ public class OrderByComparatorFactory {
   }
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
-      TransformResultMetadata[] orderByExpressionMetadata, boolean nullHandlingEnabled) {
-    return getComparator(orderByExpressions, orderByExpressionMetadata, nullHandlingEnabled, 0,
-        orderByExpressions.size());
+      ColumnContext[] orderByColumnContexts, boolean nullHandlingEnabled) {
+    return getComparator(orderByExpressions, orderByColumnContexts, nullHandlingEnabled, 0, orderByExpressions.size());
   }
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
-      TransformResultMetadata[] orderByExpressionMetadata, boolean nullHandlingEnabled, int from,
-      int to) {
+      ColumnContext[] orderByColumnContexts, boolean nullHandlingEnabled, int from, int to) {
     Preconditions.checkArgument(to <= orderByExpressions.size(),
         "Trying to access %sth position of orderByExpressions with size %s", to, orderByExpressions.size());
-    Preconditions.checkArgument(to <= orderByExpressionMetadata.length,
-        "Trying to access %sth position of orderByExpressionMetadata with size %s", to,
-        orderByExpressionMetadata.length);
+    Preconditions.checkArgument(to <= orderByColumnContexts.length,
+        "Trying to access %sth position of orderByExpressionMetadata with size %s", to, orderByColumnContexts.length);
     Preconditions.checkArgument(from < to, "FROM (%s) must be lower than TO (%s)", from, to);
 
     // Compare all single-value columns
     int numOrderByExpressions = to - from;
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
     for (int i = from; i < to; i++) {
-      if (orderByExpressionMetadata[i].isSingleValue()) {
+      if (orderByColumnContexts[i].isSingleValue()) {
         valueIndexList.add(i);
       } else {
         // MV columns should not be part of the selection order by only list
@@ -75,7 +72,7 @@ public class OrderByComparatorFactory {
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      storedTypes[i] = orderByExpressionMetadata[valueIndex].getDataType().getStoredType();
+      storedTypes[i] = orderByColumnContexts[valueIndex].getDataType().getStoredType();
       multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? 1 : -1;
     }
 
