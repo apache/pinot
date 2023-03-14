@@ -1003,7 +1003,9 @@ const verifyAuth = (authToken) => {
 
 const getAccessTokenFromHashParams = () => {
   let accessToken = '';
-  const urlSearchParams = new URLSearchParams(location.hash.substr(1));
+  const hashParam = removeAllLeadingForwardSlash(location.hash.substring(1));
+  
+  const urlSearchParams = new URLSearchParams(hashParam);
   if (urlSearchParams.has('access_token')) {
     accessToken = urlSearchParams.get('access_token') as string;
   }
@@ -1011,6 +1013,13 @@ const getAccessTokenFromHashParams = () => {
   return accessToken;
 };
 
+const removeAllLeadingForwardSlash = (string: string) => {
+  if(!string) {
+    return "";
+  }
+
+  return string.replace(new RegExp("^/+", "g"), "");
+}
 
 // validates app redirect path with known routes
 const validateRedirectPath = (path: string): boolean => {
