@@ -50,14 +50,12 @@ public class HybridSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public Pair<String, Boolean> select(List<Pair<String, Boolean>> serverCandidates) {
-    Pair<String, Boolean> selectedServer = null;
+  public String select(List<String> serverCandidates) {
+    String selectedServer = null;
     Double minScore = Double.MAX_VALUE;
 
     // TODO: If two or more servers have the same score, break the tie intelligently.
-    for (Pair<String, Boolean> instance : serverCandidates) {
-      String server = instance.getLeft();
-      Boolean onlineFlag = instance.getRight();
+    for (String server : serverCandidates) {
       Double score = _serverRoutingStatsManager.fetchHybridScoreForServer(server);
 
       // No stats for this server. That means this server hasn't received any queries yet.
@@ -69,7 +67,7 @@ public class HybridSelector implements AdaptiveServerSelector {
 
       if (score < minScore) {
         minScore = score;
-        selectedServer = ImmutablePair.of(server, onlineFlag);
+        selectedServer = server;
       }
     }
 
@@ -77,8 +75,8 @@ public class HybridSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public List<Pair<Pair<String, Boolean>, Double>> fetchAllServerRankingsWithScores() {
-    List<Pair<Pair<String, Boolean>, Double>> pairList = _serverRoutingStatsManager.fetchHybridScoreForAllServers();
+  public List<Pair<String, Double>> fetchAllServerRankingsWithScores() {
+    List<Pair<String, Double>> pairList = _serverRoutingStatsManager.fetchHybridScoreForAllServers();
 
     // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
     Collections.shuffle(pairList);
@@ -91,15 +89,14 @@ public class HybridSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public List<Pair<Pair<String, Boolean>, Double>> fetchServerRankingsWithScores(
-      List<Pair<String, Boolean>> serverCandidates) {
-    List<Pair<Pair<String, Boolean>, Double>> pairList = new ArrayList<>();
+  public List<Pair<String, Double>> fetchServerRankingsWithScores(List<String> serverCandidates) {
+    List<Pair<String, Double>> pairList = new ArrayList<>();
     if (serverCandidates.size() == 0) {
       return pairList;
     }
 
-    for (Pair<String, Boolean> server : serverCandidates) {
-      Double score = _serverRoutingStatsManager.fetchHybridScoreForServer(server.getLeft());
+    for (String server : serverCandidates) {
+      Double score = _serverRoutingStatsManager.fetchHybridScoreForServer(server);
       if (score == null) {
         score = -1.0;
       }

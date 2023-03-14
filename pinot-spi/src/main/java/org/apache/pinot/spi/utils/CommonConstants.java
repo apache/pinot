@@ -21,7 +21,6 @@ package org.apache.pinot.spi.utils;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
 
@@ -115,7 +114,6 @@ public class CommonConstants {
 
     public static class StateModel {
       // public only for testing purpose.
-      public static final long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
       public static class SegmentStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
@@ -130,10 +128,6 @@ public class CommonConstants {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
-      }
-
-      public static boolean isNewSegment(long creationTimeMillis, long nowMillis) {
-        return nowMillis - creationTimeMillis <= NEW_SEGMENT_EXPIRATION_MILLIS;
       }
     }
 

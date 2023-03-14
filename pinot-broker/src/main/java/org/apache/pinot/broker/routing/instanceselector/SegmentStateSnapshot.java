@@ -19,14 +19,13 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.slf4j.Logger;
@@ -49,20 +48,20 @@ public class SegmentStateSnapshot {
 
   private static class SelectionCandidate {
     // Mapping from segment to list of servers with online flags.
-    private Map<String, List<Pair<String, Boolean>>> _instanceMap;
+    private Map<String, List<SegmentInstanceCandidate>> _instanceMap;
     private Set<String> _unavailableSegments;
 
-    public SelectionCandidate(Map<String, List<Pair<String, Boolean>>> instanceMap,
-        @Nullable Set<String> unavailableSegments) {
+    public SelectionCandidate(Map<String, List<SegmentInstanceCandidate>> instanceMap,
+        Set<String> unavailableSegments) {
       _instanceMap = instanceMap;
       _unavailableSegments = unavailableSegments;
     }
 
-    public List<Pair<String, Boolean>> getCandidates(String segment) {
+    public List<SegmentInstanceCandidate> getCandidates(String segment) {
       return _instanceMap.get(segment);
     }
 
-    Map<String, List<Pair<String, Boolean>>> getAllCandidates() {
+    Map<String, List<SegmentInstanceCandidate>> getAllCandidates() {
       return _instanceMap;
     }
 
@@ -99,18 +98,15 @@ public class SegmentStateSnapshot {
       Map<String, List<String>> segmentToOnlineInstancesMap, Set<String> enabledInstance, BrokerMetrics brokerMetrics) {
     // Generate a new map from segment to enabled ONLINE/CONSUMING instances and a new set of unavailable segments (no
     // enabled instance or all enabled instances are in ERROR state)
-    Map<String, List<Pair<String, Boolean>>> segmentToEnabledInstancesMap = new HashMap<>();
+    Map<String, List<SegmentInstanceCandidate>> segmentToEnabledInstancesMap = new HashMap<>();
     Set<String> unavailableSegments = new HashSet<>();
-    // NOTE: Put null as the value when there is no enabled instances for a segment so that segmentToEnabledInstancesMap
-    // always contains all segments. With this, in onInstancesChange() we can directly iterate over
-    // segmentToEnabledInstancesMap.entrySet() and modify the value without changing the map entries.
     for (Map.Entry<String, List<String>> entry : segmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       List<String> onlineInstancesForSegment = entry.getValue();
-      List<Pair<String, Boolean>> enabledInstancesForSegment = new ArrayList<>();
+      List<SegmentInstanceCandidate> enabledInstancesForSegment = new ArrayList<>();
       for (String onlineInstance : onlineInstancesForSegment) {
         if (enabledInstance.contains(onlineInstance)) {
-          enabledInstancesForSegment.add(ImmutablePair.of(onlineInstance, true));
+          enabledInstancesForSegment.add(SegmentInstanceCandidate.of(onlineInstance, true));
         }
       }
       if (!enabledInstancesForSegment.isEmpty()) {
@@ -127,37 +123,52 @@ public class SegmentStateSnapshot {
     return new SelectionCandidate(segmentToEnabledInstancesMap, unavailableSegments);
   }
 
-  // Calculate candidate instance map for routing from old segment states.
+  // Calculate candidate instance map for routing from new segment states.
+  // Note that we don't report new segment as unavailable.
   private static SelectionCandidate calculateNewSegmentSelectionCandidate(
       Map<String, BaseInstanceSelector.SegmentState> newSegmentState, Set<String> enabledInstance) {
-    Map<String, List<Pair<String, Boolean>>> newSegmentToCandidateInstanceMap = new HashMap<>();
+    Map<String, List<SegmentInstanceCandidate>> newSegmentToCandidateInstanceMap = new HashMap<>();
     for (Map.Entry<String, BaseInstanceSelector.SegmentState> entry : newSegmentState.entrySet()) {
       String segment = entry.getKey();
-      List<Pair<String, Boolean>> enabledInstancesForSegment = new ArrayList<>();
+      List<SegmentInstanceCandidate> enabledInstancesForSegment = new ArrayList<>();
       BaseInstanceSelector.SegmentState state = entry.getValue();
       HashMap<String, Boolean> candidates = state.getCandidates();
       for (Map.Entry<String, Boolean> instanceEntry : candidates.entrySet()) {
         String instance = instanceEntry.getKey();
         if (enabledInstance.contains(instance)) {
-          enabledInstancesForSegment.add(ImmutablePair.of(instance, instanceEntry.getValue()));
+          enabledInstancesForSegment.add(SegmentInstanceCandidate.of(instance, instanceEntry.getValue()));
         }
       }
       if (!enabledInstancesForSegment.isEmpty()) {
         newSegmentToCandidateInstanceMap.put(segment, enabledInstancesForSegment);
       }
     }
-    return new SelectionCandidate(newSegmentToCandidateInstanceMap, null);
+    return new SelectionCandidate(newSegmentToCandidateInstanceMap, Collections.emptySet());
   }
 
-  @Nullable public List<Pair<String, Boolean>> getCandidates(String segment) {
-    List<Pair<String, Boolean>> candidates = _newSegmentSelectionCandidate.getCandidates(segment);
+  @Nullable
+  public List<SegmentInstanceCandidate> getCandidates(String segment) {
+    List<SegmentInstanceCandidate> candidates = _newSegmentSelectionCandidate.getCandidates(segment);
     if (candidates != null) {
       return candidates;
     }
     return _oldSegmentSelectionCandidate.getCandidates(segment);
   }
 
-  public Map<String, List<Pair<String, Boolean>>> getOldSegmentCandidates() {
+  @Nullable
+  public Map<String, Boolean> getCandidatesAsMap(String segment) {
+    List<SegmentInstanceCandidate> candidates = getCandidates(segment);
+    if (candidates == null) {
+      return null;
+    }
+    Map<String, Boolean> candidateMap = new HashMap<>();
+    for (SegmentInstanceCandidate instanceCandidate : candidates) {
+      candidateMap.put(instanceCandidate.getInstance(), instanceCandidate.isOnline());
+    }
+    return candidateMap;
+  }
+
+  public Map<String, List<SegmentInstanceCandidate>> getOldSegmentCandidates() {
     return _oldSegmentSelectionCandidate.getAllCandidates();
   }
 

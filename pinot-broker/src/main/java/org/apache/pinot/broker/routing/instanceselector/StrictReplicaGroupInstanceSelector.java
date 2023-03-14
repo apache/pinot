@@ -68,18 +68,12 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  *  </pre>
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
-
-  private boolean isNewSegment(String segment, Map<String, SegmentState> newSegmentStateMap, long nowMillis) {
-    SegmentState state = newSegmentStateMap.get(segment);
-    return state != null && state.isNew(nowMillis);
-  }
-
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     this(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, Clock.systemUTC());
   }
 
-  // Test only for clock injection.
+  // Directly call for test only for clock injection.
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Clock clock) {
@@ -90,11 +84,20 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    * {@inheritDoc}
    *
    * <pre>
+   *  Invariants for in memory state after this update
+   *  1) Old segment should not exist in newSegmentStateMap
+   *  2) Old segment's online instance should be tracked in segmentToOnlineInstancesMap in sorted order
+   *  3) New segment's instances in ideal state should be tracked in newSegmentStateMap with online flags set in sorted
+   *  order
+   *  4) Instances unavailable in any old segment should not exist in segmentToOnlineInstancesMap entries for segment
+   *  with same ideal state instance.
+   *
    * The maps are calculated in the following steps to meet the strict replica-group guarantee:
-   *   1. Create a map from online segment to set of instances hosting the segment based on the ideal state
-   *   2. Gather the online and offline instances for each online segment from the external view
-   *   3. Compare the instances from the ideal state and the external view and gather the unavailable instances for each
-   *      set of instances
+   *   1. Check whether segment is new or old based on ideal state and store the online instances for each segment in
+   *   new segment state map or old segment state.
+   *   2. For old segment, remove it from the newSegmentStateMap.
+   *   3. Use old segment state map to compare the instances from the ideal state and the external view and gather the
+   *   unavailable instances for each set of instances
    *   4. Exclude the unavailable instances from the online instances map
    *   5. For old segment, add the remaining online instance to the map.
    *   6. For new segment, add the ideal state instance to the map with online flags.
@@ -105,28 +108,33 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap,
       long nowMillis) {
     // TODO: Add support for AdaptiveServerSelection.
-    // Iterate over the ideal state to fill up 'idealStateSegmentToInstancesMap' which is a map from segment to set of
-    // instances hosting the segment in the ideal state
+    // Iterate over the ideal state to
+    // 1) Know whether a segment is new or old
+    // New segment definition:
+    // - in newSegmentState map and the creation time is new
+    // - external view hasn't converged ideal state.
+    // - the segment hasn't seen error in any instance.
+    // 2) For new segment, fill in newSegmentTempSegmentToOnlineInstancesMap.
+    // 3) For old segment, remove it from the newSegmentStageMap and fill in oldSegmentToOnlineInstancesMap
+    // 4) Track every segment's ideal state in idealStateSegmentToInstancesMap, which we will use to do instance
+    // exclusion later.
     int segmentMapCapacity = HashUtil.getHashMapCapacity(onlineSegments.size());
     Map<String, Set<String>> idealStateSegmentToInstancesMap = new HashMap<>(segmentMapCapacity);
-    Map<String, Set<String>> tempSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
+    Map<String, Set<String>> oldSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
     Map<String, Set<String>> newSegmentTempSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
-
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
-    // Iterate over the external view to fill up 'tempSegmentToOnlineInstancesMap' and 'segmentToOfflineInstancesMap'.
-    // 'tempSegmentToOnlineInstancesMap' is a temporary map from segment to set of instances that are in the ideal state
-    // and also ONLINE/CONSUMING in the external view. This map does not have the strict replica-group guarantee, and
-    // will be used to calculate the final 'segmentToOnlineInstancesMap'.
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
       // Only track online segments
       if (!onlineSegments.contains(segment)) {
         continue;
       }
-      Map<String, String> instanceStateMap = externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
+      Map<String, String> externalViewInstanceMap =
+          externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
       Map<String, String> idealStateInstanceStateMap = entry.getValue();
       Set<String> tempOnlineInstances = new TreeSet<>();
-      for (Map.Entry<String, String> instanceStateEntry : instanceStateMap.entrySet()) {
+      boolean hasErrorInstance = false;
+      for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceMap.entrySet()) {
         String instance = instanceStateEntry.getKey();
         // Only track instance in ideal state.
         if (!idealStateInstanceStateMap.containsKey(instance)) {
@@ -135,27 +143,25 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         String state = instanceStateEntry.getValue();
         if (SegmentStateModel.isOnline(state)) {
           tempOnlineInstances.add(instance);
-        } else if (!state.equals(SegmentStateModel.ONLINE)) {
+        } else if (state.equals(SegmentStateModel.ERROR)) {
           // error or dropped state should not be considered as new anymore.
-          newSegmentStateMap.remove(segment);
+          hasErrorInstance = true;
         }
       }
-      if (tempOnlineInstances.size() == entry.getValue().size()) {
-        // converged state segment is not considered as new
-        newSegmentStateMap.remove(segment);
-      }
-      if (isNewSegment(segment, newSegmentStateMap, nowMillis)) {
+      SegmentState state = newSegmentStateMap.getOrDefault(segment, SegmentState.OLD_SEGMENT_STATE);
+      if (state.isNew(nowMillis) && tempOnlineInstances.size() != entry.getValue().size() && !hasErrorInstance) {
         newSegmentTempSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
       } else {
         newSegmentStateMap.remove(segment);
-        tempSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
+        oldSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
       }
       idealStateSegmentToInstancesMap.put(segment, new TreeSet<>(idealStateInstanceStateMap.keySet()));
     }
 
-    // Iterate over the 'tempSegmentToOnlineInstancesMap' to gather the unavailable instances for each set of instances
+    // Get unavailable instances from oldSegmentToOnlineInstancesMap.
+    // Note that we don't use new segments to set up unavailable instance.
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
-    for (Map.Entry<String, Set<String>> entry : tempSegmentToOnlineInstancesMap.entrySet()) {
+    for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances =
@@ -168,9 +174,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       }
     }
 
-    // Iterate over the 'tempSegmentToOnlineInstancesMap' again to fill up the 'segmentToOnlineInstancesMap' which has
-    // the strict replica-group guarantee
-    for (Map.Entry<String, Set<String>> entry : tempSegmentToOnlineInstancesMap.entrySet()) {
+    // Set up 'segmentToOnlineInstancesMap' for old segments with the strict replica-group guarantee
+    for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       Set<String> candidateInstance = entry.getValue();
       // NOTE: Instances will be sorted here because 'tempOnlineInstances' is a TreeSet. We need the online instances to
@@ -189,8 +194,10 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       segmentToOnlineInstancesMap.put(segment, onlineInstances);
     }
 
+    // Set up or reset 'SegmentState' for new segments.
     for (Map.Entry<String, Set<String>> entry : newSegmentTempSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
+      // Note that instancesInIdealState needs to be sorted for strict replica group to work.
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());

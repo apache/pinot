@@ -72,13 +72,13 @@ public class ServerRoutingStatsManagerTest {
     Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer("testServer");
     assertNull(numInFlightReq);
 
-    List<Pair<Pair<String, Boolean>, Double>> latencyList = manager.fetchEMALatencyForAllServers();
+    List<Pair<String, Double>> latencyList = manager.fetchEMALatencyForAllServers();
     assertTrue(latencyList.isEmpty());
 
     Double latency = manager.fetchEMALatencyForServer("testServer");
     assertNull(latency);
 
-    List<Pair<Pair<String, Boolean>, Double>> scoreList = manager.fetchHybridScoreForAllServers();
+    List<Pair<String, Double>> scoreList = manager.fetchHybridScoreForAllServers();
     assertTrue(scoreList.isEmpty());
 
     Double score = manager.fetchHybridScoreForServer("testServer");
@@ -110,15 +110,15 @@ public class ServerRoutingStatsManagerTest {
     Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer("server1");
     assertEquals(numInFlightReq.intValue(), 1);
 
-    List<Pair<Pair<String, Boolean>, Double>> latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft().getLeft(), "server1");
+    List<Pair<String, Double>> latencyList = manager.fetchEMALatencyForAllServers();
+    assertEquals(latencyList.get(0).getLeft(), "server1");
     assertEquals(latencyList.get(0).getRight().doubleValue(), 0.0);
 
     Double latency = manager.fetchEMALatencyForServer("server1");
     assertEquals(latency, 0.0);
 
-    List<Pair<Pair<String, Boolean>, Double>> scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft().getLeft(), "server1");
+    List<Pair<String, Double>> scoreList = manager.fetchHybridScoreForAllServers();
+    assertEquals(scoreList.get(0).getLeft(), "server1");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
 
     Double score = manager.fetchHybridScoreForServer("server1");
@@ -136,14 +136,14 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(numInFlightReq.intValue(), 2);
 
     latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft().getLeft(), "server1");
+    assertEquals(latencyList.get(0).getLeft(), "server1");
     assertEquals(latencyList.get(0).getRight().doubleValue(), 0.0);
 
     latency = manager.fetchEMALatencyForServer("server1");
     assertEquals(latency, 0.0);
 
     scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft().getLeft(), "server1");
+    assertEquals(scoreList.get(0).getLeft(), "server1");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
 
     score = manager.fetchHybridScoreForServer("server1");
@@ -165,9 +165,9 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(numInFlightReq.intValue(), 2);
 
     latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft().getLeft(), "server2");
+    assertEquals(latencyList.get(0).getLeft(), "server2");
     assertEquals(latencyList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(latencyList.get(1).getLeft().getLeft(), "server1");
+    assertEquals(latencyList.get(1).getLeft(), "server1");
     assertEquals(latencyList.get(1).getRight().doubleValue(), 0.0);
 
     latency = manager.fetchEMALatencyForServer("server2");
@@ -176,9 +176,9 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(latency, 0.0);
 
     scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft().getLeft(), "server2");
+    assertEquals(scoreList.get(0).getLeft(), "server2");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(scoreList.get(1).getLeft().getLeft(), "server1");
+    assertEquals(scoreList.get(1).getLeft(), "server1");
     assertEquals(scoreList.get(1).getRight().doubleValue(), 0.0);
 
     score = manager.fetchHybridScoreForServer("server2");
@@ -202,9 +202,9 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(numInFlightReq.intValue(), 1);
 
     latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft().getLeft(), "server2");
+    assertEquals(latencyList.get(0).getLeft(), "server2");
     assertEquals(latencyList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(latencyList.get(1).getLeft().getLeft(), "server1");
+    assertEquals(latencyList.get(1).getLeft(), "server1");
     assertEquals(latencyList.get(1).getRight().doubleValue(), 2.0);
 
     latency = manager.fetchEMALatencyForServer("server2");
@@ -213,9 +213,9 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(latency, 2.0);
 
     scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft().getLeft(), "server2");
+    assertEquals(scoreList.get(0).getLeft(), "server2");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(scoreList.get(1).getLeft().getLeft(), "server1");
+    assertEquals(scoreList.get(1).getLeft(), "server1");
     assertEquals(scoreList.get(1).getRight().doubleValue(), 54.0);
 
     score = manager.fetchHybridScoreForServer("server2");
@@ -239,9 +239,9 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(numInFlightReq.intValue(), 1);
 
     latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft().getLeft(), "server2");
+    assertEquals(latencyList.get(0).getLeft(), "server2");
     assertEquals(latencyList.get(0).getRight().doubleValue(), 10.0);
-    assertEquals(latencyList.get(1).getLeft().getLeft(), "server1");
+    assertEquals(latencyList.get(1).getLeft(), "server1");
     assertEquals(latencyList.get(1).getRight().doubleValue(), 2.0);
 
     latency = manager.fetchEMALatencyForServer("server2");
@@ -250,9 +250,9 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(latency, 2.0);
 
     scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft().getLeft(), "server2");
+    assertEquals(scoreList.get(0).getLeft(), "server2");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 10.0, manager.getServerRoutingStatsStr());
-    assertEquals(scoreList.get(1).getLeft().getLeft(), "server1");
+    assertEquals(scoreList.get(1).getLeft(), "server1");
     assertEquals(scoreList.get(1).getRight().doubleValue(), 54.0, manager.getServerRoutingStatsStr());
 
     score = manager.fetchHybridScoreForServer("server2");

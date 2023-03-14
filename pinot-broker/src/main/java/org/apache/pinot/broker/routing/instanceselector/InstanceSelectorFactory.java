@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.time.Clock;
 import javax.annotation.Nullable;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -42,6 +43,13 @@ public class InstanceSelectorFactory {
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector) {
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC());
+  }
+
+  // test only
+  public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
@@ -50,14 +58,14 @@ public class InstanceSelectorFactory {
           routingConfig.getRoutingTableBuilderName())) || (tableConfig.getTableType() == TableType.REALTIME
           && LEGACY_REPLICA_GROUP_REALTIME_ROUTING.equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
         LOGGER.info("Using ReplicaGroupInstanceSelector for table: {}", tableNameWithType);
-        return new ReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector,
-            propertyStore);
+        return new ReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore,
+            clock);
       }
       if (RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new StrictReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector,
-            propertyStore);
+            propertyStore, clock);
       }
       if (RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
@@ -66,6 +74,6 @@ public class InstanceSelectorFactory {
             adaptiveServerSelector);
       }
     }
-    return new BalancedInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore);
+    return new BalancedInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
   }
 }

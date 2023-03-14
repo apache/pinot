@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -114,11 +113,11 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       instanceLookUpSet.addAll(instances);
     }
     Map<String, String> result = new HashMap<>();
-    for (Map.Entry<String, List<Pair<String, Boolean>>> entry : snapshot.getOldSegmentCandidates().entrySet()) {
+    for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : snapshot.getOldSegmentCandidates().entrySet()) {
       String segmentName = entry.getKey();
       boolean found = false;
-      for (Pair<String, Boolean> enabledInstanceForSegment : entry.getValue()) {
-        String instance = enabledInstanceForSegment.getLeft();
+      for (SegmentInstanceCandidate enabledInstanceForSegment : entry.getValue()) {
+        String instance = enabledInstanceForSegment.getInstance();
         if (instanceLookUpSet.contains(instance)) {
           found = true;
           result.put(segmentName, instance);

@@ -34,7 +34,7 @@ public interface AdaptiveServerSelector {
    * @param serverCandidates Candidate servers from which the best server should be chosen.
    * @return server identifier and whether server is online
    */
-  Pair<String, Boolean> select(List<Pair<String, Boolean>> serverCandidates);
+  String select(List<String> serverCandidates);
 
   /**
    * Note that this method is test only.
@@ -46,7 +46,7 @@ public interface AdaptiveServerSelector {
    *
    * @return List of servers with online flags along with their values ranked from best to worst.
    */
-  List<Pair<Pair<String, Boolean>, Double>> fetchAllServerRankingsWithScores();
+  List<Pair<String, Double>> fetchAllServerRankingsWithScores();
 
   /**
    * Same as above but fetches ranking only for the list of serverCandidates provided in the parameter. If a server
@@ -56,5 +56,5 @@ public interface AdaptiveServerSelector {
    * tenant. This API helps fetch ranking only for a subset of servers.
    * @return List of servers with online flags along with their values ranked from best to worst.
    */
-  List<Pair<Pair<String, Boolean>, Double>> fetchServerRankingsWithScores(List<Pair<String, Boolean>> serverCandidates);
+  List<Pair<String, Double>> fetchServerRankingsWithScores(List<String> serverCandidates);
 }
