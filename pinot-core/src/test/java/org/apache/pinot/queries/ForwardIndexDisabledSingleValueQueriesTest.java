@@ -1937,7 +1937,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     forwardIndexDisabledColumns.add("column11");
     indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
     indexLoadingConfig.setRangeIndexColumns(new HashSet<>(Arrays.asList("column6", "column9")));
-    indexLoadingConfig.getNoDictionaryColumns().remove("column9");
+    indexLoadingConfig.removeNoDictionaryColumns("column9");
     indexLoadingConfig.setReadMode(ReadMode.heap);
 
     // Reload the segments to pick up the new configs
@@ -1977,7 +1977,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     forwardIndexDisabledColumns.remove("column6");
     indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
     indexLoadingConfig.setRangeIndexColumns(new HashSet<>(Collections.singletonList("column6")));
-    indexLoadingConfig.getNoDictionaryColumns().add("column9");
+    indexLoadingConfig.addNoDictionaryColumns("column9");
     indexLoadingConfig.setReadMode(ReadMode.heap);
 
     // Reload the segments to pick up the new configs
