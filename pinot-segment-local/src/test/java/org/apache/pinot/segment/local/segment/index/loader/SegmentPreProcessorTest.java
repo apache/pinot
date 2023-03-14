@@ -42,7 +42,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -51,9 +50,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
@@ -252,22 +249,18 @@ public class SegmentPreProcessorTest {
     segmentGeneratorConfig.setRawIndexCreationColumns(rawCols);
     segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, COLUMN7_NAME);
     if (invertedIndexCols.size() > 0) {
-      for (String col : invertedIndexCols) {
-        segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, col);
-      }
+      segmentGeneratorConfig.addInvertedIndexCreationColumns(invertedIndexCols);
     }
     if (textIndexCols.size() > 0) {
       TextIndexConfig textIndexConfig = new TextIndexConfigBuilder(segmentGeneratorConfig.getFSTIndexType()).build();
       segmentGeneratorConfig.setIndexOn(StandardIndexes.text(), textIndexConfig, textIndexCols);
     }
     if (rangeIndexCols.size() > 0) {
-      RangeIndexConfig config = new RangeIndexConfig(RangeIndexType.DEFAULT_RANGE_INDEX_VERSION);
-      segmentGeneratorConfig.setIndexOn(StandardIndexes.range(), config, rangeIndexCols);
+      segmentGeneratorConfig.setRangeIndexCreationColumns(rangeIndexCols);
     }
     if (forwardIndexDisabledCols.size() > 0) {
-      segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
-          forwardIndexDisabledCols);
-      segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, forwardIndexDisabledCols);
+      segmentGeneratorConfig.setForwardIndexDisabledColumns(forwardIndexDisabledCols);
+      segmentGeneratorConfig.addInvertedIndexCreationColumns(forwardIndexDisabledCols);
     }
 
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -479,7 +472,7 @@ public class SegmentPreProcessorTest {
     // At this point, the segment has range index. Now the reload path should create a dictionary and rewrite the
     // range index.
     _indexLoadingConfig.removeNoDictionaryColumns(EXISTING_INT_COL_RAW);
-    _indexLoadingConfig.addRangeIndexColumn(EXISTING_INT_COL_RAW);
+    _indexLoadingConfig.addRangeIndexColumns(EXISTING_INT_COL_RAW);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, null, true, 0,
         DataType.INT, 100000);
     validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, true, 0,
@@ -505,7 +498,7 @@ public class SegmentPreProcessorTest {
     // TEST 1: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column. Also enable inverted index and range index.
     _indexLoadingConfig.removeNoDictionaryColumns(EXISTING_INT_COL_RAW_MV);
     _indexLoadingConfig.addInvertedIndexColumns(EXISTING_INT_COL_RAW_MV);
-    _indexLoadingConfig.addRangeIndexColumn(EXISTING_INT_COL_RAW_MV);
+    _indexLoadingConfig.addRangeIndexColumns(EXISTING_INT_COL_RAW_MV);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
     validateIndex(StandardIndexes.inverted(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
@@ -590,7 +583,7 @@ public class SegmentPreProcessorTest {
 
 
     _indexLoadingConfig.addNoDictionaryColumns(COLUMN10_NAME);
-    _indexLoadingConfig.addRangeIndexColumn(COLUMN10_NAME);
+    _indexLoadingConfig.addRangeIndexColumns(COLUMN10_NAME);
     checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
         0, DataType.INT, 100000);
     validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, true, 0,
@@ -619,7 +612,7 @@ public class SegmentPreProcessorTest {
         Collections.emptyList());
 
     _indexLoadingConfig.removeNoDictionaryColumns(EXISTING_INT_COL_RAW_MV);
-    _indexLoadingConfig.addRangeIndexColumn(EXISTING_INT_COL_RAW_MV);
+    _indexLoadingConfig.addRangeIndexColumns(EXISTING_INT_COL_RAW_MV);
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
@@ -684,6 +677,7 @@ public class SegmentPreProcessorTest {
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
     newCompressionType = ChunkCompressionType.SNAPPY;
     compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(EXISTING_STRING_COL_RAW);
     _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
@@ -699,6 +693,7 @@ public class SegmentPreProcessorTest {
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
     newCompressionType = ChunkCompressionType.ZSTANDARD;
     compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> fstColumns = new HashSet<>();
     fstColumns.add(EXISTING_STRING_COL_DICT);
     _indexLoadingConfig.setFSTIndexColumns(fstColumns);
@@ -918,7 +913,7 @@ public class SegmentPreProcessorTest {
 
         try (ForwardIndexReader fwdIndexReader = ForwardIndexType.INSTANCE.read(reader, columnMetadata)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
-          assertEquals(expectedCompressionType, compressionType, compressionType.toString());
+          assertEquals(compressionType, expectedCompressionType);
         }
 
         File inProgressFile = new File(_indexDir, column + ".fwd.inprogress");

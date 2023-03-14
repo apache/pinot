@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.segment.spi.creator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,7 +41,10 @@ import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.RangeIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
@@ -193,7 +198,10 @@ public class SegmentGeneratorConfig implements Serializable {
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList != null) {
         for (FieldConfig fieldConfig : fieldConfigList) {
-          _columnProperties.put(fieldConfig.getName(), fieldConfig.getProperties());
+          Map<String, String> properties = fieldConfig.getProperties();
+          if (properties != null) {
+            _columnProperties.put(fieldConfig.getName(), Collections.unmodifiableMap(properties));
+          }
         }
       }
 
@@ -217,8 +225,32 @@ public class SegmentGeneratorConfig implements Serializable {
     _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
   }
 
+  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config, String... columns) {
+    setIndexOn(indexType, config, Arrays.asList(columns));
+  }
+
+  @VisibleForTesting
+  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config,
+      @Nullable Iterable<String> columns) {
+    if (columns == null) {
+      return;
+    }
+    for (String column : columns) {
+      _indexConfigsByColName.compute(column, (key, old) -> {
+        FieldIndexConfigs.Builder builder;
+        if (old == null) {
+          builder = new FieldIndexConfigs.Builder();
+        } else {
+          builder = new FieldIndexConfigs.Builder(old);
+        }
+        return builder.add(indexType, config)
+            .build();
+      });
+    }
+  }
+
   public Map<String, Map<String, String>> getColumnProperties() {
-    return _columnProperties;
+    return Collections.unmodifiableMap(_columnProperties);
   }
 
   /**
@@ -250,7 +282,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Map<String, String> getCustomProperties() {
-    return _customProperties;
+    return Collections.unmodifiableMap(_customProperties);
   }
 
   public void setCustomProperties(Map<String, String> properties) {
@@ -283,15 +315,19 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Set<String> getRawIndexCreationColumns() {
-    return _rawIndexCreationColumns;
+    return Collections.unmodifiableSet(_rawIndexCreationColumns);
   }
 
   public List<String> getInvertedIndexCreationColumns() {
-    return _invertedIndexCreationColumns;
+    return Collections.unmodifiableList(_invertedIndexCreationColumns);
+  }
+
+  public void addInvertedIndexCreationColumns(Collection<String> newColumns) {
+    _invertedIndexCreationColumns.addAll(newColumns);
   }
 
   public List<String> getColumnSortOrder() {
-    return _columnSortOrder;
+    return Collections.unmodifiableList(_columnSortOrder);
   }
 
   /**
@@ -302,26 +338,17 @@ public class SegmentGeneratorConfig implements Serializable {
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
   }
 
-  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config, String... columns) {
-    setIndexOn(indexType, config, Arrays.asList(columns));
+  @VisibleForTesting
+  public void setRangeIndexCreationColumns(List<String> rangeIndexCreationColumns) {
+    if (rangeIndexCreationColumns != null) {
+      setIndexOn(StandardIndexes.range(), new RangeIndexConfig(2), rangeIndexCreationColumns);
+    }
   }
 
-  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config,
-      @Nullable Iterable<String> columns) {
-    if (columns == null) {
-      return;
-    }
-    for (String column : columns) {
-      _indexConfigsByColName.compute(column, (key, old) -> {
-        FieldIndexConfigs.Builder builder;
-        if (old == null) {
-          builder = new FieldIndexConfigs.Builder();
-        } else {
-          builder = new FieldIndexConfigs.Builder(old);
-        }
-        return builder.add(indexType, config)
-            .build();
-      });
+  @VisibleForTesting
+  public void setForwardIndexDisabledColumns(List<String> forwardIndexDisabledColumns) {
+    if (forwardIndexDisabledColumns != null) {
+      setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED, forwardIndexDisabledColumns);
     }
   }
 
@@ -334,7 +361,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public List<String> getVarLengthDictionaryColumns() {
-    return _varLengthDictionaryColumns;
+    return Collections.unmodifiableList(_varLengthDictionaryColumns);
   }
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
@@ -520,7 +547,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
   @Nullable
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
-    return _starTreeIndexConfigs;
+    if (_starTreeIndexConfigs == null) {
+      return null;
+    }
+    return Collections.unmodifiableList(_starTreeIndexConfigs);
   }
 
   public void setStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs) {
@@ -592,7 +622,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public Map<String, ChunkCompressionType> getRawIndexCompressionType() {
-    return _rawIndexCompressionType;
+    return Collections.unmodifiableMap(_rawIndexCompressionType);
   }
 
   public void setRawIndexCompressionType(Map<String, ChunkCompressionType> rawIndexCompressionType) {

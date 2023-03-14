@@ -45,9 +45,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -366,9 +364,9 @@ public class ForwardIndexHandlerTest {
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
     config.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
-    config.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED, _forwardIndexDisabledColumns);
-    config.setIndexOn(StandardIndexes.range(), new RangeIndexConfig(2),
-        DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
+    config.setForwardIndexDisabledColumns(_forwardIndexDisabledColumns);
+    config.setRangeIndexCreationColumns(
+        Collections.singletonList(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX));
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
@@ -904,7 +902,7 @@ public class ForwardIndexHandlerTest {
     // a range index
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
     indexLoadingConfig.addNoDictionaryColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
-    indexLoadingConfig.addRangeIndexColumn(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    indexLoadingConfig.addRangeIndexColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
     fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
     try {
       operationMap = fwdIndexHandler.computeOperations(writer);
@@ -2149,7 +2147,7 @@ public class ForwardIndexHandlerTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
     // Add a forward index and inverted index disabled column to the range index list
-    indexLoadingConfig.addRangeIndexColumn(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
+    indexLoadingConfig.addRangeIndexColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
     RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentLocalFSDirectory, indexLoadingConfig);
     try {
       rangeIndexHandler.updateIndices(writer);
@@ -2163,7 +2161,7 @@ public class ForwardIndexHandlerTest {
 
     // Remove inverted index disabled column from range index list and add a raw column instead
     indexLoadingConfig.removeRangeIndexColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
-    indexLoadingConfig.addRangeIndexColumn(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
+    indexLoadingConfig.addRangeIndexColumns(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
     rangeIndexHandler = new RangeIndexHandler(segmentLocalFSDirectory, indexLoadingConfig);
     try {
       rangeIndexHandler.updateIndices(writer);

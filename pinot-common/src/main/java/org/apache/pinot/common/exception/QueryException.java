@@ -130,6 +130,8 @@ public class QueryException {
   public static final ProcessingException UNKNOWN_COLUMN_ERROR = new ProcessingException(UNKNOWN_COLUMN_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
   public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
+  public static final ProcessingException BROKER_REQUEST_SEND_ERROR =
+      new ProcessingException(BROKER_REQUEST_SEND_ERROR_CODE);
 
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");

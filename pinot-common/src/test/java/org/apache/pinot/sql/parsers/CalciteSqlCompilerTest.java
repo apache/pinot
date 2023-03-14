@@ -22,6 +22,7 @@ import java.io.StringReader;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlNodeList;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.ParseException;
@@ -3008,6 +3010,48 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
     Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
     Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getStringValue(), "pst");
+  }
+
+  @Test
+  public void testExtractTableNamesFromNode() {
+    // A simple filter query with one table
+    String query = "Select * from tbl1 where condition1 = filter1";
+    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 1);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+
+    // query with IN / NOT IN clause
+    query = "SELECT COUNT(*) FROM tbl1 WHERE userUUID IN (SELECT userUUID FROM tbl2) "
+            + "and uuid NOT IN (SELECT uuid from tbl3)";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 3);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+    Assert.assertEquals(tableNames.get(2), "tbl3");
+
+    // query with JOIN clause
+    query = "SELECT A.col1, B.col2 FROM tbl1 AS A JOIN tbl2 AS B ON A.key = B.key WHERE A.col1 = value1";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+
+    // query with aliases, JOIN, IN/NOT-IN, group-by
+    query = "with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1), "
+            + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
+            + "select sum(col1) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from tbl4)";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+    Assert.assertEquals(tableNames.get(2), "tbl3");
+    Assert.assertEquals(tableNames.get(3), "tbl4");
   }
 
   private static SqlNodeAndOptions testSqlWithCustomSqlParser(String sqlString) {

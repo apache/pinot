@@ -143,7 +143,6 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     // Inverted index columns
-
     // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
     // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
     // are sorted on the sorted column.
