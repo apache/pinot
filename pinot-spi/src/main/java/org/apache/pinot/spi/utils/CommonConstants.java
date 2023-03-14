@@ -317,6 +317,8 @@ public class CommonConstants {
         // Handle IN predicate evaluation for big IN lists
         public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
 
+        public static final String DROP_RESULTS = "dropResults";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";
