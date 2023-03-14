@@ -22,8 +22,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class MinValueAggregator implements ValueAggregator<Number, Double> {
+public class MinValueAggregator implements ValueAggregator<Number, Number> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.DOUBLE;
+  private DataType _dataType;
+
+  public MinValueAggregator(DataType dataType) {
+    _dataType = dataType;
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -36,22 +41,22 @@ public class MinValueAggregator implements ValueAggregator<Number, Double> {
   }
 
   @Override
-  public Double getInitialAggregatedValue(Number rawValue) {
-    return rawValue.doubleValue();
+  public Number getInitialAggregatedValue(Number rawValue) {
+    return rawValue;
   }
 
   @Override
-  public Double applyRawValue(Double value, Number rawValue) {
-    return Math.min(value, rawValue.doubleValue());
+  public Number applyRawValue(Number value, Number rawValue) {
+    return getMinimum(value, rawValue);
   }
 
   @Override
-  public Double applyAggregatedValue(Double value, Double aggregatedValue) {
-    return Math.min(value, aggregatedValue);
+  public Number applyAggregatedValue(Number value, Number aggregatedValue) {
+    return getMinimum(value, aggregatedValue);
   }
 
   @Override
-  public Double cloneAggregatedValue(Double value) {
+  public Number cloneAggregatedValue(Number value) {
     return value;
   }
 
@@ -61,12 +66,33 @@ public class MinValueAggregator implements ValueAggregator<Number, Double> {
   }
 
   @Override
-  public byte[] serializeAggregatedValue(Double value) {
+  public byte[] serializeAggregatedValue(Number value) {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public Double deserializeAggregatedValue(byte[] bytes) {
     throw new UnsupportedOperationException();
+  }
+
+  private Number getMinimum(Number value1, Number value2) {
+    Number result;
+    switch (_dataType) {
+      case INT:
+        result = Math.min(value1.intValue(), value2.intValue());
+        break;
+      case LONG:
+        result = Math.min(value1.longValue(), value2.longValue());
+        break;
+      case FLOAT:
+        result = Math.min(value1.floatValue(), value2.floatValue());
+        break;
+      case DOUBLE:
+        result = Math.min(value1.doubleValue(), value2.doubleValue());
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported metric type : " + _dataType);
+    }
+    return result;
   }
 }

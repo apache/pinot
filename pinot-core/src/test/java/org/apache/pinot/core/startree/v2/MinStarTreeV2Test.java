@@ -26,16 +26,16 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class MinStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class MinStarTreeV2Test extends BaseStarTreeV2Test<Number, Number> {
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new MinValueAggregator();
+  ValueAggregator<Number, Number> getValueAggregator() {
+    return new MinValueAggregator(DataType.DOUBLE);
   }
 
   @Override
   DataType getRawValueType() {
-    return DataType.FLOAT;
+    return DataType.DOUBLE;
   }
 
   @Override
@@ -44,7 +44,7 @@ public class MinStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  protected void assertAggregatedValue(Number starTreeResult, Number nonStarTreeResult) {
+    assertEquals(starTreeResult.doubleValue(), nonStarTreeResult.doubleValue(), 1e-5);
   }
 }

@@ -28,12 +28,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class PreAggregatedDistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, HyperLogLog> {
+public class PreAggregatedDistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, Object> {
   // Use non-default log2m
   private static final int LOG2M = 7;
 
   @Override
-  ValueAggregator<Object, HyperLogLog> getValueAggregator() {
+  ValueAggregator<Object, Object> getValueAggregator() {
     return new DistinctCountHLLValueAggregator();
   }
 
@@ -51,7 +51,9 @@ public class PreAggregatedDistinctCountHLLStarTreeV2Test extends BaseStarTreeV2T
   }
 
   @Override
-  void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
-    assertEquals(starTreeResult.cardinality(), nonStarTreeResult.cardinality());
+  void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
+    HyperLogLog v1 = (HyperLogLog) starTreeResult;
+    HyperLogLog v2 = (HyperLogLog) nonStarTreeResult;
+    assertEquals(v1.cardinality(), v2.cardinality());
   }
 }

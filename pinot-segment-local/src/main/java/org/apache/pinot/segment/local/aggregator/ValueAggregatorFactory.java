@@ -41,11 +41,11 @@ public class ValueAggregatorFactory {
       case COUNT:
         return new CountValueAggregator();
       case MIN:
-        return new MinValueAggregator();
+        return new MinValueAggregator(DataType.DOUBLE);
       case MAX:
-        return new MaxValueAggregator();
+        return new MaxValueAggregator(DataType.DOUBLE);
       case SUM:
-        return new SumValueAggregator();
+        return new SumValueAggregator(DataType.DOUBLE);
       case SUMPRECISION:
         return new SumPrecisionValueAggregator();
       case AVG:

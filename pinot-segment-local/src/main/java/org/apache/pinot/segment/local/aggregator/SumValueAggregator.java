@@ -22,8 +22,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class SumValueAggregator implements ValueAggregator<Number, Double> {
+public class SumValueAggregator implements ValueAggregator<Number, Number> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.DOUBLE;
+  private final DataType _dataType;
+
+  public SumValueAggregator(DataType dataType) {
+    _dataType = dataType;
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -36,22 +41,22 @@ public class SumValueAggregator implements ValueAggregator<Number, Double> {
   }
 
   @Override
-  public Double getInitialAggregatedValue(Number rawValue) {
-    return rawValue.doubleValue();
+  public Number getInitialAggregatedValue(Number rawValue) {
+    return rawValue;
   }
 
   @Override
-  public Double applyRawValue(Double value, Number rawValue) {
-    return value + rawValue.doubleValue();
+  public Number applyRawValue(Number value, Number rawValue) {
+    return sum(value, rawValue);
   }
 
   @Override
-  public Double applyAggregatedValue(Double value, Double aggregatedValue) {
-    return value + aggregatedValue;
+  public Number applyAggregatedValue(Number value, Number aggregatedValue) {
+    return sum(value, aggregatedValue);
   }
 
   @Override
-  public Double cloneAggregatedValue(Double value) {
+  public Number cloneAggregatedValue(Number value) {
     return value;
   }
 
@@ -61,12 +66,33 @@ public class SumValueAggregator implements ValueAggregator<Number, Double> {
   }
 
   @Override
-  public byte[] serializeAggregatedValue(Double value) {
+  public byte[] serializeAggregatedValue(Number value) {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public Double deserializeAggregatedValue(byte[] bytes) {
     throw new UnsupportedOperationException();
+  }
+
+  private Number sum(Number value1, Number value2) {
+    Number result;
+    switch (_dataType) {
+      case INT:
+        result = value1.intValue() + value2.intValue();
+        break;
+      case LONG:
+        result = value1.longValue() + value2.longValue();
+        break;
+      case FLOAT:
+        result = value1.floatValue() + value2.floatValue();
+        break;
+      case DOUBLE:
+        result = value1.doubleValue() + value2.doubleValue();
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported metric type for SUM aggregator : " + AGGREGATED_VALUE_TYPE);
+    }
+    return result;
   }
 }

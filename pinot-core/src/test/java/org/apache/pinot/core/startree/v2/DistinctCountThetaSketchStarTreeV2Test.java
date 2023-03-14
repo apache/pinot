@@ -27,10 +27,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, Sketch> {
+public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, Object> {
 
   @Override
-  ValueAggregator<Object, Sketch> getValueAggregator() {
+  ValueAggregator<Object, Object> getValueAggregator() {
     return new DistinctCountThetaSketchValueAggregator();
   }
 
@@ -45,7 +45,9 @@ public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<O
   }
 
   @Override
-  void assertAggregatedValue(Sketch starTreeResult, Sketch nonStarTreeResult) {
-    assertEquals(starTreeResult.getEstimate(), nonStarTreeResult.getEstimate());
+  void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
+    Sketch v1 = (Sketch) starTreeResult;
+    Sketch v2 = (Sketch) nonStarTreeResult;
+    assertEquals(v1.getEstimate(), v2.getEstimate());
   }
 }

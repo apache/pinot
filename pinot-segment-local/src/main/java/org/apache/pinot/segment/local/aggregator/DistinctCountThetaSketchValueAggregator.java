@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Sketch> {
+public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Object> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
   private final Union _union;
@@ -137,27 +137,32 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   }
 
   @Override
-  public Sketch applyRawValue(Sketch value, Object rawValue) {
+  public Sketch applyRawValue(Object value, Object rawValue) {
     Sketch right;
+    Sketch v = (Sketch) value;
     if (rawValue instanceof byte[]) {
       right = deserializeAggregatedValue((byte[]) rawValue);
     } else {
       right = singleItemSketch(rawValue);
     }
-    Sketch result = union(value, right).compact();
+    Sketch result = union(v, right).compact();
     _maxByteSize = Math.max(_maxByteSize, result.getCurrentBytes());
     return result;
   }
 
   @Override
-  public Sketch applyAggregatedValue(Sketch value, Sketch aggregatedValue) {
-    Sketch result = union(value, aggregatedValue);
+  public Sketch applyAggregatedValue(Object value, Object aggregatedValue) {
+    Sketch v1 = value instanceof Sketch ? (Sketch) value
+        : CustomSerDeUtils.DATA_SKETCH_SER_DE.deserialize((byte[]) value);
+    Sketch v2 = aggregatedValue instanceof Sketch ? (Sketch) aggregatedValue
+        : CustomSerDeUtils.DATA_SKETCH_SER_DE.deserialize((byte[]) aggregatedValue);;
+    Sketch result = union(v1, v2);
     _maxByteSize = Math.max(_maxByteSize, result.getCurrentBytes());
     return result;
   }
 
   @Override
-  public Sketch cloneAggregatedValue(Sketch value) {
+  public Object cloneAggregatedValue(Object value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
   }
 
@@ -167,8 +172,8 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   }
 
   @Override
-  public byte[] serializeAggregatedValue(Sketch value) {
-    return CustomSerDeUtils.DATA_SKETCH_SER_DE.serialize(value);
+  public byte[] serializeAggregatedValue(Object value) {
+    return CustomSerDeUtils.DATA_SKETCH_SER_DE.serialize((Sketch) value);
   }
 
   @Override

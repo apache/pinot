@@ -26,7 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
+public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, Object> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
   private static final int DEFAULT_LOG2M_BYTE_SIZE = 180;
 
@@ -60,31 +60,36 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
   }
 
   @Override
-  public HyperLogLog applyRawValue(HyperLogLog value, Object rawValue) {
+  public Object applyRawValue(Object value, Object rawValue) {
+    HyperLogLog v = (HyperLogLog) value;
     if (rawValue instanceof byte[]) {
       try {
-        value.addAll(deserializeAggregatedValue((byte[]) rawValue));
+        v.addAll(deserializeAggregatedValue((byte[]) rawValue));
       } catch (CardinalityMergeException e) {
         throw new RuntimeException(e);
       }
     } else {
-      value.offer(rawValue);
+      v.offer(rawValue);
     }
-    return value;
+    return v;
   }
 
   @Override
-  public HyperLogLog applyAggregatedValue(HyperLogLog value, HyperLogLog aggregatedValue) {
+  public Object applyAggregatedValue(Object value, Object aggregatedValue) {
     try {
-      value.addAll(aggregatedValue);
-      return value;
+      HyperLogLog v1 = value instanceof HyperLogLog ? (HyperLogLog) value
+          : CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value);
+      HyperLogLog v2 = aggregatedValue instanceof HyperLogLog ? (HyperLogLog) aggregatedValue
+      : CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) aggregatedValue);
+      v1.addAll(v2);
+      return v1;
     } catch (CardinalityMergeException e) {
       throw new RuntimeException(e);
     }
   }
 
   @Override
-  public HyperLogLog cloneAggregatedValue(HyperLogLog value) {
+  public HyperLogLog cloneAggregatedValue(Object value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
   }
 
@@ -94,8 +99,8 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
   }
 
   @Override
-  public byte[] serializeAggregatedValue(HyperLogLog value) {
-    return CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(value);
+  public byte[] serializeAggregatedValue(Object value) {
+    return CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize((HyperLogLog) value);
   }
 
   @Override

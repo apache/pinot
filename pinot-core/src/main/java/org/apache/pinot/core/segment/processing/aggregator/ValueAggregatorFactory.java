@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import org.apache.pinot.segment.local.aggregator.*;
+import org.apache.pinot.segment.local.aggregator.MaxValueAggregator;
+import org.apache.pinot.segment.local.aggregator.MinValueAggregator;
+import org.apache.pinot.segment.local.aggregator.SumValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -33,6 +38,7 @@ public class ValueAggregatorFactory {
    * Constructs a ValueAggregator from the given aggregation type.
    */
   public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, DataType dataType) {
+
     switch (aggregationType) {
       case MIN:
         return new MinValueAggregator(dataType);
@@ -42,10 +48,10 @@ public class ValueAggregatorFactory {
         return new SumValueAggregator(dataType);
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
-        return new DistinctCountHLLAggregator();
+        return new DistinctCountHLLValueAggregator();
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH:
-        return new DistinctCountThetaSketchAggregator();
+        return new DistinctCountThetaSketchValueAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.segment.processing.aggregator.ValueAggregator;
 import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
@@ -146,7 +146,7 @@ public class RollupReducer implements Reducer {
       } else {
         // Non-null field, aggregate the value
         aggregatedRow.putValue(column,
-            aggregatorContext._aggregator.aggregate(aggregatedRow.getValue(column), rowToAggregate.getValue(column)));
+            aggregatorContext._aggregator.applyAggregatedValue(aggregatedRow.getValue(column), rowToAggregate.getValue(column)));
       }
     }
   }
@@ -156,7 +156,7 @@ public class RollupReducer implements Reducer {
     for (AggregatorContext aggregatorContext : aggregatorContextList) {
       String column = aggregatorContext._column;
       aggregatedRow.putValue(column,
-          aggregatorContext._aggregator.aggregate(aggregatedRow.getValue(column), rowToAggregate.getValue(column)));
+          aggregatorContext._aggregator.applyAggregatedValue(aggregatedRow.getValue(column), rowToAggregate.getValue(column)));
     }
   }
 

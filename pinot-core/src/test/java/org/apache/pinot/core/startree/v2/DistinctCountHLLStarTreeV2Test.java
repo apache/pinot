@@ -27,10 +27,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, HyperLogLog> {
+public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, Object> {
 
   @Override
-  ValueAggregator<Object, HyperLogLog> getValueAggregator() {
+  ValueAggregator<Object, Object> getValueAggregator() {
     return new DistinctCountHLLValueAggregator();
   }
 
@@ -45,7 +45,9 @@ public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, H
   }
 
   @Override
-  void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
-    assertEquals(starTreeResult.cardinality(), nonStarTreeResult.cardinality());
+  void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
+    HyperLogLog v1 = (HyperLogLog) starTreeResult;
+    HyperLogLog v2 = (HyperLogLog) nonStarTreeResult;
+    assertEquals(v1.cardinality(), v2.cardinality());
   }
 }
