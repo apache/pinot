@@ -29,7 +29,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
-import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +56,7 @@ public class FilterOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
 
   public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
-      OperatorExecutionContext context) {
+      OpChainExecutionContext context) {
     super(context);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;

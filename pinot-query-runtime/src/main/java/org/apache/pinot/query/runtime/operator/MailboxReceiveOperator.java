@@ -36,7 +36,7 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +78,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   }
 
   public MailboxReceiveOperator(RelDistribution.Type exchangeType, int senderStageId,
-      int receiverStageId, OperatorExecutionContext context) {
+      int receiverStageId, OpChainExecutionContext context) {
     this(context.getMailboxService(), context.getMetadataMap().get(senderStageId).getServerInstances(), exchangeType,
         context.getServer(), context.getRequestId(), senderStageId, receiverStageId, context.getTimeoutMs());
   }

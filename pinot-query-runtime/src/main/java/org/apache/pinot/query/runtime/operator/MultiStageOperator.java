@@ -28,7 +28,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
-import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -46,7 +46,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   protected final Map<String, OperatorStats> _operatorStatsMap;
   private final String _operatorId;
 
-  public MultiStageOperator(OperatorExecutionContext context) {
+  public MultiStageOperator(OpChainExecutionContext context) {
     this(context.getRequestId(), context.getStageId(), context.getServer());
   }
 

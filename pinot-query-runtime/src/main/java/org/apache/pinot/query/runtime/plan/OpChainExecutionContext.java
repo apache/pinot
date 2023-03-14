@@ -25,17 +25,21 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
-public class OperatorExecutionContext {
+/**
+ *  The {@code OpChainExecutionContext} class contains the information derived from the PlanRequestContext.
+ *  Members of this class should not be changed once initialized.
+ *  This information is then used by the OpChain to create the Operators for a query.
+ */
+public class OpChainExecutionContext {
   private final MailboxService<TransferableBlock> _mailboxService;
   private final long _requestId;
   private final int _stageId;
-
   private final VirtualServerAddress _server;
   private final long _timeoutMs;
   private final long _deadlineMs;
-  protected final Map<Integer, StageMetadata> _metadataMap;
+  private final Map<Integer, StageMetadata> _metadataMap;
 
-  public OperatorExecutionContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
+  public OpChainExecutionContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long timeoutMs, long deadlineMs, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
@@ -46,7 +50,7 @@ public class OperatorExecutionContext {
     _metadataMap = metadataMap;
   }
 
-  public OperatorExecutionContext(PlanRequestContext planRequestContext) {
+  public OpChainExecutionContext(PlanRequestContext planRequestContext) {
     this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
         planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
         planRequestContext.getMetadataMap());

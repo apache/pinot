@@ -38,7 +38,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
-import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +80,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   public MailboxSendOperator(MultiStageOperator dataTableBlockBaseOperator, RelDistribution.Type exchangeType,
       KeySelector<Object[], Object[]> keySelector, int senderStageId, int receiverStageId,
-      OperatorExecutionContext context) {
+      OpChainExecutionContext context) {
     this(context.getMailboxService(), dataTableBlockBaseOperator,
         context.getMetadataMap().get(receiverStageId).getServerInstances(), exchangeType, keySelector,
         context.getServer(), context.getRequestId(), senderStageId, receiverStageId, context.getDeadlineMs());

@@ -39,7 +39,7 @@ public class PlanRequestContext {
   protected final VirtualServerAddress _server;
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
-
+  private final OpChainExecutionContext _opChainExecutionContext;
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
       long timeoutMs, long deadlineMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
@@ -50,6 +50,7 @@ public class PlanRequestContext {
     _deadlineMs = deadlineMs;
     _server = server;
     _metadataMap = metadataMap;
+    _opChainExecutionContext = new OpChainExecutionContext(this);
   }
 
   public long getRequestId() {
@@ -88,7 +89,7 @@ public class PlanRequestContext {
     return ImmutableList.copyOf(_receivingMailboxes);
   }
 
-  public OperatorExecutionContext getOperatorExecutionContext() {
-    return new OperatorExecutionContext(this);
+  public OpChainExecutionContext getOpChainExecutionContext() {
+    return _opChainExecutionContext;
   }
 }

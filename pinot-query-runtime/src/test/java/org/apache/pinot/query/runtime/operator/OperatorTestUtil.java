@@ -25,7 +25,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.OperatorExecutionContext;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
 
 public class OperatorTestUtil {
@@ -62,15 +62,15 @@ public class OperatorTestUtil {
     return new TransferableBlock(Arrays.asList(rows), schema, DataBlock.Type.ROW);
   }
 
-  public static OperatorExecutionContext getDefaultContext() {
+  public static OpChainExecutionContext getDefaultContext() {
     VirtualServerAddress virtualServerAddress = new VirtualServerAddress("mock", 80, 0);
-    return new OperatorExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, Long.MAX_VALUE,
+    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, Long.MAX_VALUE,
         new HashMap<>());
   }
 
-  public static OperatorExecutionContext getContext(long requestId, int stageId,
+  public static OpChainExecutionContext getContext(long requestId, int stageId,
       VirtualServerAddress virtualServerAddress) {
-    return new OperatorExecutionContext(null, requestId, stageId, virtualServerAddress, Long.MAX_VALUE, Long.MAX_VALUE,
+    return new OpChainExecutionContext(null, requestId, stageId, virtualServerAddress, Long.MAX_VALUE, Long.MAX_VALUE,
         new HashMap<>());
   }
 }
