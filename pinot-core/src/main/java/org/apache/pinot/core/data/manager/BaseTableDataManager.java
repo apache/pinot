@@ -161,9 +161,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     _isRetrySegmentDownloadUntarFailure = tableDataManagerParams.isRetrySegmentDownloadUntarFailure();
-    _retryCount = tableDataManagerParams.getRetryCount();
-    _retryWaitMs = tableDataManagerParams.getRetryWaitMs();
-    _retryDelayScaleFactor = tableDataManagerParams.getRetryDelayScaleFactor();
+    _retryCount = tableDataManagerParams.getSegmentUntarDownloadRetryCount();
+    _retryWaitMs = tableDataManagerParams.getSegmentUntarDownloadRetryWaitMs();
+    _retryDelayScaleFactor = tableDataManagerParams.getSegmentUntarDownloadRetryDelayScaleFactor();
 
     int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
     if (maxParallelSegmentDownloads > 0) {
@@ -665,7 +665,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
       // If an exception is thrown when untarring, it means the tar file is broken
       // or not found after the retry. Thus, there's no need to retry again.
-      // unless untar retry is configured, which will retry this function call
       File untaredSegDir = TarGzCompressionUtils.untar(tarFile, untarDir).get(0);
       LOGGER.info("Uncompressed tar file: {} into target dir: {}", tarFile, untarDir);
       // Replace the existing index directory.
@@ -692,12 +691,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } catch (Exception e) {
       try {
         RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+          File retriedTarFile = null;
           try {
-            File retriedTarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
+            retriedTarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
             file.set(untarAndMoveSegment(segmentName, retriedTarFile, tempRootDir));
             return true;
           } catch (Exception ex) {
             return false;
+          } finally {
+            FileUtils.deleteQuietly(retriedTarFile);
           }
         });
       } catch (AttemptsExceededException ex) {
@@ -706,7 +708,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UNTAR_FAILURES_POST_RETRIES, 1L);
         throw ex;
       } catch (RetriableOperationException ex) {
-        LOGGER.warn("Failed to untar segment: {} of table: {} from: {} to: {}, retrying untar", segmentName,
+        LOGGER.warn("Failed to untar segment: {} of table: {}, for file {}, retrying untar", segmentName,
             _tableNameWithType, tarFile);
       }
     }

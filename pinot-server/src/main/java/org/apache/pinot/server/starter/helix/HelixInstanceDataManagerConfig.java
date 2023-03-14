@@ -21,6 +21,7 @@ package org.apache.pinot.server.starter.helix;
 import java.util.Optional;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -29,8 +30,6 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher.*;
-import static org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher.DEFAULT_RETRY_DELAY_SCALE_FACTOR;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR;
@@ -280,18 +279,20 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public int getRetryWaitMs() {
-    return _instanceDataManagerConfiguration.getProperty(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);
+    return _instanceDataManagerConfiguration.getProperty(BaseSegmentFetcher.RETRY_WAIT_MS_CONFIG_KEY,
+        BaseSegmentFetcher.DEFAULT_RETRY_WAIT_MS);
   }
 
   @Override
   public int getRetryCount() {
-    return _instanceDataManagerConfiguration.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
+    return _instanceDataManagerConfiguration.getProperty(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY,
+        BaseSegmentFetcher.DEFAULT_RETRY_COUNT);
   }
 
   @Override
   public int getRetryDelayScaleFactor() {
-    return _instanceDataManagerConfiguration.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY,
-        DEFAULT_RETRY_DELAY_SCALE_FACTOR);
+    return _instanceDataManagerConfiguration.getProperty(BaseSegmentFetcher.RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY,
+        BaseSegmentFetcher.DEFAULT_RETRY_DELAY_SCALE_FACTOR);
   }
 
   @Override
