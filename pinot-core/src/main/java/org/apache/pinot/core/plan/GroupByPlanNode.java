@@ -55,37 +55,23 @@ public class GroupByPlanNode implements PlanNode {
 
   @Override
   public Operator<GroupByResultsBlock> run() {
-    assert _queryContext.getAggregationFunctions() != null;
-    assert _queryContext.getGroupByExpressions() != null;
-
-    if (_queryContext.hasFilteredAggregations()) {
-      return buildFilteredGroupByPlan();
-    }
-    return buildNonFilteredGroupByPlan();
+    assert _queryContext.getAggregationFunctions() != null && _queryContext.getGroupByExpressions() != null;
+    return _queryContext.hasFilteredAggregations() ? buildFilteredGroupByPlan() : buildNonFilteredGroupByPlan();
   }
 
   private FilteredGroupByOperator buildFilteredGroupByPlan() {
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    // Build the operator chain for the main predicate so the filter plan can be run only one time
-    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
-        AggregationFunctionUtils.buildFilterOperator(_indexSegment, _queryContext);
-    ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
-    TransformOperator transformOperator =
-        AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext,
-            filterOperatorPair.getRight(), groupByExpressions);
-
-    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
-            filterOperatorPair.getRight(), transformOperator, groupByExpressions);
-    return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(),
-        _queryContext.getFilteredAggregationFunctions(), aggToTransformOpList,
-        _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);
+    List<Pair<AggregationFunction[], TransformOperator>> transformOperators =
+        AggregationFunctionUtils.buildFilteredAggregateTransformOperators(_indexSegment, _queryContext);
+    return new FilteredGroupByOperator(_queryContext, transformOperators,
+        _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
   private GroupByOperator buildNonFilteredGroupByPlan() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
+    List<ExpressionContext> groupByExpressionList = _queryContext.getGroupByExpressions();
+    assert aggregationFunctions != null && groupByExpressionList != null;
+    ExpressionContext[] groupByExpressions = groupByExpressionList.toArray(new ExpressionContext[0]);
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
@@ -115,7 +101,7 @@ public class GroupByPlanNode implements PlanNode {
     }
 
     Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressionList);
     TransformOperator transformPlanNode =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();

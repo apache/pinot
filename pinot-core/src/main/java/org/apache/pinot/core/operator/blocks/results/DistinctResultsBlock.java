@@ -62,7 +62,7 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public Collection<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows(QueryContext queryContext) {
     List<Object[]> rows = new ArrayList<>(_distinctTable.size());
     for (Record record : _distinctTable.getRecords()) {
       rows.add(record.getValues());

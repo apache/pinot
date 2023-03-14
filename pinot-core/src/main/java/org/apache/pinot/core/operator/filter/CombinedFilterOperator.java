@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
@@ -41,13 +40,15 @@ public class CombinedFilterOperator extends BaseFilterOperator {
 
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
       Map<String, String> queryOptions) {
+    assert !mainFilterOperator.isResultEmpty() && !mainFilterOperator.isResultMatchingAll()
+        && !subFilterOperator.isResultEmpty() && !subFilterOperator.isResultMatchingAll();
     _mainFilterOperator = mainFilterOperator;
     _subFilterOperator = subFilterOperator;
     _queryOptions = queryOptions;
   }
 
   @Override
-  public List<Operator> getChildOperators() {
+  public List<BaseFilterOperator> getChildOperators() {
     return Arrays.asList(_mainFilterOperator, _subFilterOperator);
   }
 
@@ -59,9 +60,6 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   @Override
   protected FilterBlock getNextBlock() {
     Tracing.activeRecording().setNumChildren(2);
-    if (_mainFilterOperator instanceof MatchAllFilterOperator) {
-      return _subFilterOperator.nextBlock();
-    }
     BlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBLockDocIdSet();
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
     return new FilterBlock(new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions));

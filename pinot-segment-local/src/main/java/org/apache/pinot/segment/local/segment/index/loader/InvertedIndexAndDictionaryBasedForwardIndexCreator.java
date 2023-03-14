@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -281,7 +282,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
       IndexCreationContext.Forward context =
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
-              .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
+              .withColumnMetadata(_columnMetadata).withForwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
               .withLengthOfLongestEntry(lengthOfLongestEntry).build()
               .forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());
 
@@ -360,7 +361,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
       IndexCreationContext.Forward context =
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
-              .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
+              .withColumnMetadata(_columnMetadata).withForwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
               .withTotalNumberOfEntries(_nextValueId).withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
               .withMaxRowLengthInBytes(maxRowLengthInBytes[0]).withLengthOfLongestEntry(lengthOfLongestEntry)
               .build().forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());

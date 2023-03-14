@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils.request;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import java.util.HashMap;
@@ -44,8 +45,14 @@ import org.slf4j.LoggerFactory;
 
 public class RequestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
+  private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
 
   private RequestUtils() {
+  }
+
+  public static SqlNodeAndOptions parseQuery(String query)
+          throws SqlCompilationException {
+    return parseQuery(query, EMPTY_OBJECT_NODE);
   }
 
   public static SqlNodeAndOptions parseQuery(String query, JsonNode request)

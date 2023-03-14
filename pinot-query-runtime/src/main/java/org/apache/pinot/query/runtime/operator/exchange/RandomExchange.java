@@ -48,7 +48,8 @@ class RandomExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
+  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+      throws Exception {
     int destinationIdx = _rand.apply(destinations.size());
     sendBlock(destinations.get(destinationIdx), block);
   }

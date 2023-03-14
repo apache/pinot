@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -175,7 +174,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    selectionResult = (List<Object[]>) resultsBlock.getRows();
+    selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 3);
@@ -203,9 +202,9 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    PriorityQueue<Object[]> selectionResult = resultsBlock.getRowsAsPriorityQueue();
+    List<Object[]> selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    Object[] lastRow = selectionResult.peek();
+    Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 4);
     assertEquals((String) lastRow[columnIndexMap.get("column5")], "AKXcXcIqsqOJFsdwxZ");
     assertEquals(lastRow[columnIndexMap.get("column6")], new int[]{1252});
@@ -228,9 +227,9 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    selectionResult = resultsBlock.getRowsAsPriorityQueue();
+    selectionResult = resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
-    lastRow = selectionResult.peek();
+    lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 4);
     assertEquals((String) lastRow[columnIndexMap.get("column5")], "AKXcXcIqsqOJFsdwxZ");
     assertEquals(lastRow[columnIndexMap.get("column6")], new int[]{2147483647});

@@ -186,4 +186,20 @@ public class MailboxReceiveOperator extends MultiStageOperator {
             : TransferableBlockUtils.getEndOfStreamTransferableBlock();
     return block;
   }
+
+  @Override
+  public void close() {
+    super.close();
+    for (MailboxIdentifier sendingMailbox : _sendingMailbox) {
+      _mailboxService.releaseReceivingMailbox(sendingMailbox);
+    }
+  }
+
+  @Override
+  public void cancel(Throwable t) {
+    super.cancel(t);
+    for (MailboxIdentifier sendingMailbox : _sendingMailbox) {
+      _mailboxService.releaseReceivingMailbox(sendingMailbox);
+    }
+  }
 }
