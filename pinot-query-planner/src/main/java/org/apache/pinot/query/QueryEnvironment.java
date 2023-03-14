@@ -113,7 +113,8 @@ public class QueryEnvironment {
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
     hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
-    // First run the basic rules using 1 HepInstruction per rule.
+    // First run the basic rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
+    // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
