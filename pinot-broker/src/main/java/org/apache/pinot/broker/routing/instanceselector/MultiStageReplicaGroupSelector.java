@@ -117,6 +117,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = snapshot.getCandidates(segment);
       boolean found = false;
+      // If candidates are null, we will throw an exception and log a warning.
       for (SegmentInstanceCandidate enabledInstanceForSegment : candidates) {
         SegmentInstanceCandidate candidate = enabledInstanceForSegment;
         String instance = candidate.getInstance();
