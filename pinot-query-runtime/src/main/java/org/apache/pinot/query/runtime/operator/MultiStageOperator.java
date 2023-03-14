@@ -39,24 +39,18 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   // TODO: Move to OperatorContext class.
-  protected final long _requestId;
-  protected final int _stageId;
-  protected final VirtualServerAddress _serverAddress;
   protected final OperatorStats _operatorStats;
   protected final Map<String, OperatorStats> _operatorStatsMap;
   private final String _operatorId;
+  private final OpChainExecutionContext _context;
 
   public MultiStageOperator(OpChainExecutionContext context) {
-    this(context.getRequestId(), context.getStageId(), context.getServer());
-  }
-
-  public MultiStageOperator(long requestId, int stageId, VirtualServerAddress serverAddress) {
-    _requestId = requestId;
-    _stageId = stageId;
-    _operatorStats = new OperatorStats(requestId, stageId, serverAddress, toExplainString());
-    _serverAddress = serverAddress;
+    _context = context;
+    _operatorStats =
+        new OperatorStats(_context, toExplainString());
     _operatorStatsMap = new HashMap<>();
-    _operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId, _serverAddress);
+    _operatorId =
+        Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
   }
 
   public Map<String, OperatorStats> getOperatorStatsMap() {
