@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,11 +56,11 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private InstancePartitions _instancePartitions;
+  private volatile InstancePartitions _instancePartitions;
 
   public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore);
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
   }

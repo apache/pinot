@@ -235,11 +235,14 @@ public class InstanceSelectorTest {
     AdaptiveServerSelector adaptiveServerSelector = null;
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
+        new BalancedInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore,
+            _mutableClock);
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore,
+            _mutableClock);
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, propertyStore);
+        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, propertyStore,
+            _mutableClock);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -759,7 +762,8 @@ public class InstanceSelectorTest {
     AdaptiveServerSelector adaptiveServerSelector = null;
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore,
+            _mutableClock);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -841,7 +845,7 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore, _mutableClock);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -923,7 +927,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore,
+            _mutableClock);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -998,7 +1003,7 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
 
     MultiStageReplicaGroupSelector multiStageSelector =
-        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null);
+        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, _mutableClock);
     multiStageSelector = spy(multiStageSelector);
     doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
 
@@ -1093,11 +1098,13 @@ public class InstanceSelectorTest {
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     AdaptiveServerSelector adaptiveServerSelector = null;
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore);
+        new BalancedInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore,
+            _mutableClock);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, propertyStore);
+        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, propertyStore,
+            _mutableClock);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);

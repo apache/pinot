@@ -69,11 +69,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
   }
 
-  public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore);
-  }
-
   @Override
   protected Map<String, String> select(List<String> segments, int requestId, SegmentStateSnapshot snapshot,
       Map<String, String> queryOptions) {

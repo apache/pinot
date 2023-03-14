@@ -71,7 +71,7 @@ public class InstanceSelectorFactory {
           routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
         return new MultiStageReplicaGroupSelector(tableNameWithType, propertyStore, brokerMetrics,
-            adaptiveServerSelector);
+            adaptiveServerSelector, clock);
       }
     }
     return new BalancedInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);

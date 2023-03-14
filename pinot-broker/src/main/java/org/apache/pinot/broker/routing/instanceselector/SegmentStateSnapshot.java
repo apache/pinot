@@ -118,7 +118,6 @@ public class SegmentStateSnapshot {
               + " segment as unavailable)", segment, tableNameWithType, onlineInstancesForSegment);
       unavailableSegments.add(segment);
       brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
-      segmentToEnabledInstancesMap.put(segment, null);
     }
     return new SelectionCandidate(segmentToEnabledInstancesMap, unavailableSegments);
   }

@@ -113,7 +113,6 @@ public class CommonConstants {
     public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
 
     public static class StateModel {
-      // public only for testing purpose.
       public static class SegmentStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
