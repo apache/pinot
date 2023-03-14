@@ -84,7 +84,6 @@ public class SegmentGeneratorConfig implements Serializable {
   private final Map<String, String> _customProperties = new HashMap<>();
   private final Set<String> _rawIndexCreationColumns = new HashSet<>();
   private final Map<String, ChunkCompressionType> _rawIndexCompressionType = new HashMap<>();
-  private final List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _inputFilePath = null;
@@ -191,7 +190,7 @@ public class SegmentGeneratorConfig implements Serializable {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
         if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
             || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
-          _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
+          setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, indexingConfig.getInvertedIndexColumns());
         }
       }
 
@@ -318,12 +317,8 @@ public class SegmentGeneratorConfig implements Serializable {
     return Collections.unmodifiableSet(_rawIndexCreationColumns);
   }
 
-  public List<String> getInvertedIndexCreationColumns() {
-    return Collections.unmodifiableList(_invertedIndexCreationColumns);
-  }
-
   public void addInvertedIndexCreationColumns(Collection<String> newColumns) {
-    _invertedIndexCreationColumns.addAll(newColumns);
+    setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, newColumns);
   }
 
   public List<String> getColumnSortOrder() {
