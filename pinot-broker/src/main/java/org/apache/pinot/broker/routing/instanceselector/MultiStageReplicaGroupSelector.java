@@ -93,7 +93,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     for (int iteration = 0; iteration < instancePartitions.getNumReplicaGroups(); iteration++) {
       int replicaGroup = (replicaGroupSelected + iteration) % instancePartitions.getNumReplicaGroups();
       try {
-        return tryAssigning(snapshot, instancePartitions, replicaGroup);
+        return tryAssigning(segments, snapshot, instancePartitions, replicaGroup);
       } catch (Exception e) {
         LOGGER.warn("Unable to select replica-group {} for table: {}", replicaGroup, _tableNameWithType, e);
       }
@@ -106,27 +106,30 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * Returns a map from the segmentName to the corresponding server in the given replica-group. If the is not enabled,
    * we throw an exception.
    */
-  private Map<String, String> tryAssigning(SegmentStateSnapshot snapshot, InstancePartitions instancePartitions,
-      int replicaId) {
+  private Map<String, String> tryAssigning(List<String> segments, SegmentStateSnapshot snapshot,
+      InstancePartitions instancePartitions, int replicaId) {
     Set<String> instanceLookUpSet = new HashSet<>();
     for (int partition = 0; partition < instancePartitions.getNumPartitions(); partition++) {
       List<String> instances = instancePartitions.getInstances(partition, replicaId);
       instanceLookUpSet.addAll(instances);
     }
     Map<String, String> result = new HashMap<>();
-    for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : snapshot.getOldSegmentCandidates().entrySet()) {
-      String segmentName = entry.getKey();
+    for (String segment : segments) {
+      List<SegmentInstanceCandidate> candidates = snapshot.getCandidates(segment);
       boolean found = false;
-      for (SegmentInstanceCandidate enabledInstanceForSegment : entry.getValue()) {
-        String instance = enabledInstanceForSegment.getInstance();
+      for (SegmentInstanceCandidate enabledInstanceForSegment : candidates) {
+        SegmentInstanceCandidate candidate = enabledInstanceForSegment;
+        String instance = candidate.getInstance();
         if (instanceLookUpSet.contains(instance)) {
           found = true;
-          result.put(segmentName, instance);
+          if (candidate.isOnline()) {
+            result.put(segment, instance);
+          }
           break;
         }
       }
       if (!found) {
-        throw new RuntimeException(String.format("Unable to find an enabled instance for segment: %s", segmentName));
+        throw new RuntimeException(String.format("Unable to find an enabled instance for segment: %s", segment));
       }
     }
     return result;

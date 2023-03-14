@@ -167,10 +167,6 @@ public class SegmentStateSnapshot {
     return candidateMap;
   }
 
-  public Map<String, List<SegmentInstanceCandidate>> getOldSegmentCandidates() {
-    return _oldSegmentSelectionCandidate.getAllCandidates();
-  }
-
   public Set<String> getUnavailableSegments() {
     return _oldSegmentSelectionCandidate.getUnavailableSegments();
   }

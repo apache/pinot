@@ -845,7 +845,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore, _mutableClock);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector, _propertyStore,
+            _mutableClock);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);

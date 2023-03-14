@@ -38,34 +38,26 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
 
 /**
- * Base implementation of instance selector.
- * Selector maintains a map from segment to enabled ONLINE/CONSUMING server instances that serves the segment
- * and a set of unavailable segments (no enabled instance or all enabled instances are in ERROR state).
- *
- * Special handling of new segment:
- * It is common for new segment to be partially available or not available at all in all instances.
- * 1) We don't report new segment as unavailable segments.
- * 2) To increase query availability, unavailable instance for new segment won't be excluded for instance selection.
- * When it is selected, we don't serve the new segment.
- *
- * Definition of new segment:
- * 1) Segment created more than 5 minutes ago.
- * - If we first see a segment via initialization, we look up segment creation time from zookeeper.
- * - If we first see a segment via onAssignmentChange initialization, we use the calling time of onAssignmentChange
- *   as approximation.
- * 2) We retire new segment as old when:
- * - The creation time is more than 5 minutes ago
- * - Any instance for new segment is in error state
- * - External view for segment converges with ideal state.
- * Note that this implementation means:
- * 1) Inconsistent selection of new segments across queries. (some queries will serve new segments and others won't)
- * 2) When there is no state update from helix, new segments won't be retired because of the time passing.(those with
- * creation time more than 5 minutes ago)
+ * Base implementation of instance selector. Selector maintains a map from segment to enabled ONLINE/CONSUMING server
+ * instances that serves the segment and a set of unavailable segments (no enabled instance or all enabled instances are
+ * in ERROR state).
+ * <p>
+ * Special handling of new segment: It is common for new segment to be partially available or not available at all in
+ * all instances. 1) We don't report new segment as unavailable segments. 2) To increase query availability, unavailable
+ * instance for new segment won't be excluded for instance selection. When it is selected, we don't serve the new
+ * segment.
+ * <p>
+ * Definition of new segment: 1) Segment created more than 5 minutes ago. - If we first see a segment via
+ * initialization, we look up segment creation time from zookeeper. - If we first see a segment via onAssignmentChange
+ * initialization, we use the calling time of onAssignmentChange as approximation. 2) We retire new segment as old when:
+ * - The creation time is more than 5 minutes ago - Any instance for new segment is in error state - External view for
+ * segment converges with ideal state. Note that this implementation means: 1) Inconsistent selection of new segments
+ * across queries. (some queries will serve new segments and others won't) 2) When there is no state update from helix,
+ * new segments won't be retired because of the time passing.(those with creation time more than 5 minutes ago)
  */
 abstract class BaseInstanceSelector implements InstanceSelector {
   // Class used to represent the instance state for new segment.
@@ -195,8 +187,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   public void init(Set<String> enabledInstances, IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
-    int segmentMapCapacity = HashUtil.getHashMapCapacity(onlineSegments.size());
-    _segmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
     _newSegmentStates = getSegmentStagesWithCreationTime(idealState, externalView, onlineSegments, true);
     updateSegmentMaps(idealState, externalView, onlineSegments, _segmentToOnlineInstancesMap, _newSegmentStates);
     _segmentStateSnapshot =
@@ -245,8 +235,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       Map<String, SegmentState> newSegmentState = new HashMap<>();
       for (String segment : onlineSegments) {
         SegmentState state = _newSegmentStates.getOrDefault(segment, null);
-        if (state != null){
-          if(state.isNew(nowMillis)){
+        if (state != null) {
+          if (state.isNew(nowMillis)) {
             newSegmentState.put(segment, state);
           }
         } else if (!_segmentToOnlineInstancesMap.containsKey(segment)) {
@@ -261,16 +251,13 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   /**
    * Updates the segment maps based on the given ideal state, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
-   * Assumption before this call
-   * 1) newSegmentStateMap contains all the potentially new segments based on segment creation time.
-   * Invariants for in memory state after this update:
-   * 1) New segments should retire from newSegmentStateMap based on external view or ideal state update.
-   * 2) Segment should only exist in newSegmentStateMap or segmentToOnlineInstancesMap depending on whether it is old
-   * or new.
-   * 3) Old segment's online instance should be tracked in segmentToOnlineInstancesMap in sorted order
-   * 4) New segment's instances in ideal state should be tracked in newSegmentStateMap with online flags set in sorted
-   * order
+   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Assumption
+   * before this call 1) newSegmentStateMap contains all the potentially new segments based on segment creation time.
+   * Invariants for in memory state after this update: 1) New segments should retire from newSegmentStateMap based on
+   * external view or ideal state update. 2) Segment should only exist in newSegmentStateMap or
+   * segmentToOnlineInstancesMap depending on whether it is old or new. 3) Old segment's online instance should be
+   * tracked in segmentToOnlineInstancesMap in sorted order 4) New segment's instances in ideal state should be tracked
+   * in newSegmentStateMap with online flags set in sorted order
    */
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap) {
@@ -346,8 +333,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   /**
-   * Selects the server instances for the given segments based on the request id and SegmentStateSnapshot.
-   * Returns a map from segment to selected server instance hosting the segment.
+   * Selects the server instances for the given segments based on the request id and SegmentStateSnapshot. Returns a map
+   * from segment to selected server instance hosting the segment.
    */
   protected abstract Map<String, String> select(List<String> segments, int requestId, SegmentStateSnapshot snapshot,
       Map<String, String> queryOptions);
