@@ -96,7 +96,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       DataSchema resultSchema, DataSchema inputSchema, OperatorExecutionContext context) {
     this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
         upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
-        context.getRequestId(), context.getStageId(), context.getServer());
+        context);
   }
 
   @VisibleForTesting
@@ -105,9 +105,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
       DataSchema resultSchema, DataSchema inputSchema, Map<String,
-      Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, long requestId, int stageId,
-      VirtualServerAddress virtualServerAddress) {
-    super(requestId, stageId, virtualServerAddress);
+      Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, OperatorExecutionContext context) {
+    super(context);
 
     boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, orderSetDirection, orderSetNullDirection);
     Preconditions.checkState(orderSet == null || orderSet.isEmpty() || isPartitionByOnly,

@@ -84,15 +84,14 @@ public class AggregateOperator extends MultiStageOperator {
   public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
       List<RexExpression> groupSet, DataSchema inputSchema, OperatorExecutionContext context) {
     this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.AggregateAccumulator.AGG_MERGERS,
-        context.getRequestId(), context.getStageId(), context.getServer());
+        context);
   }
 
   @VisibleForTesting
   AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
       List<RexExpression> groupSet, DataSchema inputSchema,
-      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, long requestId, int stageId,
-      VirtualServerAddress serverAddress) {
-    super(requestId, stageId, serverAddress);
+      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, OperatorExecutionContext context) {
+    super(context);
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;

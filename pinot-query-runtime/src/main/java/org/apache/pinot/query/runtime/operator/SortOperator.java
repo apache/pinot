@@ -59,15 +59,14 @@ public class SortOperator extends MultiStageOperator {
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
       OperatorExecutionContext context) {
     this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, context.getRequestId(), context.getStageId(),
-        context.getServer());
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, context);
   }
 
   @VisibleForTesting
   SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      int defaultHolderCapacity, long requestId, int stageId, VirtualServerAddress serverAddress) {
-    super(requestId, stageId, serverAddress);
+      int defaultHolderCapacity, OperatorExecutionContext context) {
+    super(context);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = Math.max(offset, 0);

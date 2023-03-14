@@ -261,7 +261,8 @@ public class SortOperatorTest {
     List<RexExpression> collation = collation(0);
     List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op = new SortOperator(_input, collation, directions, 0, 0, schema, 1, 1, 2, _serverAddress);
+    SortOperator op =
+        new SortOperator(_input, collation, directions, 0, 0, schema, 1, OperatorTestUtil.getDefaultContext());
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());

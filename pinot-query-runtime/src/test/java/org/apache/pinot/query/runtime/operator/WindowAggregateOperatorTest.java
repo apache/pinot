@@ -321,7 +321,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
             Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, ImmutableMap.of("SUM", cdt -> merger), 1, 2, _serverAddress);
+            Collections.emptyList(), outSchema, inSchema, ImmutableMap.of("SUM", cdt -> merger),
+            OperatorTestUtil.getDefaultContext());
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock(); // (output result)
