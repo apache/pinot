@@ -45,47 +45,58 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
  */
 @SuppressWarnings("unchecked")
 public class StandardIndexes {
+  public static final String FORWARD_ID = "forward_index";
+  public static final String DICTIONARY_ID = "dictionary";
+  public static final String NULL_VALUE_VECTOR_ID = "nullvalue_vector";
+  public static final String BLOOM_FILTER_ID = "bloom_filter";
+  public static final String FST_ID = "fst_index";
+  public static final String INVERTED_ID = "inverted_index";
+  public static final String JSON_ID = "json_index";
+  public static final String RANGE_ID = "range_index";
+  public static final String TEXT_ID = "text_index";
+  public static final String H3_ID = "h3_index";
+
   private StandardIndexes() {
   }
 
   public static IndexType<?, ?, ?> forward() {
-    return IndexService.getInstance().getOrThrow("forward_index");
+    return IndexService.getInstance().getOrThrow(FORWARD_ID);
   }
 
   public static IndexType<?, ?, ?> dictionary() {
-    return IndexService.getInstance().getOrThrow("dictionary");
+    return IndexService.getInstance().getOrThrow(DICTIONARY_ID);
   }
 
   public static IndexType<?, ?, ?> nullValueVector() {
-    return IndexService.getInstance().getOrThrow("nullvalue_vector");
+    return IndexService.getInstance().getOrThrow(NULL_VALUE_VECTOR_ID);
   }
 
   public static IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator> bloomFilter() {
     return (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
-        IndexService.getInstance().getOrThrow("bloom_filter");
+        IndexService.getInstance().getOrThrow(BLOOM_FILTER_ID);
   }
 
   public static IndexType<?, ?, ?> fst() {
-    return IndexService.getInstance().getOrThrow("fst_index");
+    return IndexService.getInstance().getOrThrow(FST_ID);
   }
 
   public static IndexType<?, ?, ?> inverted() {
-    return IndexService.getInstance().getOrThrow("inverted_index");
+    return IndexService.getInstance().getOrThrow(INVERTED_ID);
   }
 
   public static IndexType<?, ?, ?> json() {
-    return IndexService.getInstance().getOrThrow("json_index");
+    return IndexService.getInstance().getOrThrow(JSON_ID);
   }
 
   public static IndexType<?, ?, ?> range() {
-    return IndexService.getInstance().getOrThrow("range_index");
+    return IndexService.getInstance().getOrThrow(RANGE_ID);
   }
 
   public static IndexType<?, ?, ?> text() {
-    return IndexService.getInstance().getOrThrow("text_index");
+    return IndexService.getInstance().getOrThrow(TEXT_ID);
   }
 
   public static IndexType<?, ?, ?> h3() {
-    return IndexService.getInstance().getOrThrow("h3_index");
+    return IndexService.getInstance().getOrThrow(H3_ID);
   }
 }

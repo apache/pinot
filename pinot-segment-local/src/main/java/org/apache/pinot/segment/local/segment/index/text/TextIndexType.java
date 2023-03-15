@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -43,7 +44,7 @@ public class TextIndexType implements IndexType<IndexConfig, IndexReader, IndexC
 
   @Override
   public String getId() {
-    return "text_index";
+    return StandardIndexes.TEXT_ID;
   }
 
   @Override
