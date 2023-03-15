@@ -72,12 +72,12 @@ public class IndexService {
     return _allIndexes;
   }
 
-  public Optional<IndexType<?, ?, ?>> getIndexTypeById(String indexId) {
+  public Optional<IndexType<?, ?, ?>> get(String indexId) {
     return getAllIndexes().stream().filter(indexType -> indexType.getId().equalsIgnoreCase(indexId)).findAny();
   }
 
-  public IndexType<?, ?, ?> getIndexTypeByIdOrThrow(String indexId) {
-    return getIndexTypeById(indexId)
+  public IndexType<?, ?, ?> getOrThrow(String indexId) {
+    return get(indexId)
         .orElseThrow(() -> new IllegalArgumentException("Unknown index id: " + indexId));
   }
 }
