@@ -1,20 +1,14 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.core.function.scalar;
 
@@ -23,6 +17,8 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.UpdateSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -130,5 +126,50 @@ public class SketchFunctions {
       hll.offer(input);
     }
     return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hll);
+  }
+
+  /**
+   * Create a Tuple Sketch containing the key and value supplied
+   *
+   * @param key an Object we want to insert as the key of the sketch, may be null to return an empty sketch
+   * @param value an Integer we want to associate as the value to go along with the key, may be null to return an
+   *              empty sketch
+   * @return serialized tuple sketch as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] toIntegerSumTupleSketch(@Nullable Object key, @Nullable Integer value) {
+    return toIntegerSumTupleSketch(key, value, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
+  }
+
+  /**
+   * Create a Tuple Sketch containing the key and value supplied
+   *
+   * @param key an Object we want to insert as the key of the sketch, may be null to return an empty sketch
+   * @param value an Integer we want to associate as the value to go along with the key, may be null to return an
+   *              empty sketch
+   * @param lgK integer representing the log of the maximum number of retained entries in the sketch, between 4 and 26
+   * @return serialized tuple sketch as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] toIntegerSumTupleSketch(@Nullable Object key, Integer value, int lgK) {
+    IntegerSketch is = new IntegerSketch(lgK, IntegerSummary.Mode.Sum);
+    if (value != null) {
+      if (key instanceof Integer) {
+        is.update((Integer) key, value);
+      } else if (key instanceof Long) {
+        is.update((Long) key, value);
+      } else if (key instanceof Float) {
+        is.update((float) key, value);
+      } else if (key instanceof Double) {
+        is.update((double) key, value);
+      } else if (key instanceof BigDecimal) {
+        is.update(((BigDecimal) key).toString(), value);
+      } else if (key instanceof String) {
+        is.update((String) key, value);
+      } else if (key instanceof byte[]) {
+        is.update((byte[]) key, value);
+      }
+    }
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
   }
 }

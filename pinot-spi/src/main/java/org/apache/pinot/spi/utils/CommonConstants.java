@@ -96,6 +96,9 @@ public class CommonConstants {
     // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
     public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 65536;
 
+
+    public static final int DEFAULT_TUPLE_SKETCH_LGK = 16;
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 

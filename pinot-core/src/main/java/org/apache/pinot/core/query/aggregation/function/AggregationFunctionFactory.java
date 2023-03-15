@@ -1,26 +1,21 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -169,13 +164,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
+              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
-                  return new FirstIntValueWithTimeAggregationFunction(
-                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                  return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol,
+                      fieldDataType == FieldSpec.DataType.BOOLEAN);
                 case LONG:
                   return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -299,13 +293,21 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
+          case DISTINCTCOUNTTUPLESKETCH:
+            // mode actually doesn't matter here because we only care about keys, not values
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case SUMVALUESINTEGERSUMTUPLESKETCH:
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case AVGVALUEINTEGERSUMTUPLESKETCH:
+            return new AvgIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           default:
             throw new IllegalArgumentException();
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException(
-          "Invalid aggregation function: " + function + "; Reason: " + e.getMessage());
+      throw new BadQueryRequestException("Invalid aggregation function: " + function + "; Reason: " + e.getMessage());
     }
   }
 

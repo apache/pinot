@@ -1,20 +1,14 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.core.common;
 
@@ -59,6 +53,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
@@ -127,7 +123,8 @@ public class ObjectSerDeUtils {
     StringLongPair(31),
     CovarianceTuple(32),
     VarianceTuple(33),
-    PinotFourthMoment(34);
+    PinotFourthMoment(34),
+    IntegerTupleSketch(35);
 
     private final int _value;
 
@@ -213,6 +210,8 @@ public class ObjectSerDeUtils {
         return ObjectType.VarianceTuple;
       } else if (value instanceof PinotFourthMoment) {
         return ObjectType.PinotFourthMoment;
+      } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
+        return ObjectType.IntegerTupleSketch;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -494,16 +493,16 @@ public class ObjectSerDeUtils {
       return value.serialize();
     }
 
-    @Override
-    public PinotFourthMoment deserialize(byte[] bytes) {
-      return PinotFourthMoment.fromBytes(bytes);
-    }
+        @Override
+        public PinotFourthMoment deserialize(byte[] bytes) {
+          return PinotFourthMoment.fromBytes(bytes);
+        }
 
-    @Override
-    public PinotFourthMoment deserialize(ByteBuffer byteBuffer) {
-      return PinotFourthMoment.fromBytes(byteBuffer);
-    }
-  };
+        @Override
+        public PinotFourthMoment deserialize(ByteBuffer byteBuffer) {
+          return PinotFourthMoment.fromBytes(byteBuffer);
+        }
+      };
 
   public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 
@@ -918,6 +917,28 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>> DATA_SKETCH_INT_TUPLE_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(org.apache.datasketches.tuple.Sketch<IntegerSummary> value) {
+          return value.compact().toByteArray();
+        }
+
+        @Override
+        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(byte[] bytes) {
+          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+              new IntegerSummaryDeserializer());
+        }
+
+        @Override
+        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(ByteBuffer byteBuffer) {
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+              new IntegerSummaryDeserializer());
+        }
+      };
+
   public static final ObjectSerDe<Geometry> GEOMETRY_SER_DE = new ObjectSerDe<Geometry>() {
 
     @Override
@@ -1236,7 +1257,8 @@ public class ObjectSerDeUtils {
       STRING_LONG_PAIR_SER_DE,
       COVARIANCE_TUPLE_OBJECT_SER_DE,
       VARIANCE_TUPLE_OBJECT_SER_DE,
-      PINOT_FOURTH_MOMENT_OBJECT_SER_DE
+      PINOT_FOURTH_MOMENT_OBJECT_SER_DE,
+      DATA_SKETCH_INT_TUPLE_SER_DE
   };
   //@formatter:on
 
