@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 public class LeastTransformFunction extends SelectTupleElementTransformFunction {
@@ -30,15 +30,15 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
-    int[] values = _arguments.get(0).transformToIntValuesSV(projectionBlock);
+    int[] values = _arguments.get(0).transformToIntValuesSV(valueBlock);
     System.arraycopy(values, 0, _intValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToIntValuesSV(projectionBlock);
+      values = _arguments.get(i).transformToIntValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < values.length; j++) {
         _intValuesSV[j] = Math.min(_intValuesSV[j], values[j]);
       }
@@ -47,15 +47,15 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_longValuesSV == null) {
       _longValuesSV = new long[numDocs];
     }
-    long[] values = _arguments.get(0).transformToLongValuesSV(projectionBlock);
+    long[] values = _arguments.get(0).transformToLongValuesSV(valueBlock);
     System.arraycopy(values, 0, _longValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToLongValuesSV(projectionBlock);
+      values = _arguments.get(i).transformToLongValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < values.length; j++) {
         _longValuesSV[j] = Math.min(_longValuesSV[j], values[j]);
       }
@@ -64,15 +64,15 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_floatValuesSV == null) {
       _floatValuesSV = new float[numDocs];
     }
-    float[] values = _arguments.get(0).transformToFloatValuesSV(projectionBlock);
+    float[] values = _arguments.get(0).transformToFloatValuesSV(valueBlock);
     System.arraycopy(values, 0, _floatValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToFloatValuesSV(projectionBlock);
+      values = _arguments.get(i).transformToFloatValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < values.length; j++) {
         _floatValuesSV[j] = Math.min(_floatValuesSV[j], values[j]);
       }
@@ -81,15 +81,15 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[numDocs];
     }
-    double[] values = _arguments.get(0).transformToDoubleValuesSV(projectionBlock);
+    double[] values = _arguments.get(0).transformToDoubleValuesSV(valueBlock);
     System.arraycopy(values, 0, _doubleValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToDoubleValuesSV(projectionBlock);
+      values = _arguments.get(i).transformToDoubleValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < values.length; j++) {
         _doubleValuesSV[j] = Math.min(_doubleValuesSV[j], values[j]);
       }
@@ -98,15 +98,15 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[numDocs];
     }
-    BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(projectionBlock);
+    BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(valueBlock);
     System.arraycopy(values, 0, _bigDecimalValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToBigDecimalValuesSV(projectionBlock);
+      values = _arguments.get(i).transformToBigDecimalValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < values.length; j++) {
         _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].min(values[j]);
       }
@@ -115,15 +115,15 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[numDocs];
     }
-    String[] values = _arguments.get(0).transformToStringValuesSV(projectionBlock);
+    String[] values = _arguments.get(0).transformToStringValuesSV(valueBlock);
     System.arraycopy(values, 0, _stringValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToStringValuesSV(projectionBlock);
+      values = _arguments.get(i).transformToStringValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < values.length; j++) {
         if (_stringValuesSV[j].compareTo(values[j]) > 0) {
           _stringValuesSV[j] = values[j];

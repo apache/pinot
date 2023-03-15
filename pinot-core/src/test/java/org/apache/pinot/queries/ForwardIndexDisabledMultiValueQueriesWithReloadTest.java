@@ -754,7 +754,7 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     Set<String> forwardIndexDisabledColumns = new HashSet<>(_forwardIndexDisabledColumns);
     forwardIndexDisabledColumns.add("column7");
     indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
-    indexLoadingConfig.getNoDictionaryColumns().remove("column7");
+    indexLoadingConfig.removeNoDictionaryColumns("column7");
     indexLoadingConfig.setReadMode(ReadMode.heap);
 
     // Reload the segments to pick up the new configs
@@ -785,7 +785,7 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     Set<String> forwardIndexDisabledColumns = new HashSet<>(_forwardIndexDisabledColumns);
     forwardIndexDisabledColumns.remove("column6");
     indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
-    indexLoadingConfig.getNoDictionaryColumns().add("column7");
+    indexLoadingConfig.addNoDictionaryColumns("column7");
     indexLoadingConfig.setReadMode(ReadMode.heap);
 
     // Reload the segments to pick up the new configs

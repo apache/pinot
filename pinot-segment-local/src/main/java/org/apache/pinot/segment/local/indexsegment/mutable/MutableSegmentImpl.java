@@ -62,6 +62,7 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
@@ -163,7 +164,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
 
   private final UpsertConfig.Mode _upsertMode;
-  private final String _upsertComparisonColumn;
+  private final List<String> _upsertComparisonColumns;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
@@ -244,7 +245,8 @@ public class MutableSegmentImpl implements MutableSegment {
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
-    Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
+    // Here we create a copy of no dictionary columns because we are going to mutate the set some lines bellow
+    Set<String> noDictionaryColumns = new HashSet<>(config.getNoDictionaryColumns());
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     Set<String> textIndexColumns = config.getTextIndexColumns();
     Set<String> fstIndexColumns = config.getFSTIndexColumns();
@@ -408,12 +410,13 @@ public class MutableSegmentImpl implements MutableSegment {
           "Metrics aggregation and upsert cannot be enabled together");
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
-      String upsertComparisonColumn = config.getUpsertComparisonColumn();
-      _upsertComparisonColumn = upsertComparisonColumn != null ? upsertComparisonColumn : _timeColumnName;
+      List<String> upsertComparisonColumns = config.getUpsertComparisonColumns();
+      _upsertComparisonColumns =
+          upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
-      _upsertComparisonColumn = null;
+      _upsertComparisonColumns = null;
     }
   }
 
@@ -558,13 +561,43 @@ public class MutableSegmentImpl implements MutableSegment {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
 
     if (isUpsertEnabled()) {
-      Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
-      Preconditions.checkState(upsertComparisonValue instanceof Comparable,
-          "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-      return new RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
+      if (_upsertComparisonColumns.size() > 1) {
+        return multiComparisonRecordInfo(primaryKey, docId, row);
+      }
+      Comparable comparisonValue = (Comparable) row.getValue(_upsertComparisonColumns.get(0));
+      return new RecordInfo(primaryKey, docId, comparisonValue);
     }
 
     return new RecordInfo(primaryKey, docId, null);
+  }
+
+  private RecordInfo multiComparisonRecordInfo(PrimaryKey primaryKey, int docId, GenericRow row) {
+    int numComparisonColumns = _upsertComparisonColumns.size();
+    Comparable[] comparisonValues = new Comparable[numComparisonColumns];
+
+    int comparableIndex = -1;
+    for (int i = 0; i < numComparisonColumns; i++) {
+      String columnName = _upsertComparisonColumns.get(i);
+
+      if (!row.isNullValue(columnName)) {
+        // Inbound records may only have exactly 1 non-null value in one of the comparison column i.e. comparison
+        // columns are mutually exclusive. If comparableIndex has already been modified from its initialized value,
+        // that means there must have already been a non-null value processed and therefore processing an additional
+        // non-null value would be an error.
+        Preconditions.checkState(comparableIndex == -1,
+            "Documents must have exactly 1 non-null comparison column value");
+
+        comparableIndex = i;
+
+        Object comparisonValue = row.getValue(columnName);
+        Preconditions.checkState(comparisonValue instanceof Comparable,
+            "Upsert comparison column: %s must be comparable", columnName);
+        comparisonValues[i] = (Comparable) comparisonValue;
+      }
+    }
+    Preconditions.checkState(comparableIndex != -1,
+        "Documents must have exactly 1 non-null comparison column value");
+    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues, comparableIndex));
   }
 
   private void updateDictionary(GenericRow row) {

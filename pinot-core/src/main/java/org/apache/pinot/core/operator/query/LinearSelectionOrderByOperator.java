@@ -32,14 +32,13 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
@@ -70,28 +69,23 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected final List<ExpressionContext> _alreadySorted;
   protected final List<ExpressionContext> _toSort;
 
-  protected final TransformOperator _transformOperator;
+  protected final BaseProjectOperator<?> _projectOperator;
   protected final List<OrderByExpressionContext> _orderByExpressions;
-  protected final TransformResultMetadata[] _expressionsMetadata;
+  protected final ColumnContext[] _columnContexts;
   protected final int _numRowsToKeep;
-  private final Supplier<ListBuilder> _listBuilderSupplier;
-  protected boolean _used = false;
-  /**
-   * The comparator used to build the resulting {@link SelectionResultsBlock}, which sorts rows in reverse order to the
-   * one specified in the query.
-   */
-  protected Comparator<Object[]> _comparator;
+  protected final Comparator<Object[]> _comparator;
+  protected final Supplier<ListBuilder> _listBuilderSupplier;
 
   /**
-   * @param expressions Order-by expressions must be at the head of the list.
+   * @param expressions          Order-by expressions must be at the head of the list.
    * @param numSortedExpressions Number of expressions in the order-by expressions that are sorted.
    */
   public LinearSelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator, int numSortedExpressions) {
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     _indexSegment = indexSegment;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
-    _transformOperator = transformOperator;
+    _projectOperator = projectOperator;
 
     _orderByExpressions = queryContext.getOrderByExpressions();
     assert _orderByExpressions != null;
@@ -100,28 +94,26 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     _alreadySorted = expressions.subList(0, numSortedExpressions);
     _toSort = expressions.subList(numSortedExpressions, numOrderByExpressions);
 
-    _expressionsMetadata = new TransformResultMetadata[_expressions.size()];
-    for (int i = 0; i < _expressionsMetadata.length; i++) {
+    _columnContexts = new ColumnContext[_expressions.size()];
+    for (int i = 0; i < _columnContexts.length; i++) {
       ExpressionContext expression = _expressions.get(i);
-      _expressionsMetadata[i] = _transformOperator.getResultMetadata(expression);
+      _columnContexts[i] = _projectOperator.getResultColumnContext(expression);
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
+    _comparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled);
 
     if (_toSort.isEmpty()) {
       _listBuilderSupplier = () -> new TotallySortedListBuilder(_numRowsToKeep);
     } else {
       Comparator<Object[]> sortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, false, _nullHandlingEnabled,
-              0, numSortedExpressions);
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled, 0,
+              numSortedExpressions);
       Comparator<Object[]> unsortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, true, _nullHandlingEnabled,
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled,
               numSortedExpressions, numOrderByExpressions);
       _listBuilderSupplier = () -> new PartiallySortedListBuilder(_numRowsToKeep, sortedComparator, unsortedComparator);
     }
-
-    _comparator =
-        OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, true, _nullHandlingEnabled);
   }
 
   @Override
@@ -131,20 +123,20 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     int numDocsScanned = getNumDocsScanned();
-    long numEntriesScannedPostFilter = (long) numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numEntriesScannedPostFilter = (long) numDocsScanned * _projectOperator.getNumColumnsProjected();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);
   }
 
-  protected IntFunction<Object[]> fetchBlock(TransformBlock transformBlock, BlockValSet[] blockValSets) {
+  protected IntFunction<Object[]> fetchBlock(ValueBlock valueBlock, BlockValSet[] blockValSets) {
     int numExpressions = _expressions.size();
 
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = _expressions.get(i);
-      blockValSets[i] = transformBlock.getBlockValueSet(expression);
+      blockValSets[i] = valueBlock.getBlockValueSet(expression);
     }
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
@@ -184,8 +176,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected abstract List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier);
 
   @Override
-  public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+  public List<BaseProjectOperator<?>> getChildOperators() {
+    return Collections.singletonList(_projectOperator);
   }
 
   protected abstract String getExplainName();
@@ -221,17 +213,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
-    Preconditions.checkState(!_used, "nextBlock was called more than once");
-    _used = true;
-    List<Object[]> list = fetch(_listBuilderSupplier);
-
-    DataSchema dataSchema = createDataSchema();
-
-    if (list.size() > _numRowsToKeep) {
-      list = new ArrayList<>(list.subList(0, _numRowsToKeep));
-    }
-
-    return new SelectionResultsBlock(dataSchema, list, _comparator);
+    return new SelectionResultsBlock(createDataSchema(), fetch(_listBuilderSupplier), _comparator);
   }
 
   protected DataSchema createDataSchema() {
@@ -244,9 +226,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       columnNames[i] = _expressions.get(i).toString();
     }
     for (int i = 0; i < numExpressions; i++) {
-      TransformResultMetadata expressionMetadata = _expressionsMetadata[i];
       columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+          DataSchema.ColumnDataType.fromDataType(_columnContexts[i].getDataType(), _columnContexts[i].isSingleValue());
     }
     return new DataSchema(columnNames, columnDataTypes);
   }
@@ -335,25 +316,28 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
    */
   @VisibleForTesting
   static class PartiallySortedListBuilder implements ListBuilder {
-    /**
-     * A list with all the elements that have been already sorted.
-     */
-    private final ArrayList<Object[]> _sorted;
-    /**
-     * This attribute is used to store the last partition when the builder already contains {@link #_maxNumRows} rows.
-     */
-    private PriorityQueue<Object[]> _lastPartitionQueue;
+
+    private final int _maxNumRows;
+
     /**
      * The comparator that defines the partitions and the one that impose in which order add has to be called.
      */
     private final Comparator<Object[]> _partitionComparator;
+
     /**
-     * The comparator that sorts different rows on each partition, which sorts rows in reverse order to the one
-     * specified in the query.
+     * The comparator that sorts different rows on each partition.
      */
     private final Comparator<Object[]> _unsortedComparator;
 
-    private final int _maxNumRows;
+    /**
+     * List of rows, where the first _numSortedRows are sorted.
+     */
+    private final ArrayList<Object[]> _rows;
+
+    /**
+     * This attribute is used to store the last partition when the builder already contains {@link #_maxNumRows} rows.
+     */
+    private PriorityQueue<Object[]> _lastPartitionQueue;
 
     private Object[] _lastPartitionRow;
     private int _numSortedRows;
@@ -361,50 +345,52 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     public PartiallySortedListBuilder(int maxNumRows, Comparator<Object[]> partitionComparator,
         Comparator<Object[]> unsortedComparator) {
       _maxNumRows = maxNumRows;
-      _sorted = new ArrayList<>(Integer.min(maxNumRows, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
       _partitionComparator = partitionComparator;
       _unsortedComparator = unsortedComparator;
+      _rows = new ArrayList<>(Integer.min(maxNumRows, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     }
 
     @Override
     public boolean add(Object[] row) {
       if (_lastPartitionRow == null) {
         _lastPartitionRow = row;
-        _sorted.add(row);
+        _rows.add(row);
         return false;
       }
-      int cmp = _partitionComparator.compare(row, _lastPartitionRow);
-      if (cmp < 0) {
-        throw new IllegalArgumentException(
-            "Row with docId " + _sorted.size() + " is not sorted compared to the previous one");
-      }
+      int compareResult = _partitionComparator.compare(row, _lastPartitionRow);
+      Preconditions.checkState(compareResult >= 0, "Rows are not sorted");
 
-      boolean newPartition = cmp > 0;
-      if (_sorted.size() < _maxNumRows) {
+      boolean newPartition = compareResult > 0;
+      int numRows = _rows.size();
+      if (numRows < _maxNumRows) {
         // we don't have enough rows yet
         if (newPartition) {
           _lastPartitionRow = row;
-          _numSortedRows = _sorted.size();
+          if (numRows - _numSortedRows > 1) {
+            _rows.subList(_numSortedRows, numRows).sort(_unsortedComparator);
+          }
+          _numSortedRows = numRows;
         }
         // just add the new row to the result list
-        _sorted.add(row);
+        _rows.add(row);
         return false;
       }
 
       // enough rows have been collected
-      assert _sorted.size() == _maxNumRows;
-      if (newPartition) { // and the new element belongs to a new partition, so we can just ignore it
+      assert numRows == _maxNumRows;
+      if (newPartition) {
+        // new element belongs to a new partition, so we can just ignore it
         return true;
       }
       // new element doesn't belong to a new partition, so we may need to add it
-      if (_lastPartitionQueue == null) { // we have exactly _numRows rows, and the new belongs to the last partition
+      if (_lastPartitionQueue == null) {
         // we need to prepare the priority queue
-        int numRowsInPriorityQueue = _maxNumRows - _numSortedRows;
-        _lastPartitionQueue = new PriorityQueue<>(numRowsInPriorityQueue, _unsortedComparator);
-        _lastPartitionQueue.addAll(_sorted.subList(_numSortedRows, _maxNumRows));
+        int numRowsInPriorityQueue = numRows - _numSortedRows;
+        _lastPartitionQueue = new PriorityQueue<>(numRowsInPriorityQueue, _unsortedComparator.reversed());
+        _lastPartitionQueue.addAll(_rows.subList(_numSortedRows, numRows));
       }
       // add the new element if it is lower than the greatest element stored in the partition
-      if (_unsortedComparator.compare(row, _lastPartitionQueue.peek()) > 0) {
+      if (_unsortedComparator.compare(row, _lastPartitionQueue.peek()) < 0) {
         _lastPartitionQueue.poll();
         _lastPartitionQueue.offer(row);
       }
@@ -413,14 +399,18 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
     @Override
     public List<Object[]> build() {
-      if (_lastPartitionQueue != null) {
-        assert _lastPartitionQueue.size() == _maxNumRows - _numSortedRows;
-        Iterator<Object[]> lastPartitionIt = _lastPartitionQueue.iterator();
-        for (int i = _numSortedRows; i < _maxNumRows; i++) {
-          _sorted.set(i, lastPartitionIt.next());
+      int numRows = _rows.size();
+      if (_lastPartitionQueue == null) {
+        if (numRows - _numSortedRows > 1) {
+          _rows.subList(_numSortedRows, numRows).sort(_unsortedComparator);
+        }
+      } else {
+        assert numRows == _maxNumRows && _lastPartitionQueue.size() == numRows - _numSortedRows;
+        for (int i = numRows - 1; i >= _numSortedRows; i--) {
+          _rows.set(i, _lastPartitionQueue.poll());
         }
       }
-      return _sorted;
+      return _rows;
     }
   }
 }

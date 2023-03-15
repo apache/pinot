@@ -19,11 +19,12 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.List;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 
-public final class SortedDocIdSet implements FilterBlockDocIdSet {
+public final class SortedDocIdSet implements BlockDocIdSet {
   private final List<IntPair> _docIdRanges;
 
   // NOTE: No need to track numDocs because sorted index can only apply to ImmutableSegment, so the document ids are

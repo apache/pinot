@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 
 
 /**
- * Singleton class which extends {@link FilterBlockDocIdSet} that is empty, i.e. does not contain any document.
+ * Singleton class which extends {@link BlockDocIdSet} that is empty, i.e. does not contain any document.
  */
-public final class EmptyDocIdSet implements FilterBlockDocIdSet {
+public final class EmptyDocIdSet implements BlockDocIdSet {
   private EmptyDocIdSet() {
   }
 

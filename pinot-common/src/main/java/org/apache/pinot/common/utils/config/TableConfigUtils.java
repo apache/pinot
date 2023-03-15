@@ -113,11 +113,11 @@ public class TableConfigUtils {
       queryConfig = JsonUtils.stringToObject(queryConfigString, QueryConfig.class);
     }
 
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = null;
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = null;
     String instanceAssignmentConfigMapString = simpleFields.get(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY);
     if (instanceAssignmentConfigMapString != null) {
       instanceAssignmentConfigMap = JsonUtils.stringToObject(instanceAssignmentConfigMapString,
-          new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
+          new TypeReference<Map<String, InstanceAssignmentConfig>>() {
           });
     }
 
@@ -181,9 +181,9 @@ public class TableConfigUtils {
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap,
-        fieldConfigList, upsertConfig, dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable,
-        tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap);
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
+        dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList,
+        instancePartitionsMap, segmentAssignmentConfigMap);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -216,8 +216,7 @@ public class TableConfigUtils {
     if (queryConfig != null) {
       simpleFields.put(TableConfig.QUERY_CONFIG_KEY, queryConfig.toJsonString());
     }
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        tableConfig.getInstanceAssignmentConfigMap();
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     if (instanceAssignmentConfigMap != null) {
       simpleFields
           .put(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToString(instanceAssignmentConfigMap));

@@ -36,12 +36,10 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +71,7 @@ public class DriverUtils {
   public static void handleAuth(Properties info, Map<String, String> headers)
       throws SQLException {
 
-    if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
+    if (info.containsKey(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
       String username = info.getProperty(USER_PROPERTY);
       String password = info.getProperty(PASSWORD_PROPERTY, "");
       if (StringUtils.isAnyEmpty(username, password)) {
@@ -220,13 +218,37 @@ public class DriverUtils {
     return matcher.find();
   }
 
-  public static String enableNullHandling(PinotConnection connection, String query) {
-    if (query.contains(QueryOptionKey.ENABLE_NULL_HANDLING)) {
-      return query;
+  public static String enableQueryOptions(String sql, Map<String, Object> options) {
+    StringBuilder optionsBuilder = new StringBuilder();
+    for (Map.Entry<String, Object> optionEntry: options.entrySet()) {
+      if (!sql.contains(optionEntry.getKey())) {
+        optionsBuilder.append(DriverUtils.createSetQueryOptionString(optionEntry.getKey(), optionEntry.getValue()));
+      }
+    }
+    optionsBuilder.append(sql);
+    return optionsBuilder.toString();
+  }
+
+  public static String createSetQueryOptionString(String optionKey, Object optionValue) {
+    StringBuilder optionBuilder = new StringBuilder();
+    optionBuilder.append("SET ").append(optionKey);
+
+    if (optionValue != null) {
+      optionBuilder.append('=');
+
+      if (optionValue instanceof Boolean) {
+        optionBuilder.append(((Boolean) optionValue).booleanValue());
+      } else if (optionValue instanceof Integer || optionValue instanceof Long) {
+        optionBuilder.append(((Number) optionValue).longValue());
+      } else if (optionValue instanceof Float || optionValue instanceof Double) {
+        optionBuilder.append(((Number) optionValue).doubleValue());
+      } else {
+        throw new IllegalArgumentException(
+          "Option Type " + optionValue.getClass().getSimpleName() + " is not supported.");
+      }
     }
 
-    return connection.isNullHandlingEnabled()
-      ? String.format("SET %s = true; %s", QueryOptionKey.ENABLE_NULL_HANDLING, query)
-      : query;
+    optionBuilder.append(";\n");
+    return optionBuilder.toString();
   }
 }

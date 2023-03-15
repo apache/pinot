@@ -2430,9 +2430,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},"
         + "\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)\",1,0],[\"COMBINE_GROUP_BY\",2,1],"
         + "[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],"
-        + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],"
-        + "[\"TRANSFORM_PASSTHROUGH(Carrier)\",4,3],[\"PROJECT(Carrier)\",5,4],[\"DOC_ID_SET\",6,5],"
-        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",7,6]]}");
+        + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],[\"PROJECT(Carrier)\",4,3],"
+        + "[\"DOC_ID_SET\",5,4],[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",6,5]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.

@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.blocks.results;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
@@ -77,7 +76,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public Collection<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows(QueryContext queryContext) {
     return Collections.singletonList(_results.toArray());
   }
 
