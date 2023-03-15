@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
@@ -100,13 +101,18 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
           //  anyways as info for now so we can see how frequently this happens.
           LOGGER.info("Unexpected error issuing onError to MailboxContentStreamObserver: {}", e.getMessage());
         }
-      }, DEFAULT_CANCELLATION_DELAY_MS, TimeUnit.MILLISECONDS);
+      }, getCancellationDelayMs(), TimeUnit.MILLISECONDS);
     }
   }
 
   @Override
   public String getMailboxId() {
     return _mailboxId;
+  }
+
+  @VisibleForTesting
+  public long getCancellationDelayMs() {
+    return DEFAULT_CANCELLATION_DELAY_MS;
   }
 
   private void open() {

@@ -37,6 +37,7 @@ import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -294,6 +295,10 @@ public class GrpcMailboxServiceTest {
 
     GrpcSendingMailbox grpcSendingMailbox =
         (GrpcSendingMailbox) _mailboxService1.getSendingMailbox(mailboxId, deadlineMs);
+    // Do cancellations immediately for this test
+    grpcSendingMailbox = Mockito.spy(grpcSendingMailbox);
+    Mockito.doReturn(0L).when(grpcSendingMailbox).getCancellationDelayMs();
+
     GrpcReceivingMailbox grpcReceivingMailbox =
         (GrpcReceivingMailbox) _mailboxService2.getReceivingMailbox(mailboxId);
 
