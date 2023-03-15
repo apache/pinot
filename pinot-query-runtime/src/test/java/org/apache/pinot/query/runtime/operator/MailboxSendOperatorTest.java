@@ -199,7 +199,7 @@ public class MailboxSendOperatorTest {
 
   private OpChainExecutionContext getOpChainContext(long deadlineMs) {
     StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server));
+    stageMetadata.setServerInstances(ImmutableList.of(_server));
     Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(DEFAULT_RECEIVER_STAGE_ID, stageMetadata);
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_SENDER_STAGE_ID, new VirtualServerAddress(_server),

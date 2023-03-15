@@ -85,8 +85,8 @@ public class MailboxReceiveOperator extends MultiStageOperator {
 
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
   //TODO: Remove boxed timeoutMs value from here and use long deadlineMs from context.
-  public MailboxReceiveOperator(List<VirtualServer> sendingStageInstances,
-      RelDistribution.Type exchangeType, int senderStageId, int receiverStageId, Long timeoutMs, OpChainExecutionContext context) {
+  public MailboxReceiveOperator(List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType,
+      int senderStageId, int receiverStageId, Long timeoutMs, OpChainExecutionContext context) {
     super(context);
     _mailboxService = context.getMailboxService();
     VirtualServerAddress receiver = context.getServer();

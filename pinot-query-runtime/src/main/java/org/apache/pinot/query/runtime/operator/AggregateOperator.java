@@ -89,7 +89,8 @@ public class AggregateOperator extends MultiStageOperator {
   @VisibleForTesting
   AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
       List<RexExpression> groupSet, DataSchema inputSchema,
-      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, OpChainExecutionContext context) {
+      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers,
+      OpChainExecutionContext context) {
     super(context);
     _inputOperator = inputOperator;
     _groupSet = groupSet;

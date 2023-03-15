@@ -144,7 +144,7 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.RANGE_DISTRIBUTED, 456,
-            789,null, context);
+            789, null, context);
   }
 
   @Test
