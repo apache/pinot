@@ -57,12 +57,10 @@ public class SegmentStateSnapshot {
       _unavailableSegments = unavailableSegments;
     }
 
+    @Nullable
+    // Return null if segment doesn't exist in the map.
     public List<SegmentInstanceCandidate> getCandidates(String segment) {
       return _instanceMap.get(segment);
-    }
-
-    Map<String, List<SegmentInstanceCandidate>> getAllCandidates() {
-      return _instanceMap;
     }
 
     public Set<String> getUnavailableSegments() {

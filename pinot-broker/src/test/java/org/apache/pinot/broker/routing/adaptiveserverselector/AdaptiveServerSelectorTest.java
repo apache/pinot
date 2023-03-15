@@ -112,7 +112,7 @@ public class AdaptiveServerSelectorTest {
 
     // A random server will be returned if any of the candidate servers do not have stats.
     String selectedServer = selector.select(_servers);
-    assertTrue(_servers.contains(selectedServer));
+    assertTrue(_servers.contains(selectedServer), selectedServer);
 
     // TEST 2: Populate all servers with equal stats.
     // Current numInFlightRequests:
@@ -139,7 +139,7 @@ public class AdaptiveServerSelectorTest {
     selectedServer = selector.select(_servers);
     assertEquals(selectedServer, _servers.get(0));
 
-    List<String> candidateServers = Arrays.asList("server2", "server3");
+    List<String> candidateServers = new ArrayList<>(Arrays.asList("server2", "server3"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 2);
     for (Pair<String, Double> entry : serverRankingWithVal) {
@@ -183,7 +183,7 @@ public class AdaptiveServerSelectorTest {
     selectedServer = selector.select(Arrays.asList("server3", "server1", "server2"));
     assertEquals(selectedServer, "server1");
 
-    candidateServers = Arrays.asList("server4", "server3", "server1");
+    candidateServers = new ArrayList<>(Arrays.asList("server4", "server3", "server1"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 3);
     assertEquals(serverRankingWithVal.get(0).getLeft(), "server1");
@@ -192,6 +192,7 @@ public class AdaptiveServerSelectorTest {
     assertEquals(serverRankingWithVal.get(1).getRight(), (double) numInflightReqMap.get("server3"));
     assertEquals(serverRankingWithVal.get(2).getLeft(), "server4");
     assertEquals(serverRankingWithVal.get(2).getRight(), (double) numInflightReqMap.get("server4"));
+
 
     // TEST 4: Populate all servers with unequal stats.
     // Current numInFlightRequests:
@@ -305,9 +306,9 @@ public class AdaptiveServerSelectorTest {
 
     // A random server will be returned if any of the candidate servers do not have stats.
     String selectedServer = selector.select(_servers);
-    assertTrue(_servers.contains(selectedServer));
+    assertTrue(_servers.contains(selectedServer), selectedServer);
 
-    List<String> candidateServers = Arrays.asList("server2");
+    List<String> candidateServers = new ArrayList<>(Arrays.asList("server2"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 1);
     assertEquals(serverRankingWithVal.get(0).getLeft(), "server2");
@@ -334,7 +335,7 @@ public class AdaptiveServerSelectorTest {
     selectedServer = selector.select(_servers);
     assertEquals(selectedServer, _servers.get(0));
 
-    candidateServers = Arrays.asList("server4", "server3");
+    candidateServers = new ArrayList<>(Arrays.asList("server4", "server3"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 2);
     for (Pair<String, Double> entry : serverRankingWithVal) {
@@ -362,7 +363,7 @@ public class AdaptiveServerSelectorTest {
     for (Pair<String, Double> entry : serverRankingWithVal) {
       String server = entry.getLeft();
       double latency = entry.getRight();
-      assertEquals(latency, latencyMap.get(server).getAverage());
+      assertEquals(latency, (double) latencyMap.get(server).getAverage());
       assertTrue(prevVal <= latency, prevVal + " " + latency + " " + server);
       prevVal = latency;
     }
@@ -376,7 +377,7 @@ public class AdaptiveServerSelectorTest {
     selectedServer = selector.select(Arrays.asList("server3", "server4", "server2"));
     assertEquals(selectedServer, "server2");
 
-    candidateServers = Arrays.asList("server4", "server1", "server3");
+    candidateServers = new ArrayList<>(Arrays.asList("server4", "server1", "server3"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 3);
     prevVal = 0.0;
@@ -442,14 +443,14 @@ public class AdaptiveServerSelectorTest {
 
     // A random server will be returned if any of the candidate servers do not have stats.
     String selectedServer = selector.select(_servers);
-    assertTrue(_servers.contains(selectedServer));
-
-    List<String> candidateServers = Arrays.asList("server2", "server3", "server1", "server4");
+    assertTrue(_servers.contains(selectedServer), selectedServer);
+    List<String> candidateServers = new ArrayList<>(Arrays.asList("server2", "server3", "server1", "server4"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 4);
     for (Pair<String, Double> entry : serverRankingWithVal) {
       assertEquals(entry.getRight(), -1.0);
     }
+
 
     // TEST 2: Populate all servers with equal numInFlightRequests and latencies.
     for (int ii = 0; ii < 10; ii++) {

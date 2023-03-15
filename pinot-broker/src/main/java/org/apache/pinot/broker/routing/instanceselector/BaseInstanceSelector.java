@@ -62,7 +62,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 abstract class BaseInstanceSelector implements InstanceSelector {
   // Class used to represent the instance state for new segment.
   protected static class SegmentState {
-    protected static final SegmentState OLD_SEGMENT_STATE = new SegmentState(Long.MIN_VALUE);
     // Mapping from candidate to online flag.
     // key = instance
     // value = true (online)/false(offline)
@@ -149,7 +148,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           continue;
         }
         String externalViewState = instanceStateEntry.getValue();
-        if (SegmentStateModel.isOnline(externalViewState)) {
+        if (InstanceSelector.isOnlineForServing(externalViewState)) {
           onlineInstance.add(instance);
         }
       }
@@ -203,6 +202,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   @Override
   public void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
     _enabledInstances = enabledInstances;
+    // Note that the whole _segmentStateSnapshot has to be updated together to avoid partial state update.
     // Update the map from segment to enabled ONLINE/CONSUMING instances and set of unavailable segments (no enabled
     // instance or all enabled instances are in ERROR state)
     _segmentStateSnapshot =
@@ -288,7 +288,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         }
         String externalViewState = instanceStateEntry.getValue();
         // Do not track instances in ERROR state
-        if (SegmentStateModel.isOnline(externalViewState)) {
+        if (InstanceSelector.isOnlineForServing(externalViewState)) {
           onlineInstances.add(instance);
         } else if (externalViewState.equals(SegmentStateModel.ERROR)) {
           hasErrorInstance = true;

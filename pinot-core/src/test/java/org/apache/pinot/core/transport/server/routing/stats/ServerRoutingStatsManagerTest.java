@@ -153,6 +153,7 @@ public class ServerRoutingStatsManagerTest {
     manager.recordStatsAfterQuerySubmission(requestId++, "server2");
     waitForStatsUpdate(manager, requestId);
 
+
     numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
     assertEquals(numInFlightReqList.get(0).getLeft(), "server2");
     assertEquals(numInFlightReqList.get(0).getRight().intValue(), 1);

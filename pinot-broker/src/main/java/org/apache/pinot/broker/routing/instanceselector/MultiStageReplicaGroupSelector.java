@@ -98,8 +98,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
         LOGGER.warn("Unable to select replica-group {} for table: {}", replicaGroup, _tableNameWithType, e);
       }
     }
-    throw new RuntimeException(
-        String.format("Unable to find any replica-group to serve table: %s", _tableNameWithType));
+    throw new RuntimeException(String.format("Unable to find any replica-group to serve table: %s",
+        _tableNameWithType));
   }
 
   /**

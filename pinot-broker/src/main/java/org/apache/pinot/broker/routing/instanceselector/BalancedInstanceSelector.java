@@ -41,6 +41,7 @@ import org.apache.pinot.common.utils.HashUtil;
  *    Step1: Process seg1. Fetch server rankings. Pick the best server.
  *    Step2: Process seg2. Fetch server rankings (could have changed or not since Step 1). Pick the best server.
  *    Step3: Process seg3. Fetch server rankings (could have changed or not since Step 2). Pick the best server.
+ *
  * <p>If AdaptiveServerSelection is disabled, the selection algorithm will always evenly distribute the traffic to all
  * replicas of each segment, and will try to select different replica id for each segment. The algorithm is very
  * light-weight and will do best effort to balance the number of segments served by each selected server instance.

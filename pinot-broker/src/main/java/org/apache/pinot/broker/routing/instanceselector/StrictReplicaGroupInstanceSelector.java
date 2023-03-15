@@ -88,7 +88,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    *   2. For old segment, remove it from the newSegmentStateMap.
    *   3. Use old segment state map to compare the instances from the ideal state and the external view and gather the
    *   unavailable instances for each set of instances
-   *   4. Exclude the unavailable instances from the online instances map using old segments state.
+   *   4. Exclude the unavailable instances from the online instances map for both old and new segment map.
    *   5. For old segment, add the remaining online instance to the map.
    *   6. For new segment, add the ideal state instance to the map with online flags.
    * </pre>
@@ -129,7 +129,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
           continue;
         }
         String state = instanceStateEntry.getValue();
-        if (SegmentStateModel.isOnline(state)) {
+        if (InstanceSelector.isOnlineForServing(state)) {
           tempOnlineInstances.add(instance);
         } else if (state.equals(SegmentStateModel.ERROR)) {
           // error or dropped state should not be considered as new anymore.

@@ -46,7 +46,6 @@ public class InstanceSelectorFactory {
     return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC());
   }
 
-  // test only
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
@@ -54,15 +53,16 @@ public class InstanceSelectorFactory {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
       if (RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
-          || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING.equalsIgnoreCase(
-          routingConfig.getRoutingTableBuilderName())) || (tableConfig.getTableType() == TableType.REALTIME
-          && LEGACY_REPLICA_GROUP_REALTIME_ROUTING.equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
+          || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING
+          .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName())) || (
+          tableConfig.getTableType() == TableType.REALTIME && LEGACY_REPLICA_GROUP_REALTIME_ROUTING
+              .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
         LOGGER.info("Using ReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new ReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore,
             clock);
       }
-      if (RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
-          routingConfig.getInstanceSelectorType())) {
+      if (RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
+          .equalsIgnoreCase(routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new StrictReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector,
             propertyStore, clock);
