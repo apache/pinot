@@ -19,7 +19,13 @@
 
 package org.apache.pinot.segment.spi.index;
 
-
+/**
+ * IndexPlugins are the way {@link IndexType}s are registered in a {@link IndexService}.
+ *
+ * In order to create an IndexService, a set of IndexPlugin must be provided. Although IndexTypes could be directly
+ * added into a IndexService, this indirection is used to decouple the way indexes are discovered
+ * (usually by {@link java.util.ServiceLoader} services) and the actual implementation.
+ */
 public interface IndexPlugin<T extends IndexType<?, ?, ?>> {
   T getIndexType();
 }
