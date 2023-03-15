@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.ServiceLoader;
