@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -61,12 +62,11 @@ import org.slf4j.LoggerFactory;
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  *
  * TODO:
- *     1. Add support for OVER() clause with ORDER BY only or PARTITION BY ORDER BY
- *     2. Add support for rank window functions
- *     3. Add support for value window functions
- *     4. Add support for custom frames
- *     5. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
- *     6. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
+ *     1. Add support for rank window functions
+ *     2. Add support for value window functions
+ *     3. Add support for custom frames
+ *     4. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
+ *     5. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
  */
 public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
@@ -79,7 +79,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final List<RexExpression> _constants;
   private final DataSchema _resultSchema;
-  private final AggregationUtils.Accumulator[] _windowAccumulators;
+  private final WindowAggregateAccumulator[] _windowAccumulators;
   private final Map<Key, List<Object[]>> _partitionRows;
 
   private TransferableBlock _upstreamErrorBlock;
@@ -94,7 +94,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
       DataSchema resultSchema, DataSchema inputSchema) {
     this(context, inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
-        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS);
+        upperBound, windowFrameType, constants, resultSchema, inputSchema, WindowAggregateAccumulator.WIN_AGG_MERGERS);
   }
 
   @VisibleForTesting
@@ -106,21 +106,17 @@ public class WindowAggregateOperator extends MultiStageOperator {
       Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers) {
     super(context);
 
-    boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, orderSetDirection, orderSetNullDirection);
-    Preconditions.checkState(orderSet == null || orderSet.isEmpty() || isPartitionByOnly,
-        "Order by is not yet supported in window functions");
-
     _inputOperator = inputOperator;
     _groupSet = groupSet;
-    _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection);
+    boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet);
+    _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection, isPartitionByOnly);
     _windowFrame = new WindowFrame(lowerBound, upperBound, windowFrameType);
 
     Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
         "Only RANGE type frames are supported at present");
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
-    Preconditions.checkState(_windowFrame.isUnboundedFollowing()
-            || (_windowFrame.isUpperBoundCurrentRow() && isPartitionByOnly),
+    Preconditions.checkState(_windowFrame.isUnboundedFollowing() || _windowFrame.isUpperBoundCurrentRow(),
         "Only default frame is supported, upperBound must be UNBOUNDED FOLLOWING or CURRENT ROW");
 
     // we expect all agg calls to be aggregate function calls
@@ -128,7 +124,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     _constants = constants;
     _resultSchema = resultSchema;
 
-    _windowAccumulators = new AggregationUtils.Accumulator[_aggCalls.size()];
+    _windowAccumulators = new WindowAggregateAccumulator[_aggCalls.size()];
     int aggCallsSize = _aggCalls.size();
     for (int i = 0; i < aggCallsSize; i++) {
       RexExpression.FunctionCall agg = _aggCalls.get(i);
@@ -136,7 +132,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       if (!mergers.containsKey(functionName)) {
         throw new IllegalStateException("Unexpected aggregation function name: " + functionName);
       }
-      _windowAccumulators[i] = new AggregationUtils.Accumulator(agg, mergers, functionName, inputSchema);
+      _windowAccumulators[i] = new WindowAggregateAccumulator(agg, mergers, functionName, inputSchema, _orderSetInfo);
     }
 
     _partitionRows = new HashMap<>();
@@ -180,9 +176,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
   }
 
-  private boolean isPartitionByOnlyQuery(List<RexExpression> groupSet, List<RexExpression> orderSet,
-      List<RelFieldCollation.Direction> orderSetDirection,
-      List<RelFieldCollation.NullDirection> orderSetNullDirection) {
+  private boolean isPartitionByOnlyQuery(List<RexExpression> groupSet, List<RexExpression> orderSet) {
     if (CollectionUtils.isEmpty(orderSet)) {
       return true;
     }
@@ -203,15 +197,20 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   private TransferableBlock produceWindowAggregatedBlock() {
+    boolean isPartitionByOnly =
+        CollectionUtils.isEmpty(_orderSetInfo.getOrderSet()) || _orderSetInfo.isPartitionByOnly();
+    Key emptyOrderKey = AggregationUtils.extractEmptyKey();
     List<Object[]> rows = new ArrayList<>(_numRows);
     for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
       Key partitionKey = e.getKey();
       List<Object[]> rowList = e.getValue();
       for (Object[] existingRow : rowList) {
         Object[] row = new Object[existingRow.length + _aggCalls.size()];
+        Key orderKey = isPartitionByOnly ? emptyOrderKey
+            : AggregationUtils.extractRowKey(existingRow, _orderSetInfo.getOrderSet());
         System.arraycopy(existingRow, 0, row, 0, existingRow.length);
         for (int i = 0; i < _windowAccumulators.length; i++) {
-          row[i + existingRow.length] = _windowAccumulators[i].getResults().get(partitionKey);
+          row[i + existingRow.length] = _windowAccumulators[i].getResultForKeys(partitionKey, orderKey);
         }
         rows.add(row);
       }
@@ -239,16 +238,18 @@ public class WindowAggregateOperator extends MultiStageOperator {
         return true;
       }
 
+      Key emptyOrderKey = AggregationUtils.extractEmptyKey();
       List<Object[]> container = block.getContainer();
       for (Object[] row : container) {
         _numRows++;
-        // TODO: Revisit the aggregation logic once ORDER BY inside OVER() support is added, also revisit null direction
-        //       handling for all query types
+        // TODO: Revisit null direction handling for all query types
         Key key = AggregationUtils.extractRowKey(row, _groupSet);
+        Key orderKey = (CollectionUtils.isEmpty(_orderSetInfo.getOrderSet()) || _orderSetInfo.isPartitionByOnly())
+            ? emptyOrderKey : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
         _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
         int aggCallsSize = _aggCalls.size();
         for (int i = 0; i < aggCallsSize; i++) {
-          _windowAccumulators[i].accumulate(key, row);
+          _windowAccumulators[i].accumulate(key, orderKey, row);
         }
       }
       block = _inputOperator.nextBlock();
@@ -266,12 +267,15 @@ public class WindowAggregateOperator extends MultiStageOperator {
     final List<RelFieldCollation.Direction> _orderSetDirection;
     // List of null direction for each key
     final List<RelFieldCollation.NullDirection> _orderSetNullDirection;
+    // Set to 'true' if this is a partition by only query
+    final boolean _isPartitionByOnly;
 
     OrderSetInfo(List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
-        List<RelFieldCollation.NullDirection> orderSetNullDirection) {
+        List<RelFieldCollation.NullDirection> orderSetNullDirection, boolean isPartitionByOnly) {
       _orderSet = orderSet;
       _orderSetDirection = orderSetDirection;
       _orderSetNullDirection = orderSetNullDirection;
+      _isPartitionByOnly = isPartitionByOnly;
     }
 
     List<RexExpression> getOrderSet() {
@@ -284,6 +288,10 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     List<RelFieldCollation.NullDirection> getOrderSetNullDirection() {
       return _orderSetNullDirection;
+    }
+
+    boolean isPartitionByOnly() {
+      return _isPartitionByOnly;
     }
   }
 
@@ -327,6 +335,94 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     int getUpperBound() {
       return _upperBound;
+    }
+  }
+
+  private static class WindowAggregateAccumulator extends AggregationUtils.Accumulator {
+    private static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> WIN_AGG_MERGERS =
+        ImmutableMap.<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>>builder()
+            .putAll(AggregationUtils.Accumulator.MERGERS)
+            .build();
+
+    private final Map<Key, OrderKeyResult> _orderByResults = new HashMap<>();
+    private final boolean _isPartitionByOnly;
+    private final Key _emptyOrderKey;
+
+    WindowAggregateAccumulator(RexExpression.FunctionCall aggCall, Map<String,
+        Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
+        DataSchema inputSchema, OrderSetInfo orderSetInfo) {
+      super(aggCall, merger, functionName, inputSchema);
+      _isPartitionByOnly = CollectionUtils.isEmpty(orderSetInfo.getOrderSet()) || orderSetInfo.isPartitionByOnly();
+      _emptyOrderKey = AggregationUtils.extractEmptyKey();
+    }
+
+    public void accumulate(Key key, Key orderKey, Object[] row) {
+      if (_isPartitionByOnly) {
+        Preconditions.checkState(orderKey.equals(_emptyOrderKey) || orderKey.equals(key),
+            "Partition by only query has a non-empty order by key different from partition by key!");
+        accumulate(key, row);
+        return;
+      }
+
+      // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
+      Key previousOrderKeyIfPresent = _orderByResults.get(key) == null ? null
+          : _orderByResults.get(key).getPreviousOrderByKey();
+      Object currentRes = previousOrderKeyIfPresent == null ? null
+          : _orderByResults.get(key).getOrderByResults().get(previousOrderKeyIfPresent);
+      Object value = _inputRef == -1 ? _literal : row[_inputRef];
+
+      _orderByResults.putIfAbsent(key, new OrderKeyResult());
+      if (currentRes == null) {
+        _orderByResults.get(key).addOrderByResult(orderKey, _merger.initialize(value, _dataType));
+      } else {
+        Object mergedResult;
+        if (orderKey.equals(previousOrderKeyIfPresent)) {
+          mergedResult = _merger.merge(currentRes, value);
+        } else {
+          Object previousValue = _orderByResults.get(key).getOrderByResults().get(previousOrderKeyIfPresent);
+          mergedResult = _merger.merge(previousValue, value);
+        }
+        _orderByResults.get(key).addOrderByResult(orderKey, mergedResult);
+      }
+    }
+
+    public Object getResultForKeys(Key key, Key orderKey) {
+      if (_isPartitionByOnly) {
+        Preconditions.checkState(orderKey.equals(_emptyOrderKey) || orderKey.equals(key),
+            "Partition by only query has a non-empty order by key different from partition by key!");
+        return _results.get(key);
+      } else {
+        return _orderByResults.get(key).getOrderByResults().get(orderKey);
+      }
+    }
+
+    public Map<Key, OrderKeyResult> getOrderByResults() {
+      return _orderByResults;
+    }
+
+    static class OrderKeyResult {
+      final Map<Key, Object> _orderByResults;
+      Key _previousOrderByKey;
+
+      OrderKeyResult() {
+        _orderByResults = new HashMap<>();
+        _previousOrderByKey = null;
+      }
+
+      public void addOrderByResult(Key orderByKey, Object value) {
+        // We expect to get the rows in order based on the ORDER BY key so it is safe to blindly assign the
+        // current key as the previous key
+        _orderByResults.put(orderByKey, value);
+        _previousOrderByKey = orderByKey;
+      }
+
+      public Map<Key, Object> getOrderByResults() {
+        return _orderByResults;
+      }
+
+      public Key getPreviousOrderByKey() {
+        return _previousOrderByKey;
+      }
     }
   }
 }

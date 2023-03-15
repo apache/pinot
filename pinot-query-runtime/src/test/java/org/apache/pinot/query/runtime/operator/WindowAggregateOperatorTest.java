@@ -402,17 +402,20 @@ public class WindowAggregateOperatorTest {
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Order by is not yet "
-      + "supported in window functions")
-  public void testShouldThrowOnNonEmptyOrderByKeysNotMatchingPartitionByKeys() {
-    // TODO: Remove this test once order by support is added
+  @Test
+  public void testNonEmptyOrderByKeysNotMatchingPartitionByKeys() {
     // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
-    Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
+    // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
+    Mockito.when(_input.nextBlock())
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"},
+            new Object[]{2, "foo"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"},
+            new Object[]{3, "true"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
@@ -422,10 +425,28 @@ public class WindowAggregateOperatorTest {
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
             outSchema, inSchema);
+
+    TransferableBlock result = operator.getNextBlock();
+    while (result.isNoOpBlock()) {
+      result = operator.getNextBlock();
+    }
+    TransferableBlock eosBlock = operator.getNextBlock();
+    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "foo", 1}, new Object[]{2, "bar", 2},
+        new Object[]{2, "foo", 6.0}, new Object[]{2, "foo", 6.0}, new Object[]{3, "and", 3},
+        new Object[]{3, "true", 6.0});
+    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
+    Assert.assertEquals(resultRows.get(3), expectedRows.get(3));
+    Assert.assertEquals(resultRows.get(4), expectedRows.get(4));
+    Assert.assertEquals(resultRows.get(5), expectedRows.get(5));
+    Assert.assertTrue(eosBlock.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
   @Test
-  public void testShouldThrowOnNonEmptyOrderByKeysMatchingPartitionByKeysWithDifferentDirection() {
+  public void testNonEmptyOrderByKeysMatchingPartitionByKeysWithDifferentDirection() {
     // Given:
     // Set ORDER BY key same as PARTITION BY key with custom direction and null direction. Should still be treated
     // like a PARTITION BY only query (since the final aggregation value won't change).
