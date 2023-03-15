@@ -16,27 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.distinct;
+package org.apache.pinot.core.operator;
 
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-/**
- * Interface class for executing the distinct queries.
- */
-public interface DistinctExecutor {
-  // TODO: Tune the initial capacity
-  int MAX_INITIAL_CAPACITY = 10000;
+public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOperator<T> {
 
   /**
-   * Processes the given value block, returns {@code true} if the query is already satisfied, {@code false}
-   * otherwise. No more calls should be made after it returns {@code true}.
+   * Returns a map from source column name to context.
    */
-  boolean process(ValueBlock valueBlock);
+  public abstract Map<String, ColumnContext> getSourceColumnContextMap();
 
   /**
-   * Returns the distinct result. Note that the returned DistinctTable might not be a main DistinctTable, thus cannot be
-   * used to merge other records or tables, but can only be merged into the main DistinctTable.
+   * Returns the result column context. Without transform, the source and result column context are the same.
    */
-  DistinctTable getResult();
+  public abstract ColumnContext getResultColumnContext(ExpressionContext expression);
+
+  /**
+   * Returns the number of columns projected.
+   */
+  public int getNumColumnsProjected() {
+    return getSourceColumnContextMap().size();
+  }
 }

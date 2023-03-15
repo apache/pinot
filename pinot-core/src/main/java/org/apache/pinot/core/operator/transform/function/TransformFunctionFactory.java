@@ -32,6 +32,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
@@ -47,6 +48,7 @@ import org.apache.pinot.core.geospatial.transform.function.StGeometryTypeFunctio
 import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
 import org.apache.pinot.core.geospatial.transform.function.StPolygonFunction;
 import org.apache.pinot.core.geospatial.transform.function.StWithinFunction;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
@@ -249,12 +251,12 @@ public class TransformFunctionFactory {
   /**
    * Returns an instance of transform function for the given expression.
    *
-   * @param expression Transform expression
-   * @param dataSourceMap Map from column name to column data source
-   * @param queryContext the query context if available
+   * @param expression       Transform expression
+   * @param columnContextMap Map from column name to context
+   * @param queryContext     Query context if available
    * @return Transform function
    */
-  public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap,
+  public static TransformFunction get(ExpressionContext expression, Map<String, ColumnContext> columnContextMap,
       @Nullable QueryContext queryContext) {
     switch (expression.getType()) {
       case FUNCTION:
@@ -288,10 +290,10 @@ public class TransformFunctionFactory {
 
         List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
         for (ExpressionContext argument : arguments) {
-          transformFunctionArguments.add(TransformFunctionFactory.get(argument, dataSourceMap, queryContext));
+          transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
         }
         try {
-          transformFunction.init(transformFunctionArguments, dataSourceMap);
+          transformFunction.init(transformFunctionArguments, columnContextMap);
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
               e);
@@ -299,7 +301,7 @@ public class TransformFunctionFactory {
         return transformFunction;
       case IDENTIFIER:
         String columnName = expression.getIdentifier();
-        return new IdentifierTransformFunction(columnName, dataSourceMap.get(columnName));
+        return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
         return queryContext == null ? new LiteralTransformFunction(expression.getLiteral())
             : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
@@ -311,7 +313,9 @@ public class TransformFunctionFactory {
 
   @VisibleForTesting
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
-    return get(expression, dataSourceMap, null);
+    Map<String, ColumnContext> columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
+    dataSourceMap.forEach((k, v) -> columnContextMap.put(k, ColumnContext.fromDataSource(v)));
+    return get(expression, columnContextMap, null);
   }
 
   /**

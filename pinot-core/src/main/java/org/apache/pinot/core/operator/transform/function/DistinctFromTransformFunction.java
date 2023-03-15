@@ -22,9 +22,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -49,9 +49,9 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
    * Returns null by default if null option is disabled.
    */
   @Nullable
-  private static RoaringBitmap getNullBitMap(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
+  private static RoaringBitmap getNullBitMap(ValueBlock valueBlock, TransformFunction transformFunction) {
     String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    return projectionBlock.getBlockValueSet(columnName).getNullBitmap();
+    return valueBlock.getBlockValueSet(columnName).getNullBitmap();
   }
 
   /**
@@ -79,8 +79,8 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    super.init(arguments, dataSourceMap);
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     if (!(_leftTransformFunction instanceof IdentifierTransformFunction)
         || !(_rightTransformFunction instanceof IdentifierTransformFunction)) {
       throw new IllegalArgumentException("Only column names are supported in DistinctFrom transformation.");
@@ -93,10 +93,10 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    _intValuesSV = super.transformToIntValuesSV(projectionBlock);
-    RoaringBitmap leftNull = getNullBitMap(projectionBlock, _leftTransformFunction);
-    RoaringBitmap rightNull = getNullBitMap(projectionBlock, _rightTransformFunction);
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    _intValuesSV = super.transformToIntValuesSV(valueBlock);
+    RoaringBitmap leftNull = getNullBitMap(valueBlock, _leftTransformFunction);
+    RoaringBitmap rightNull = getNullBitMap(valueBlock, _rightTransformFunction);
     // Both sides are not null.
     if (isEmpty(leftNull) && isEmpty(rightNull)) {
       return _intValuesSV;

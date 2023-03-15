@@ -18,24 +18,35 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
 
 
 /**
- * Transform Block servers as a pass-through to projection block.
+ * The {@code ValueBlock} contains a block of values for multiple expressions.
  */
-public class PassThroughTransformBlock extends TransformBlock {
+public interface ValueBlock extends Block {
 
-  public PassThroughTransformBlock(ProjectionBlock projectionBlock,
-      Map<ExpressionContext, TransformFunction> transformFunctionMap) {
-    super(projectionBlock, transformFunctionMap);
-  }
+  /**
+   * Returns the number of documents within the block.
+   */
+  int getNumDocs();
 
-  @Override
-  public BlockValSet getBlockValueSet(ExpressionContext expression) {
-    return _projectionBlock.getBlockValueSet(expression.getIdentifier());
-  }
+  /**
+   * Returns the document ids from the segment, or {@code null} if it is not available.
+   */
+  @Nullable
+  int[] getDocIds();
+
+  /**
+   * Returns the values for a given expression.
+   */
+  BlockValSet getBlockValueSet(ExpressionContext expression);
+
+  /**
+   * Returns the values for a given column (identifier).
+   */
+  BlockValSet getBlockValueSet(String column);
 }
