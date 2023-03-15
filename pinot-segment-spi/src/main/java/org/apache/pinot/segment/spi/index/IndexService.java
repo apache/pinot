@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.HashSet;
 import java.util.Optional;
@@ -45,21 +46,36 @@ public class IndexService {
   private final Set<IndexType<?, ?, ?>> _allIndexes;
 
   public IndexService(Set<IndexPlugin<?>> allPlugins) {
-    _allIndexes = Sets.newHashSetWithExpectedSize(allPlugins.size());
+    ImmutableSet.Builder<IndexType<?, ?, ?>> builder = ImmutableSet.builder();
 
     for (IndexPlugin<?> plugin : allPlugins) {
-      _allIndexes.add(plugin.getIndexType());
+      builder.add(plugin.getIndexType());
     }
+    _allIndexes = builder.build();
   }
 
+  /**
+   * Get the static IndexService instance that Pinot should use.
+   */
   public static IndexService getInstance() {
     return _instance;
   }
 
+  /**
+   * Sets the static IndexService.
+   *
+   * This is the instance that will be used by most of the code.
+   */
   public static void setInstance(IndexService other) {
     _instance = other;
   }
 
+  /**
+   * Creates an IndexService by looking for all {@link IndexPlugin} defined as services by {@link ServiceLoader}.
+   *
+   * This is the default way to create an IndexService. In case more tuning is needed,
+   * {@link IndexService#IndexService(Set)}} can be used.
+   */
   public static IndexService fromServiceLoader() {
     Set<IndexPlugin<?>> pluginList = new HashSet<>();
     for (IndexPlugin indexPlugin : ServiceLoader.load(IndexPlugin.class)) {
@@ -68,14 +84,46 @@ public class IndexService {
     return new IndexService(pluginList);
   }
 
+  /**
+   * Returns a set with all the index types stored by this index service.
+   *
+   * @return an immutable list with all index types known by this instance.
+   */
   public Set<IndexType<?, ?, ?>> getAllIndexes() {
     return _allIndexes;
   }
 
+  /**
+   * Get the IndexType that is identified by the given index id.
+   *
+   * All IndexType references must be obtained using the {@link IndexService} class (directly or indirectly). Even
+   * if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
+   * using index overriding.
+   *
+   * In order to have a typesafe access to standard indexes, it is recommended to use {@link StandardIndexes} whenever
+   * it is possible.
+   *
+   * @param indexId the index id, as defined in {@link IndexType#getId()}.
+   * @return An optional which will be empty in case there is no index identified by that id.
+   */
   public Optional<IndexType<?, ?, ?>> get(String indexId) {
     return getAllIndexes().stream().filter(indexType -> indexType.getId().equalsIgnoreCase(indexId)).findAny();
   }
 
+  /**
+   * Get the IndexType that is identified by the given index id.
+   *
+   * All IndexType references must be obtained using the {@link IndexService} class (directly or indirectly). Even
+   * if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
+   * using index overriding.
+   *
+   * In order to have a typesafe access to standard indexes, it is recommended to use {@link StandardIndexes} whenever
+   * it is possible.
+   *
+   * @param indexId the index id, as defined in {@link IndexType#getId()}.
+   * @return The index type that is identified by the given id.
+   * @throws IllegalArgumentException in case there is not index type identified by the given id.
+   */
   public IndexType<?, ?, ?> getOrThrow(String indexId) {
     return get(indexId)
         .orElseThrow(() -> new IllegalArgumentException("Unknown index id: " + indexId));
