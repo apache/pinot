@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
@@ -25,6 +26,8 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
@@ -189,5 +192,19 @@ public class QueryOptionsUtils {
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
     return groupByTrimThreshold != null ? Integer.parseInt(groupByTrimThreshold) : null;
+  }
+
+  public static boolean isDropResultsEnabled(final JsonNode request) {
+    boolean dropResults = false;
+
+    if (request.has(CommonConstants.Broker.Request.QUERY_OPTIONS)) {
+      String queryOptions = request.get(CommonConstants.Broker.Request.QUERY_OPTIONS).asText();
+      Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
+      if (Boolean.parseBoolean(optionsFromString.get(CommonConstants.Broker.Request.QueryOptionKey.DROP_RESULTS))) {
+        dropResults = true;
+      }
+    }
+
+    return dropResults;
   }
 }
