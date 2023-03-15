@@ -154,6 +154,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.mercateo</groupId>
+      <artifactId>test-clock</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.threeten</groupId>
       <artifactId>threeten-extra</artifactId>
       <version>1.5.0</version>

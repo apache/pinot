@@ -22,9 +22,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.mercateo.test.clock.TestClock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -57,8 +58,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-import org.threeten.extra.MutableClock;
 
+import static org.apache.pinot.broker.routing.instanceselector.InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS;
 import static org.apache.pinot.spi.config.table.RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.config.table.RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
@@ -96,7 +97,7 @@ public class InstanceSelectorTest {
   @Mock
   private TableConfig _tableConfig;
 
-  private MutableClock _mutableClock;
+  private TestClock _mutableClock;
 
   private static final String TABLE_NAME = "testTable_OFFLINE";
 
@@ -173,7 +174,7 @@ public class InstanceSelectorTest {
 
   @BeforeMethod
   public void setUp() {
-    _mutableClock = MutableClock.of(Instant.now(), ZoneId.systemDefault());
+    _mutableClock = TestClock.fixed(Instant.now(), ZoneId.systemDefault());
     _mocks = MockitoAnnotations.openMocks(this);
     when(_brokerRequest.getPinotQuery()).thenReturn(_pinotQuery);
     when(_pinotQuery.getQueryOptions()).thenReturn(null);
@@ -1460,7 +1461,7 @@ public class InstanceSelectorTest {
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
     // Advance the clock to make newSeg to old segment.
-    _mutableClock.add(InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS + 10, ChronoUnit.MILLIS);
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     // Upon re-initialization, newly old segments can only be served from online instances: instance1
     selector.init(enabledInstances, idealState, externalView, onlineSegments);
     {
@@ -1499,7 +1500,7 @@ public class InstanceSelectorTest {
     String newSeg = "segment0";
     String oldSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
-        Pair.of(oldSeg, _mutableClock.millis() - InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS - 100));
+        Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
 
@@ -1536,7 +1537,7 @@ public class InstanceSelectorTest {
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Advance the clock to make newSeg to old segment and we see newSeg is reported as unavailable segment.
-    _mutableClock.add(InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS + 10, ChronoUnit.MILLIS);
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     selector.init(enabledInstances, idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
@@ -1766,7 +1767,7 @@ public class InstanceSelectorTest {
 
     // Advance the clock to make newSeg to old segment.
     // On state update, all segments become unavailable.
-    _mutableClock.add(InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS + 10, ChronoUnit.MILLIS);
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
@@ -1852,7 +1853,7 @@ public class InstanceSelectorTest {
     // Set segment1 as new segment
     String newSeg = "segment1";
     List<Pair<String, Long>> segmentCreationTime =
-        ImmutableList.of(Pair.of(oldSeg, _mutableClock.millis() - InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS - 100),
+        ImmutableList.of(Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100),
             Pair.of(newSeg, _mutableClock.millis() - 100));
     createSegments(segmentCreationTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
