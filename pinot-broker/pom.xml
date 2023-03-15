@@ -158,11 +158,5 @@
       <artifactId>test-clock</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.threeten</groupId>
-      <artifactId>threeten-extra</artifactId>
-      <version>1.5.0</version>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 </project>

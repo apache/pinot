@@ -19,10 +19,9 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -68,7 +67,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  *  </pre>
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
-  // Directly call for test only for clock injection.
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Clock clock) {
@@ -79,8 +77,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    * {@inheritDoc}
    *
    * <pre>
-   *  Instances unavailable in any old segment should not exist in segmentToOnlineInstancesMap entries for segment
-   *  with same ideal state instance.
+   *  Instances unavailable in any old segment should not exist in segmentToOnlineInstancesMap entries or
+   *  newSegmentStateMap for segment with same ideal state instance.
    *
    * The maps are calculated in the following steps to meet the strict replica-group guarantee:
    *   1. Check whether segment is new or old based on ideal state and external view and store the online instances for
@@ -95,7 +93,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    */
   @Override
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap) {
+      Map<String, TreeSet<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap) {
     // TODO: Add support for AdaptiveServerSelection.
     // Iterate over the ideal state to
     // 1) Know whether a segment is new or old
@@ -120,7 +118,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       Map<String, String> externalViewInstanceMap =
           externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
       Map<String, String> idealStateInstanceStateMap = entry.getValue();
-      Set<String> tempOnlineInstances = new TreeSet<>();
+      Set<String> tempOnlineInstances = new HashSet<>();
       boolean hasErrorInstance = false;
       for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceMap.entrySet()) {
         String instance = instanceStateEntry.getKey();
@@ -143,7 +141,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         newSegmentStateMap.remove(segment);
         oldSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
       }
-      idealStateSegmentToInstancesMap.put(segment, new TreeSet<>(idealStateInstanceStateMap.keySet()));
+      idealStateSegmentToInstancesMap.put(segment, idealStateInstanceStateMap.keySet());
     }
 
     // Get unavailable instances from oldSegmentToOnlineInstancesMap.
@@ -169,7 +167,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       // NOTE: Instances will be sorted here because 'candidateInstance' is a TreeSet. We need the online instances to
       //       be sorted for replica-group routing to work. For multiple segments with the same online instances, if the
       //       list is sorted, the same index in the list will always point to the same instance.
-      List<String> onlineInstances = new ArrayList<>(candidateInstance.size());
+      TreeSet<String> onlineInstances = new TreeSet<>();
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());

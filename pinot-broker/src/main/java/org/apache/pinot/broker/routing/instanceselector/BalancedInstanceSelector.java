@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -59,7 +60,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     if (_adaptiveServerSelector != null) {
       for (String segment : segments) {
-        Map<String, Boolean> enabledInstancesMap = snapshot.getCandidatesAsMap(segment);
+        TreeMap<String, Boolean> enabledInstancesMap = snapshot.getCandidatesAsMap(segment);
         // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance
         // selector has not been updated (we update all components for routing in sequence)
         if (enabledInstancesMap == null) {

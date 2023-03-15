@@ -25,6 +25,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -80,7 +82,7 @@ public class SegmentStateSnapshot {
 
   // Create a segment state snapshot based on some in-memory states to be used for routing.
   public static SegmentStateSnapshot createSnapshot(String tableNameWithType,
-      Map<String, List<String>> segmentToOnlineInstancesMap,
+      Map<String, TreeSet<String>> segmentToOnlineInstancesMap,
       Map<String, BaseInstanceSelector.SegmentState> newSegmentState, Set<String> enabledInstance,
       BrokerMetrics brokerMetrics) {
     SelectionCandidate oldSelectionCandidate =
@@ -93,14 +95,15 @@ public class SegmentStateSnapshot {
 
   // Calculate online instance map for routing and unavailable segments from old segment states.
   private static SelectionCandidate calculateOldSegmentSelectionCandidate(String tableNameWithType,
-      Map<String, List<String>> segmentToOnlineInstancesMap, Set<String> enabledInstance, BrokerMetrics brokerMetrics) {
+      Map<String, TreeSet<String>> segmentToOnlineInstancesMap, Set<String> enabledInstance,
+      BrokerMetrics brokerMetrics) {
     // Generate a new map from segment to enabled ONLINE/CONSUMING instances and a new set of unavailable segments (no
     // enabled instance or all enabled instances are in ERROR state)
     Map<String, List<SegmentInstanceCandidate>> segmentToEnabledInstancesMap = new HashMap<>();
     Set<String> unavailableSegments = new HashSet<>();
-    for (Map.Entry<String, List<String>> entry : segmentToOnlineInstancesMap.entrySet()) {
+    for (Map.Entry<String, TreeSet<String>> entry : segmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
-      List<String> onlineInstancesForSegment = entry.getValue();
+      TreeSet<String> onlineInstancesForSegment = entry.getValue();
       List<SegmentInstanceCandidate> enabledInstancesForSegment = new ArrayList<>();
       for (String onlineInstance : onlineInstancesForSegment) {
         if (enabledInstance.contains(onlineInstance)) {
@@ -129,11 +132,11 @@ public class SegmentStateSnapshot {
       String segment = entry.getKey();
       List<SegmentInstanceCandidate> enabledInstancesForSegment = new ArrayList<>();
       BaseInstanceSelector.SegmentState state = entry.getValue();
-      HashMap<String, Boolean> candidates = state.getCandidates();
-      for (Map.Entry<String, Boolean> instanceEntry : candidates.entrySet()) {
-        String instance = instanceEntry.getKey();
+      TreeSet<SegmentInstanceCandidate> candidates = state.getCandidates();
+      for (SegmentInstanceCandidate candidate : candidates) {
+        String instance = candidate.getInstance();
         if (enabledInstance.contains(instance)) {
-          enabledInstancesForSegment.add(SegmentInstanceCandidate.of(instance, instanceEntry.getValue()));
+          enabledInstancesForSegment.add(SegmentInstanceCandidate.of(instance, candidate.isOnline()));
         }
       }
       if (!enabledInstancesForSegment.isEmpty()) {
@@ -153,12 +156,12 @@ public class SegmentStateSnapshot {
   }
 
   @Nullable
-  public Map<String, Boolean> getCandidatesAsMap(String segment) {
+  public TreeMap<String, Boolean> getCandidatesAsMap(String segment) {
     List<SegmentInstanceCandidate> candidates = getCandidates(segment);
     if (candidates == null) {
       return null;
     }
-    Map<String, Boolean> candidateMap = new HashMap<>();
+    TreeMap<String, Boolean> candidateMap = new TreeMap<>();
     for (SegmentInstanceCandidate instanceCandidate : candidates) {
       candidateMap.put(instanceCandidate.getInstance(), instanceCandidate.isOnline());
     }

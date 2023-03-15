@@ -72,7 +72,7 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
 
     List<Pair<String, Double>> pairList = new ArrayList<>();
     for (Pair<String, Integer> p : tempPairList) {
-      Pair<String, Double> pair = ImmutablePair.of(p.getLeft(), (double) p.getRight());
+      Pair<String, Double> pair = new ImmutablePair<>(p.getLeft(), new Double(p.getRight()));
       pairList.add(pair);
     }
 

@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.instanceselector;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,25 +48,40 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  * in ERROR state).
  * <p>
  * Special handling of new segment: It is common for new segment to be partially available or not available at all in
- * all instances. 1) We don't report new segment as unavailable segments. 2) To increase query availability, unavailable
+ * all instances.
+ * 1) We don't report new segment as unavailable segments.
+ * 2) To increase query availability, unavailable
  * instance for new segment won't be excluded for instance selection. When it is selected, we don't serve the new
  * segment.
  * <p>
- * Definition of new segment: 1) Segment created more than 5 minutes ago. - If we first see a segment via
- * initialization, we look up segment creation time from zookeeper. - If we first see a segment via onAssignmentChange
- * initialization, we use the calling time of onAssignmentChange as approximation. 2) We retire new segment as old when:
- * - The creation time is more than 5 minutes ago - Any instance for new segment is in error state - External view for
- * segment converges with ideal state. Note that this implementation means: 1) Inconsistent selection of new segments
- * across queries. (some queries will serve new segments and others won't) 2) When there is no state update from helix,
- * new segments won't be retired because of the time passing.(those with creation time more than 5 minutes ago)
+ * Definition of new segment:
+ * 1) Segment created more than 5 minutes ago.
+ * - If we first see a segment via initialization, we look up segment creation time from zookeeper.
+ * - If we first see a segment via onAssignmentChange initialization, we use the calling time of onAssignmentChange
+ * as approximation.
+ * 2) We retire new segment as old when:
+ * - The creation time is more than 5 minutes ago
+ * - Any instance for new segment is in error state
+ * - External view for segment converges with ideal state.
+ *
+ * Note that this implementation means:
+ * 1) Inconsistent selection of new segments across queries. (some queries will serve new segments and others won't)
+ * 2) When there is no state update from helix, new segments won't be retired because of the time passing.
+ * (those with creation time more than 5 minutes ago)
  */
 abstract class BaseInstanceSelector implements InstanceSelector {
   // Class used to represent the instance state for new segment.
   protected static class SegmentState {
-    // Mapping from candidate to online flag.
-    // key = instance
-    // value = true (online)/false(offline)
-    private HashMap<String, Boolean> _candidates;
+    // List of SegmentInstanceCandidate: which contains instance name and online flags.
+    // The candidates have to be in instance sorted order.
+    private TreeSet<SegmentInstanceCandidate> _candidates;
+
+    private static class CompareByInstanceName implements Comparator<SegmentInstanceCandidate> {
+      public int compare(SegmentInstanceCandidate candidate1, SegmentInstanceCandidate candidate2) {
+        return candidate1.getInstance().compareTo(candidate2.getInstance());
+      }
+    }
+
     // Segment creation time. This could be
     // 1) From ZK if we first see this segment via init call.
     // 2) Use wall time, if first see this segment from onAssignmentChange call.
@@ -73,7 +89,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
     private SegmentState(long creationMillis) {
       _creationMillis = creationMillis;
-      _candidates = new HashMap<>();
+      _candidates = new TreeSet<>(new CompareByInstanceName());
     }
 
     public boolean isNew(long nowMillis) {
@@ -85,10 +101,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     }
 
     public void addCandidate(String candidate, boolean online) {
-      _candidates.put(candidate, online);
+      _candidates.add(SegmentInstanceCandidate.of(candidate, online));
     }
 
-    public HashMap<String, Boolean> getCandidates() {
+    public TreeSet<SegmentInstanceCandidate> getCandidates() {
       return _candidates;
     }
   }
@@ -104,7 +120,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   // These 3 variables are the cached states to help accelerate the change processing
   private Set<String> _enabledInstances;
   // Tracking instance state old for segments.
-  private Map<String, List<String>> _segmentToOnlineInstancesMap;
+  // Instances have to be in sorted order
+  private Map<String, TreeSet<String>> _segmentToOnlineInstancesMap;
   // Tracking instance state for new segments.
   private Map<String, SegmentState> _newSegmentStates;
 
@@ -186,7 +203,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   public void init(Set<String> enabledInstances, IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
-    _newSegmentStates = getSegmentStagesWithCreationTime(idealState, externalView, onlineSegments, true);
+    _newSegmentStates = getNewSegmentWithCreationTime(idealState, externalView, onlineSegments, true);
     updateSegmentMaps(idealState, externalView, onlineSegments, _segmentToOnlineInstancesMap, _newSegmentStates);
     _segmentStateSnapshot =
         SegmentStateSnapshot.createSnapshot(_tableNameWithType, _segmentToOnlineInstancesMap, _newSegmentStates,
@@ -219,14 +236,17 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    */
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    _newSegmentStates = getSegmentStagesWithCreationTime(idealState, externalView, onlineSegments, false);
+    _newSegmentStates = getNewSegmentWithCreationTime(idealState, externalView, onlineSegments, false);
     updateSegmentMaps(idealState, externalView, onlineSegments, _segmentToOnlineInstancesMap, _newSegmentStates);
     _segmentStateSnapshot =
         SegmentStateSnapshot.createSnapshot(_tableNameWithType, _segmentToOnlineInstancesMap, _newSegmentStates,
             _enabledInstances, _brokerMetrics);
   }
 
-  private Map<String, SegmentState> getSegmentStagesWithCreationTime(IdealState idealState, ExternalView externalView,
+  // Return a map of potential new segments name to creation time.
+  // 1) When readFromZK is set to true, we read creation time from ZK
+  // 2) Otherwise, we use system time as an approximation.
+  private Map<String, SegmentState> getNewSegmentWithCreationTime(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments, boolean readFromZK) {
     long nowMillis = _clock.millis();
     if (!readFromZK) {
@@ -236,10 +256,12 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       for (String segment : onlineSegments) {
         SegmentState state = _newSegmentStates.getOrDefault(segment, null);
         if (state != null) {
+          // We see this segment before and it is still new.
           if (state.isNew(nowMillis)) {
             newSegmentState.put(segment, state);
           }
         } else if (!_segmentToOnlineInstancesMap.containsKey(segment)) {
+          // This is the first time we see this segment.
           newSegmentState.put(segment, new SegmentState(nowMillis));
         }
       }
@@ -251,16 +273,18 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   /**
    * Updates the segment maps based on the given ideal state, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Assumption
-   * before this call 1) newSegmentStateMap contains all the potentially new segments based on segment creation time.
-   * Invariants for in memory state after this update: 1) New segments should retire from newSegmentStateMap based on
-   * external view or ideal state update. 2) Segment should only exist in newSegmentStateMap or
-   * segmentToOnlineInstancesMap depending on whether it is old or new. 3) Old segment's online instance should be
-   * tracked in segmentToOnlineInstancesMap in sorted order 4) New segment's instances in ideal state should be tracked
-   * in newSegmentStateMap with online flags set in sorted order
+   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
+   * Prerequisite for this call
+   * 1) newSegmentStateMap contains all the potentially new segments based on segment creation time.
+   * Invariants for in memory state after this update:
+   * 1) New segments should retire from newSegmentStateMap based on external view or ideal state change.
+   * 2) Segment should only exist in newSegmentStateMap or segmentToOnlineInstancesMap depending on whether it is old or
+   * new.
+   * 3) Old segment's online instance should be tracked in segmentToOnlineInstancesMap
+   * 4) New segment's instances in ideal state should be tracked in newSegmentStateMap with online flags
    */
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap) {
+      Map<String, TreeSet<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap) {
     // Iterate over the ideal state instead of the external view since segments with missing external view are
     // considered as new.
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
@@ -275,7 +299,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
       // Sort the online instances for replica-group routing to work. For multiple segments with the same online
       // instances, if the list is sorted, the same index in the list will always point to the same instance.
-      Set<String> onlineInstances = new TreeSet<>();
+      TreeSet<String> onlineInstances = new TreeSet<>();
       boolean hasErrorInstance = false;
       for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceStateMap.entrySet()) {
         String instance = instanceStateEntry.getKey();
@@ -298,12 +322,12 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       if (state != null && onlineInstances.size() != idealStateInstanceStateMap.size() && !hasErrorInstance) {
         state.resetCandidates();
         // New segment should have all ideal state as candidates to avoid hotspot.
-        for (String instance : new TreeSet<>(idealStateInstanceStateMap.keySet())) {
+        for (String instance : idealStateInstanceStateMap.keySet()) {
           state.addCandidate(instance, onlineInstances.contains(instance));
         }
       } else {
         newSegmentStateMap.remove(segment);
-        segmentToOnlineInstancesMap.put(segment, new ArrayList<>(onlineInstances));
+        segmentToOnlineInstancesMap.put(segment, onlineInstances);
       }
     }
   }

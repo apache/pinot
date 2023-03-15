@@ -62,7 +62,6 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
  * NUM_REPLICA_GROUPS_TO_QUERY is not supported is AdaptiveServerSelection is enabled.
  */
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
-  // Directly call for test only for clock injection.
   public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Clock clock) {

@@ -444,6 +444,7 @@ public class AdaptiveServerSelectorTest {
     // A random server will be returned if any of the candidate servers do not have stats.
     String selectedServer = selector.select(_servers);
     assertTrue(_servers.contains(selectedServer), selectedServer);
+
     List<String> candidateServers = new ArrayList<>(Arrays.asList("server2", "server3", "server1", "server4"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 4);
@@ -478,7 +479,7 @@ public class AdaptiveServerSelectorTest {
     selectedServer = selector.select(_servers);
     assertEquals(selectedServer, _servers.get(0));
 
-    candidateServers = Arrays.asList("server1", "server2");
+    candidateServers = new ArrayList<>(Arrays.asList("server1", "server2"));
     serverRankingWithVal = selector.fetchServerRankingsWithScores(candidateServers);
     assertEquals(serverRankingWithVal.size(), 2);
     for (Pair<String, Double> entry : serverRankingWithVal) {
