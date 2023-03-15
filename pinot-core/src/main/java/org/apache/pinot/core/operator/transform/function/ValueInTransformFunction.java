@@ -39,9 +39,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import javax.annotation.Nullable;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -67,7 +68,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are more than 1 arguments
     int numArguments = arguments.size();
     if (numArguments < 2) {
@@ -96,14 +97,15 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     return _resultMetadata;
   }
 
+  @Nullable
   @Override
   public Dictionary getDictionary() {
     return _dictionary;
   }
 
   @Override
-  public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_dictIdSet == null) {
       _dictIdSet = new IntOpenHashSet();
       assert _dictionary != null;
@@ -117,7 +119,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
         _dictIds = new int[length][];
       }
     }
-    int[][] unFilteredDictIds = _mainTransformFunction.transformToDictIdsMV(projectionBlock);
+    int[][] unFilteredDictIds = _mainTransformFunction.transformToDictIdsMV(valueBlock);
     for (int i = 0; i < length; i++) {
       _dictIds[i] = filterInts(_dictIdSet, unFilteredDictIds[i]);
     }
@@ -125,11 +127,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.INT) {
-      return super.transformToIntValuesMV(projectionBlock);
+      return super.transformToIntValuesMV(valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     if (_intValueSet == null) {
       _intValueSet = new IntOpenHashSet();
       for (String inValue : _stringValueSet) {
@@ -139,7 +141,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
         _intValuesMV = new int[length][];
       }
     }
-    int[][] unFilteredIntValues = _mainTransformFunction.transformToIntValuesMV(projectionBlock);
+    int[][] unFilteredIntValues = _mainTransformFunction.transformToIntValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesMV[i] = filterInts(_intValueSet, unFilteredIntValues[i]);
     }
@@ -147,11 +149,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.LONG) {
-      return super.transformToLongValuesMV(projectionBlock);
+      return super.transformToLongValuesMV(valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     if (_longValueSet == null) {
       _longValueSet = new LongOpenHashSet();
       for (String inValue : _stringValueSet) {
@@ -161,7 +163,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
         _longValuesMV = new long[length][];
       }
     }
-    long[][] unFilteredLongValues = _mainTransformFunction.transformToLongValuesMV(projectionBlock);
+    long[][] unFilteredLongValues = _mainTransformFunction.transformToLongValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       _longValuesMV[i] = filterLongs(_longValueSet, unFilteredLongValues[i]);
     }
@@ -169,11 +171,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
-      return super.transformToFloatValuesMV(projectionBlock);
+      return super.transformToFloatValuesMV(valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     if (_floatValueSet == null) {
       _floatValueSet = new FloatOpenHashSet();
       for (String inValue : _stringValueSet) {
@@ -183,7 +185,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
         _floatValuesMV = new float[length][];
       }
     }
-    float[][] unFilteredFloatValues = _mainTransformFunction.transformToFloatValuesMV(projectionBlock);
+    float[][] unFilteredFloatValues = _mainTransformFunction.transformToFloatValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       _floatValuesMV[i] = filterFloats(_floatValueSet, unFilteredFloatValues[i]);
     }
@@ -191,11 +193,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
-      return super.transformToDoubleValuesMV(projectionBlock);
+      return super.transformToDoubleValuesMV(valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     if (_doubleValueSet == null) {
       _doubleValueSet = new DoubleOpenHashSet();
       for (String inValue : _stringValueSet) {
@@ -205,7 +207,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
         _doubleValuesMV = new double[length][];
       }
     }
-    double[][] unFilteredDoubleValues = _mainTransformFunction.transformToDoubleValuesMV(projectionBlock);
+    double[][] unFilteredDoubleValues = _mainTransformFunction.transformToDoubleValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       _doubleValuesMV[i] = filterDoubles(_doubleValueSet, unFilteredDoubleValues[i]);
     }
@@ -213,15 +215,15 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.STRING) {
-      return super.transformToStringValuesMV(projectionBlock);
+      return super.transformToStringValuesMV(valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     if (_stringValuesMV == null) {
       _stringValuesMV = new String[length][];
     }
-    String[][] unFilteredStringValues = _mainTransformFunction.transformToStringValuesMV(projectionBlock);
+    String[][] unFilteredStringValues = _mainTransformFunction.transformToStringValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       _stringValuesMV[i] = filterStrings(_stringValueSet, unFilteredStringValues[i]);
     }

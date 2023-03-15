@@ -26,77 +26,56 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
  * Class for evaluating transform expressions.
  */
-public class TransformOperator extends BaseOperator<TransformBlock> {
+public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
-  protected final ProjectionOperator _projectionOperator;
-  protected final Map<String, DataSource> _dataSourceMap;
-  protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
+  private final BaseProjectOperator<?> _projectOperator;
+  private final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
 
-  public TransformOperator(QueryContext queryContext, ProjectionOperator projectionOperator,
+  public TransformOperator(QueryContext queryContext, BaseProjectOperator<?> projectOperator,
       Collection<ExpressionContext> expressions) {
-    _projectionOperator = projectionOperator;
-    _dataSourceMap = projectionOperator.getDataSourceMap();
+    _projectOperator = projectOperator;
+    _transformFunctionMap = new HashMap<>(HashUtil.getHashMapCapacity(expressions.size()));
     for (ExpressionContext expression : expressions) {
-      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap, queryContext);
+      TransformFunction transformFunction =
+          TransformFunctionFactory.get(expression, projectOperator.getSourceColumnContextMap(), queryContext);
       _transformFunctionMap.put(expression, transformFunction);
     }
   }
 
-  /**
-   * Returns the number of columns projected.
-   *
-   * @return Number of columns projected
-   */
-  public int getNumColumnsProjected() {
-    return _dataSourceMap.size();
+  @Override
+  public Map<String, ColumnContext> getSourceColumnContextMap() {
+    return _projectOperator.getSourceColumnContextMap();
   }
 
-  /**
-   * Returns the transform result metadata associated with the given expression.
-   *
-   * @param expression Expression
-   * @return Transform result metadata
-   */
-  public TransformResultMetadata getResultMetadata(ExpressionContext expression) {
-    return _transformFunctionMap.get(expression).getResultMetadata();
-  }
-
-  /**
-   * Returns the dictionary associated with the given expression if the transform result is dictionary-encoded, or
-   * {@code null} if not.
-   *
-   * @return Dictionary
-   */
-  public Dictionary getDictionary(ExpressionContext expression) {
-    return _transformFunctionMap.get(expression).getDictionary();
+  @Override
+  public ColumnContext getResultColumnContext(ExpressionContext expression) {
+    return ColumnContext.fromTransformFunction(_transformFunctionMap.get(expression));
   }
 
   @Override
   protected TransformBlock getNextBlock() {
-    ProjectionBlock projectionBlock = _projectionOperator.nextBlock();
-    if (projectionBlock == null) {
+    ValueBlock sourceBlock = _projectOperator.nextBlock();
+    if (sourceBlock == null) {
       return null;
-    } else {
-      Tracing.activeRecording().setNumChildren(_dataSourceMap.size());
-      return new TransformBlock(projectionBlock, _transformFunctionMap);
     }
+    Tracing.activeRecording().setNumChildren(_transformFunctionMap.size());
+    return new TransformBlock(sourceBlock, _transformFunctionMap);
   }
 
   @Override
@@ -111,12 +90,12 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   }
 
   @Override
-  public List<ProjectionOperator> getChildOperators() {
-    return Collections.singletonList(_projectionOperator);
+  public List<BaseProjectOperator<?>> getChildOperators() {
+    return Collections.singletonList(_projectOperator);
   }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _projectionOperator.getExecutionStatistics();
+    return _projectOperator.getExecutionStatistics();
   }
 }
