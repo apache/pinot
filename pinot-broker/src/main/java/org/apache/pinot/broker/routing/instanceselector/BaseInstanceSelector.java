@@ -41,6 +41,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
+
 
 /**
  * Base implementation of instance selector. Selector maintains a map from segment to enabled ONLINE/CONSUMING server
@@ -143,6 +145,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   // Get potential new segments
   // - external view hasn't converged with ideal state
   // - external view could be either missing or partial
+  // - external view doesn't have error instance.
   private static List<String> getPotentialNewSegments(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     List<String> potentialNewSegments = new ArrayList<>();
@@ -158,6 +161,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       Map<String, String> externalViewInstanceStateMap =
           externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
       List<String> onlineInstance = new ArrayList<>();
+      boolean hasError = false;
       for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceStateMap.entrySet()) {
         String instance = instanceStateEntry.getKey();
         // Only track instance in ideal state.
@@ -167,9 +171,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         String externalViewState = instanceStateEntry.getValue();
         if (InstanceSelector.isOnlineForServing(externalViewState)) {
           onlineInstance.add(instance);
+        } else if(externalViewState.equals(ERROR)){
+          hasError = true;
         }
       }
-      if (onlineInstance.size() != idealStateInstanceStateMap.size()) {
+      if (onlineInstance.size() != idealStateInstanceStateMap.size() && !hasError) {
         potentialNewSegments.add(segment);
       }
     }
@@ -314,7 +320,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         // Do not track instances in ERROR state
         if (InstanceSelector.isOnlineForServing(externalViewState)) {
           onlineInstances.add(instance);
-        } else if (externalViewState.equals(SegmentStateModel.ERROR)) {
+        } else if (externalViewState.equals(ERROR)) {
           hasErrorInstance = true;
         }
       }
