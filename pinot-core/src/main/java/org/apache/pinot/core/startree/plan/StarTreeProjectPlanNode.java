@@ -19,56 +19,72 @@
 package org.apache.pinot.core.startree.plan;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
-public class StarTreeTransformPlanNode implements PlanNode {
+public class StarTreeProjectPlanNode implements PlanNode {
   private final QueryContext _queryContext;
-  private final List<ExpressionContext> _groupByExpressions;
-  private final StarTreeProjectionPlanNode _starTreeProjectionPlanNode;
+  private final StarTreeV2 _starTreeV2;
+  private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
+  private final ExpressionContext[] _groupByExpressions;
+  private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
 
-  public StarTreeTransformPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
+  public StarTreeProjectPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap) {
     _queryContext = queryContext;
-    Set<String> projectionColumns = new HashSet<>();
-    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
-    }
-    Set<String> groupByColumns;
-    if (groupByExpressions != null) {
-      _groupByExpressions = Arrays.asList(groupByExpressions);
-      groupByColumns = new HashSet<>();
-      for (ExpressionContext groupByExpression : groupByExpressions) {
-        groupByExpression.getColumns(groupByColumns);
-      }
-      projectionColumns.addAll(groupByColumns);
-    } else {
-      _groupByExpressions = Collections.emptyList();
-      groupByColumns = null;
-    }
-    _starTreeProjectionPlanNode =
-        new StarTreeProjectionPlanNode(queryContext, starTreeV2, projectionColumns, predicateEvaluatorsMap,
-            groupByColumns);
+    _starTreeV2 = starTreeV2;
+    _aggregationFunctionColumnPairs = aggregationFunctionColumnPairs;
+    _groupByExpressions = groupByExpressions;
+    _predicateEvaluatorsMap = predicateEvaluatorsMap;
   }
 
   @Override
-  public TransformOperator run() {
+  public BaseProjectOperator<?> run() {
+    Set<String> projectionColumns = new HashSet<>();
+    boolean hasNonIdentifierExpression = false;
+    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : _aggregationFunctionColumnPairs) {
+      projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
+    }
+    Set<String> groupByColumns;
+    if (_groupByExpressions != null) {
+      groupByColumns = new HashSet<>();
+      for (ExpressionContext expression : _groupByExpressions) {
+        expression.getColumns(groupByColumns);
+        if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
+          hasNonIdentifierExpression = true;
+        }
+      }
+      projectionColumns.addAll(groupByColumns);
+    } else {
+      groupByColumns = null;
+    }
+    DocIdSetOperator docIdSetOperator =
+        new StarTreeDocIdSetPlanNode(_queryContext, _starTreeV2, _predicateEvaluatorsMap, groupByColumns).run();
+    Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
+    projectionColumns.forEach(column -> dataSourceMap.put(column, _starTreeV2.getDataSource(column)));
+    ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
     // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
     //       - They are all columns (not functions or constants), where no transform is required
-    //       - We never call TransformOperator.getResultMetadata() or TransformOperator.getDictionary() on them
-    return new TransformOperator(_queryContext, _starTreeProjectionPlanNode.run(), _groupByExpressions);
+    //       - We never call TransformOperator.getResultColumnContext() on them
+    return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator,
+        Arrays.asList(_groupByExpressions)) : projectionOperator;
   }
 }
