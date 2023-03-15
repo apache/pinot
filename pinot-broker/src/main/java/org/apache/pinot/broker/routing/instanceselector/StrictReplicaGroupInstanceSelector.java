@@ -134,7 +134,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
           hasErrorInstance = true;
         }
       }
-      SegmentState state = newSegmentStateMap.getOrDefault(segment, null);
+      SegmentState state = newSegmentStateMap.get(segment);
       if (state != null && tempOnlineInstances.size() != entry.getValue().size() && !hasErrorInstance) {
         newSegmentTempSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
       } else {
