@@ -161,7 +161,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       Map<String, String> externalViewInstanceStateMap =
           externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
       List<String> onlineInstance = new ArrayList<>();
-      boolean hasError = false;
+      boolean hasErrorInstance = false;
       for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceStateMap.entrySet()) {
         String instance = instanceStateEntry.getKey();
         // Only track instance in ideal state.
@@ -172,10 +172,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         if (InstanceSelector.isOnlineForServing(externalViewState)) {
           onlineInstance.add(instance);
         } else if(externalViewState.equals(ERROR)){
-          hasError = true;
+          hasErrorInstance = true;
+          break;
         }
       }
-      if (onlineInstance.size() != idealStateInstanceStateMap.size() && !hasError) {
+      if (onlineInstance.size() != idealStateInstanceStateMap.size() && !hasErrorInstance) {
         potentialNewSegments.add(segment);
       }
     }
