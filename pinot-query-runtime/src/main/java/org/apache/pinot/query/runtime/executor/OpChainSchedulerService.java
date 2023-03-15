@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
+import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -83,7 +86,6 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
         @Override
         public void runJob() {
           boolean isFinished = false;
-          boolean returnedErrorBlock = false;
           Throwable thrown = null;
           try {
             LOGGER.trace("({}): Executing", operatorChain);
@@ -107,7 +109,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
             } else {
               isFinished = true;
               if (result.isErrorBlock()) {
-                returnedErrorBlock = true;
+                thrown = new RuntimeException(getErrorMessage(result));
                 LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
                     result.getDataBlock().getExceptions());
               } else {
@@ -119,7 +121,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
             LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
             thrown = e;
           } finally {
-            if (returnedErrorBlock || thrown != null) {
+            if (thrown != null) {
               cancelOpChain(operatorChain, thrown);
             } else if (isFinished) {
               closeOpChain(operatorChain);
@@ -184,5 +186,14 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     } finally {
       _scheduler.deregister(opChain);
     }
+  }
+
+  private String getErrorMessage(TransferableBlock block) {
+    Preconditions.checkState(block.isErrorBlock());
+    DataBlock dataBlock = block.getDataBlock();
+    if (MapUtils.isNotEmpty(dataBlock.getExceptions())) {
+      return dataBlock.getExceptions().values().iterator().next();
+    }
+    return "No message found in error-block";
   }
 }

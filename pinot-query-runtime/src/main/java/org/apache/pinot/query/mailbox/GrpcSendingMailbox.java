@@ -23,12 +23,16 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
+import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -41,6 +45,10 @@ import org.slf4j.LoggerFactory;
  */
 public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
+  private static final long DEFAULT_CANCELLATION_DELAY_MS = 1_000;
+  private static final ScheduledExecutorService DELAYED_CANCEL_SCHEDULER =
+      new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 2,
+          new TracedThreadFactory(Thread.NORM_PRIORITY, true, "grpc-send-cancel-%d"));
   private final String _mailboxId;
   private final AtomicBoolean _initialized = new AtomicBoolean(false);
 
@@ -84,14 +92,15 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   public void cancel(Throwable t) {
     if (_initialized.get() && !_statusObserver.isFinished()) {
       LOGGER.warn("GrpcSendingMailbox={} cancelling stream", _mailboxId);
-      try {
-        _mailboxContentStreamObserver.onError(Status.fromThrowable(
-            new RuntimeException("Cancelled by the sender")).asRuntimeException());
-      } catch (Exception e) {
-        // TODO: We don't necessarily need to log this since this is relatively quite likely to happen. Logging this
-        //  anyways as info for now so we can see how frequently this happens.
-        LOGGER.info("Unexpected error issuing onError to MailboxContentStreamObserver: {}", e.getMessage());
-      }
+      DELAYED_CANCEL_SCHEDULER.schedule(() -> {
+        try {
+          _mailboxContentStreamObserver.onError(Status.CANCELLED.asRuntimeException());
+        } catch (Exception e) {
+          // TODO: We don't necessarily need to log this since this is relatively quite likely to happen. Logging this
+          //  anyways as info for now so we can see how frequently this happens.
+          LOGGER.info("Unexpected error issuing onError to MailboxContentStreamObserver: {}", e.getMessage());
+        }
+      }, DEFAULT_CANCELLATION_DELAY_MS, TimeUnit.MILLISECONDS);
     }
   }
 
