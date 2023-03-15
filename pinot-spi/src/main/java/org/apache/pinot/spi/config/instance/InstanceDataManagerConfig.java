@@ -65,11 +65,11 @@ public interface InstanceDataManagerConfig {
 
   boolean isRetrySegmentDownloadUntarFailure();
 
-  int getRetryWaitMs();
+  int getSegmentDownloadUntarRetryWaitMs();
 
-  int getRetryCount();
+  int getSegmentDownloadUntarRetryCount();
 
-  int getRetryDelayScaleFactor();
+  int getSegmentDownloadUntarRetryDelayScaleFactor();
 
   int getDeletedSegmentsCacheSize();
 

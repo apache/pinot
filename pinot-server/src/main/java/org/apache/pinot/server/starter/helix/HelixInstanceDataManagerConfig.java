@@ -278,19 +278,19 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public int getRetryWaitMs() {
+  public int getSegmentDownloadUntarRetryWaitMs() {
     return _instanceDataManagerConfiguration.getProperty(BaseSegmentFetcher.RETRY_WAIT_MS_CONFIG_KEY,
         BaseSegmentFetcher.DEFAULT_RETRY_WAIT_MS);
   }
 
   @Override
-  public int getRetryCount() {
+  public int getSegmentDownloadUntarRetryCount() {
     return _instanceDataManagerConfiguration.getProperty(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY,
         BaseSegmentFetcher.DEFAULT_RETRY_COUNT);
   }
 
   @Override
-  public int getRetryDelayScaleFactor() {
+  public int getSegmentDownloadUntarRetryDelayScaleFactor() {
     return _instanceDataManagerConfiguration.getProperty(BaseSegmentFetcher.RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY,
         BaseSegmentFetcher.DEFAULT_RETRY_DELAY_SCALE_FACTOR);
   }

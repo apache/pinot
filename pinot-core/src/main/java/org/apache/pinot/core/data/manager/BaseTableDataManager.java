@@ -104,9 +104,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
   protected boolean _isRetrySegmentDownloadUntarFailure;
-  protected int _retryCount;
-  protected int _retryWaitMs;
-  protected int _retryDelayScaleFactor;
+  protected int _segmentDownloadUntarRetryCount;
+  protected int _segmentDownloadUntarRetryWaitMs;
+  protected int _segmentDownloadUntarRetryDelayScaleFactor;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
@@ -161,9 +161,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     _isRetrySegmentDownloadUntarFailure = tableDataManagerParams.isRetrySegmentDownloadUntarFailure();
-    _retryCount = tableDataManagerParams.getSegmentUntarDownloadRetryCount();
-    _retryWaitMs = tableDataManagerParams.getSegmentUntarDownloadRetryWaitMs();
-    _retryDelayScaleFactor = tableDataManagerParams.getSegmentUntarDownloadRetryDelayScaleFactor();
+    _segmentDownloadUntarRetryCount = tableDataManagerParams.getSegmentDownloadUntarRetryCount();
+    _segmentDownloadUntarRetryWaitMs = tableDataManagerParams.getSegmentDownloadUntarRetryWaitMs();
+    _segmentDownloadUntarRetryDelayScaleFactor = tableDataManagerParams.getSegmentDownloadUntarRetryDelayScaleFactor();
 
     int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
     if (maxParallelSegmentDownloads > 0) {
@@ -690,7 +690,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       file.set(untarAndMoveSegment(segmentName, tarFile, tempRootDir));
     } catch (Exception e) {
       try {
-        RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+        RetryPolicies.exponentialBackoffRetryPolicy(_segmentDownloadUntarRetryCount, _segmentDownloadUntarRetryWaitMs,
+            _segmentDownloadUntarRetryDelayScaleFactor).attempt(() -> {
           File retriedTarFile = null;
           try {
             retriedTarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
@@ -704,7 +705,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         });
       } catch (AttemptsExceededException ex) {
         LOGGER.error("Failed to untar segment: {} of table: {} from: {}, even after {} retries", segmentName,
-            _tableNameWithType, tarFile, _retryCount);
+            _tableNameWithType, tarFile, _segmentDownloadUntarRetryCount);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UNTAR_FAILURES_POST_RETRIES, 1L);
         throw ex;
       } catch (RetriableOperationException ex) {
