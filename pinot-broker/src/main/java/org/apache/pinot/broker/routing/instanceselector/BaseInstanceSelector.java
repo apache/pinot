@@ -41,8 +41,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
-
 
 /**
  * Base implementation of instance selector. Selector maintains a map from segment to enabled ONLINE/CONSUMING server
@@ -171,7 +169,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         String externalViewState = instanceStateEntry.getValue();
         if (InstanceSelector.isOnlineForServing(externalViewState)) {
           onlineInstance.add(instance);
-        } else if(externalViewState.equals(ERROR)){
+        } else if (externalViewState.equals(SegmentStateModel.ERROR)) {
           hasErrorInstance = true;
           break;
         }
@@ -321,7 +319,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         // Do not track instances in ERROR state
         if (InstanceSelector.isOnlineForServing(externalViewState)) {
           onlineInstances.add(instance);
-        } else if (externalViewState.equals(ERROR)) {
+        } else if (externalViewState.equals(SegmentStateModel.ERROR)) {
           hasErrorInstance = true;
         }
       }
