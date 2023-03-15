@@ -77,22 +77,23 @@ public class MailboxReceiveOperator extends MultiStageOperator {
         receiverStageId);
   }
 
-  public MailboxReceiveOperator(RelDistribution.Type exchangeType, int senderStageId,
-      int receiverStageId, OpChainExecutionContext context) {
-    this(context.getMetadataMap().get(senderStageId).getServerInstances(), exchangeType, senderStageId, receiverStageId, context);
+  public MailboxReceiveOperator(RelDistribution.Type exchangeType, int senderStageId, int receiverStageId,
+      OpChainExecutionContext context) {
+    this(context.getMetadataMap().get(senderStageId).getServerInstances(), exchangeType, senderStageId, receiverStageId,
+        context.getTimeoutMs(), context);
   }
 
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
+  //TODO: Remove boxed timeoutMs value from here and use long deadlineMs from context.
   public MailboxReceiveOperator(List<VirtualServer> sendingStageInstances,
-      RelDistribution.Type exchangeType, int senderStageId, int receiverStageId, OpChainExecutionContext context) {
+      RelDistribution.Type exchangeType, int senderStageId, int receiverStageId, Long timeoutMs, OpChainExecutionContext context) {
     super(context);
     _mailboxService = context.getMailboxService();
     VirtualServerAddress receiver = context.getServer();
     long jobId = context.getRequestId();
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
-    //TODO: Should I be using the Long.MAX_VALUE here instead of -1 or previous null check?
-    long timeoutNano = (context.getTimeoutMs() != Long.MAX_VALUE ? context.getTimeoutMs() : QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS) * 1_000_000L;
+    long timeoutNano = (timeoutMs != null ? timeoutMs : QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS) * 1_000_000L;
     _deadlineTimestampNano = timeoutNano + System.nanoTime();
 
     _exchangeType = exchangeType;

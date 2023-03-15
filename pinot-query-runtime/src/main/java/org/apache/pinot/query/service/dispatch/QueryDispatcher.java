@@ -278,7 +278,8 @@ public class QueryDispatcher {
   private static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
       Map<Integer, StageMetadata> stageMetadataMap, long jobId, int stageId, int reducerStageId, DataSchema dataSchema,
       VirtualServerAddress server, long timeoutMs) {
-    OpChainExecutionContext context = new OpChainExecutionContext(mailboxService, jobId, stageId, server, timeoutMs, timeoutMs, stageMetadataMap);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(mailboxService, jobId, stageId, server, timeoutMs, timeoutMs, stageMetadataMap);
     // timeout is set for reduce stage
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(RelDistribution.Type.RANDOM_DISTRIBUTED, stageId, reducerStageId, context);
