@@ -321,19 +321,25 @@ public class SegmentPushUtils implements Serializable {
             retryWaitMs = spec.getPushJobSpec().getPushRetryIntervalMillis();
           }
           RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
-            List<Header> reqHttpHeaders = new ArrayList<>(headers);
+            Map<String, Header> reqHttpHeaders = new HashMap<>();
+            headers.forEach(header -> reqHttpHeaders.put(header.getName(), header));
             try {
-              reqHttpHeaders.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
-              reqHttpHeaders.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
-                  FileUploadDownloadClient.FileUploadType.METADATA.toString()));
+              reqHttpHeaders.put(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
+                  new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
+              reqHttpHeaders.put(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+                  new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+                      FileUploadDownloadClient.FileUploadType.METADATA.toString()));
+
               if (spec.getPushJobSpec() != null) {
-                reqHttpHeaders.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE,
-                    String.valueOf(spec.getPushJobSpec().getCopyToDeepStoreForMetadataPush())));
+                reqHttpHeaders.put(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE,
+                    new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE,
+                        String.valueOf(spec.getPushJobSpec().getCopyToDeepStoreForMetadataPush())));
               }
 
               SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(
                   FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName,
-                  segmentMetadataFile, reqHttpHeaders, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                  segmentMetadataFile, new ArrayList<>(reqHttpHeaders.values()), parameters,
+                  HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
               LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                   controllerURI, response.getStatusCode(), response.getResponse());
               return true;
