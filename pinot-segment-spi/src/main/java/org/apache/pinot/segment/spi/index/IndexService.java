@@ -19,8 +19,11 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -43,14 +46,17 @@ public class IndexService {
   private static volatile IndexService _instance = fromServiceLoader();
 
   private final Set<IndexType<?, ?, ?>> _allIndexes;
+  private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
 
   public IndexService(Set<IndexPlugin<?>> allPlugins) {
-    ImmutableSet.Builder<IndexType<?, ?, ?>> builder = ImmutableSet.builder();
+    ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
 
     for (IndexPlugin<?> plugin : allPlugins) {
-      builder.add(plugin.getIndexType());
+      IndexType<?, ?, ?> indexType = plugin.getIndexType();
+      builder.put(indexType.getId().toLowerCase(Locale.US), indexType);
     }
-    _allIndexes = builder.build();
+    _allIndexesById = builder.build();
+    _allIndexes = ImmutableSet.copyOf(_allIndexesById.values());
   }
 
   /**
@@ -106,7 +112,7 @@ public class IndexService {
    * @return An optional which will be empty in case there is no index identified by that id.
    */
   public Optional<IndexType<?, ?, ?>> get(String indexId) {
-    return getAllIndexes().stream().filter(indexType -> indexType.getId().equalsIgnoreCase(indexId)).findAny();
+    return Optional.ofNullable(_allIndexesById.get(indexId.toLowerCase(Locale.US)));
   }
 
   /**
@@ -124,7 +130,10 @@ public class IndexService {
    * @throws IllegalArgumentException in case there is not index type identified by the given id.
    */
   public IndexType<?, ?, ?> getOrThrow(String indexId) {
-    return get(indexId)
-        .orElseThrow(() -> new IllegalArgumentException("Unknown index id: " + indexId));
+    IndexType<?, ?, ?> indexType = _allIndexesById.get(indexId.toLowerCase(Locale.US));
+    if (indexType == null) {
+      throw new IllegalArgumentException("Unknown index id: " + indexId);
+    }
+    return indexType;
   }
 }
