@@ -16,25 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
 
-import org.apache.pinot.segment.spi.index.IndexReader;
+package org.apache.pinot.segment.spi.index;
+
+import java.io.Closeable;
 
 
-/**
- * Interface for bloom filter reader.
- */
-public interface BloomFilterReader extends IndexReader {
-
-  /**
-   * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.
-   */
-  boolean mightContain(String value);
-
-  /**
-   * Returns {@code true} if the value with the given hash might have been put in this bloom filer, {@code false}
-   * otherwise.
-   * <p>This method is provided to prevent hashing the same value multiple times.
-   */
-  boolean mightContain(long hash1, long hash2);
+public interface IndexReader extends Closeable {
 }

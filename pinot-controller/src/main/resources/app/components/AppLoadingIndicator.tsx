@@ -16,25 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
 
-import org.apache.pinot.segment.spi.index.IndexReader;
+import React from 'react';
+import { CircularProgress, makeStyles } from "@material-ui/core";
 
+export const useAppLoadingIndicatorStyles = makeStyles({
+  appLoadingIndicator: {
+    height: "100vh",
+    width: "100%",
+    display: "flex",
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
 
-/**
- * Interface for bloom filter reader.
- */
-public interface BloomFilterReader extends IndexReader {
-
-  /**
-   * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.
-   */
-  boolean mightContain(String value);
-
-  /**
-   * Returns {@code true} if the value with the given hash might have been put in this bloom filer, {@code false}
-   * otherwise.
-   * <p>This method is provided to prevent hashing the same value multiple times.
-   */
-  boolean mightContain(long hash1, long hash2);
+export const AppLoadingIndicator = () => {
+  const classes = useAppLoadingIndicatorStyles();
+  return (
+    <div
+      className={classes.appLoadingIndicator}
+    >
+      <CircularProgress size={80} color="primary" />
+    </div>
+  )
 }
