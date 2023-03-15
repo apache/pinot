@@ -231,7 +231,7 @@ public class CustomSerDeUtils {
   };
 
   public static final ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>> DATA_SKETCH_INT_TUPLE_SER_DE =
-      new ObjectSerDe<>() {
+      new ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>>() {
         @Override
         public byte[] serialize(org.apache.datasketches.tuple.Sketch<IntegerSummary> value) {
           return value.compact().toByteArray();
