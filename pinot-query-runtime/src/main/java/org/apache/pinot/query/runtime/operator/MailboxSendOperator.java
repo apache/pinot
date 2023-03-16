@@ -28,9 +28,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -45,6 +47,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
+ *
+ * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
 public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
@@ -56,6 +60,9 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   private final MultiStageOperator _dataTableBlockBaseOperator;
   private final BlockExchange _exchange;
+  private final List<RexExpression> _collationKeys;
+  private final List<RelFieldCollation.Direction> _collationDirections;
+  private final boolean _isSortOnSender;
 
   @VisibleForTesting
   interface BlockExchangeFactory {
@@ -70,16 +77,19 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator dataTableBlockBaseOperator,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, int senderStageId,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections, boolean isSortOnSender, int senderStageId,
       int receiverStageId) {
-    this(context, dataTableBlockBaseOperator, exchangeType, keySelector,
+    this(context, dataTableBlockBaseOperator, exchangeType, keySelector, collationKeys, collationDirections,
+        isSortOnSender,
         (server) -> toMailboxId(server, context.getRequestId(), senderStageId, receiverStageId, context.getServer()),
         BlockExchange::getExchange, receiverStageId);
   }
 
   @VisibleForTesting
   MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator dataTableBlockBaseOperator,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections, boolean isSortOnSender,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, int receiverStageId) {
     super(context);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
@@ -115,6 +125,10 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange =
         blockExchangeFactory.build(context.getMailboxService(), receivingMailboxes, exchangeType, keySelector, splitter,
             context.getDeadlineMs());
+
+    _collationKeys = collationKeys;
+    _collationDirections = collationDirections;
+    _isSortOnSender = isSortOnSender;
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
         String.format("Exchange type '%s' is not supported yet", exchangeType));

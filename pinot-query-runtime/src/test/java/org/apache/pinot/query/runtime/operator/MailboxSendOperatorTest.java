@@ -90,7 +90,7 @@ public class MailboxSendOperatorTest {
     OpChainExecutionContext context = getOpChainContext(deadlineMs);
 
     MailboxSendOperator operator =
-        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector,
+        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector, null, null, false,
             server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
                 DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, DEFAULT_RECEIVER_STAGE_ID);
 
@@ -112,7 +112,7 @@ public class MailboxSendOperatorTest {
     OpChainExecutionContext context = getOpChainContext(deadlineMs);
 
     MailboxSendOperator operator =
-        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector,
+        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector, null, null, false,
             server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
                 DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, DEFAULT_RECEIVER_STAGE_ID);
     TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!"));
@@ -134,7 +134,7 @@ public class MailboxSendOperatorTest {
     OpChainExecutionContext context = getOpChainContext(deadlineMs);
 
     MailboxSendOperator operator =
-        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector,
+        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector, null, null, false,
             server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
                 DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_input.nextBlock()).thenThrow(new RuntimeException("foo!"));
@@ -157,7 +157,7 @@ public class MailboxSendOperatorTest {
     OpChainExecutionContext context = getOpChainContext(deadlineMs);
 
     MailboxSendOperator operator =
-        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector,
+        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector, null, null, false,
             server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
                 DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, DEFAULT_RECEIVER_STAGE_ID);
 
@@ -180,7 +180,7 @@ public class MailboxSendOperatorTest {
     OpChainExecutionContext context = getOpChainContext(deadlineMs);
 
     MailboxSendOperator operator =
-        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector,
+        new MailboxSendOperator(context, _input, RelDistribution.Type.HASH_DISTRIBUTED, _selector, null, null, false,
             server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
                 DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, DEFAULT_RECEIVER_STAGE_ID);
     TransferableBlock dataBlock = block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
