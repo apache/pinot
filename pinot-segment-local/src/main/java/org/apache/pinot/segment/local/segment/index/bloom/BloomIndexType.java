@@ -79,18 +79,7 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
 
   @Override
   public IndexReaderFactory<BloomFilterReader> getReaderFactory() {
-    return new IndexReaderFactory.Default<BloomFilterConfig, BloomFilterReader>() {
-      @Override
-      protected IndexType<BloomFilterConfig, BloomFilterReader, ?> getIndexType() {
-        return BloomIndexType.INSTANCE;
-      }
-
-      @Override
-      protected BloomFilterReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-          BloomFilterConfig indexConfig) {
-        return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
-      }
-    };
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
@@ -106,5 +95,20 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
   @Override
   public String toString() {
     return getId();
+  }
+
+  private static class ReaderFactory extends IndexReaderFactory.Default<BloomFilterConfig, BloomFilterReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    @Override
+    protected IndexType<BloomFilterConfig, BloomFilterReader, ?> getIndexType() {
+      return BloomIndexType.INSTANCE;
+    }
+
+    @Override
+    protected BloomFilterReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        BloomFilterConfig indexConfig) {
+      return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
+    }
   }
 }

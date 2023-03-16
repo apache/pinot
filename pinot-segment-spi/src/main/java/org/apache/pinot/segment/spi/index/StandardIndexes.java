@@ -39,7 +39,7 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
  *   included in a Pinot distribution. {@link StandardIndexes} contains one get method for each standard index,
  *   providing a typesafe way to get these references. Instead of having to write something like
  *   {@code (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
- *   IndexService.getInstance().getOrThrow("bloom_filter")},
+ *   IndexService.getInstance().get("bloom_filter")},
  *   a caller can simply use {@link StandardIndexes#bloomFilter()}
  * </p>
  */
@@ -60,43 +60,43 @@ public class StandardIndexes {
   }
 
   public static IndexType<?, ?, ?> forward() {
-    return IndexService.getInstance().getOrThrow(FORWARD_ID);
+    return IndexService.getInstance().get(FORWARD_ID);
   }
 
   public static IndexType<?, ?, ?> dictionary() {
-    return IndexService.getInstance().getOrThrow(DICTIONARY_ID);
+    return IndexService.getInstance().get(DICTIONARY_ID);
   }
 
   public static IndexType<?, ?, ?> nullValueVector() {
-    return IndexService.getInstance().getOrThrow(NULL_VALUE_VECTOR_ID);
+    return IndexService.getInstance().get(NULL_VALUE_VECTOR_ID);
   }
 
   public static IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator> bloomFilter() {
     return (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
-        IndexService.getInstance().getOrThrow(BLOOM_FILTER_ID);
+        IndexService.getInstance().get(BLOOM_FILTER_ID);
   }
 
   public static IndexType<?, ?, ?> fst() {
-    return IndexService.getInstance().getOrThrow(FST_ID);
+    return IndexService.getInstance().get(FST_ID);
   }
 
   public static IndexType<?, ?, ?> inverted() {
-    return IndexService.getInstance().getOrThrow(INVERTED_ID);
+    return IndexService.getInstance().get(INVERTED_ID);
   }
 
   public static IndexType<?, ?, ?> json() {
-    return IndexService.getInstance().getOrThrow(JSON_ID);
+    return IndexService.getInstance().get(JSON_ID);
   }
 
   public static IndexType<?, ?, ?> range() {
-    return IndexService.getInstance().getOrThrow(RANGE_ID);
+    return IndexService.getInstance().get(RANGE_ID);
   }
 
   public static IndexType<?, ?, ?> text() {
-    return IndexService.getInstance().getOrThrow(TEXT_ID);
+    return IndexService.getInstance().get(TEXT_ID);
   }
 
   public static IndexType<?, ?, ?> h3() {
-    return IndexService.getInstance().getOrThrow(H3_ID);
+    return IndexService.getInstance().get(H3_ID);
   }
 }
