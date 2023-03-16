@@ -87,8 +87,6 @@ public class MailboxSendOperatorTest {
       throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
     // Given:
-//    OpChainExecutionContext context =
-//        OperatorTestUtil.getContext(1, DEFAULT_SENDER_STAGE_ID, new VirtualServerAddress(_server));
     OpChainExecutionContext context = getOpChainContext(deadlineMs);
 
     MailboxSendOperator operator =
