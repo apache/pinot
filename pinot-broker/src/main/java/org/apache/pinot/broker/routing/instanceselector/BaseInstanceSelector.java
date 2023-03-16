@@ -202,6 +202,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     _newSegmentStates = getNewSegmentWithCreationTime(idealState, externalView, onlineSegments, false);
+    _oldOnlineSegmentStates.clear();
     updateSegmentMaps(idealState, externalView, onlineSegments, _oldOnlineSegmentStates, _newSegmentStates);
     _segmentStateSnapshot =
         SegmentStateSnapshot.createSnapshot(_tableNameWithType, _oldOnlineSegmentStates, _newSegmentStates,
