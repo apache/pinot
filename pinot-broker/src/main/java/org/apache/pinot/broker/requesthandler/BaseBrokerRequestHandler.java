@@ -253,8 +253,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerResponse brokerResponse = handleRequest(requestId, query, sqlNodeAndOptions, request,
             requesterIdentity, requestContext);
 
-    if (QueryOptionsUtils.isDropResultsEnabled(request)) {
-      brokerResponse.setResultTable(null);
+    if (request.has(Broker.Request.QUERY_OPTIONS)) {
+      String queryOptions = request.get(Broker.Request.QUERY_OPTIONS).asText();
+      Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
+      if (QueryOptionsUtils.shouldDropResults(optionsFromString)) {
+        brokerResponse.setResultTable(null);
+      }
     }
 
     return brokerResponse;
