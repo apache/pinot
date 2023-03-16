@@ -120,7 +120,7 @@ public class IndexService {
    * @param indexId the index id, as defined in {@link IndexType#getId()}.
    * @return An optional which will be empty in case there is no index identified by that id.
    */
-  public Optional<IndexType<?, ?, ?>> get(String indexId) {
+  public Optional<IndexType<?, ?, ?>> getOptional(String indexId) {
     return Optional.ofNullable(_allIndexesById.get(indexId.toLowerCase(Locale.US)));
   }
 
@@ -138,7 +138,7 @@ public class IndexService {
    * @return The index type that is identified by the given id.
    * @throws IllegalArgumentException in case there is not index type identified by the given id.
    */
-  public IndexType<?, ?, ?> getOrThrow(String indexId) {
+  public IndexType<?, ?, ?> get(String indexId) {
     IndexType<?, ?, ?> indexType = _allIndexesById.get(indexId.toLowerCase(Locale.US));
     if (indexType == null) {
       throw new IllegalArgumentException("Unknown index id: " + indexId);
