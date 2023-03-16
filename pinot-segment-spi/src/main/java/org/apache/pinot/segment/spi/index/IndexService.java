@@ -27,20 +27,29 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import javax.annotation.concurrent.ThreadSafe;
 
 
 /**
- * This is the entry point of the Index SPI.
+ * This is the entry point of the Index SPI, containing all index types that can be used.
  *
- * Ideally, if we used some kind of injection system, this class should be injected into a Pinot context all classes can
- * receive when they are built. Given that Pinot doesn't have that, we have to relay on static fields.
+ * A caller can get a specific index type by calling {@link #get(String)} with their id or list all indexes by invoking
+ * {@link IndexService#getAllIndexes()}.
  *
- * By default, this class will be initialized by reading all ServiceLoader SPI services that implement
- * {@link IndexPlugin}, adding all the {@link IndexType} that can be found in that way.
+ * In production, there should be a single instance of this class and that instance should be returned by
+ * {@link #getInstance()}. By default, this instance will be created by calling {@link #fromServiceLoader()}, which
+ * reads all ServiceLoader SPI services that implement {@link IndexPlugin}, adding all the {@link IndexType} that can be
+ * found in that way. In case we need to change the default behavior, the static instance can be changed with
+ * {@link #setInstance(IndexService)}.
  *
- * In case we want to change the instance to be used at runtime, the method {@link #setInstance(IndexService)} can be
- * called.
+ * Thread safety: All methods in this class, including static ones, are thread safe.
+ *
+ * Note: This class offers a singleton interface, but callers are encouraged to receive a IndexService instance in their
+ * constructor and use that instance instead of using the static {@link #getInstance()} method directly. This is
+ * specially important when callers want to test the behavior when dealing with different index type sets.
+ *
  */
+@ThreadSafe
 public class IndexService {
 
   private static volatile IndexService _instance = fromServiceLoader();
