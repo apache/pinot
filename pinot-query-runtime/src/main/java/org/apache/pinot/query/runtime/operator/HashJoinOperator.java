@@ -88,8 +88,8 @@ public class HashJoinOperator extends MultiStageOperator {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
-      DataSchema leftSchema, JoinNode node, OpChainExecutionContext context) {
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
+      MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
     super(context);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");

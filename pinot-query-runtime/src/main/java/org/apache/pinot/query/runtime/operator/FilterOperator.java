@@ -55,8 +55,8 @@ public class FilterOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
-      OpChainExecutionContext context) {
+  public FilterOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, DataSchema dataSchema,
+      RexExpression filter) {
     super(context);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;

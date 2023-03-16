@@ -85,7 +85,7 @@ public class MailboxReceiveOperatorTest {
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 10L, 10L,
             new HashMap<>());
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 10L, context);
+        new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 10L);
     Thread.sleep(200L);
     TransferableBlock mailbox = receiveOp.nextBlock();
     Assert.assertTrue(mailbox.isErrorBlock());
@@ -95,13 +95,13 @@ public class MailboxReceiveOperatorTest {
     // longer timeout or default timeout (10s) doesn't result in error.
     context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 2000L, 2000L,
         new HashMap<>());
-    receiveOp = new MailboxReceiveOperator(new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 2000L, context);
+    receiveOp = new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 2000L);
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
     Assert.assertFalse(mailbox.isErrorBlock());
     context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
         Long.MAX_VALUE, new HashMap<>());
-    receiveOp = new MailboxReceiveOperator(new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, null, context);
+    receiveOp = new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, null);
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
     Assert.assertFalse(mailbox.isErrorBlock());
@@ -124,8 +124,8 @@ public class MailboxReceiveOperatorTest {
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
             Long.MAX_VALUE, new HashMap<>());
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, 456, 789, null,
-            context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, 456,
+            789, null);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
@@ -142,9 +142,8 @@ public class MailboxReceiveOperatorTest {
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
             Long.MAX_VALUE, new HashMap<>());
-    MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.RANGE_DISTRIBUTED, 456,
-            789, null, context);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
+        RelDistribution.Type.RANGE_DISTRIBUTED, 456, 789, null);
   }
 
   @Test
@@ -173,8 +172,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
 
     // Receive end of stream block directly when there is no match.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
@@ -211,8 +210,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
 
     // Receive end of stream block directly when mailbox is close.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
@@ -251,8 +250,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive NoOpBlock.
     Assert.assertTrue(receiveOp.nextBlock().isNoOpBlock());
   }
@@ -289,8 +288,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive EosBloc.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
   }
@@ -329,8 +328,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
     Assert.assertEquals(resultRows.size(), 1);
@@ -370,8 +369,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock());
     MetadataBlock error = (MetadataBlock) receivedBlock.getDataBlock();
@@ -414,8 +413,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
     Assert.assertEquals(resultRows.size(), 1);
@@ -459,8 +458,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
     Assert.assertEquals(resultRows.size(), 1);
@@ -508,8 +507,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive first block from first server.
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
@@ -566,8 +565,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive error block from first server.
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock());
@@ -612,8 +611,8 @@ public class MailboxReceiveOperatorTest {
             Long.MAX_VALUE, new HashMap<>());
 
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null, context);
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock(), "server-1 should have returned an error-block");
   }

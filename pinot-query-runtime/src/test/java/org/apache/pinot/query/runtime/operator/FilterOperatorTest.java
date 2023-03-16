@@ -62,7 +62,7 @@ public class FilterOperatorTest {
         DataSchema.ColumnDataType.BOOLEAN
     });
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock errorBlock = op.getNextBlock();
     Assert.assertTrue(errorBlock.isErrorBlock());
     DataBlock error = errorBlock.getDataBlock();
@@ -78,7 +78,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertTrue(dataBlock.isEndOfStreamBlock());
   }
@@ -92,7 +92,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertTrue(dataBlock.isNoOpBlock());
   }
@@ -108,7 +108,7 @@ public class FilterOperatorTest {
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -127,7 +127,7 @@ public class FilterOperatorTest {
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -143,7 +143,7 @@ public class FilterOperatorTest {
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock errorBlock = op.getNextBlock();
     Assert.assertTrue(errorBlock.isErrorBlock());
     DataBlock data = errorBlock.getDataBlock();
@@ -158,7 +158,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
-    FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, ref0, OperatorTestUtil.getDefaultContext());
+    FilterOperator op = new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, ref0);
     TransferableBlock errorBlock = op.getNextBlock();
     Assert.assertTrue(errorBlock.isErrorBlock());
     DataBlock data = errorBlock.getDataBlock();
@@ -173,7 +173,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, true}, new Object[]{2, false}));
-    FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, ref1, OperatorTestUtil.getDefaultContext());
+    FilterOperator op = new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, ref1);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -194,7 +194,7 @@ public class FilterOperatorTest {
         ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
 
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, andCall, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, andCall);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -215,7 +215,7 @@ public class FilterOperatorTest {
         ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
 
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, orCall, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, orCall);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -238,7 +238,7 @@ public class FilterOperatorTest {
         ImmutableList.of(new RexExpression.InputRef(0)));
 
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, notCall, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, notCall);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -258,7 +258,7 @@ public class FilterOperatorTest {
         new RexExpression.FunctionCall(SqlKind.GREATER_THAN, FieldSpec.DataType.BOOLEAN, "greaterThan",
             ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, greaterThan, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, greaterThan);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -279,7 +279,7 @@ public class FilterOperatorTest {
             ImmutableList.of(new RexExpression.InputRef(0),
                 new RexExpression.Literal(FieldSpec.DataType.STRING, "star")));
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, startsWith, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, startsWith);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
@@ -301,6 +301,6 @@ public class FilterOperatorTest {
             ImmutableList.of(new RexExpression.InputRef(0),
                 new RexExpression.Literal(FieldSpec.DataType.STRING, "star")));
     FilterOperator op =
-        new FilterOperator(_upstreamOperator, inputSchema, startsWith, OperatorTestUtil.getDefaultContext());
+        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, startsWith);
   }
 }

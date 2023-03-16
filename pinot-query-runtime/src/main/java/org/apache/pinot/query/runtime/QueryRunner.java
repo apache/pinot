@@ -213,10 +213,10 @@ public class QueryRunner {
       OpChainExecutionContext opChainExecutionContext =
           new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(), _rootServer, deadlineMs,
               deadlineMs, distributedStagePlan.getMetadataMap());
-      mailboxSendOperator = new MailboxSendOperator(
-          new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), opChainExecutionContext),
+      mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext,
+          new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema()),
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getStageId(),
-          sendNode.getReceiverStageId(), opChainExecutionContext);
+          sendNode.getReceiverStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);

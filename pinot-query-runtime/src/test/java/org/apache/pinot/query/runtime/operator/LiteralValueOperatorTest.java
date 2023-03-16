@@ -66,7 +66,7 @@ public class LiteralValueOperatorTest {
     List<List<RexExpression>> literals = ImmutableList.of(
         ImmutableList.of(new RexExpression.Literal(DataType.STRING, "foo"), new RexExpression.Literal(DataType.INT, 1)),
         ImmutableList.of(new RexExpression.Literal(DataType.STRING, ""), new RexExpression.Literal(DataType.INT, 2)));
-    LiteralValueOperator operator = new LiteralValueOperator(schema, literals, OperatorTestUtil.getDefaultContext());
+    LiteralValueOperator operator = new LiteralValueOperator(OperatorTestUtil.getDefaultContext(), schema, literals);
 
     // When:
     TransferableBlock transferableBlock = operator.nextBlock();
@@ -82,7 +82,7 @@ public class LiteralValueOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{}, new ColumnDataType[]{});
     List<List<RexExpression>> literals = ImmutableList.of(ImmutableList.of());
-    LiteralValueOperator operator = new LiteralValueOperator(schema, literals, OperatorTestUtil.getDefaultContext());
+    LiteralValueOperator operator = new LiteralValueOperator(OperatorTestUtil.getDefaultContext(), schema, literals);
 
     // When:
     TransferableBlock transferableBlock = operator.nextBlock();

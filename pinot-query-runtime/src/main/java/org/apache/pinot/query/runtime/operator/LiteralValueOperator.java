@@ -40,8 +40,8 @@ public class LiteralValueOperator extends MultiStageOperator {
   private final TransferableBlock _rexLiteralBlock;
   private boolean _isLiteralBlockReturned;
 
-  public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
-      OpChainExecutionContext context) {
+  public LiteralValueOperator(OpChainExecutionContext context, DataSchema dataSchema,
+      List<List<RexExpression>> rexLiteralRows) {
     super(context);
     _dataSchema = dataSchema;
     _rexLiteralBlock = constructBlock(rexLiteralRows);

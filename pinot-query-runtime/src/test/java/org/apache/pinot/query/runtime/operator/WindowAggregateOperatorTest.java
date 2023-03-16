@@ -81,9 +81,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build
@@ -105,9 +105,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -131,9 +131,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
@@ -162,9 +162,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
@@ -196,9 +196,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -226,10 +226,10 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, order, Arrays.asList(RelFieldCollation.Direction.ASCENDING),
-            Arrays.asList(RelFieldCollation.NullDirection.LAST), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
-            OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+            Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
+            calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
+            outSchema, inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -255,9 +255,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE,
+            Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -284,9 +284,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -319,10 +319,10 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, ImmutableMap.of("SUM", cdt -> merger),
-            OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            ImmutableMap.of("SUM", cdt -> merger));
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock(); // (output result)
@@ -349,10 +349,10 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator sum0PartitionBy1 =
-        new WindowAggregateOperator(upstreamOperator, Arrays.asList(new RexExpression.InputRef(1)),
-            Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Arrays.asList(agg),
-            Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema,
-            inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator,
+            Arrays.asList(new RexExpression.InputRef(1)), Collections.emptyList(), Collections.emptyList(),
+            Collections.emptyList(), Arrays.asList(agg), Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = sum0PartitionBy1.getNextBlock();
     while (result.isNoOpBlock()) {
@@ -379,9 +379,9 @@ public class WindowAggregateOperatorTest {
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected aggregation "
@@ -397,9 +397,9 @@ public class WindowAggregateOperatorTest {
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Order by is not yet "
@@ -418,10 +418,10 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, order, Arrays.asList(RelFieldCollation.Direction.ASCENDING),
-            Arrays.asList(RelFieldCollation.NullDirection.LAST), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
-            OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+            Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
+            calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
+            outSchema, inSchema);
   }
 
   @Test
@@ -443,10 +443,10 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, order, Arrays.asList(RelFieldCollation.Direction.DESCENDING),
-            Arrays.asList(RelFieldCollation.NullDirection.LAST), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
-            OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+            Arrays.asList(RelFieldCollation.Direction.DESCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
+            calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
+            outSchema, inSchema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock(); // (output result)
@@ -475,9 +475,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.ROW,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.ROW, Collections.emptyList(), outSchema, inSchema);
   }
 
   @Test
@@ -494,10 +494,10 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, order, Arrays.asList(RelFieldCollation.Direction.ASCENDING),
-            Arrays.asList(RelFieldCollation.NullDirection.LAST), calls, Integer.MIN_VALUE, 0,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
-            OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+            Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
+            calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema,
+            inSchema);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -526,9 +526,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, 5, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, 5, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only default frame is "
@@ -546,9 +546,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, 5, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 5,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
 
   @Test
@@ -567,9 +567,9 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(_input, group, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema, OperatorTestUtil.getDefaultContext());
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     // When:
     TransferableBlock block = operator.nextBlock();

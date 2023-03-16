@@ -69,17 +69,18 @@ public class MailboxSendOperator extends MultiStageOperator {
     MailboxIdentifier generate(VirtualServer server);
   }
 
-  public MailboxSendOperator(MultiStageOperator dataTableBlockBaseOperator, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> keySelector, int senderStageId, int receiverStageId,
-      OpChainExecutionContext context) {
-    this(dataTableBlockBaseOperator, exchangeType, keySelector, (server) -> toMailboxId(server, context.getRequestId(),
-        senderStageId, receiverStageId, context.getServer()), BlockExchange::getExchange, receiverStageId, context);
+  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator dataTableBlockBaseOperator,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, int senderStageId,
+      int receiverStageId) {
+    this(context, dataTableBlockBaseOperator, exchangeType, keySelector,
+        (server) -> toMailboxId(server, context.getRequestId(), senderStageId, receiverStageId, context.getServer()),
+        BlockExchange::getExchange, receiverStageId);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(MultiStageOperator dataTableBlockBaseOperator, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> keySelector, MailboxIdGenerator mailboxIdGenerator,
-      BlockExchangeFactory blockExchangeFactory, int receiverStageId, OpChainExecutionContext context) {
+  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator dataTableBlockBaseOperator,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
+      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, int receiverStageId) {
     super(context);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
     MailboxService<TransferableBlock> mailboxService = context.getMailboxService();

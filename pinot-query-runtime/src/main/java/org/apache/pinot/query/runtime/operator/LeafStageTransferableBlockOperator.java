@@ -67,8 +67,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private final DataSchema _desiredDataSchema;
   private int _currentIndex;
 
-  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
-      OpChainExecutionContext context) {
+  public LeafStageTransferableBlockOperator(OpChainExecutionContext context,
+      List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
     super(context);
     _baseResultBlock = baseResultBlock;
     _desiredDataSchema = dataSchema;

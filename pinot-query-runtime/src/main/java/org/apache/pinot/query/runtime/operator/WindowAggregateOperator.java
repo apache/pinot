@@ -88,23 +88,22 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _hasReturnedWindowAggregateBlock;
 
-  public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
-      List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema, OpChainExecutionContext context) {
-    this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
-        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
-        context);
+      DataSchema resultSchema, DataSchema inputSchema) {
+    this(context, inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
+        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS);
   }
 
   @VisibleForTesting
-  public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
-      List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema, Map<String,
-      Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, OpChainExecutionContext context) {
+      DataSchema resultSchema, DataSchema inputSchema,
+      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers) {
     super(context);
 
     boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, orderSetDirection, orderSetNullDirection);

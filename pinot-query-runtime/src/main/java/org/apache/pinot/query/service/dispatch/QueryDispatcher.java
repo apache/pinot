@@ -282,7 +282,7 @@ public class QueryDispatcher {
         new OpChainExecutionContext(mailboxService, jobId, stageId, server, timeoutMs, timeoutMs, stageMetadataMap);
     // timeout is set for reduce stage
     MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(RelDistribution.Type.RANDOM_DISTRIBUTED, stageId, reducerStageId, context);
+        new MailboxReceiveOperator(context, RelDistribution.Type.RANDOM_DISTRIBUTED, stageId, reducerStageId);
     return mailboxReceiveOperator;
   }
 

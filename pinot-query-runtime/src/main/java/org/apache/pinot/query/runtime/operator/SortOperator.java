@@ -54,17 +54,17 @@ public class SortOperator extends MultiStageOperator {
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
-  public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      OpChainExecutionContext context) {
-    this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, context);
+  public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections, int fetch, int offset,
+      DataSchema dataSchema) {
+    this(context, upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
   }
 
   @VisibleForTesting
-  SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
+  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      int defaultHolderCapacity, OpChainExecutionContext context) {
+      int defaultHolderCapacity) {
     super(context);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;

@@ -55,8 +55,8 @@ public class TransformOperator extends MultiStageOperator {
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema, List<RexExpression> transforms,
-      DataSchema upstreamDataSchema, OpChainExecutionContext context) {
+  public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+      DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
     super(context);
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
