@@ -49,6 +49,7 @@ import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -71,7 +72,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
 
   @Override
   public String getId() {
-    return "range_index";
+    return StandardIndexes.RANGE_ID;
   }
 
   @Override

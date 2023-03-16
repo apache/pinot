@@ -22,9 +22,9 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.joda.time.Chronology;
 import org.joda.time.DateTimeField;
@@ -46,7 +46,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     Preconditions.checkArgument(!arguments.isEmpty() && arguments.size() <= 2, "%s takes one or two arguments", _name);
     _timestampsFunction = arguments.get(0);
     if (arguments.size() == 2) {
@@ -70,12 +70,12 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
-    long[] timestamps = _timestampsFunction.transformToLongValuesSV(projectionBlock);
+    long[] timestamps = _timestampsFunction.transformToLongValuesSV(valueBlock);
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;
   }

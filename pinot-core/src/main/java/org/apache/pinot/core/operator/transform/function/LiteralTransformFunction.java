@@ -29,9 +29,9 @@ import java.util.Map;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.PinotDataType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -129,7 +129,7 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
   }
 
   @Override
@@ -139,22 +139,22 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Dictionary getDictionary() {
+    return null;
+  }
+
+  @Override
+  public int[] transformToDictIdsSV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
+  public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     int[] intResult = _intResult;
     if (intResult == null || intResult.length < numDocs) {
       intResult = new int[numDocs];
@@ -171,8 +171,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     long[] longResult = _longResult;
     if (longResult == null || longResult.length < numDocs) {
       longResult = new long[numDocs];
@@ -189,8 +189,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     float[] floatResult = _floatResult;
     if (floatResult == null || floatResult.length < numDocs) {
       floatResult = new float[numDocs];
@@ -203,8 +203,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     double[] doubleResult = _doubleResult;
     if (doubleResult == null || doubleResult.length < numDocs) {
       doubleResult = new double[numDocs];
@@ -217,8 +217,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     BigDecimal[] bigDecimalResult = _bigDecimalResult;
     if (bigDecimalResult == null || bigDecimalResult.length < numDocs) {
       bigDecimalResult = new BigDecimal[numDocs];
@@ -229,8 +229,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     String[] stringResult = _stringResult;
     if (stringResult == null || stringResult.length < numDocs) {
       stringResult = new String[numDocs];
@@ -241,8 +241,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     byte[][] bytesResult = _bytesResult;
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
@@ -253,32 +253,32 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 }

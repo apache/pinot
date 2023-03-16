@@ -16,17 +16,33 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=11
-ARG OPENJDK_IMAGE=openjdk
-FROM ${OPENJDK_IMAGE}:${JAVA_VERSION} AS pinot_build_env
+FROM debian:buster-slim
+
+ARG version=11.0.18.10-1
+# In addition to installing the Amazon corretto, we also install
+# fontconfig. The folks who manage the docker hub's
+# official image library have found that font management
+# is a common usecase, and painpoint, and have
+# recommended that Java images include font support.
+#
+# See:
+#  https://github.com/docker-library/official-images/blob/master/test/tests/java-uimanager-font/container.java
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
-# extra dependency for running launcher
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev \
-    libssl-dev libtool make pkg-config && \
-    rm -rf /var/lib/apt/lists/*
+RUN set -eux \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl ca-certificates gnupg software-properties-common fontconfig java-common vim wget git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config\
+    && curl -fL https://apt.corretto.aws/corretto.key | apt-key add - \
+    && add-apt-repository 'deb https://apt.corretto.aws stable main' \
+    && mkdir -p /usr/share/man/man1 || true \
+    && apt-get update \
+    && apt-get install -y java-11-amazon-corretto-jdk=1:$version \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LANG C.UTF-8
+ENV JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \

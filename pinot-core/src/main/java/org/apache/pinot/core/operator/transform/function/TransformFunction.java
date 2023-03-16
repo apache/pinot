@@ -21,9 +21,10 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import javax.annotation.Nullable;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
@@ -43,10 +44,10 @@ public interface TransformFunction {
   /**
    * Initializes the transform function.
    *
-   * @param arguments Arguments for the transform function
-   * @param dataSourceMap Map from column to data source
+   * @param arguments        Arguments for the transform function
+   * @param columnContextMap Map from column name to context
    */
-  void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap);
+  void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap);
 
   /**
    * Returns the metadata for the result of the transform function.
@@ -61,136 +62,90 @@ public interface TransformFunction {
 
   /**
    * Returns the dictionary for the transform result if the result is dictionary-encoded, or {@code null} if not.
-   *
-   * @return Dictionary
    */
+  @Nullable
   Dictionary getDictionary();
 
   /**
-   * Transforms the data from the given projection block to single-valued dictionary Ids.
-   *
-   * @param projectionBlock Projection block
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued dictionary ids.
    */
-  int[] transformToDictIdsSV(ProjectionBlock projectionBlock);
+  int[] transformToDictIdsSV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to multi-valued dictionary Ids.
-   *
-   * @param projectionBlock Projection block
-   * @return Transformation result
+   * Transforms the data from the given value block to multi-valued dictionary ids.
    */
-  int[][] transformToDictIdsMV(ProjectionBlock projectionBlock);
+  int[][] transformToDictIdsMV(ValueBlock valueBlock);
 
   /**
    * SINGLE-VALUED APIs
    */
 
   /**
-   * Transforms the data from the given projection block to single-valued int values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued int values.
    */
-  int[] transformToIntValuesSV(ProjectionBlock projectionBlock);
+  int[] transformToIntValuesSV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to single-valued long values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued long values.
    */
-  long[] transformToLongValuesSV(ProjectionBlock projectionBlock);
+  long[] transformToLongValuesSV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to single-valued float values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued float values.
    */
-  float[] transformToFloatValuesSV(ProjectionBlock projectionBlock);
+  float[] transformToFloatValuesSV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to single-valued double values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued double values.
    */
-  double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock);
+  double[] transformToDoubleValuesSV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to single-valued BigDecimal values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued BigDecimal values.
    */
-  BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock);
+  BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to single-valued string values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued string values.
    */
-  String[] transformToStringValuesSV(ProjectionBlock projectionBlock);
+  String[] transformToStringValuesSV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to single-valued bytes values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to single-valued bytes values.
    */
-  byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock);
+  byte[][] transformToBytesValuesSV(ValueBlock valueBlock);
 
   /**
    * MULTI-VALUED APIs
    */
 
   /**
-   * Transforms the data from the given projection block to multi-valued int values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to multi-valued int values.
    */
-  int[][] transformToIntValuesMV(ProjectionBlock projectionBlock);
+  int[][] transformToIntValuesMV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to multi-valued long values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to multi-valued long values.
    */
-  long[][] transformToLongValuesMV(ProjectionBlock projectionBlock);
+  long[][] transformToLongValuesMV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to multi-valued float values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to multi-valued float values.
    */
-  float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock);
+  float[][] transformToFloatValuesMV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to multi-valued double values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to multi-valued double values.
    */
-  double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock);
+  double[][] transformToDoubleValuesMV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to multi-valued string values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to multi-valued string values.
    */
-  String[][] transformToStringValuesMV(ProjectionBlock projectionBlock);
+  String[][] transformToStringValuesMV(ValueBlock valueBlock);
 
   /**
-   * Transforms the data from the given projection block to multi-valued bytes values.
-   *
-   * @param projectionBlock Projection result
-   * @return Transformation result
+   * Transforms the data from the given value block to multi-valued bytes values.
    */
-  byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock);
+  byte[][][] transformToBytesValuesMV(ValueBlock valueBlock);
 }

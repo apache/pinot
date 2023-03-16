@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -91,13 +91,13 @@ public class LookupTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are correct number of arguments
     Preconditions.checkArgument(arguments.size() >= 4,
         "At least 4 arguments are required for LOOKUP transform function: "
             + "LOOKUP(TableName, ColumnName, JoinKey, JoinValue [, JoinKey2, JoinValue2 ...])");
-    Preconditions
-        .checkArgument(arguments.size() % 2 == 0, "Should have the same number of JoinKey and JoinValue arguments");
+    Preconditions.checkArgument(arguments.size() % 2 == 0,
+        "Should have the same number of JoinKey and JoinValue arguments");
 
     TransformFunction dimTableNameFunction = arguments.get(0);
     Preconditions.checkArgument(dimTableNameFunction instanceof LiteralTransformFunction,
@@ -133,9 +133,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(_dataManager.isPopulated(), "Dimension table is not populated: %s", dimTableName);
 
     _lookupColumnFieldSpec = _dataManager.getColumnFieldSpec(_dimColumnName);
-    Preconditions
-        .checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s", dimTableName,
-            _dimColumnName);
+    Preconditions.checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s",
+        dimTableName, _dimColumnName);
 
     for (String joinKey : _joinKeys) {
       FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
@@ -168,31 +167,31 @@ public class LookupTransformFunction extends BaseTransformFunction {
     void accept(int index, @Nullable Object value);
   }
 
-  private void lookup(ProjectionBlock projectionBlock, ValueAcceptor valueAcceptor) {
+  private void lookup(ValueBlock valueBlock, ValueAcceptor valueAcceptor) {
     int numPkColumns = _joinKeys.size();
-    int numDocuments = projectionBlock.getNumDocs();
+    int numDocuments = valueBlock.getNumDocs();
     Object[] pkColumns = new Object[numPkColumns];
     for (int c = 0; c < numPkColumns; c++) {
       DataType storedType = _joinValueFieldSpecs.get(c).getDataType().getStoredType();
       TransformFunction tf = _joinValueFunctions.get(c);
       switch (storedType) {
         case INT:
-          pkColumns[c] = tf.transformToIntValuesSV(projectionBlock);
+          pkColumns[c] = tf.transformToIntValuesSV(valueBlock);
           break;
         case LONG:
-          pkColumns[c] = tf.transformToLongValuesSV(projectionBlock);
+          pkColumns[c] = tf.transformToLongValuesSV(valueBlock);
           break;
         case FLOAT:
-          pkColumns[c] = tf.transformToFloatValuesSV(projectionBlock);
+          pkColumns[c] = tf.transformToFloatValuesSV(valueBlock);
           break;
         case DOUBLE:
-          pkColumns[c] = tf.transformToDoubleValuesSV(projectionBlock);
+          pkColumns[c] = tf.transformToDoubleValuesSV(valueBlock);
           break;
         case STRING:
-          pkColumns[c] = tf.transformToStringValuesSV(projectionBlock);
+          pkColumns[c] = tf.transformToStringValuesSV(valueBlock);
           break;
         case BYTES:
-          pkColumns[c] = tf.transformToBytesValuesSV(projectionBlock);
+          pkColumns[c] = tf.transformToBytesValuesSV(valueBlock);
           break;
         default:
           throw new IllegalStateException("Unknown column type for primary key");
@@ -226,145 +225,145 @@ public class LookupTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
-      return super.transformToIntValuesSV(projectionBlock);
+      return super.transformToIntValuesSV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
-    lookup(projectionBlock, this::setIntSV);
+    lookup(valueBlock, this::setIntSV);
     return _intValuesSV;
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
-      return super.transformToLongValuesSV(projectionBlock);
+      return super.transformToLongValuesSV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_longValuesSV == null) {
       _longValuesSV = new long[numDocs];
     }
-    lookup(projectionBlock, this::setLongSV);
+    lookup(valueBlock, this::setLongSV);
     return _longValuesSV;
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
-      return super.transformToFloatValuesSV(projectionBlock);
+      return super.transformToFloatValuesSV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_floatValuesSV == null) {
       _floatValuesSV = new float[numDocs];
     }
-    lookup(projectionBlock, this::setFloatSV);
+    lookup(valueBlock, this::setFloatSV);
     return _floatValuesSV;
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
-      return super.transformToDoubleValuesSV(projectionBlock);
+      return super.transformToDoubleValuesSV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[numDocs];
     }
-    lookup(projectionBlock, this::setDoubleSV);
+    lookup(valueBlock, this::setDoubleSV);
     return _doubleValuesSV;
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
-      return super.transformToStringValuesSV(projectionBlock);
+      return super.transformToStringValuesSV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[numDocs];
     }
-    lookup(projectionBlock, this::setStringSV);
+    lookup(valueBlock, this::setStringSV);
     return _stringValuesSV;
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.BYTES) {
-      return super.transformToBytesValuesSV(projectionBlock);
+      return super.transformToBytesValuesSV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_bytesValuesSV == null) {
       _bytesValuesSV = new byte[numDocs][];
     }
-    lookup(projectionBlock, this::setBytesSV);
+    lookup(valueBlock, this::setBytesSV);
     return _bytesValuesSV;
   }
 
   @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
-      return super.transformToIntValuesMV(projectionBlock);
+      return super.transformToIntValuesMV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_intValuesMV == null) {
       _intValuesMV = new int[numDocs][];
     }
-    lookup(projectionBlock, this::setIntMV);
+    lookup(valueBlock, this::setIntMV);
     return _intValuesMV;
   }
 
   @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
-      return super.transformToLongValuesMV(projectionBlock);
+      return super.transformToLongValuesMV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_longValuesMV == null) {
       _longValuesMV = new long[numDocs][];
     }
-    lookup(projectionBlock, this::setLongMV);
+    lookup(valueBlock, this::setLongMV);
     return _longValuesMV;
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
-      return super.transformToFloatValuesMV(projectionBlock);
+      return super.transformToFloatValuesMV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_floatValuesMV == null) {
       _floatValuesMV = new float[numDocs][];
     }
-    lookup(projectionBlock, this::setFloatMV);
+    lookup(valueBlock, this::setFloatMV);
     return _floatValuesMV;
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
-      return super.transformToDoubleValuesMV(projectionBlock);
+      return super.transformToDoubleValuesMV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_doubleValuesMV == null) {
       _doubleValuesMV = new double[numDocs][];
     }
-    lookup(projectionBlock, this::setDoubleMV);
+    lookup(valueBlock, this::setDoubleMV);
     return _doubleValuesMV;
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
-      return super.transformToStringValuesMV(projectionBlock);
+      return super.transformToStringValuesMV(valueBlock);
     }
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     if (_stringValuesMV == null) {
       _stringValuesMV = new String[numDocs][];
     }
-    lookup(projectionBlock, this::setStringMV);
+    lookup(valueBlock, this::setStringMV);
     return _stringValuesMV;
   }
 

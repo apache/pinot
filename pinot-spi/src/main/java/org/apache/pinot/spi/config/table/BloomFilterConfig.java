@@ -26,7 +26,7 @@ import java.util.Objects;
 
 public class BloomFilterConfig extends IndexConfig {
   public static final double DEFAULT_FPP = 0.05;
-  private static final BloomFilterConfig DEFAULT = new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false);
+  public static final BloomFilterConfig DEFAULT = new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false);
   public static final BloomFilterConfig DISABLED = new BloomFilterConfig(false, BloomFilterConfig.DEFAULT_FPP, 0,
       false);
 
@@ -51,10 +51,6 @@ public class BloomFilterConfig extends IndexConfig {
     }
     _maxSizeInBytes = maxSizeInBytes;
     _loadOnHeap = loadOnHeap;
-  }
-
-  public static BloomFilterConfig createDefault() {
-    return DEFAULT;
   }
 
   public double getFpp() {
