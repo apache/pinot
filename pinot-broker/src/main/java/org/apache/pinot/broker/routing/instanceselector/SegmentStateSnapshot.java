@@ -19,14 +19,12 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -48,111 +46,61 @@ import org.slf4j.LoggerFactory;
 public class SegmentStateSnapshot {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStateSnapshot.class);
 
-  private static class SelectionCandidate {
-    // Mapping from segment to list of servers with online flags.
-    private Map<String, List<SegmentInstanceCandidate>> _instanceMap;
-    private Set<String> _unavailableSegments;
-
-    public SelectionCandidate(Map<String, List<SegmentInstanceCandidate>> instanceMap,
-        Set<String> unavailableSegments) {
-      _instanceMap = instanceMap;
-      _unavailableSegments = unavailableSegments;
-    }
-
-    @Nullable
-    // Return null if segment doesn't exist in the map.
-    public List<SegmentInstanceCandidate> getCandidates(String segment) {
-      return _instanceMap.get(segment);
-    }
-
-    public Set<String> getUnavailableSegments() {
-      return _unavailableSegments;
-    }
-  }
-
-  private final SelectionCandidate _oldSegmentSelectionCandidate;
-  // New segment doesn't have unavailable segments reported.
-  private final SelectionCandidate _newSegmentSelectionCandidate;
-
-  private SegmentStateSnapshot(SelectionCandidate oldSegmentSelectionCandidate,
-      SelectionCandidate newSegmentSelectionCandidate) {
-    _oldSegmentSelectionCandidate = oldSegmentSelectionCandidate;
-    _newSegmentSelectionCandidate = newSegmentSelectionCandidate;
-  }
+  private Map<String, List<SegmentInstanceCandidate>> _segmentCandidates;
+  private Set<String> _unavailableSegments;
 
   // Create a segment state snapshot based on some in-memory states to be used for routing.
-  public static SegmentStateSnapshot createSnapshot(String tableNameWithType,
-      Map<String, TreeSet<String>> segmentToOnlineInstancesMap,
-      Map<String, BaseInstanceSelector.SegmentState> newSegmentState, Set<String> enabledInstance,
-      BrokerMetrics brokerMetrics) {
-    SelectionCandidate oldSelectionCandidate =
-        calculateOldSegmentSelectionCandidate(tableNameWithType, segmentToOnlineInstancesMap, enabledInstance,
-            brokerMetrics);
-    SelectionCandidate newSelectionCandidate = calculateNewSegmentSelectionCandidate(newSegmentState, enabledInstance);
-    SegmentStateSnapshot snapshot = new SegmentStateSnapshot(oldSelectionCandidate, newSelectionCandidate);
+  public static SegmentStateSnapshot createSnapshot(String tableNameWithType, Map<String, SegmentState> oldSegmentState,
+      Map<String, SegmentState> newSegmentState, Set<String> enabledInstance, BrokerMetrics brokerMetrics) {
+    Map<String, List<SegmentInstanceCandidate>> segmentCandidates = new HashMap<>();
+    Set<String> unavailableSegments = new HashSet<>();
+    calculateSegmentSelectionCandidate(tableNameWithType, oldSegmentState, enabledInstance, brokerMetrics, true,
+        segmentCandidates, unavailableSegments);
+    // Note that we don't report new segment as unavailable.
+    calculateSegmentSelectionCandidate(tableNameWithType, newSegmentState, enabledInstance, brokerMetrics, false,
+        segmentCandidates, unavailableSegments);
+    SegmentStateSnapshot snapshot = new SegmentStateSnapshot(segmentCandidates, unavailableSegments);
     return snapshot;
   }
 
+  private SegmentStateSnapshot(Map<String, List<SegmentInstanceCandidate>> segmentCandidates,
+      Set<String> unavailableSegments) {
+    _segmentCandidates = segmentCandidates;
+    _unavailableSegments = unavailableSegments;
+  }
+
   // Calculate online instance map for routing and unavailable segments from old segment states.
-  private static SelectionCandidate calculateOldSegmentSelectionCandidate(String tableNameWithType,
-      Map<String, TreeSet<String>> segmentToOnlineInstancesMap, Set<String> enabledInstance,
-      BrokerMetrics brokerMetrics) {
+  private static void calculateSegmentSelectionCandidate(String tableNameWithType,
+      Map<String, SegmentState> oldSegmentState, Set<String> enabledInstance, BrokerMetrics brokerMetrics,
+      boolean shouldReportUnavailableSegments, Map<String, List<SegmentInstanceCandidate>> candidates,
+      Set<String> unavailableSegments) {
     // Generate a new map from segment to enabled ONLINE/CONSUMING instances and a new set of unavailable segments (no
     // enabled instance or all enabled instances are in ERROR state)
     Map<String, List<SegmentInstanceCandidate>> segmentToEnabledInstancesMap = new HashMap<>();
-    Set<String> unavailableSegments = new HashSet<>();
-    for (Map.Entry<String, TreeSet<String>> entry : segmentToOnlineInstancesMap.entrySet()) {
+    for (Map.Entry<String, SegmentState> entry : oldSegmentState.entrySet()) {
       String segment = entry.getKey();
-      TreeSet<String> onlineInstancesForSegment = entry.getValue();
-      List<SegmentInstanceCandidate> enabledInstancesForSegment = new ArrayList<>();
-      for (String onlineInstance : onlineInstancesForSegment) {
-        if (enabledInstance.contains(onlineInstance)) {
-          enabledInstancesForSegment.add(SegmentInstanceCandidate.of(onlineInstance, true));
+      SegmentState segmentState = entry.getValue();
+      List<SegmentInstanceCandidate> enabledInstancesCandidates = new ArrayList<>();
+      for (SegmentInstanceCandidate candidate : segmentState.getCandidates()) {
+        if (enabledInstance.contains(candidate.getInstance())) {
+          enabledInstancesCandidates.add(candidate);
         }
       }
-      if (!enabledInstancesForSegment.isEmpty()) {
-        segmentToEnabledInstancesMap.put(segment, enabledInstancesForSegment);
-        continue;
-      }
-      LOGGER.warn(
-          "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} counting"
-              + " segment as unavailable)", segment, tableNameWithType, onlineInstancesForSegment);
-      unavailableSegments.add(segment);
-      brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
-    }
-    return new SelectionCandidate(segmentToEnabledInstancesMap, unavailableSegments);
-  }
-
-  // Calculate candidate instance map for routing from new segment states.
-  // Note that we don't report new segment as unavailable.
-  private static SelectionCandidate calculateNewSegmentSelectionCandidate(
-      Map<String, BaseInstanceSelector.SegmentState> newSegmentState, Set<String> enabledInstance) {
-    Map<String, List<SegmentInstanceCandidate>> newSegmentToCandidateInstanceMap = new HashMap<>();
-    for (Map.Entry<String, BaseInstanceSelector.SegmentState> entry : newSegmentState.entrySet()) {
-      String segment = entry.getKey();
-      List<SegmentInstanceCandidate> enabledInstancesForSegment = new ArrayList<>();
-      BaseInstanceSelector.SegmentState state = entry.getValue();
-      TreeSet<SegmentInstanceCandidate> candidates = state.getCandidates();
-      for (SegmentInstanceCandidate candidate : candidates) {
-        String instance = candidate.getInstance();
-        if (enabledInstance.contains(instance)) {
-          enabledInstancesForSegment.add(SegmentInstanceCandidate.of(instance, candidate.isOnline()));
-        }
-      }
-      if (!enabledInstancesForSegment.isEmpty()) {
-        newSegmentToCandidateInstanceMap.put(segment, enabledInstancesForSegment);
+      if (!enabledInstancesCandidates.isEmpty()) {
+        candidates.put(segment, enabledInstancesCandidates);
+      } else if (shouldReportUnavailableSegments) {
+        LOGGER.warn(
+            "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} counting"
+                + " segment as unavailable)", segment, tableNameWithType, segmentState);
+        unavailableSegments.add(segment);
+        brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       }
     }
-    return new SelectionCandidate(newSegmentToCandidateInstanceMap, Collections.emptySet());
   }
 
   @Nullable
   public List<SegmentInstanceCandidate> getCandidates(String segment) {
-    List<SegmentInstanceCandidate> candidates = _newSegmentSelectionCandidate.getCandidates(segment);
-    if (candidates != null) {
-      return candidates;
-    }
-    return _oldSegmentSelectionCandidate.getCandidates(segment);
+    return _segmentCandidates.get(segment);
   }
 
   @Nullable
@@ -169,6 +117,6 @@ public class SegmentStateSnapshot {
   }
 
   public Set<String> getUnavailableSegments() {
-    return _oldSegmentSelectionCandidate.getUnavailableSegments();
+    return _unavailableSegments;
   }
 }

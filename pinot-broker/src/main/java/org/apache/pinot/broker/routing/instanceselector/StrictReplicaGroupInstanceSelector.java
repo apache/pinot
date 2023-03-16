@@ -19,9 +19,11 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -77,7 +79,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    * {@inheritDoc}
    *
    * <pre>
-   *  Instances unavailable in any old segment should not exist in segmentToOnlineInstancesMap entries or
+   *  Instances unavailable in any old segment should not exist in oldNewSegmentStateMap entries or
    *  newSegmentStateMap for segment with same ideal state instance.
    *
    * The maps are calculated in the following steps to meet the strict replica-group guarantee:
@@ -93,7 +95,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    */
   @Override
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, TreeSet<String>> segmentToOnlineInstancesMap, Map<String, SegmentState> newSegmentStateMap) {
+      Map<String, SegmentState> oldNewSegmentStateMap, Map<String, SegmentState> newSegmentStateMap) {
     // TODO: Add support for AdaptiveServerSelection.
     // Iterate over the ideal state to
     // 1) Know whether a segment is new or old
@@ -138,7 +140,13 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       if (state != null && tempOnlineInstances.size() != entry.getValue().size() && !hasErrorInstance) {
         newSegmentTempSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
       } else {
+        if (state == null) {
+          state = SegmentState.createDefaultSegmentState();
+        } else {
+          state.promoteToOld();
+        }
         newSegmentStateMap.remove(segment);
+        oldNewSegmentStateMap.put(segment, state);
         oldSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
       }
       idealStateSegmentToInstancesMap.put(segment, idealStateInstanceStateMap.keySet());
@@ -164,20 +172,19 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       Set<String> candidateInstance = entry.getValue();
-      // NOTE: Instances will be sorted here because 'candidateInstance' is a TreeSet. We need the online instances to
-      //       be sorted for replica-group routing to work. For multiple segments with the same online instances, if the
-      //       list is sorted, the same index in the list will always point to the same instance.
-      TreeSet<String> onlineInstances = new TreeSet<>();
+      List<SegmentInstanceCandidate> onlineInstanceCandidates = new ArrayList<>();
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());
       for (String instance : candidateInstance) {
         // Some instances are unavailable, add the remaining instances as online instance
         if (!unavailableInstances.contains(instance)) {
-          onlineInstances.add(instance);
+          onlineInstanceCandidates.add(SegmentInstanceCandidate.of(instance, true));
         }
       }
-      segmentToOnlineInstancesMap.put(segment, onlineInstances);
+      SegmentState state =
+          oldNewSegmentStateMap.computeIfAbsent(segment, s -> SegmentState.createDefaultSegmentState());
+      state.resetCandidates(onlineInstanceCandidates);
     }
 
     // Set up instances in newSegmentStateMap for new segments.
@@ -188,13 +195,14 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());
       SegmentState state = newSegmentStateMap.get(segment);
-      state.resetCandidates();
       Set<String> onlineInstances = entry.getValue();
+      List<SegmentInstanceCandidate> candidates = new ArrayList<>();
       for (String instance : instancesInIdealState) {
         if (!unavailableInstances.contains(instance)) {
-          state.addCandidate(instance, onlineInstances.contains(instance));
+          candidates.add(SegmentInstanceCandidate.of(instance, onlineInstances.contains(instance)));
         }
       }
+      state.resetCandidates(candidates);
     }
   }
 }

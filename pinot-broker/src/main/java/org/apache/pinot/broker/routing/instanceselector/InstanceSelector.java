@@ -36,6 +36,9 @@ public interface InstanceSelector {
   long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
 
   static boolean isNewSegment(long creationTimeMillis, long nowMillis) {
+    if (creationTimeMillis == Long.MIN_VALUE) {
+      return false;
+    }
     return nowMillis - creationTimeMillis <= NEW_SEGMENT_EXPIRATION_MILLIS;
   }
 
