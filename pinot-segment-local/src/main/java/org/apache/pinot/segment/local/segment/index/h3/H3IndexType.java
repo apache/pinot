@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -45,7 +46,7 @@ public class H3IndexType implements IndexType<IndexConfig, IndexReader, IndexCre
 
   @Override
   public String getId() {
-    return "h3_index";
+    return StandardIndexes.H3_ID;
   }
 
   @Override

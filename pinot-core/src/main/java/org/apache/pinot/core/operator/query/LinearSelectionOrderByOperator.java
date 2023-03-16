@@ -32,14 +32,13 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
@@ -70,23 +69,23 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected final List<ExpressionContext> _alreadySorted;
   protected final List<ExpressionContext> _toSort;
 
-  protected final TransformOperator _transformOperator;
+  protected final BaseProjectOperator<?> _projectOperator;
   protected final List<OrderByExpressionContext> _orderByExpressions;
-  protected final TransformResultMetadata[] _expressionsMetadata;
+  protected final ColumnContext[] _columnContexts;
   protected final int _numRowsToKeep;
   protected final Comparator<Object[]> _comparator;
   protected final Supplier<ListBuilder> _listBuilderSupplier;
 
   /**
-   * @param expressions Order-by expressions must be at the head of the list.
+   * @param expressions          Order-by expressions must be at the head of the list.
    * @param numSortedExpressions Number of expressions in the order-by expressions that are sorted.
    */
   public LinearSelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator, int numSortedExpressions) {
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     _indexSegment = indexSegment;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
-    _transformOperator = transformOperator;
+    _projectOperator = projectOperator;
 
     _orderByExpressions = queryContext.getOrderByExpressions();
     assert _orderByExpressions != null;
@@ -95,24 +94,23 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     _alreadySorted = expressions.subList(0, numSortedExpressions);
     _toSort = expressions.subList(numSortedExpressions, numOrderByExpressions);
 
-    _expressionsMetadata = new TransformResultMetadata[_expressions.size()];
-    for (int i = 0; i < _expressionsMetadata.length; i++) {
+    _columnContexts = new ColumnContext[_expressions.size()];
+    for (int i = 0; i < _columnContexts.length; i++) {
       ExpressionContext expression = _expressions.get(i);
-      _expressionsMetadata[i] = _transformOperator.getResultMetadata(expression);
+      _columnContexts[i] = _projectOperator.getResultColumnContext(expression);
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
-    _comparator =
-        OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, _nullHandlingEnabled);
+    _comparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled);
 
     if (_toSort.isEmpty()) {
       _listBuilderSupplier = () -> new TotallySortedListBuilder(_numRowsToKeep);
     } else {
       Comparator<Object[]> sortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, _nullHandlingEnabled, 0,
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled, 0,
               numSortedExpressions);
       Comparator<Object[]> unsortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, _nullHandlingEnabled,
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled,
               numSortedExpressions, numOrderByExpressions);
       _listBuilderSupplier = () -> new PartiallySortedListBuilder(_numRowsToKeep, sortedComparator, unsortedComparator);
     }
@@ -125,20 +123,20 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     int numDocsScanned = getNumDocsScanned();
-    long numEntriesScannedPostFilter = (long) numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numEntriesScannedPostFilter = (long) numDocsScanned * _projectOperator.getNumColumnsProjected();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);
   }
 
-  protected IntFunction<Object[]> fetchBlock(TransformBlock transformBlock, BlockValSet[] blockValSets) {
+  protected IntFunction<Object[]> fetchBlock(ValueBlock valueBlock, BlockValSet[] blockValSets) {
     int numExpressions = _expressions.size();
 
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = _expressions.get(i);
-      blockValSets[i] = transformBlock.getBlockValueSet(expression);
+      blockValSets[i] = valueBlock.getBlockValueSet(expression);
     }
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
@@ -178,8 +176,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected abstract List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier);
 
   @Override
-  public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+  public List<BaseProjectOperator<?>> getChildOperators() {
+    return Collections.singletonList(_projectOperator);
   }
 
   protected abstract String getExplainName();
@@ -228,9 +226,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       columnNames[i] = _expressions.get(i).toString();
     }
     for (int i = 0; i < numExpressions; i++) {
-      TransformResultMetadata expressionMetadata = _expressionsMetadata[i];
       columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+          DataSchema.ColumnDataType.fromDataType(_columnContexts[i].getDataType(), _columnContexts[i].isSingleValue());
     }
     return new DataSchema(columnNames, columnDataTypes);
   }

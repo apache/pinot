@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,7 +45,7 @@ public class InvertedIndexType implements IndexType<IndexConfig, IndexReader, In
 
   @Override
   public String getId() {
-    return "inverted_index";
+    return StandardIndexes.INVERTED_ID;
   }
 
   @Override

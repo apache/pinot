@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -44,7 +45,7 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
 
   @Override
   public String getId() {
-    return "bloom_filter";
+    return StandardIndexes.BLOOM_FILTER_ID;
   }
 
   @Override
@@ -78,18 +79,7 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
 
   @Override
   public IndexReaderFactory<BloomFilterReader> getReaderFactory() {
-    return new IndexReaderFactory.Default<BloomFilterConfig, BloomFilterReader>() {
-      @Override
-      protected IndexType<BloomFilterConfig, BloomFilterReader, ?> getIndexType() {
-        return BloomIndexType.INSTANCE;
-      }
-
-      @Override
-      protected BloomFilterReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-          BloomFilterConfig indexConfig) {
-        return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
-      }
-    };
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
@@ -105,5 +95,20 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
   @Override
   public String toString() {
     return getId();
+  }
+
+  private static class ReaderFactory extends IndexReaderFactory.Default<BloomFilterConfig, BloomFilterReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    @Override
+    protected IndexType<BloomFilterConfig, BloomFilterReader, ?> getIndexType() {
+      return BloomIndexType.INSTANCE;
+    }
+
+    @Override
+    protected BloomFilterReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        BloomFilterConfig indexConfig) {
+      return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
+    }
   }
 }

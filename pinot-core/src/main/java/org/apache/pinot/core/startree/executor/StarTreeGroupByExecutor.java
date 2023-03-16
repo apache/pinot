@@ -21,8 +21,8 @@ package org.apache.pinot.core.startree.executor;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
@@ -44,8 +44,8 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
   public StarTreeGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
-      TransformOperator transformOperator) {
-    super(queryContext, groupByExpressions, transformOperator);
+      BaseProjectOperator<?> projectOperator) {
+    super(queryContext, groupByExpressions, projectOperator);
 
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
@@ -58,11 +58,11 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   }
 
   @Override
-  protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
+  protected void aggregate(ValueBlock valueBlock, int length, int functionIndex) {
     AggregationFunction aggregationFunction = _aggregationFunctions[functionIndex];
     GroupByResultHolder groupByResultHolder = _groupByResultHolders[functionIndex];
     Map<ExpressionContext, BlockValSet> blockValSetMap =
-        AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[functionIndex], transformBlock);
+        AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[functionIndex], valueBlock);
     if (_hasMVGroupByExpression) {
       aggregationFunction.aggregateGroupByMV(length, _mvGroupKeys, groupByResultHolder, blockValSetMap);
     } else {

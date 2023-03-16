@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
@@ -57,7 +57,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     Preconditions.checkArgument(arguments.size() >= 2 && arguments.size() <= 4,
         "REGEXP_EXTRACT takes between 2 to 4 arguments. See usage: "
             + "REGEXP_EXTRACT(`value`, `regexp`[, `group`[, `default_value`]]");
@@ -95,12 +95,12 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[length];
     }
-    String[] valuesSV = _valueFunction.transformToStringValuesSV(projectionBlock);
+    String[] valuesSV = _valueFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       Matcher matcher = _regexp.matcher(valuesSV[i]);
       if (matcher.find() && matcher.groupCount() >= _group) {

@@ -23,9 +23,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -63,14 +63,13 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    * Returns a bit map of corresponding column.
    * Returns an empty bitmap by default if null option is disabled.
    */
-  private static RoaringBitmap[] getNullBitMaps(ProjectionBlock projectionBlock,
-      TransformFunction[] transformFunctions) {
+  private static RoaringBitmap[] getNullBitMaps(ValueBlock valueBlock, TransformFunction[] transformFunctions) {
     RoaringBitmap[] roaringBitmaps = new RoaringBitmap[transformFunctions.length];
     for (int i = 0; i < roaringBitmaps.length; i++) {
       TransformFunction func = transformFunctions[i];
       if (func instanceof IdentifierTransformFunction) {
         String columnName = ((IdentifierTransformFunction) func).getColumnName();
-        RoaringBitmap nullBitmap = projectionBlock.getBlockValueSet(columnName).getNullBitmap();
+        RoaringBitmap nullBitmap = valueBlock.getBlockValueSet(columnName).getNullBitmap();
         roaringBitmaps[i] = nullBitmap;
       } else {
         // Consider literal as not null.
@@ -82,15 +81,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   /**
    * Get transform int results based on store type.
-   * @param projectionBlock
    */
-  private int[] getIntTransformResults(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  private int[] getIntTransformResults(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[length];
     }
     int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     int[][] data = new int[width][length];
     RoaringBitmap filledData = new RoaringBitmap();
     for (int i = 0; i < length; i++) {
@@ -102,7 +100,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         }
         if (!filledData.contains(j)) {
           filledData.add(j);
-          data[j] = _transformFunctions[j].transformToIntValuesSV(projectionBlock);
+          data[j] = _transformFunctions[j].transformToIntValuesSV(valueBlock);
         }
         hasNonNullValue = true;
         _intValuesSV[i] = data[j][i];
@@ -117,15 +115,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   /**
    * Get transform long results based on store type.
-   * @param projectionBlock
    */
-  private long[] getLongTransformResults(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  private long[] getLongTransformResults(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_longValuesSV == null) {
       _longValuesSV = new long[length];
     }
     int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     long[][] data = new long[width][length];
     RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
@@ -137,7 +134,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         }
         if (!filledData.contains(j)) {
           filledData.add(j);
-          data[j] = _transformFunctions[j].transformToLongValuesSV(projectionBlock);
+          data[j] = _transformFunctions[j].transformToLongValuesSV(valueBlock);
         }
         hasNonNullValue = true;
         _longValuesSV[i] = data[j][i];
@@ -152,15 +149,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   /**
    * Get transform float results based on store type.
-   * @param projectionBlock
    */
-  private float[] getFloatTransformResults(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  private float[] getFloatTransformResults(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_floatValuesSV == null) {
       _floatValuesSV = new float[length];
     }
     int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     float[][] data = new float[width][length];
     RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
@@ -172,7 +168,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         }
         if (!filledData.contains(j)) {
           filledData.add(j);
-          data[j] = _transformFunctions[j].transformToFloatValuesSV(projectionBlock);
+          data[j] = _transformFunctions[j].transformToFloatValuesSV(valueBlock);
         }
         hasNonNullValue = true;
         _floatValuesSV[i] = data[j][i];
@@ -187,15 +183,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   /**
    * Get transform double results based on store type.
-   * @param projectionBlock
    */
-  private double[] getDoubleTransformResults(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  private double[] getDoubleTransformResults(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[length];
     }
     int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     double[][] data = new double[width][length];
     RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
@@ -207,7 +202,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         }
         if (!filledData.contains(j)) {
           filledData.add(j);
-          data[j] = _transformFunctions[j].transformToDoubleValuesSV(projectionBlock);
+          data[j] = _transformFunctions[j].transformToDoubleValuesSV(valueBlock);
         }
         hasNonNullValue = true;
         _doubleValuesSV[i] = data[j][i];
@@ -222,15 +217,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   /**
    * Get transform BigDecimal results based on store type.
-   * @param projectionBlock
    */
-  private BigDecimal[] getBigDecimalTransformResults(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  private BigDecimal[] getBigDecimalTransformResults(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[length];
     }
     int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     BigDecimal[][] data = new BigDecimal[width][length];
     RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
@@ -242,7 +236,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         }
         if (!filledData.contains(j)) {
           filledData.add(j);
-          data[j] = _transformFunctions[j].transformToBigDecimalValuesSV(projectionBlock);
+          data[j] = _transformFunctions[j].transformToBigDecimalValuesSV(valueBlock);
         }
         hasNonNullValue = true;
         _bigDecimalValuesSV[i] = data[j][i];
@@ -257,15 +251,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   /**
    * Get transform String results based on store type.
-   * @param projectionBlock
    */
-  private String[] getStringTransformResults(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  private String[] getStringTransformResults(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[length];
     }
     int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     String[][] data = new String[width][length];
     RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
@@ -277,7 +270,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         }
         if (!filledData.contains(j)) {
           filledData.add(j);
-          data[j] = _transformFunctions[j].transformToStringValuesSV(projectionBlock);
+          data[j] = _transformFunctions[j].transformToStringValuesSV(valueBlock);
         }
         hasNonNullValue = true;
         _stringValuesSV[i] = data[j][i];
@@ -296,7 +289,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     int argSize = arguments.size();
     Preconditions.checkArgument(argSize > 0, "COALESCE needs to have at least one argument.");
     _transformFunctions = new TransformFunction[argSize];
@@ -344,50 +337,50 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     if (_dataType != DataType.INT) {
-      return super.transformToIntValuesSV(projectionBlock);
+      return super.transformToIntValuesSV(valueBlock);
     }
-    return getIntTransformResults(projectionBlock);
+    return getIntTransformResults(valueBlock);
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     if (_dataType != DataType.LONG) {
-      return super.transformToLongValuesSV(projectionBlock);
+      return super.transformToLongValuesSV(valueBlock);
     }
-    return getLongTransformResults(projectionBlock);
+    return getLongTransformResults(valueBlock);
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
     if (_dataType != DataType.FLOAT) {
-      return super.transformToFloatValuesSV(projectionBlock);
+      return super.transformToFloatValuesSV(valueBlock);
     }
-    return getFloatTransformResults(projectionBlock);
+    return getFloatTransformResults(valueBlock);
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     if (_dataType != DataType.DOUBLE) {
-      return super.transformToDoubleValuesSV(projectionBlock);
+      return super.transformToDoubleValuesSV(valueBlock);
     }
-    return getDoubleTransformResults(projectionBlock);
+    return getDoubleTransformResults(valueBlock);
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
     if (_dataType != DataType.BIG_DECIMAL) {
-      return super.transformToBigDecimalValuesSV(projectionBlock);
+      return super.transformToBigDecimalValuesSV(valueBlock);
     }
-    return getBigDecimalTransformResults(projectionBlock);
+    return getBigDecimalTransformResults(valueBlock);
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     if (_dataType != DataType.STRING) {
-      return super.transformToStringValuesSV(projectionBlock);
+      return super.transformToStringValuesSV(valueBlock);
     }
-    return getStringTransformResults(projectionBlock);
+    return getStringTransformResults(valueBlock);
   }
 }

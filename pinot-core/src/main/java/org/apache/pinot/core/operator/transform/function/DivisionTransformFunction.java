@@ -23,9 +23,9 @@ import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
@@ -45,7 +45,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are exactly 2 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for DIV transform function");
@@ -96,19 +96,19 @@ public class DivisionTransformFunction extends BaseTransformFunction {
 
   @SuppressWarnings("Duplicates")
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[length];
     }
     if (_resultDataType == DataType.BIG_DECIMAL) {
-      BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
+      BigDecimal[] values = transformToBigDecimalValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _doubleValuesSV, length);
     } else {
       if (_firstTransformFunction == null) {
         Arrays.fill(_doubleValuesSV, 0, length, _doubleLiterals[0]);
       } else {
-        double[] values = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
+        double[] values = _firstTransformFunction.transformToDoubleValuesSV(valueBlock);
         System.arraycopy(values, 0, _doubleValuesSV, 0, length);
       }
       if (_secondTransformFunction == null) {
@@ -116,7 +116,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
           _doubleValuesSV[i] /= _doubleLiterals[1];
         }
       } else {
-        double[] values = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
+        double[] values = _secondTransformFunction.transformToDoubleValuesSV(valueBlock);
         for (int i = 0; i < length; i++) {
           _doubleValuesSV[i] /= values[i];
         }
@@ -126,19 +126,19 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[length];
     }
     if (_resultDataType == DataType.DOUBLE) {
-      double[] values = transformToDoubleValuesSV(projectionBlock);
+      double[] values = transformToDoubleValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _bigDecimalValuesSV, length);
     } else {
       if (_firstTransformFunction == null) {
         Arrays.fill(_bigDecimalValuesSV, 0, length, _bigDecimalLiterals[0]);
       } else {
-        BigDecimal[] values = _firstTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        BigDecimal[] values = _firstTransformFunction.transformToBigDecimalValuesSV(valueBlock);
         System.arraycopy(values, 0, _bigDecimalValuesSV, 0, length);
       }
       if (_secondTransformFunction == null) {
@@ -147,7 +147,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
           _bigDecimalValuesSV[i] = _bigDecimalValuesSV[i].divide(_bigDecimalLiterals[1], RoundingMode.HALF_EVEN);
         }
       } else {
-        BigDecimal[] values = _secondTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        BigDecimal[] values = _secondTransformFunction.transformToBigDecimalValuesSV(valueBlock);
         for (int i = 0; i < length; i++) {
           // todo: expose roundingMode/mathContext as parameter in DivisionTransformFunction.
           _bigDecimalValuesSV[i] = _bigDecimalValuesSV[i].divide(values[i], RoundingMode.HALF_EVEN);

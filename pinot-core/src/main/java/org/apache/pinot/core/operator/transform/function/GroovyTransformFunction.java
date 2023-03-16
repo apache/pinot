@@ -32,11 +32,11 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.EnumUtils;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -70,7 +70,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   private TransformFunction[] _groovyArguments;
   private boolean[] _isSourceSingleValue;
   private DataType[] _sourceStoredTypes;
-  private BiFunction<TransformFunction, ProjectionBlock, Object>[] _transformToValuesFunctions;
+  private BiFunction<TransformFunction, ValueBlock, Object>[] _transformToValuesFunctions;
   private BiFunction<Object, Integer, Object>[] _fetchElementFunctions;
   private Object[] _sourceArrays;
   private Object[] _bindingValues;
@@ -81,7 +81,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     int numArgs = arguments.size();
     if (numArgs < 2) {
       throw new IllegalArgumentException("GROOVY transform function requires at least 2 arguments");
@@ -156,7 +156,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   private void initFunctions() {
     for (int i = 0; i < _numGroovyArgs; i++) {
       BiFunction<Object, Integer, Object> getElementFunction;
-      BiFunction<TransformFunction, ProjectionBlock, Object> transformToValuesFunction;
+      BiFunction<TransformFunction, ValueBlock, Object> transformToValuesFunction;
       if (_isSourceSingleValue[i]) {
         switch (_sourceStoredTypes[i]) {
           case INT:
@@ -220,13 +220,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_intValuesSV == null) {
       _intValuesSV = new int[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -238,13 +238,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_longValuesSV == null) {
       _longValuesSV = new long[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -256,13 +256,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_floatValuesSV == null) {
       _floatValuesSV = new float[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -274,14 +274,14 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
@@ -292,13 +292,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -310,13 +310,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -328,13 +328,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_intValuesMV == null) {
       _intValuesMV = new int[length][];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -353,13 +353,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_longValuesMV == null) {
       _longValuesMV = new long[length][];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -378,13 +378,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_floatValuesMV == null) {
       _floatValuesMV = new float[length][];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -403,13 +403,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
     if (_doubleValuesMV == null) {
       _doubleValuesMV = new double[length][];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
@@ -428,14 +428,14 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     if (_stringValuesMV == null) {
       _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);

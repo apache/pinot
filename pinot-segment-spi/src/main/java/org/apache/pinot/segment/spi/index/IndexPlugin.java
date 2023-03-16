@@ -19,7 +19,17 @@
 
 package org.apache.pinot.segment.spi.index;
 
-
+/**
+ * IndexPlugins are the way {@link IndexType}s are registered in a {@link IndexService}.
+ *
+ * In order to create an IndexService, a set of IndexPlugin must be provided. Although IndexTypes could be directly
+ * added into a IndexService, this indirection is used to decouple the way indexes are discovered
+ * (usually by {@link java.util.ServiceLoader} services) and the actual implementation.
+ *
+ * In order to mark a class as a {@link java.util.ServiceLoader} service, some metadata has to be added. Java modules
+ * define a typesafe way to define services, but given that Pinot does not use them right now, the easier way to create
+ * these services is by using Google AutoService. BloomIndexPlugin can be used as example.
+ */
 public interface IndexPlugin<T extends IndexType<?, ?, ?>> {
   T getIndexType();
 }

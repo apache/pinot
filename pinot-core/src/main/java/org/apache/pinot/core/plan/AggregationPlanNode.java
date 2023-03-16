@@ -25,19 +25,19 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
-import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
+import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -80,9 +80,9 @@ public class AggregationPlanNode implements PlanNode {
    * Build the operator to be used for filtered aggregations
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
-    List<Pair<AggregationFunction[], TransformOperator>> transformOperators =
-        AggregationFunctionUtils.buildFilteredAggregateTransformOperators(_indexSegment, _queryContext);
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), transformOperators,
+    List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
+        AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
+    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), projectOperators,
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
@@ -131,10 +131,10 @@ public class AggregationPlanNode implements PlanNode {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
                 predicateEvaluatorsMap.keySet())) {
-              TransformOperator transformOperator =
-                  new StarTreeTransformPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
+              BaseProjectOperator<?> projectOperator =
+                  new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap).run();
-              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true);
+              return new AggregationOperator(aggregationFunctions, projectOperator, numTotalDocs, true);
             }
           }
         }
@@ -143,10 +143,10 @@ public class AggregationPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-    TransformOperator transformOperator =
-        new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
+    return new AggregationOperator(aggregationFunctions, projectOperator, numTotalDocs, false);
   }
 
   /**
