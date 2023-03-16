@@ -36,6 +36,7 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,12 +77,20 @@ public class MailboxReceiveOperator extends MultiStageOperator {
         receiverStageId);
   }
 
+  public MailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType, int senderStageId,
+      int receiverStageId) {
+    this(context, context.getMetadataMap().get(senderStageId).getServerInstances(), exchangeType, senderStageId,
+        receiverStageId, context.getTimeoutMs());
+  }
+
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
-  public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
-      List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType, VirtualServerAddress receiver,
-      long jobId, int senderStageId, int receiverStageId, Long timeoutMs) {
-    super(jobId, senderStageId, receiver);
-    _mailboxService = mailboxService;
+  //TODO: Remove boxed timeoutMs value from here and use long deadlineMs from context.
+  public MailboxReceiveOperator(OpChainExecutionContext context, List<VirtualServer> sendingStageInstances,
+      RelDistribution.Type exchangeType, int senderStageId, int receiverStageId, Long timeoutMs) {
+    super(context);
+    _mailboxService = context.getMailboxService();
+    VirtualServerAddress receiver = context.getServer();
+    long jobId = context.getRequestId();
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
     long timeoutNano = (timeoutMs != null ? timeoutMs : QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS) * 1_000_000L;
