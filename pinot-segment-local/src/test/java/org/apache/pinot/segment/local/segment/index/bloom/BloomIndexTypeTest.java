@@ -112,7 +112,7 @@ public class BloomIndexTypeTest {
           JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
       );
 
-      assertEquals(BloomFilterConfig.createDefault());
+      assertEquals(BloomFilterConfig.DEFAULT);
     }
 
     @Test

@@ -34,9 +34,9 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -48,11 +48,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   public static final NullValueIndexType INSTANCE = new NullValueIndexType();
 
   private NullValueIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.NULL_VALUE_VECTOR_ID;
+    super(StandardIndexes.NULL_VALUE_VECTOR_ID);
   }
 
   @Override
@@ -128,10 +124,5 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 }

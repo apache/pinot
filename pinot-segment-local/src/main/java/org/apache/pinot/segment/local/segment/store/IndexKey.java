@@ -46,7 +46,7 @@ public class IndexKey implements Comparable<IndexKey> {
    * @throws IllegalArgumentException if there is no index with the given index id
    */
   public static IndexKey fromIndexName(String name, String indexName) {
-    IndexType<?, ?, ?> type = IndexService.getInstance().getOrThrow(indexName);
+    IndexType<?, ?, ?> type = IndexService.getInstance().get(indexName);
     return new IndexKey(name, type);
   }
 

@@ -52,9 +52,8 @@ public class BloomIndexType
     implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
   public static final BloomIndexType INSTANCE = new BloomIndexType();
 
-  @Override
-  public String getId() {
-    return StandardIndexes.BLOOM_FILTER_ID;
+  private BloomIndexType() {
+    super(StandardIndexes.BLOOM_FILTER_ID);
   }
 
   @Override
@@ -82,7 +81,7 @@ public class BloomIndexType
                   .withFallbackAlternative(// reads tableConfig.indexingConfig.bloomFilterColumns
                       IndexConfigDeserializer.fromCollection(
                           tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
-                          (accum, column) -> accum.put(column, BloomFilterConfig.createDefault())))
+                          (accum, column) -> accum.put(column, BloomFilterConfig.DEFAULT)))
             )
         );
   }
@@ -115,11 +114,6 @@ public class BloomIndexType
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<BloomFilterConfig, BloomFilterReader> {

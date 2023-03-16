@@ -45,10 +45,10 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -63,11 +63,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   public static final FstIndexType INSTANCE = new FstIndexType();
 
   private FstIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.FST_ID;
+    super(StandardIndexes.FST_ID);
   }
 
   @Override
@@ -170,10 +166,5 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 }

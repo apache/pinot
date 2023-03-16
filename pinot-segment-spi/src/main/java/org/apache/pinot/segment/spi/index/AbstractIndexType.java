@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.spi.index;
 
 import java.util.Map;
+import java.util.Objects;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -28,9 +29,19 @@ import org.apache.pinot.spi.data.Schema;
 public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator>
     implements IndexType<C, IR, IC> {
 
+  private final String _id;
   private ColumnConfigDeserializer<C> _deserializer;
 
   protected abstract ColumnConfigDeserializer<C> getDeserializer();
+
+  public AbstractIndexType(String id) {
+    _id = id;
+  }
+
+  @Override
+  public String getId() {
+    return _id;
+  }
 
   @Override
   public Map<String, C> getConfig(TableConfig tableConfig, Schema schema) {
@@ -38,5 +49,27 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
       _deserializer = getDeserializer();
     }
     return _deserializer.deserialize(tableConfig, schema);
+  }
+
+  @Override
+  public String toString() {
+    return _id;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    AbstractIndexType<?, ?, ?> that = (AbstractIndexType<?, ?, ?>) o;
+    return _id.equals(that._id);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_id);
   }
 }

@@ -80,11 +80,7 @@ public class DictionaryIndexType
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
 
   private DictionaryIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.DICTIONARY_ID;
+    super(StandardIndexes.DICTIONARY_ID);
   }
 
   @Override
@@ -295,10 +291,5 @@ public class DictionaryIndexType
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return getFileExtension();
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 }

@@ -46,10 +46,10 @@ import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -68,11 +68,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   public static final RangeIndexType INSTANCE = new RangeIndexType();
 
   RangeIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.RANGE_ID;
+    super(StandardIndexes.RANGE_ID);
   }
 
   @Override
@@ -152,11 +148,6 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
     return new RangeIndexHandler(segmentDirectory, configsByCol, tableConfig);
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<RangeIndexConfig, RangeIndexReader> {

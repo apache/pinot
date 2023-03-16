@@ -40,12 +40,12 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -59,11 +59,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   public static final H3IndexType INSTANCE = new H3IndexType();
 
   private H3IndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.H3_ID;
+    super(StandardIndexes.H3_ID);
   }
 
   @Override
@@ -127,10 +123,5 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 }

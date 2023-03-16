@@ -244,7 +244,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           try {
             String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
             if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
-              IndexType<?, ?, ?> indexType = IndexService.getInstance().getOrThrow(parsedKeys[1]);
+              IndexType<?, ?, ?> indexType = IndexService.getInstance().get(parsedKeys[1]);
               _columnMetadataMap.get(parsedKeys[0]).getIndexSizeMap().put(indexType, mapConfig.getLong(key));
             }
           } catch (Exception e) {

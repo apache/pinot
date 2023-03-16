@@ -40,10 +40,10 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -56,11 +56,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   public static final JsonIndexType INSTANCE = new JsonIndexType();
 
   private JsonIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.JSON_ID;
+    super(StandardIndexes.JSON_ID);
   }
 
   @Override
@@ -124,11 +120,6 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
     return new JsonIndexHandler(segmentDirectory, configsByCol, tableConfig);
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<JsonIndexConfig, JsonIndexReader> {

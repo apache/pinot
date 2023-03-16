@@ -41,10 +41,10 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -59,11 +59,7 @@ public class ForwardIndexType
   public static final ForwardIndexType INSTANCE = new ForwardIndexType();
 
   private ForwardIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.FORWARD_ID;
+    super(StandardIndexes.FORWARD_ID);
   }
 
   @Override
@@ -232,10 +228,5 @@ public class ForwardIndexType
 
   public ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     return ForwardIndexReaderFactory.createIndexReader(dataBuffer, metadata);
-  }
-
-  @Override
-  public String toString() {
-    return getId();
   }
 }
