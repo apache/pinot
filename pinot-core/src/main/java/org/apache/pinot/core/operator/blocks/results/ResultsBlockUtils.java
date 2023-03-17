@@ -71,8 +71,6 @@ public class ResultsBlockUtils {
 
   private static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
-        queryContext.getFilteredAggregationFunctions();
     assert aggregationFunctions != null;
     int numAggregations = aggregationFunctions.length;
     List<Object> results = new ArrayList<>(numAggregations);
@@ -85,9 +83,8 @@ public class ResultsBlockUtils {
   private static GroupByResultsBlock buildEmptyGroupByQueryResults(QueryContext queryContext) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
-
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-    assert groupByExpressions != null;
+    assert filteredAggregationFunctions != null && groupByExpressions != null;
     int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
@@ -98,12 +95,9 @@ public class ResultsBlockUtils {
       columnDataTypes[index] = ColumnDataType.STRING;
       index++;
     }
-    for (Pair<AggregationFunction, FilterContext> aggFilterPair : filteredAggregationFunctions) {
-      // NOTE: Use AggregationFunction.getResultColumnName() for SQL format response
-      AggregationFunction aggregationFunction = aggFilterPair.getLeft();
-      String columnName =
-          AggregationFunctionUtils.getResultColumnName(aggregationFunction, aggFilterPair.getRight());
-      columnNames[index] = columnName;
+    for (Pair<AggregationFunction, FilterContext> pair : filteredAggregationFunctions) {
+      AggregationFunction aggregationFunction = pair.getLeft();
+      columnNames[index] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
       index++;
     }

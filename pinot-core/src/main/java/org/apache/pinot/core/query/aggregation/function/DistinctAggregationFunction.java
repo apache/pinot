@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -80,23 +79,18 @@ public class DistinctAggregationFunction implements AggregationFunction<Object, 
   }
 
   @Override
-  public String getColumnName() {
-    return AggregationFunctionType.DISTINCT.getName() + "_" + StringUtils.join(_columns, ':');
-  }
-
-  @Override
-  public String getResultColumnName() {
-    return AggregationFunctionType.DISTINCT.getName().toLowerCase() + "(" + StringUtils.join(_columns, ':') + ")";
-  }
-
-  @Override
   public List<ExpressionContext> getInputExpressions() {
     return _expressions;
   }
 
   @Override
+  public String getResultColumnName() {
+    throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
+  }
+
+  @Override
   public ColumnDataType getIntermediateResultColumnType() {
-    return ColumnDataType.OBJECT;
+    throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 
   @Override

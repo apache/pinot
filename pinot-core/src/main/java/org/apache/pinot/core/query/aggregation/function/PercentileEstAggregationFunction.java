@@ -58,12 +58,6 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public String getColumnName() {
-    return _version == 0 ? AggregationFunctionType.PERCENTILEEST.getName() + (int) _percentile + "_" + _expression
-        : AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + _expression;
-  }
-
-  @Override
   public String getResultColumnName() {
     return _version == 0 ? AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + (int) _percentile + "("
         + _expression + ")"
