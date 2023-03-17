@@ -307,7 +307,7 @@ public class AggregationFunctionFactory {
           case SUMVALUESINTEGERSUMTUPLESKETCH:
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
-            return new AvgIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           default:
             throw new IllegalArgumentException();
         }

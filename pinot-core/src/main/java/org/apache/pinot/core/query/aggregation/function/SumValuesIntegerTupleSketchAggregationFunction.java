@@ -58,7 +58,7 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();
     }
-    double estimate = retainedTotal / result.getRetainedEntries() * result.getEstimate();
-    return Double.valueOf(estimate).longValue();
+    double estimate = retainedTotal / result.getTheta();
+    return Math.round(estimate);
   }
 }

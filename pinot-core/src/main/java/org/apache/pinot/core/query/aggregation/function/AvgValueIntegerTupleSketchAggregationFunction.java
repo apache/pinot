@@ -28,10 +28,10 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class AvgIntegerTupleSketchAggregationFunction
+public class AvgValueIntegerTupleSketchAggregationFunction
     extends IntegerTupleSketchAggregationFunction {
 
-  public AvgIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
+  public AvgValueIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
     super(arguments, mode);
   }
 
@@ -64,6 +64,6 @@ public class AvgIntegerTupleSketchAggregationFunction
       return null;
     }
     double estimate = retainedTotal / result.getRetainedEntries();
-    return Double.valueOf(estimate).longValue();
+    return Math.round(estimate);
   }
 }
