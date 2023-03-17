@@ -165,7 +165,9 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/metadata")
   @ApiOperation(value = "List metadata for all segments of a given table",
-      notes = "List segments metadata of table hosted on this server")
+      notes = "List segments metadata of table hosted on this server. However, when consistent push is enabled, the "
+          + "statistics reported would include both the replaced and the updated segments, unless "
+          + "excludeReplacedSegments is set to true")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal server error"),
@@ -174,7 +176,9 @@ public class TablesResource {
   public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-          List<String> columns)
+          List<String> columns,
+      @ApiParam(value = "Whether to exclude replaced segments in the response") @QueryParam("excludeReplacedSegments")
+      @DefaultValue("false") String excludeReplacedSegments)
       throws WebApplicationException {
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
 
@@ -205,8 +209,8 @@ public class TablesResource {
       }
     }
     Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
-
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    boolean excludeReplacedSegmentsBool = Boolean.parseBoolean(excludeReplacedSegments);
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments(excludeReplacedSegmentsBool);
     long totalSegmentSizeBytes = 0;
     long totalNumRows = 0;
     Map<String, Double> columnLengthMap = new HashMap<>();
