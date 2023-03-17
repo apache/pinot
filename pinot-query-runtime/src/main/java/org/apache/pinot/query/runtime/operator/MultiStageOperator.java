@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -38,20 +38,18 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   // TODO: Move to OperatorContext class.
-  protected final long _requestId;
-  protected final int _stageId;
-  protected final VirtualServerAddress _serverAddress;
   protected final OperatorStats _operatorStats;
   protected final Map<String, OperatorStats> _operatorStatsMap;
   private final String _operatorId;
+  private final OpChainExecutionContext _context;
 
-  public MultiStageOperator(long requestId, int stageId, VirtualServerAddress serverAddress) {
-    _requestId = requestId;
-    _stageId = stageId;
-    _operatorStats = new OperatorStats(requestId, stageId, serverAddress, toExplainString());
-    _serverAddress = serverAddress;
+  public MultiStageOperator(OpChainExecutionContext context) {
+    _context = context;
+    _operatorStats =
+        new OperatorStats(_context, toExplainString());
     _operatorStatsMap = new HashMap<>();
-    _operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId, _serverAddress);
+    _operatorId =
+        Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
   }
 
   public Map<String, OperatorStats> getOperatorStatsMap() {

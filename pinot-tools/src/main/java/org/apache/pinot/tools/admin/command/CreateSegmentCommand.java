@@ -26,14 +26,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -83,10 +81,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-failOnEmptySegment"},
       description = "Option to fail the segment creation if output is an empty segment.")
   private boolean _failOnEmptySegment = false;
-
-  @CommandLine.Option(names = {"-realtimePartitionId"},
-      description = "If table is realtime, partition id to be used for segment name generation. Default is 0.")
-  private int _realtimePartitionId = 0;
 
   @CommandLine.Option(names = {"-postCreationVerification"},
       description = "Verify segment data file after segment creation. Please ensure you have enough local disk to"
@@ -142,11 +136,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   public CreateSegmentCommand setFailOnEmptySegment(boolean failOnEmptySegment) {
     _failOnEmptySegment = failOnEmptySegment;
-    return this;
-  }
-
-  public CreateSegmentCommand setRealtimePartitionId(int realtimePartitionId) {
-    _realtimePartitionId = realtimePartitionId;
     return this;
   }
 
@@ -220,7 +209,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     }
     LOGGER.info("Using table config: {}", tableConfig.toJsonString());
     String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    TableType tableType = tableConfig.getTableType();
 
     Preconditions.checkArgument(_schemaFile != null, "'schemaFile' must be specified");
     Schema schema;
@@ -258,10 +246,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
         segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
         segmentGeneratorConfig.setTableName(rawTableName);
         segmentGeneratorConfig.setSequenceId(sequenceId);
-        if (tableType == TableType.REALTIME) {
-          segmentGeneratorConfig.setSegmentName(new LLCSegmentName(rawTableName, _realtimePartitionId, sequenceId,
-              System.currentTimeMillis()).getSegmentName());
-        }
         segmentGeneratorConfig.setFailOnEmptySegment(_failOnEmptySegment);
         for (int j = 0; j <= _retry; j++) {
           try {
