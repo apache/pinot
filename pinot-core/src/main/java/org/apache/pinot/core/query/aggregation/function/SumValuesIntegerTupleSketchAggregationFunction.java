@@ -47,6 +47,9 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
 
   @Override
   public Comparable extractFinalResult(List<CompactSketch<IntegerSummary>> integerSummarySketches) {
+    if (integerSummarySketches == null) {
+      return null;
+    }
     Union<IntegerSummary> union = new Union<>(_entries, _setOps);
     integerSummarySketches.forEach(union::union);
     double retainedTotal = 0L;

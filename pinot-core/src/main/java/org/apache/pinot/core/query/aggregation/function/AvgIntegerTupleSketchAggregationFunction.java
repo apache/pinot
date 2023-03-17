@@ -48,6 +48,9 @@ public class AvgIntegerTupleSketchAggregationFunction
 
   @Override
   public Comparable extractFinalResult(List<CompactSketch<IntegerSummary>> integerSummarySketches) {
+    if (integerSummarySketches == null) {
+      return null;
+    }
     Union<IntegerSummary> union = new Union<>(_entries, _setOps);
     integerSummarySketches.forEach(union::union);
     double retainedTotal = 0L;
@@ -55,6 +58,10 @@ public class AvgIntegerTupleSketchAggregationFunction
     SketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();
+    }
+    if (result.getRetainedEntries() == 0) {
+      // there is nothing to average, return null
+      return null;
     }
     double estimate = retainedTotal / result.getRetainedEntries();
     return Double.valueOf(estimate).longValue();

@@ -178,6 +178,13 @@ public class IntegerTupleSketchAggregationFunction
   @Override
   public List<CompactSketch<IntegerSummary>> merge(List<CompactSketch<IntegerSummary>> intermediateResult1,
       List<CompactSketch<IntegerSummary>> intermediateResult2) {
+    if (intermediateResult1 == null && intermediateResult2 != null) {
+      return intermediateResult2;
+    } else if (intermediateResult1 != null && intermediateResult2 == null) {
+      return intermediateResult1;
+    } else if (intermediateResult1 == null && intermediateResult2 == null) {
+      return List.of();
+    }
     ArrayList<CompactSketch<IntegerSummary>> merged =
         new ArrayList<>(intermediateResult1.size() + intermediateResult2.size());
     merged.addAll(intermediateResult1);
@@ -197,6 +204,9 @@ public class IntegerTupleSketchAggregationFunction
 
   @Override
   public Comparable extractFinalResult(List<CompactSketch<IntegerSummary>> integerSummarySketches) {
+    if (integerSummarySketches == null) {
+      return null;
+    }
     Union<IntegerSummary> union = new Union<>(_entries, _setOps);
     integerSummarySketches.forEach(union::union);
     return Base64.getEncoder().encodeToString(union.getResult().toByteArray());
