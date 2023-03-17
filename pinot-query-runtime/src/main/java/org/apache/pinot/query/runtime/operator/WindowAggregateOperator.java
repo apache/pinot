@@ -37,10 +37,10 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.stage.WindowNode;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,26 +88,23 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _hasReturnedWindowAggregateBlock;
 
-  public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
-      List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema, long requestId, int stageId,
-      VirtualServerAddress virtualServerAddress) {
-    this(inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
-        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS,
-        requestId, stageId, virtualServerAddress);
+      DataSchema resultSchema, DataSchema inputSchema) {
+    this(context, inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
+        upperBound, windowFrameType, constants, resultSchema, inputSchema, AggregationUtils.Accumulator.MERGERS);
   }
 
   @VisibleForTesting
-  public WindowAggregateOperator(MultiStageOperator inputOperator, List<RexExpression> groupSet,
-      List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema, Map<String,
-      Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, long requestId, int stageId,
-      VirtualServerAddress virtualServerAddress) {
-    super(requestId, stageId, virtualServerAddress);
+      DataSchema resultSchema, DataSchema inputSchema,
+      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers) {
+    super(context);
 
     boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, orderSetDirection, orderSetNullDirection);
     Preconditions.checkState(orderSet == null || orderSet.isEmpty() || isPartitionByOnly,
