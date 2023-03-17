@@ -50,15 +50,14 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class IntegerTupleSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<List<CompactSketch<IntegerSummary>>, Comparable> {
-  ExpressionContext _expressionContext;
-  IntegerSummarySetOperations _setOps;
-  int _entries;
+  final ExpressionContext _expressionContext;
+  final IntegerSummarySetOperations _setOps;
+  final int _entries;
 
   public IntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
     super(arguments.get(0));
     _expressionContext = arguments.get(0);
     _setOps = new IntegerSummarySetOperations(mode, mode);
-    _entries = 4096;
     if (arguments.size() == 2) {
       _entries = ((Long) arguments.get(1).getLiteral().getValue()).intValue();
     } else {
