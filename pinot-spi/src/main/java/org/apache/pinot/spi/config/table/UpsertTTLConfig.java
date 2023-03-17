@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +39,7 @@ public class UpsertTTLConfig {
   @JsonPropertyDescription("ttl time value")
   private String _ttlTimeValue;
 
+  @JsonCreator
   public UpsertTTLConfig(@JsonProperty("ttlTimeUnit") @Nullable String ttlTimeUnit,
       @JsonProperty("ttlTimeValue") @Nullable String ttlTimeValue) {
     _ttlTimeUnit = ttlTimeUnit;
