@@ -89,20 +89,24 @@ public class SketchFunctions {
   @ScalarFunction(nullableParameters = true)
   public static byte[] toThetaSketch(@Nullable Object input, int nominalEntries) {
     UpdateSketch sketch = Sketches.updateSketchBuilder().setNominalEntries(nominalEntries).build();
-    if (input instanceof Integer) {
-      sketch.update((Integer) input);
-    } else if (input instanceof Long) {
-      sketch.update((Long) input);
-    } else if (input instanceof Float) {
-      sketch.update((Float) input);
-    } else if (input instanceof Double) {
-      sketch.update((Double) input);
-    } else if (input instanceof BigDecimal) {
-      sketch.update(((BigDecimal) input).toString());
-    } else if (input instanceof String) {
-      sketch.update((String) input);
-    } else if (input instanceof byte[]) {
-      sketch.update((byte[]) input);
+    if (input != null) {
+      if (input instanceof Integer) {
+        sketch.update((Integer) input);
+      } else if (input instanceof Long) {
+        sketch.update((Long) input);
+      } else if (input instanceof Float) {
+        sketch.update((Float) input);
+      } else if (input instanceof Double) {
+        sketch.update((Double) input);
+      } else if (input instanceof BigDecimal) {
+        sketch.update(((BigDecimal) input).toString());
+      } else if (input instanceof String) {
+        sketch.update((String) input);
+      } else if (input instanceof byte[]) {
+        sketch.update((byte[]) input);
+      } else {
+        throw new IllegalArgumentException("Unrecognised input type for Theta sketch: " + input.getClass().getName());
+      }
     }
     return ObjectSerDeUtils.DATA_SKETCH_SER_DE.serialize(sketch.compact());
   }
@@ -159,7 +163,7 @@ public class SketchFunctions {
   @ScalarFunction(nullableParameters = true)
   public static byte[] toIntegerSumTupleSketch(@Nullable Object key, Integer value, int lgK) {
     IntegerSketch is = new IntegerSketch(lgK, IntegerSummary.Mode.Sum);
-    if (value != null) {
+    if (value != null && key != null) {
       if (key instanceof Integer) {
         is.update((Integer) key, value);
       } else if (key instanceof Long) {
@@ -174,6 +178,8 @@ public class SketchFunctions {
         is.update((String) key, value);
       } else if (key instanceof byte[]) {
         is.update((byte[]) key, value);
+      } else {
+        throw new IllegalArgumentException("Unrecognised key type for Theta sketch: " + key.getClass().getName());
       }
     }
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());

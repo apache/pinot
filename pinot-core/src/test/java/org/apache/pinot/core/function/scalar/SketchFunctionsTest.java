@@ -44,6 +44,8 @@ public class SketchFunctionsTest {
     }
     Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null)), 0.0);
     Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null, 1024)), 0.0);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object()));
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object(), 1024));
   }
 
   private long hllEstimate(byte[] bytes) {
@@ -72,5 +74,8 @@ public class SketchFunctionsTest {
     }
     Assert.assertEquals(intTupleEstimate(SketchFunctions.toIntegerSumTupleSketch(null, 1)), 0.0d);
     Assert.assertEquals(intTupleEstimate(SketchFunctions.toIntegerSumTupleSketch(null, 1, 16)), 0.0d);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1, 1024));
   }
 }
