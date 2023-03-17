@@ -57,7 +57,7 @@ public class IndexService {
   private final Set<IndexType<?, ?, ?>> _allIndexes;
   private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
 
-  public IndexService(Set<IndexPlugin<?>> allPlugins) {
+  private IndexService(Set<IndexPlugin<?>> allPlugins) {
     ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
 
     for (IndexPlugin<?> plugin : allPlugins) {

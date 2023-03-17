@@ -35,10 +35,10 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,19 +80,17 @@ public class AggregateOperator extends MultiStageOperator {
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
-  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet, DataSchema inputSchema, long requestId, int stageId,
-      VirtualServerAddress virtualServerAddress) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.AggregateAccumulator.AGG_MERGERS,
-        requestId, stageId, virtualServerAddress);
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema dataSchema,
+      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema) {
+    this(context, inputOperator, dataSchema, aggCalls, groupSet, inputSchema,
+        AggregateOperator.AggregateAccumulator.AGG_MERGERS);
   }
 
   @VisibleForTesting
-  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet, DataSchema inputSchema,
-      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers, long requestId, int stageId,
-      VirtualServerAddress serverAddress) {
-    super(requestId, stageId, serverAddress);
+  AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema dataSchema,
+      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema,
+      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers) {
+    super(context);
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;

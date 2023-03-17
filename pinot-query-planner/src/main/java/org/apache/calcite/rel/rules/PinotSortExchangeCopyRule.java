@@ -26,7 +26,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.SortExchange;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalSortExchange;
+import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexBuilder;
@@ -99,7 +99,7 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
   public interface Config extends RelRule.Config {
 
     Config DEFAULT = ImmutableSortExchangeCopyRule.Config.of()
-        .withOperandFor(LogicalSort.class, LogicalSortExchange.class);
+        .withOperandFor(LogicalSort.class, PinotLogicalSortExchange.class);
 
     @Override default PinotSortExchangeCopyRule toRule() {
       return new PinotSortExchangeCopyRule(this);

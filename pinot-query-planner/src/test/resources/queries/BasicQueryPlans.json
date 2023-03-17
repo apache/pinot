@@ -39,7 +39,7 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[dateTrunc('DAY', $4)])",
           "\n  LogicalSort(offset=[0], fetch=[10])",
-          "\n    LogicalSortExchange(distribution=[hash], collation=[[]])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalSort(fetch=[10])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
@@ -52,7 +52,7 @@
           "Execution Plan",
           "\nLogicalProject(day=[dateTrunc('DAY', $4)])",
           "\n  LogicalSort(offset=[0], fetch=[10])",
-          "\n    LogicalSortExchange(distribution=[hash], collation=[[]])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalSort(fetch=[10])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
