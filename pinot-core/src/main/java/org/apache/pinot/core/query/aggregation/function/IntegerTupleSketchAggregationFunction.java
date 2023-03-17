@@ -182,7 +182,7 @@ public class IntegerTupleSketchAggregationFunction
     } else if (intermediateResult1 != null && intermediateResult2 == null) {
       return intermediateResult1;
     } else if (intermediateResult1 == null && intermediateResult2 == null) {
-      return List.of();
+      return new ArrayList<>(0);
     }
     ArrayList<CompactSketch<IntegerSummary>> merged =
         new ArrayList<>(intermediateResult1.size() + intermediateResult2.size());
