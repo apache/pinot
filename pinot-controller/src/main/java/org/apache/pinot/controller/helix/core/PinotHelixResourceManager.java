@@ -1332,7 +1332,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSchema(Schema schema, boolean reload)
+  public void updateSchema(Schema schema, boolean reload, boolean forceTableSchemaUpdate)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Updating schema: {} with reload: {}", schemaName, reload);
@@ -1342,7 +1342,7 @@ public class PinotHelixResourceManager {
       throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
     }
 
-    updateSchema(schema, oldSchema, false);
+    updateSchema(schema, oldSchema, forceTableSchemaUpdate);
 
     if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
@@ -1357,7 +1357,7 @@ public class PinotHelixResourceManager {
    * Helper method to update the schema, or throw SchemaBackwardIncompatibleException when the new schema is not
    * backward-compatible with the existing schema.
    */
-  private void updateSchema(Schema schema, Schema oldSchema, boolean force)
+  private void updateSchema(Schema schema, Schema oldSchema, boolean forceTableSchemaUpdate)
       throws SchemaBackwardIncompatibleException {
     String schemaName = schema.getSchemaName();
     schema.updateBooleanFieldsIfNeeded(oldSchema);
@@ -1367,7 +1367,7 @@ public class PinotHelixResourceManager {
     }
     boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
     if (!isBackwardCompatible) {
-      if (force) {
+      if (forceTableSchemaUpdate) {
         LOGGER.warn("Force updated schema: {} which is backward incompatible with the existing schema", oldSchema);
       } else {
         // TODO: Add the reason of the incompatibility
