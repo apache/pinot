@@ -51,11 +51,12 @@ public class AvgIntegerTupleSketchAggregationFunction
     Union<IntegerSummary> union = new Union<>(_entries, _setOps);
     integerSummarySketches.forEach(union::union);
     double retainedTotal = 0L;
-    SketchIterator<IntegerSummary> summaries = union.getResult().iterator();
+    CompactSketch<IntegerSummary> result = union.getResult();
+    SketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();
     }
-    double estimate = retainedTotal / union.getResult().getRetainedEntries();
+    double estimate = retainedTotal / result.getRetainedEntries();
     return Double.valueOf(estimate).longValue();
   }
 }

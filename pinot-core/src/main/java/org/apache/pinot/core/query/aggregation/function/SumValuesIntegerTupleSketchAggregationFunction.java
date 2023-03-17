@@ -50,11 +50,12 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
     Union<IntegerSummary> union = new Union<>(_entries, _setOps);
     integerSummarySketches.forEach(union::union);
     double retainedTotal = 0L;
-    SketchIterator<IntegerSummary> summaries = union.getResult().iterator();
+    CompactSketch<IntegerSummary> result = union.getResult();
+    SketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();
     }
-    double estimate = retainedTotal / union.getResult().getRetainedEntries() * union.getResult().getEstimate();
+    double estimate = retainedTotal / result.getRetainedEntries() * result.getEstimate();
     return Double.valueOf(estimate).longValue();
   }
 }
