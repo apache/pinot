@@ -29,8 +29,8 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalExchange;
-import org.apache.calcite.rel.logical.LogicalSortExchange;
 import org.apache.calcite.rel.logical.LogicalWindow;
+import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.RelBuilderFactory;
 
@@ -86,8 +86,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     } else if (windowGroup.keys.isEmpty() && !windowGroup.orderKeys.getKeys().isEmpty()) {
       // Only ORDER BY
       // Add a LogicalSortExchange with collation on the order by key(s) and an empty hash partition key
-      LogicalSortExchange sortExchange = LogicalSortExchange.create(windowInput,
-          RelDistributions.hash(Collections.emptyList()), windowGroup.orderKeys);
+      // TODO: ORDER BY only type queries need to be sorted on both sender and receiver side for better performance.
+      //       Sorted input data can use a k-way merge instead of a PriorityQueue for sorting. For now support to
+      //       sort on the sender side is not available thus setting this up to only sort on the receiver.
+      PinotLogicalSortExchange sortExchange = PinotLogicalSortExchange.create(windowInput,
+          RelDistributions.hash(Collections.emptyList()), windowGroup.orderKeys, false, true);
       call.transformTo(LogicalWindow.create(window.getTraitSet(), sortExchange, window.constants, window.getRowType(),
           window.groups));
     } else {
@@ -106,8 +109,12 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       } else {
         // PARTITION BY and ORDER BY on different key(s)
         // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys
-        LogicalSortExchange sortExchange = LogicalSortExchange.create(windowInput,
-            RelDistributions.hash(windowGroup.keys.toList()), windowGroup.orderKeys);
+        // TODO: ORDER BY only type queries need to be sorted only on the receiver side unless a hint is set indicating
+        //       that the data is already partitioned and sorting can be done on the sender side instead. This way
+        //       sorting on the receiver side can be a no-op. Add support for this hint and pass it on. Until sender
+        //       side sorting is implemented, setting this hint will throw an error on execution.
+        PinotLogicalSortExchange sortExchange = PinotLogicalSortExchange.create(windowInput,
+            RelDistributions.hash(windowGroup.keys.toList()), windowGroup.orderKeys, false, true);
         call.transformTo(LogicalWindow.create(window.getTraitSet(), sortExchange, window.constants, window.getRowType(),
             window.groups));
       }

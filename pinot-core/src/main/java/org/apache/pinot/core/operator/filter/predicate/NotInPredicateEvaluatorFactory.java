@@ -34,10 +34,12 @@ import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MultiValueVisitor;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -69,7 +71,7 @@ public class NotInPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based NOT_IN predicate evaluator
    */
-  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate,
+  public static NotInRawPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate,
       DataType dataType) {
     switch (dataType) {
       case INT: {
@@ -225,7 +227,18 @@ public class NotInPredicateEvaluatorFactory {
     }
   }
 
-  private static final class IntRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static abstract class NotInRawPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    public NotInRawPredicateEvaluator(Predicate predicate) {
+      super(predicate);
+    }
+
+    /**
+     * Visits the not matching value of this predicate.
+     */
+    public abstract <R> R accept(MultiValueVisitor<R> visitor);
+  }
+
+  private static final class IntRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     final IntSet _nonMatchingValues;
 
     IntRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, IntSet nonMatchingValues) {
@@ -260,9 +273,14 @@ public class NotInPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      return visitor.visitInt(_nonMatchingValues.toIntArray());
+    }
   }
 
-  private static final class LongRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class LongRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     final LongSet _nonMatchingValues;
 
     LongRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, LongSet nonMatchingValues) {
@@ -297,9 +315,14 @@ public class NotInPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      return visitor.visitLong(_nonMatchingValues.toLongArray());
+    }
   }
 
-  private static final class FloatRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class FloatRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     final FloatSet _nonMatchingValues;
 
     FloatRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, FloatSet nonMatchingValues) {
@@ -334,9 +357,14 @@ public class NotInPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      return visitor.visitFloat(_nonMatchingValues.toFloatArray());
+    }
   }
 
-  private static final class DoubleRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class DoubleRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     final DoubleSet _nonMatchingValues;
 
     DoubleRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, DoubleSet nonMatchingValues) {
@@ -371,10 +399,14 @@ public class NotInPredicateEvaluatorFactory {
       }
       return matches;
     }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      return visitor.visitDouble(_nonMatchingValues.toDoubleArray());
+    }
   }
 
-  private static final class BigDecimalRawValueBasedNotInPredicateEvaluator
-      extends BaseRawValueBasedPredicateEvaluator {
+  private static final class BigDecimalRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     // See: BigDecimalRawValueBasedInPredicateEvaluator.
     final TreeSet<BigDecimal> _nonMatchingValues;
 
@@ -398,9 +430,14 @@ public class NotInPredicateEvaluatorFactory {
     public boolean applySV(BigDecimal value) {
       return !_nonMatchingValues.contains(value);
     }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      return visitor.visitBigDecimal(_nonMatchingValues.toArray(new BigDecimal[0]));
+    }
   }
 
-  private static final class StringRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class StringRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     final Set<String> _nonMatchingValues;
 
     StringRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<String> nonMatchingValues) {
@@ -422,9 +459,14 @@ public class NotInPredicateEvaluatorFactory {
     public boolean applySV(String value) {
       return !_nonMatchingValues.contains(value);
     }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      return visitor.visitString(_nonMatchingValues.toArray(new String[0]));
+    }
   }
 
-  private static final class BytesRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class BytesRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     final Set<ByteArray> _nonMatchingValues;
 
     BytesRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<ByteArray> nonMatchingValues) {
@@ -445,6 +487,14 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public boolean applySV(byte[] value) {
       return !_nonMatchingValues.contains(new ByteArray(value));
+    }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      byte[][] bytes = _nonMatchingValues.stream()
+          .map(ByteArray::getBytes)
+          .toArray(byte[][]::new);
+      return visitor.visitBytes(bytes);
     }
   }
 }
