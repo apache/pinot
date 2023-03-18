@@ -30,7 +30,7 @@ import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +73,7 @@ public final class Schema implements Serializable {
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
-  private final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
+  private final Map<String, FieldSpec> _fieldSpecMap = new LinkedHashMap<>();
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
