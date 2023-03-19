@@ -243,6 +243,10 @@ public class QueryOptimizerTest {
     testQuery("SELECT * FROM testTable WHERE 1=1 AND \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
     testQuery("SELECT * FROM testTable WHERE 1!=1 OR \"a\"=\"a\"", "SELECT * FROM testTable WHERE true");
     testQuery("SELECT * FROM testTable WHERE 1=1 OR \"a\"!=\"a\"", "SELECT * FROM testTable WHERE true");
+
+    testQuery("SELECT * FROM testTable WHERE 1.0=1.0", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1.0=1", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1.01=1", "SELECT * FROM testTable WHERE false");
   }
 
   private static void testQuery(String actual, String expected) {
