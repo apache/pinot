@@ -9,6 +9,11 @@ import org.apache.pinot.sql.FilterKind;
 import javax.annotation.Nullable;
 import java.util.List;
 
+/**
+ * This base class acts as a helper for any optimizer that is effectively removing filter conditions.
+ * It provides TRUE/FALSE literal classes that can be used to replace filter expressions that are always true/false.
+ * It provides an optimization implementation for AND/OR/NOT expressions.
+ */
 public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer {
 
     protected static final Expression TRUE = RequestUtils.getLiteralExpression(true);
@@ -28,27 +33,27 @@ public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer
         String operator = function.getOperator();
         List<Expression> operands = function.getOperands();
         if (operator.equals(FilterKind.AND.name())) {
-            // If any of the literal operands are FALSE, then replace AND function with FALSE.
+            // If any of the literal operands are always false, then replace AND function with FALSE.
             for (Expression operand : operands) {
                 if (isAlwaysFalse(operand)) {
                     return FALSE;
                 }
             }
 
-            // Remove all Literal operands that are TRUE.
+            // Remove all Literal operands that are always true.
             operands.removeIf(this::isAlwaysTrue);
             if (operands.isEmpty()) {
                 return TRUE;
             }
         } else if (operator.equals(FilterKind.OR.name())) {
-            // If any of the literal operands are TRUE, then replace OR function with TRUE
+            // If any of the literal operands are always true, then replace OR function with TRUE
             for (Expression operand : operands) {
                 if (isAlwaysTrue(operand)) {
                     return TRUE;
                 }
             }
 
-            // Remove all Literal operands that are FALSE.
+            // Remove all Literal operands that are always false.
             operands.removeIf(this::isAlwaysFalse);
             if (operands.isEmpty()) {
                 return FALSE;

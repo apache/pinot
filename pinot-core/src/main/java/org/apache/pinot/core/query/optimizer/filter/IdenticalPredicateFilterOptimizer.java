@@ -11,6 +11,11 @@ import java.util.List;
 import static org.apache.pinot.sql.FilterKind.EQUALS;
 import static org.apache.pinot.sql.FilterKind.NOT_EQUALS;
 
+/**
+ * This optimizer converts all predicates where the left hand side == right hand side to
+ * a simple TRUE/FALSE literal value. While filters like, WHERE 1=1 OR "col1"="col1" are not
+ * typical, they end up expensive in Pinot because they are rewritten as A-A==0.
+ */
 public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
     @Override
@@ -66,6 +71,11 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
         return false;
     }
 
+    /**
+     * Pinot queries of the WHERE 1 != 1 AND "col1" = "col2" variety are rewritten as
+     * 1-1 != 0 AND "col1"-"col2" = 0. Therefore, we check specifically for the case where
+     * the operand is set up in this fashion.
+     */
     private boolean hasIdenticalLhsAndRhs(Expression operand) {
         List<Expression> children = operand.getFunctionCall().getOperands();
         boolean hasTwoChildren = children.size() == 2;
