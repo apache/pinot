@@ -62,9 +62,7 @@ import org.apache.pinot.sql.FilterKind;
  *
  * TODO: Add support for BETWEEN, IN, and NOT IN operators.
  */
-public class NumericalFilterOptimizer implements FilterOptimizer {
-  private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
-  private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
+public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   @Override
   public Expression optimize(Expression expression, @Nullable Schema schema) {
@@ -112,55 +110,6 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
           }
         }
         break;
-    }
-    return expression;
-  }
-
-  /**
-   * If any of the operands of AND function is "false", then the AND function itself is false and can be replaced with
-   * "false" literal. Otherwise, remove all the "true" operands of the AND function. Similarly, if any of the operands
-   * of OR function is "true", then the OR function itself is true and can be replaced with "true" literal. Otherwise,
-   * remove all the "false" operands of the OR function.
-   */
-  private static Expression optimizeCurrent(Expression expression) {
-    Function function = expression.getFunctionCall();
-    String operator = function.getOperator();
-    List<Expression> operands = function.getOperands();
-    if (operator.equals(FilterKind.AND.name())) {
-      // If any of the literal operands are FALSE, then replace AND function with FALSE.
-      for (Expression operand : operands) {
-        if (operand.equals(FALSE)) {
-          return FALSE;
-        }
-      }
-
-      // Remove all Literal operands that are TRUE.
-      operands.removeIf(x -> x.equals(TRUE));
-      if (operands.isEmpty()) {
-        return TRUE;
-      }
-    } else if (operator.equals(FilterKind.OR.name())) {
-      // If any of the literal operands are TRUE, then replace OR function with TRUE
-      for (Expression operand : operands) {
-        if (operand.equals(TRUE)) {
-          return TRUE;
-        }
-      }
-
-      // Remove all Literal operands that are FALSE.
-      operands.removeIf(x -> x.equals(FALSE));
-      if (operands.isEmpty()) {
-        return FALSE;
-      }
-    } else if (operator.equals(FilterKind.NOT.name())) {
-      assert operands.size() == 1;
-      Expression operand = operands.get(0);
-      if (operand.equals(TRUE)) {
-        return FALSE;
-      }
-      if (operand.equals(FALSE)) {
-        return TRUE;
-      }
     }
     return expression;
   }
