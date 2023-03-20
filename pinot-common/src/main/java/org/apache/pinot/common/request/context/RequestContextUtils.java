@@ -232,7 +232,7 @@ public class RequestContextUtils {
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
     if (thriftExpression.getLiteral().getSetField() == Literal._Fields.NULL_VALUE) {
-      return String.valueOf(null);
+      return "null";
     }
     return thriftExpression.getLiteral().getFieldValue().toString();
   }
