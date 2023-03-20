@@ -170,6 +170,8 @@ public class InputManager {
     for (String queryString : _queryWeightMap.keySet()) {
       try {
         PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(queryString);
+        // TODO: should we catch and ignore any errors here. If we error on query optimization,
+        // we probably shouldn't fail the query as well.
         _queryOptimizer.optimize(pinotQuery, _schema);
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
 

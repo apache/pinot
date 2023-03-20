@@ -90,24 +90,34 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
    * Pinot queries of the WHERE 1 != 1 AND "col1" = "col2" variety are rewritten as
    * 1-1 != 0 AND "col1"-"col2" = 0. Therefore, we check specifically for the case where
    * the operand is set up in this fashion.
+   *
+   * We return false specifically after every check to ensure we're only continuing when
+   * the input looks as expected. Otherwise, it's easy to for one of the operand functions
+   * to return null and fail the query.
    */
   private boolean hasIdenticalLhsAndRhs(Expression operand) {
     List<Expression> children = operand.getFunctionCall().getOperands();
     boolean hasTwoChildren = children.size() == 2;
     Expression firstChild = children.get(0);
-    if (firstChild.getFunctionCall() == null) {
+    if (firstChild.getFunctionCall() == null || !hasTwoChildren) {
       return false;
     }
     boolean firstChildIsMinusOperator = firstChild.getFunctionCall().getOperator().equals("minus");
+    if (!firstChildIsMinusOperator) {
+      return false;
+    }
     boolean firstChildHasTwoOperands = firstChild.getFunctionCall().getOperandsSize() == 2;
+    if (!firstChildHasTwoOperands) {
+      return false;
+    }
     Expression minusOperandFirstChild = firstChild.getFunctionCall().getOperands().get(0);
     Expression minusOperandSecondChild = firstChild.getFunctionCall().getOperands().get(1);
-    boolean bothOperandsAreEqual = minusOperandFirstChild.equals(minusOperandSecondChild);
+    if (minusOperandFirstChild == null || minusOperandSecondChild == null || !minusOperandFirstChild.equals(
+        minusOperandSecondChild)) {
+      return false;
+    }
     Expression secondChild = children.get(1);
-    boolean isSecondChildLiteralZero = isLiteralZero(secondChild);
-
-    return hasTwoChildren && firstChildIsMinusOperator && firstChildHasTwoOperands && bothOperandsAreEqual
-        && isSecondChildLiteralZero;
+    return isLiteralZero(secondChild);
   }
 
   private boolean isLiteralZero(Expression expression) {
