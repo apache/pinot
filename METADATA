@@ -5,3 +5,7 @@ schema:
 reviewers:
   groups:
     - rta-group
+---
+bots:
+  - buildkite
+  - buildkite_bot
