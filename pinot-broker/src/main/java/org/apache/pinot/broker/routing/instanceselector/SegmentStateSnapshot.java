@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.Immutable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.slf4j.Logger;
@@ -43,6 +44,7 @@ import org.slf4j.LoggerFactory;
  *  online or not.
  *  We don't report new segment as unavailable segments because it is valid for new segments to be not online at all.
  */
+@Immutable
 public class SegmentStateSnapshot {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStateSnapshot.class);
 
@@ -69,25 +71,24 @@ public class SegmentStateSnapshot {
     _unavailableSegments = unavailableSegments;
   }
 
-  // Calculate online instance map for routing and unavailable segments from old segment states.
+  // Calculate online instance map for routing and unavailable segments from segment states.
   private static void calculateSegmentSelectionCandidate(String tableNameWithType,
-      Map<String, SegmentState> oldSegmentState, Set<String> enabledInstance, BrokerMetrics brokerMetrics,
-      boolean shouldReportUnavailableSegments, Map<String, List<SegmentInstanceCandidate>> candidates,
+      Map<String, SegmentState> segmentState, Set<String> enabledInstance, BrokerMetrics brokerMetrics,
+      boolean shouldReportUnavailableSegments, Map<String, List<SegmentInstanceCandidate>> selectionCandidates,
       Set<String> unavailableSegments) {
     // Generate a new map from segment to enabled ONLINE/CONSUMING instances and a new set of unavailable segments (no
     // enabled instance or all enabled instances are in ERROR state)
-    Map<String, List<SegmentInstanceCandidate>> segmentToEnabledInstancesMap = new HashMap<>();
-    for (Map.Entry<String, SegmentState> entry : oldSegmentState.entrySet()) {
+    for (Map.Entry<String, SegmentState> entry : segmentState.entrySet()) {
       String segment = entry.getKey();
-      SegmentState segmentState = entry.getValue();
+      SegmentState state = entry.getValue();
       List<SegmentInstanceCandidate> enabledInstancesCandidates = new ArrayList<>();
-      for (SegmentInstanceCandidate candidate : segmentState.getCandidates()) {
+      for (SegmentInstanceCandidate candidate : state.getCandidates()) {
         if (enabledInstance.contains(candidate.getInstance())) {
           enabledInstancesCandidates.add(candidate);
         }
       }
       if (!enabledInstancesCandidates.isEmpty()) {
-        candidates.put(segment, enabledInstancesCandidates);
+        selectionCandidates.put(segment, enabledInstancesCandidates);
       } else if (shouldReportUnavailableSegments) {
         LOGGER.warn(
             "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} counting"

@@ -36,7 +36,7 @@ public class SegmentState {
   // Segment creation time. This could be
   // 1) From ZK if we first see this segment via init call.
   // 2) Use wall time, if first see this segment from onAssignmentChange call.
-  // For old segment, we don't need to track creation time anymore, so this will be set to LONG.MIN.
+  // 3) For old segment, we don't need to track creation time anymore, so this will be set to LONG.MIN.
   private long _creationMillis;
 
   private static class CompareByInstanceName implements Comparator<SegmentInstanceCandidate> {
@@ -67,7 +67,8 @@ public class SegmentState {
   }
 
   public void resetCandidates(List<SegmentInstanceCandidate> candidates) {
-    _candidates.clear();
+    // Sort the online instances for replica-group routing to work. For multiple segments with the same online
+    // instances, if the list is sorted, the same index in the list will always point to the same instance.
     Collections.sort(candidates, new CompareByInstanceName());
     _candidates = candidates;
   }

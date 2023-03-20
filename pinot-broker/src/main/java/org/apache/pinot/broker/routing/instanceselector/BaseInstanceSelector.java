@@ -80,7 +80,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   // These 3 variables are the cached states to help accelerate the change processing
   private Set<String> _enabledInstances;
   // Tracking instance state old for segments.
-  // Instances have to be in sorted order
+  // We only track online instance for old segments.
   private Map<String, SegmentState> _oldOnlineSegmentStates;
   // Tracking instance state for new segments.
   private Map<String, SegmentState> _newSegmentStates;
@@ -169,6 +169,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
     _newSegmentStates = getNewSegmentWithCreationTime(idealState, externalView, onlineSegments, true);
+    _oldOnlineSegmentStates.clear();
     updateSegmentMaps(idealState, externalView, onlineSegments, _oldOnlineSegmentStates, _newSegmentStates);
     _segmentStateSnapshot =
         SegmentStateSnapshot.createSnapshot(_tableNameWithType, _oldOnlineSegmentStates, _newSegmentStates,
@@ -209,6 +210,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
             _enabledInstances, _brokerMetrics);
   }
 
+  // Prerequisite for this call
+  // 1) _newSegmentStates and _oldOnlineSegmentStates contain segments we have seen before.
   // Return a map of potential new segments name to creation time.
   // 1) When readFromZK is set to true, we read creation time from ZK
   // 2) Otherwise, we use system time as an approximation.
@@ -241,11 +244,12 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * Updates the segment maps based on the given ideal state, external view and online segments (segments with
    * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    * Prerequisite for this call
-   * 1) newSegmentStateMap contains all the potentially new segments based on segment creation time.
+   * 1) newSegmentStateMap contains all the potentially new segments from onlineSegments based on segment creation time.
+   * 2) oldSegmentStateMap is empty.
    * Invariants for in memory state after this update:
    * 1) New segments should retire from newSegmentStateMap based on external view or ideal state change.
-   * 2) Segment should only exist in newSegmentStateMap or segmentToOnlineInstancesMap depending on whether it is old or
-   * new.
+   * 2) Online segment should only exist in newSegmentStateMap or segmentToOnlineInstancesMap depending on whether
+   * it is old or new.
    * 3) Old segment's online instance should be tracked in segmentToOnlineInstancesMap
    * 4) New segment's instances in ideal state should be tracked in newSegmentStateMap with online flags
    */
@@ -263,8 +267,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       Map<String, String> idealStateInstanceStateMap = entry.getValue();
       Map<String, String> externalViewInstanceStateMap =
           externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
-      // Sort the online instances for replica-group routing to work. For multiple segments with the same online
-      // instances, if the list is sorted, the same index in the list will always point to the same instance.
       Set<String> onlineInstances = new HashSet<>();
       boolean hasErrorInstance = false;
       for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceStateMap.entrySet()) {

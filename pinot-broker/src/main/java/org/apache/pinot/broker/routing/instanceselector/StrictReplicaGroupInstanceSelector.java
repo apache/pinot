@@ -95,7 +95,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    */
   @Override
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, SegmentState> oldNewSegmentStateMap, Map<String, SegmentState> newSegmentStateMap) {
+      Map<String, SegmentState> oldSegmentStateMap, Map<String, SegmentState> newSegmentStateMap) {
     // TODO: Add support for AdaptiveServerSelection.
     // Iterate over the ideal state to
     // 1) Know whether a segment is new or old
@@ -146,7 +146,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
           state.promoteToOld();
         }
         newSegmentStateMap.remove(segment);
-        oldNewSegmentStateMap.put(segment, state);
+        oldSegmentStateMap.put(segment, state);
         oldSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
       }
       idealStateSegmentToInstancesMap.put(segment, idealStateInstanceStateMap.keySet());
@@ -183,14 +183,13 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
         }
       }
       SegmentState state =
-          oldNewSegmentStateMap.computeIfAbsent(segment, s -> SegmentState.createDefaultSegmentState());
+          oldSegmentStateMap.computeIfAbsent(segment, s -> SegmentState.createDefaultSegmentState());
       state.resetCandidates(onlineInstanceCandidates);
     }
 
     // Set up instances in newSegmentStateMap for new segments.
     for (Map.Entry<String, Set<String>> entry : newSegmentTempSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
-      // Note that instancesInIdealState needs to be sorted for strict replica group to work.
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());
