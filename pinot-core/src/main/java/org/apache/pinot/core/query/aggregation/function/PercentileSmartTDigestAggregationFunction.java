@@ -94,11 +94,6 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   }
 
   @Override
-  public String getColumnName() {
-    return AggregationFunctionType.PERCENTILESMARTTDIGEST.getName() + _percentile + "_" + _expression;
-  }
-
-  @Override
   public String getResultColumnName() {
     return AggregationFunctionType.PERCENTILESMARTTDIGEST.getName().toLowerCase() + "(" + _expression + ", "
         + _percentile + ")";

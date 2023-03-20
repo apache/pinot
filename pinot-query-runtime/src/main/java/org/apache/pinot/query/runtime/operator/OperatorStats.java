@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
 public class OperatorStats {
@@ -42,6 +43,11 @@ public class OperatorStats {
   private long _startTimeMs = -1;
   private final Map<String, String> _executionStats;
 
+  public OperatorStats(OpChainExecutionContext context, String operatorType) {
+    this(context.getRequestId(), context.getStageId(), context.getServer(), operatorType);
+  }
+
+  //TODO: remove this constructor after the context constructor can be used in serialization and deserialization
   public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress, String operatorType) {
     _stageId = stageId;
     _requestId = requestId;

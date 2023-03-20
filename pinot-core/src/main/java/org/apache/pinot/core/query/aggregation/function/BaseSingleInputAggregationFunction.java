@@ -39,11 +39,6 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
   }
 
   @Override
-  public String getColumnName() {
-    return getType().getName() + "_" + _expression;
-  }
-
-  @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _expression + ")";
   }

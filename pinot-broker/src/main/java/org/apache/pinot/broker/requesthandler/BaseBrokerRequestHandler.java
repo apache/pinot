@@ -250,7 +250,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     String query = sql.asText();
     requestContext.setQuery(query);
-    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
+    BrokerResponse brokerResponse = handleRequest(requestId, query, sqlNodeAndOptions, request,
+            requesterIdentity, requestContext);
+
+    if (request.has(Broker.Request.QUERY_OPTIONS)) {
+      String queryOptions = request.get(Broker.Request.QUERY_OPTIONS).asText();
+      Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
+      if (QueryOptionsUtils.shouldDropResults(optionsFromString)) {
+        brokerResponse.setResultTable(null);
+      }
+    }
+
+    return brokerResponse;
   }
 
   private BrokerResponseNative handleRequest(long requestId, String query,

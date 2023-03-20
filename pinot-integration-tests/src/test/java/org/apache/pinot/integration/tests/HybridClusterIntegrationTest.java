@@ -211,6 +211,21 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
+  public void testDropResults() throws Exception {
+    final String query = String.format("SELECT * FROM %s limit 10", getTableName());
+    final String resultTag = "resultTable";
+
+    // dropResults=true - resultTable must not be in the response
+    Assert.assertFalse(postQueryWithOptions(query, "dropResults=true").has(resultTag));
+
+    // dropResults=TrUE (case insensitive match) - resultTable must not be in the response
+    Assert.assertFalse(postQueryWithOptions(query, "dropResults=TrUE").has(resultTag));
+
+    // dropResults=truee - (anything other than true, is taken as false) - resultTable must be in the response
+    Assert.assertTrue(postQueryWithOptions(query, "dropResults=truee").has(resultTag));
+  }
+
+  @Test
   @Override
   public void testHardcodedQueries()
       throws Exception {
