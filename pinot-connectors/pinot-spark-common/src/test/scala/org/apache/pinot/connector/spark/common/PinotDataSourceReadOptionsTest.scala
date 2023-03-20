@@ -34,6 +34,7 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
       PinotDataSourceReadOptions.CONFIG_SEGMENTS_PER_SPLIT -> "1",
       PinotDataSourceReadOptions.CONFIG_USE_PUSH_DOWN_FILTERS -> "false",
       PinotDataSourceReadOptions.CONFIG_USE_GRPC_SERVER -> "false",
+      PinotDataSourceReadOptions.CONFIG_QUERY_OPTIONS -> "a=1,b=2"
     )
 
     val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
@@ -47,7 +48,8 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
         false,
         1,
         10000,
-        false
+        false,
+        Set("a=1", "b=2")
       )
 
     pinotDataSourceReadOptions shouldEqual expected
