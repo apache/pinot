@@ -110,7 +110,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     Preconditions.checkState(reducerStageId != -1);
     ResultTable resultTable = QueryDispatcher.runReducer(requestId, queryPlan, reducerStageId,
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-        executionStatsAggregatorMap);
+        executionStatsAggregatorMap, false);
     return resultTable.getRows();
   }
 

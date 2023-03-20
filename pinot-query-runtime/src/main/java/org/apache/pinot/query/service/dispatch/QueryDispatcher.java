@@ -85,13 +85,14 @@ public class QueryDispatcher {
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
       MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions,
-      Map<Integer, ExecutionStatsAggregator> executionStatsAggregator)
+      Map<Integer, ExecutionStatsAggregator> executionStatsAggregator, boolean traceEnabled)
       throws Exception {
     try {
       // submit all the distributed stages.
       int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
       // run reduce stage and return result.
-      return runReducer(requestId, queryPlan, reduceStageId, timeoutMs, mailboxService, executionStatsAggregator);
+      return runReducer(requestId, queryPlan, reduceStageId, timeoutMs, mailboxService, executionStatsAggregator,
+          traceEnabled);
     } catch (Exception e) {
       cancel(requestId, queryPlan);
       throw new RuntimeException("Error executing query: " + ExplainPlanStageVisitor.explain(queryPlan), e);
@@ -175,13 +176,14 @@ public class QueryDispatcher {
 
   @VisibleForTesting
   public static ResultTable runReducer(long requestId, QueryPlan queryPlan, int reduceStageId, long timeoutMs,
-      MailboxService<TransferableBlock> mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap) {
+      MailboxService<TransferableBlock> mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap,
+      boolean traceEnabled) {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     VirtualServerAddress server =
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0);
     OpChainExecutionContext context =
         new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs, timeoutMs,
-            queryPlan.getStageMetadataMap());
+            queryPlan.getStageMetadataMap(), traceEnabled);
     MailboxReceiveOperator mailboxReceiveOperator =
         createReduceStageOperator(reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(), context);
     List<DataBlock> resultDataBlocks =

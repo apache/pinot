@@ -206,7 +206,7 @@ public class MailboxSendOperatorTest {
     Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(DEFAULT_RECEIVER_STAGE_ID, stageMetadata);
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_SENDER_STAGE_ID, new VirtualServerAddress(_server),
-            deadlineMs, deadlineMs, stageMetadataMap);
+            deadlineMs, deadlineMs, stageMetadataMap, false);
     return context;
   }
 }
