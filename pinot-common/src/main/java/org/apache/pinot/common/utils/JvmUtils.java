@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Joiner;
-
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.util.List;
