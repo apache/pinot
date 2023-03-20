@@ -109,6 +109,10 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         }
       } else {
         _currentIndex = -1;
+        if (!_context.isTraceEnabled()) {
+          _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), getOperatorId());
+          _operatorStatsMap.put(getOperatorId(), _operatorStats);
+        }
         return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
       }
     }
