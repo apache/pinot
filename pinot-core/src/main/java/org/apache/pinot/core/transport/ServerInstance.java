@@ -150,6 +150,23 @@ public class ServerInstance {
     }
   }
 
+  public ServerRoutingInstance toServerRoutingInstance(Integer partitionId, TableType tableType,
+      RoutingType routingType) {
+    switch (routingType) {
+      case NETTY:
+        Preconditions.checkState(_port > 0, "Netty port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType, partitionId);
+      case GRPC:
+        Preconditions.checkState(_grpcPort > 0, "GRPC port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _grpcPort, tableType, partitionId);
+      case NETTY_TLS:
+        Preconditions.checkState(_nettyTlsPort > 0, "Netty TLS port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, partitionId, true);
+      default:
+        throw new IllegalStateException("Unsupported routing type: " + routingType);
+    }
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {

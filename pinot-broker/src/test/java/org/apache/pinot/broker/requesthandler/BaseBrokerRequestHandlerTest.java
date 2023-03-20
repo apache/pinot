@@ -198,7 +198,8 @@ public class BaseBrokerRequestHandlerTest {
     when(routingManager.routingExists(anyString())).thenReturn(true);
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(Collections
-        .singletonMap(new ServerInstance(new InstanceConfig("server01_9000")), Collections.singletonList("segment01")));
+        .singletonMap(new ServerInstance(new InstanceConfig("server01_9000")),
+            Collections.singletonMap(0, Collections.singletonList("segment01"))));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
@@ -220,10 +221,10 @@ public class BaseBrokerRequestHandlerTest {
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
               BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-              @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+              @Nullable Map<ServerInstance, Map<Integer, List<String>>> offlineRoutingTable,
               @Nullable BrokerRequest realtimeBrokerRequest,
-              @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-              RequestContext requestContext)
+              @Nullable Map<ServerInstance, Map<Integer, List<String>>> realtimeRoutingTable, long timeoutMs,
+              ServerStats serverStats, RequestContext requestContext)
               throws Exception {
             latch.await();
             return null;

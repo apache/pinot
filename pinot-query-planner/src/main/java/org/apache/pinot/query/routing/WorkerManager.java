@@ -90,11 +90,12 @@ public class WorkerManager {
         String tableType = routingEntry.getKey();
         RoutingTable routingTable = routingEntry.getValue();
         // for each server instance, attach all table types and their associated segment list.
-        for (Map.Entry<ServerInstance, List<String>> serverEntry
+        for (Map.Entry<ServerInstance, Map<Integer, List<String>>> serverEntry
             : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
           serverInstanceToSegmentsMap.putIfAbsent(serverEntry.getKey(), new HashMap<>());
           Map<String, List<String>> tableTypeToSegmentListMap = serverInstanceToSegmentsMap.get(serverEntry.getKey());
-          Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue()) == null,
+          // TODO: support partition routing
+          Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().get(0)) == null,
               "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
         }
       }

@@ -85,8 +85,10 @@ public class QueryRouter {
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
+      @Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable Map<ServerInstance, Map<Integer, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Map<Integer, List<String>>> realtimeRoutingTable,
       long timeoutMs) {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
@@ -97,20 +99,28 @@ public class QueryRouter {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
-      for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
+      for (Map.Entry<ServerInstance, Map<Integer, List<String>>> routingEntry : offlineRoutingTable.entrySet()) {
+        for (Map.Entry<Integer, List<String>> partitionedEntry : routingEntry.getValue().entrySet()) {
+          ServerRoutingInstance serverRoutingInstance = routingEntry.getKey().toServerRoutingInstance(
+              partitionedEntry.getKey(), TableType.OFFLINE,
+              preferTls ? ServerInstance.RoutingType.NETTY_TLS : ServerInstance.RoutingType.NETTY);
+          InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest,
+              partitionedEntry.getValue());
+          requestMap.put(serverRoutingInstance, instanceRequest);
+        }
       }
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
+      for (Map.Entry<ServerInstance, Map<Integer, List<String>>> routingEntry : realtimeRoutingTable.entrySet()) {
+        for (Map.Entry<Integer, List<String>> partitionedEntry : routingEntry.getValue().entrySet()) {
+          ServerRoutingInstance serverRoutingInstance = routingEntry.getKey().toServerRoutingInstance(
+              partitionedEntry.getKey(), TableType.REALTIME,
+              preferTls ? ServerInstance.RoutingType.NETTY_TLS : ServerInstance.RoutingType.NETTY);
+          InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest,
+              partitionedEntry.getValue());
+          requestMap.put(serverRoutingInstance, instanceRequest);
+        }
       }
     }
 

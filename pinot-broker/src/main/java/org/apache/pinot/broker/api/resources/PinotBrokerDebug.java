@@ -99,9 +99,9 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, Map<ServerInstance, List<String>>> getRoutingTable(
+  public Map<String, Map<ServerInstance, Map<Integer, List<String>>>> getRoutingTable(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
-    Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
+    Map<String, Map<ServerInstance, Map<Integer, List<String>>>> result = new TreeMap<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -135,7 +135,7 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, List<String>> getRoutingTableForQuery(
+  public Map<ServerInstance, Map<Integer, List<String>>> getRoutingTableForQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query) {
     RoutingTable routingTable = _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(query),
         getRequestId());

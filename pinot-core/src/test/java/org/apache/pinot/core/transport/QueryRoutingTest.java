@@ -59,8 +59,8 @@ public class QueryRoutingTest {
       SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
   private static final BrokerRequest BROKER_REQUEST =
       CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
-  private static final Map<ServerInstance, List<String>> ROUTING_TABLE =
-      Collections.singletonMap(SERVER_INSTANCE, Collections.emptyList());
+  private static final Map<ServerInstance, Map<Integer, List<String>>> ROUTING_TABLE =
+      Collections.singletonMap(SERVER_INSTANCE, Collections.singletonMap(0, Collections.emptyList()));
 
   private QueryRouter _queryRouter;
   private ServerRoutingStatsManager _serverRoutingStatsManager;

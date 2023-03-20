@@ -86,9 +86,10 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-      RequestContext requestContext)
+      @Nullable Map<ServerInstance, Map<Integer, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Map<Integer, List<String>>> realtimeRoutingTable,
+      long timeoutMs, ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     // TODO: Support failure detection
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -111,19 +112,22 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
    * Query pinot server for data table.
    */
   private void sendRequest(long requestId, TableType tableType, BrokerRequest brokerRequest,
-      Map<ServerInstance, List<String>> routingTable,
+      Map<ServerInstance, Map<Integer, List<String>>> routingTable,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, boolean trace) {
-    for (Map.Entry<ServerInstance, List<String>> routingEntry : routingTable.entrySet()) {
+    for (Map.Entry<ServerInstance, Map<Integer, List<String>>> routingEntry : routingTable.entrySet()) {
       ServerInstance serverInstance = routingEntry.getKey();
-      List<String> segments = routingEntry.getValue();
-      String serverHost = serverInstance.getHostname();
-      int port = serverInstance.getGrpcPort();
-      // TODO: enable throttling on per host bases.
-      Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverHost, port,
-          new GrpcRequestBuilder().setRequestId(requestId).setBrokerId(_brokerId).setEnableTrace(trace)
-              .setEnableStreaming(true).setBrokerRequest(brokerRequest).setSegments(segments).build());
-      responseMap.put(serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.GRPC),
-          streamingResponse);
+      for (Map.Entry<Integer, List<String>> partitionedEntry : routingEntry.getValue().entrySet()) {
+        List<String> segments = partitionedEntry.getValue();
+        String serverHost = serverInstance.getHostname();
+        int port = serverInstance.getGrpcPort();
+        // TODO: enable throttling on per host bases.
+        Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverHost, port,
+            new GrpcRequestBuilder().setRequestId(requestId).setBrokerId(_brokerId).setEnableTrace(trace)
+                .setEnableStreaming(true).setBrokerRequest(brokerRequest).setSegments(segments).build());
+        responseMap.put(serverInstance.toServerRoutingInstance(partitionedEntry.getKey(), tableType,
+                ServerInstance.RoutingType.GRPC),
+            streamingResponse);
+      }
     }
   }
 

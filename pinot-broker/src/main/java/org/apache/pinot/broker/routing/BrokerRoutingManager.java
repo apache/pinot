@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.MapUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -61,6 +62,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -105,6 +107,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private String _idealStatePathPrefix;
   private String _instanceConfigsPath;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  // TODO: Entries are never removed from map
+  private Map<String, SegmentMetadataCache> _segmentMetadataCacheMap;
 
   private Set<String> _routableServers;
 
@@ -123,6 +127,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
+    _segmentMetadataCacheMap = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -406,6 +411,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    String partitionColumn = null;
+    if (segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap())) {
+      partitionColumn = segmentPartitionConfig.getColumnPartitionMap().keySet().iterator().next();
+    }
+    _segmentMetadataCacheMap.putIfAbsent(tableNameWithType, new SegmentMetadataCache(tableNameWithType,
+        partitionColumn, _propertyStore));
+
     String idealStatePath = getIdealStatePath(tableNameWithType);
     IdealState idealState = getIdealState(idealStatePath);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
@@ -434,6 +447,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (SegmentPruner segmentPruner : segmentPruners) {
       segmentPruner.init(idealState, externalView, preSelectedOnlineSegments);
     }
+    _segmentMetadataCacheMap.get(tableNameWithType).init(preSelectedOnlineSegments);
     AdaptiveServerSelector adaptiveServerSelector =
         AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
     InstanceSelector instanceSelector =
@@ -491,7 +505,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
             segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, timeBoundaryManager,
-            queryTimeoutMs);
+            queryTimeoutMs, _segmentMetadataCacheMap.get(tableNameWithType));
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -575,19 +589,27 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return null;
     }
     InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, requestId);
-    Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
-    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
-    for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
+    SegmentMetadataCache segmentMetadataCache =
+        _segmentMetadataCacheMap.get(brokerRequest.getPinotQuery().getDataSource().getTableName());
+    Map<ServerInstance, Map<Integer, List<String>>> serverInstanceToPartitionedSegmentsMap = new HashMap<>();
+    for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        serverInstanceToSegmentsMap.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(entry.getKey());
+        // add segment into the segments list by the partitionId.
+        Map<Integer, List<String>> selectedPartitionedSegmentMap =
+            serverInstanceToPartitionedSegmentsMap.computeIfAbsent(serverInstance, k -> new HashMap<>());
+        String segmentName = entry.getKey();
+        int partitionId = segmentMetadataCache.getPartitionId(segmentName);
+        List<String> segments = selectedPartitionedSegmentMap.getOrDefault(partitionId, new ArrayList<>());
+        segments.add(entry.getKey());
+        selectedPartitionedSegmentMap.put(partitionId, segments);
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
     }
-    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments(),
-        selectionResult.getNumPrunedSegments());
+    return new RoutingTable(serverInstanceToPartitionedSegmentsMap, selectionResult.getUnavailableSegments(),
+        selectionResult.getNumPrunedSegments(), null);
   }
 
   @Override
@@ -638,6 +660,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     final List<SegmentPruner> _segmentPruners;
     final InstanceSelector _instanceSelector;
     final Long _queryTimeoutMs;
+    final SegmentMetadataCache _segmentMetadataCache;
 
     // Cache IdealState and ExternalView version for the last update
     transient int _lastUpdateIdealStateVersion;
@@ -648,7 +671,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
-        @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
+        @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs,
+        SegmentMetadataCache segmentMetadataCache) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -660,6 +684,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       _lastUpdateExternalViewVersion = lastUpdateExternalViewVersion;
       _timeBoundaryManager = timeBoundaryManager;
       _queryTimeoutMs = queryTimeoutMs;
+      _segmentMetadataCache = segmentMetadataCache;
     }
 
     String getTableNameWithType() {
@@ -693,6 +718,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     void onAssignmentChange(IdealState idealState, ExternalView externalView) {
       Set<String> onlineSegments = getOnlineSegments(idealState);
       Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
+      _segmentMetadataCache.onAssignmentChange(preSelectedOnlineSegments);
       _segmentSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       for (SegmentPruner segmentPruner : _segmentPruners) {
         segmentPruner.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
@@ -710,6 +736,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
 
     void refreshSegment(String segment) {
+      _segmentMetadataCache.refreshSegment(segment);
       for (SegmentPruner segmentPruner : _segmentPruners) {
         segmentPruner.refreshSegment(segment);
       }

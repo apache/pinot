@@ -18,25 +18,43 @@
  */
 package org.apache.pinot.core.routing;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
 public class RoutingTable {
-  private final Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
+  private final Map<ServerInstance, Map<Integer, List<String>>> _serverInstanceToPartitionedSegmentsMap;
+  private final Map<ServerInstance, Integer> _serverInstancePartitionMap;
   private final List<String> _unavailableSegments;
   private final int _numPrunedSegments;
 
-  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments,
-      int numPrunedSegments) {
-    _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
+  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap,
+      List<String> unavailableSegments, int numPrunedSegments) {
+    _serverInstanceToPartitionedSegmentsMap = new HashMap<>();
+    serverInstanceToSegmentsMap.forEach((key, value) -> {
+      Map<Integer, List<String>> partitionedSegments = new HashMap<>();
+      partitionedSegments.put(0, value);
+      _serverInstanceToPartitionedSegmentsMap.put(key, partitionedSegments);
+    });
     _unavailableSegments = unavailableSegments;
     _numPrunedSegments = numPrunedSegments;
+    _serverInstancePartitionMap = null;
   }
 
-  public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {
-    return _serverInstanceToSegmentsMap;
+  public RoutingTable(Map<ServerInstance, Map<Integer, List<String>>> serverInstanceToPartitionedSegmentsMap,
+      List<String> unavailableSegments, int numPrunedSegments,
+      @Nullable Map<ServerInstance, Integer> serverInstancePartitionMap) {
+    _serverInstanceToPartitionedSegmentsMap = serverInstanceToPartitionedSegmentsMap;
+    _unavailableSegments = unavailableSegments;
+    _numPrunedSegments = numPrunedSegments;
+    _serverInstancePartitionMap = serverInstancePartitionMap;
+  }
+
+  public Map<ServerInstance, Map<Integer, List<String>>> getServerInstanceToSegmentsMap() {
+    return _serverInstanceToPartitionedSegmentsMap;
   }
 
   public List<String> getUnavailableSegments() {
@@ -45,5 +63,9 @@ public class RoutingTable {
 
   public int getNumPrunedSegments() {
     return _numPrunedSegments;
+  }
+
+  public Map<ServerInstance, Integer> getServerInstancePartitionMap() {
+    return _serverInstancePartitionMap;
   }
 }

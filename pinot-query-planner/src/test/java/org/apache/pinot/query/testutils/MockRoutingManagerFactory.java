@@ -54,7 +54,7 @@ public class MockRoutingManagerFactory {
   private final Map<String, RoutingTable> _routingTableMap;
   private final List<String> _hybridTables;
 
-  private final Map<String, Map<ServerInstance, List<String>>> _tableServerSegmentMap;
+  private final Map<String, Map<ServerInstance, Map<Integer, List<String>>>> _tableServerSegmentMap;
 
   public MockRoutingManagerFactory(int... ports) {
     _hybridTables = new ArrayList<>();
@@ -83,13 +83,16 @@ public class MockRoutingManagerFactory {
 
   public MockRoutingManagerFactory registerSegment(int insertToServerPort, String tableNameWithType,
       String segmentName) {
-    Map<ServerInstance, List<String>> serverSegmentMap =
+    Map<ServerInstance, Map<Integer, List<String>>> serverSegmentMap =
         _tableServerSegmentMap.getOrDefault(tableNameWithType, new HashMap<>());
     ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
 
-    List<String> sSegments = serverSegmentMap.getOrDefault(serverInstance, new ArrayList<>());
+    // TODO: support partition routing
+    Map<Integer, List<String>> partitionSegmentMap = serverSegmentMap.getOrDefault(serverInstance, new HashMap<>());
+    List<String> sSegments = partitionSegmentMap.getOrDefault(0, new ArrayList<>());
     sSegments.add(segmentName);
-    serverSegmentMap.put(serverInstance, sSegments);
+    partitionSegmentMap.put(0, sSegments);
+    serverSegmentMap.put(serverInstance, partitionSegmentMap);
     _tableServerSegmentMap.put(tableNameWithType, serverSegmentMap);
     return this;
   }
@@ -97,9 +100,10 @@ public class MockRoutingManagerFactory {
   public RoutingManager buildRoutingManager() {
     // create all the fake routing tables
     _routingTableMap.clear();
-    for (Map.Entry<String, Map<ServerInstance, List<String>>> tableEntry : _tableServerSegmentMap.entrySet()) {
+    for (Map.Entry<String, Map<ServerInstance, Map<Integer, List<String>>>> tableEntry
+        : _tableServerSegmentMap.entrySet()) {
       String tableNameWithType = tableEntry.getKey();
-      RoutingTable fakeRoutingTable = new RoutingTable(tableEntry.getValue(), Collections.emptyList(), 0);
+      RoutingTable fakeRoutingTable = new RoutingTable(tableEntry.getValue(), Collections.emptyList(), 0, null);
       _routingTableMap.put(tableNameWithType, fakeRoutingTable);
     }
     return new FakeRoutingManager(_routingTableMap, _serverInstances, _hybridTables);

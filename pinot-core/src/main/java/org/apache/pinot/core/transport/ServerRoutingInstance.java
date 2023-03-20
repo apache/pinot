@@ -43,14 +43,26 @@ public class ServerRoutingInstance {
   private final String _hostname;
   private final int _port;
   private final TableType _tableType;
+  private final int _partitionId;
   private final boolean _tlsEnabled;
 
-  public ServerRoutingInstance(String instanceId, String hostname, int port, TableType tableType, boolean tlsEnabled) {
+
+  public ServerRoutingInstance(String instanceId, String hostname, int port, TableType tableType, int partitionId,
+      boolean tlsEnabled) {
     _instanceId = instanceId;
     _hostname = hostname;
     _port = port;
     _tableType = tableType;
+    _partitionId = partitionId;
     _tlsEnabled = tlsEnabled;
+  }
+
+  public ServerRoutingInstance(String instanceId, String hostname, int port, TableType tableType, int partitionId) {
+    this(instanceId, hostname, port, tableType, partitionId, false);
+  }
+
+  public ServerRoutingInstance(String instanceId, String hostname, int port, TableType tableType, boolean tlsEnabled) {
+    this(instanceId, hostname, port, tableType, 0, tlsEnabled);
   }
 
   public ServerRoutingInstance(String instanceId, String hostname, int port, TableType tableType) {
@@ -105,18 +117,24 @@ public class ServerRoutingInstance {
     ServerRoutingInstance that = (ServerRoutingInstance) o;
     // NOTE: Only check hostname, port and tableType for performance concern because they can identify a routing
     //       instance within the same query
-    return _hostname.equals(that._hostname) && _port == that._port && _tableType == that._tableType;
+    return _hostname.equals(that._hostname) && _port == that._port && _tableType == that._tableType
+        && _partitionId == that._partitionId;
   }
 
   @Override
   public int hashCode() {
     // NOTE: Only check hostname, port and tableType for performance concern because they can identify a routing
     //       instance within the same query
-    return 31 * 31 * _hostname.hashCode() + 31 * Integer.hashCode(_port) + _tableType.hashCode();
+    return 31 * 31 * 31 + _partitionId + 31 * 31 * _hostname.hashCode() + 31 * Integer.hashCode(_port)
+        + _tableType.hashCode();
   }
 
   @Override
   public String toString() {
     return getShortName();
+  }
+
+  public int getPartitionId() {
+    return _partitionId;
   }
 }
