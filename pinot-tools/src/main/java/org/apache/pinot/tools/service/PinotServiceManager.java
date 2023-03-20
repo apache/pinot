@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.common.utils.JvmUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.minion.MinionStarter;
@@ -214,6 +215,7 @@ public class PinotServiceManager {
       LOGGER.info("Skip Starting Pinot Service Manager admin application");
     } else {
       LOGGER.info("Starting Pinot Service Manager admin application on port: {}", _port);
+      LOGGER.info(JvmUtils.getJvmInputArguments());
       _pinotServiceManagerAdminApplication = new PinotServiceManagerAdminApiApplication(this);
       _pinotServiceManagerAdminApplication.start(_port);
     }
