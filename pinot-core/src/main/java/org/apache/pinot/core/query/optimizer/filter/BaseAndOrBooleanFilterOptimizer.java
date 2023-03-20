@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.core.query.optimizer.filter;
 
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
-
-import javax.annotation.Nullable;
-import java.util.List;
 
 /**
  * This base class acts as a helper for any optimizer that is effectively removing filter conditions.
