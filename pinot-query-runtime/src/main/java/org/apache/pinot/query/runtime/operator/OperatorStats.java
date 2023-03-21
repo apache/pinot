@@ -69,6 +69,11 @@ public class OperatorStats {
     }
   }
 
+  public void resetStartTime() {
+    _startTimeMs = -1;
+    _executeStopwatch.reset();
+  }
+
   public void recordRow(int numBlock, int numRows) {
     _numBlock += numBlock;
     _numRows += numRows;

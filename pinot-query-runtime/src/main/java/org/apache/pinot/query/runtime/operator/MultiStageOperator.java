@@ -42,6 +42,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   protected final Map<String, OperatorStats> _operatorStatsMap;
   private final String _operatorId;
   private final OpChainExecutionContext _context;
+  private boolean _firstDataBlockEncountered;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
@@ -64,8 +65,15 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       _operatorStats.startTimer();
       TransferableBlock nextBlock = getNextBlock();
+
+      if (!_firstDataBlockEncountered && nextBlock.isNoOpBlock()) {
+        _operatorStats.resetStartTime();
+      } else {
+        _firstDataBlockEncountered = true;
+        _operatorStats.endTimer();
+      }
+
       _operatorStats.recordRow(1, nextBlock.getNumRows());
-      _operatorStats.endTimer();
       if (nextBlock.isEndOfStreamBlock()) {
         if (nextBlock.isSuccessfulEndOfStreamBlock()) {
           for (MultiStageOperator op : getChildOperators()) {
