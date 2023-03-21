@@ -31,6 +31,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SchemaUtils;
@@ -112,12 +113,18 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, instancePartitionsName);
   }
 
-  public static String constructPropertyStorePathForControllerJob() {
-    return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX);
-  }
-
   public static String constructPropertyStorePathForResource(String resourceName) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName);
+  }
+
+  public static String constructPropertyStorePathForControllerJob(ControllerJobType jobType) {
+    if (jobType == ControllerJobType.TABLE_REBALANCE) {
+      return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX, jobType.name());
+    } else {
+      // For other types, we will continue to use the root path until we migrate
+      // other types to use separate nodes based on jobType like TABLE_REBALANCE
+      return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX);
+    }
   }
 
   public static String constructPropertyStorePathForResourceConfig(String resourceName) {

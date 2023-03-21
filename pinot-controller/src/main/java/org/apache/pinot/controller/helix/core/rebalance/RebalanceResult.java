@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RebalanceResult {
+  private final String _jobId;
   private final Status _status;
   private final Map<InstancePartitionsType, InstancePartitions> _instanceAssignment;
   private final Map<String, InstancePartitions> _tierInstanceAssignment;
@@ -36,16 +37,23 @@ public class RebalanceResult {
   private final String _description;
 
   @JsonCreator
-  public RebalanceResult(@JsonProperty(value = "status", required = true) Status status,
+  public RebalanceResult(@JsonProperty(value = "jobId", required = true) String jobId,
+      @JsonProperty(value = "status", required = true) Status status,
       @JsonProperty(value = "description", required = true) String description,
       @JsonProperty("instanceAssignment") @Nullable Map<InstancePartitionsType, InstancePartitions> instanceAssignment,
       @JsonProperty("tierInstanceAssignment") @Nullable Map<String, InstancePartitions> tierInstanceAssignment,
       @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment) {
+    _jobId = jobId;
     _status = status;
     _description = description;
     _instanceAssignment = instanceAssignment;
     _tierInstanceAssignment = tierInstanceAssignment;
     _segmentAssignment = segmentAssignment;
+  }
+
+  @JsonProperty
+  public String getJobId() {
+    return _jobId;
   }
 
   @JsonProperty
