@@ -74,7 +74,7 @@ If `segmentsPerSplit` is equal to 1, there will be created 6 Spark partition;
 
 If `segmentsPerSplit` value is too low, that means more parallelism. But this also mean that a lot of connection will be opened with Pinot servers, and will increase QPS on the Pinot servers. 
 
-If `segmetnsPerSplit` value is too high, that means less parallelism. Each Pinot server will scan more segments per request.  
+If `segmentsPerSplit` value is too high, that means less parallelism. Each Pinot server will scan more segments per request.  
 
 **Note:** Pinot servers prunes segments based on the segment metadata when query comes. In some cases(for example filtering based on the some columns), some servers may not return data. Therefore, some Spark partitions will be empty. In this cases, `repartition()` may be applied for efficient data analysis after loading data to Spark.
 
@@ -120,7 +120,7 @@ val df = spark.read
       .load()
       .filter($"DestStateName" === "Florida")
       .filter($"Origin" === "ORD")
-      .select($"Carrier")
+      .select($"DestStateName", $"Origin", $"Carrier")
 ```
 
 - Offline query: `select DestStateName, Origin, Carrier from airlineStats_OFFLINE where DestStateName = 'Florida and Origin = 'ORD' LIMIT {Int.MaxValue}`
@@ -137,6 +137,5 @@ val df = spark.read
 | usePushDownFilters | Push filters to pinot servers or not. If true, data exchange between pinot server and spark will be minimized. | No | true |
 | segmentsPerSplit | Represents the maximum segment count that will be scanned by pinot server in one connection | No | 3 | 
 | pinotServerTimeoutMs | The maximum timeout(ms) to get data from pinot server | No | 10 mins |
-
-
- 
+| useGrpcServer | Boolean value to enable reads via gRPC. This option is more memory efficient both on Pinot server and Spark executor side because it utilizes streaming. Requires gRPC to be enabled on Pinot server. | No | false |
+| queryOptions | Comma separated list of Pinot query options (e.g. "enableNullHandling=true,skipUpsert=true") | No | "" |

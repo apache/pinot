@@ -152,8 +152,8 @@ public class QueryEnvironment {
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
-    } catch (Exception e) {
-      throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
+    } catch (Throwable t) {
+      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
   }
 

@@ -73,15 +73,16 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
       }
 
     val whereCondition = FilterPushDown.compileFiltersToSqlWhereClause(this.acceptedFilters)
-    val generatedSQLs = ScanQueryGenerator.generate(
+    val scanQuery = ScanQueryGenerator.generate(
       readParameters.tableName,
       readParameters.tableType,
       timeBoundaryInfo,
       schema.fieldNames,
-      whereCondition
+      whereCondition,
+      readParameters.queryOptions
     )
 
-    val routingTable = PinotClusterClient.getRoutingTable(readParameters.broker, generatedSQLs)
+    val routingTable = PinotClusterClient.getRoutingTable(readParameters.broker, scanQuery)
 
     val instanceInfo : Map[String, InstanceInfo] = Map()
     val instanceInfoReader = (instance:String) => { // cached reader to reduce network round trips
@@ -92,7 +93,7 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
     }
 
     PinotSplitter
-      .generatePinotSplits(generatedSQLs, routingTable, instanceInfoReader, readParameters)
+      .generatePinotSplits(scanQuery, routingTable, instanceInfoReader, readParameters)
       .zipWithIndex
       .map {
         case (pinotSplit, partitionId) =>
