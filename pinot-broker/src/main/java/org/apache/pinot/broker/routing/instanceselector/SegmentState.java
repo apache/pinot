@@ -23,8 +23,9 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-
-// Class used to represent the instance state for new segment.
+/**
+ *  Class used to represent the instance state for new segment.
+ */
 public class SegmentState {
   // List of SegmentInstanceCandidate: which contains instance name and online flags.
   // The candidates have to be in instance sorted order.

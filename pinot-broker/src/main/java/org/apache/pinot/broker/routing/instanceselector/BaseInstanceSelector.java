@@ -67,6 +67,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  * 1) Inconsistent selection of new segments across queries. (some queries will serve new segments and others won't)
  * 2) When there is no state update from helix, new segments won't be retired because of the time passing.
  * (those with creation time more than 5 minutes ago)
+ * TODO: refresh new/old segment state where there is no update from helix for long time.
  */
 abstract class BaseInstanceSelector implements InstanceSelector {
   // To prevent int overflow, reset the request id once it reaches this value

@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-// Represents an instance candidate for segment.
-// Note that instance can be online or offline.
+/** Represents an instance candidate for segment.
+ *  Note that instance can be online or offline.
+ */
 public class SegmentInstanceCandidate {
   public static SegmentInstanceCandidate of(String instance, boolean isOnline) {
     return new SegmentInstanceCandidate(instance, isOnline);

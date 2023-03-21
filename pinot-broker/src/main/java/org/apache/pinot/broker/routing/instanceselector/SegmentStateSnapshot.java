@@ -51,7 +51,9 @@ public class SegmentStateSnapshot {
   private Map<String, List<SegmentInstanceCandidate>> _segmentCandidates;
   private Set<String> _unavailableSegments;
 
-  // Create a segment state snapshot based on some in-memory states to be used for routing.
+  /**
+   * Create a segment state snapshot based on some in-memory states to be used for routing.
+   **/
   public static SegmentStateSnapshot createSnapshot(String tableNameWithType, Map<String, SegmentState> oldSegmentState,
       Map<String, SegmentState> newSegmentState, Set<String> enabledInstance, BrokerMetrics brokerMetrics) {
     Map<String, List<SegmentInstanceCandidate>> segmentCandidates = new HashMap<>();
@@ -71,7 +73,9 @@ public class SegmentStateSnapshot {
     _unavailableSegments = unavailableSegments;
   }
 
-  // Calculate online instance map for routing and unavailable segments from segment states.
+  /**
+   * Calculate online instance map for routing and unavailable segments from segment states.
+   */
   private static void calculateSegmentSelectionCandidate(String tableNameWithType,
       Map<String, SegmentState> segmentState, Set<String> enabledInstance, BrokerMetrics brokerMetrics,
       boolean shouldReportUnavailableSegments, Map<String, List<SegmentInstanceCandidate>> selectionCandidates,
