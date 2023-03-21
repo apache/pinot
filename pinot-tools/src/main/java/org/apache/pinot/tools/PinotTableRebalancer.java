@@ -50,6 +50,8 @@ public class PinotTableRebalancer extends PinotZKChanger {
         externalViewCheckIntervalInMs);
     _rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
         externalViewStabilizationTimeoutInMs);
+    _rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID,
+        TableRebalancer.createUniqueRebalanceJobIdentifier());
   }
 
   public RebalanceResult rebalance(String tableNameWithType) {

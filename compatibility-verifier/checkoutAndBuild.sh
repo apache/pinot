@@ -73,7 +73,8 @@ function build() {
   local buildTests=$2
   local buildId=$3
   local repoOption=""
-  local versionOption="-Djdk.version=8"
+  local versionOption="-Djdk.version=11"
+  local maxRetry=5
 
   mkdir -p ${MVN_CACHE_DIR}
 
@@ -85,14 +86,28 @@ function build() {
     mvn versions:commit -q -B 1>${outFile} 2>&1
     repoOption="-Dmaven.repo.local=${mvnCache}/${buildId}"
   fi
-
-  mvn install package -DskipTests -Pbin-dist ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
-  if [ $? -ne 0 ]; then exit 1; fi
-  mvn -pl pinot-tools package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
-  if [ $? -ne 0 ]; then exit 1; fi
+  for i in $(seq 1 $maxRetry); do
+    mvn clean install -DskipTests -Pbin-dist ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+    if [ $? -eq 0 ]; then break; fi
+    if [ $i -eq $maxRetry ]; then exit 1; fi
+    echo "Build failed, retrying after 30 seconds"
+    sleep 30
+  done
+  for i in $(seq 1 $maxRetry); do
+    mvn -pl pinot-tools package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+    if [ $? -eq 0 ]; then break; fi
+    if [ $i -eq $maxRetry ]; then exit 1; fi
+    echo "Build failed, retrying after 30 seconds"
+    sleep 30
+  done
   if [ $buildTests -eq 1 ]; then
-    mvn -pl pinot-integration-tests package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
-    if [ $? -ne 0 ]; then exit 1; fi
+    for i in $(seq 1 $maxRetry); do
+      mvn -pl pinot-integration-tests package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+      if [ $? -eq 0 ]; then break; fi
+      if [ $i -eq $maxRetry ]; then exit 1; fi
+      echo "Build failed, retrying after 30 seconds"
+      sleep 30
+    done
   fi
 }
 
