@@ -92,7 +92,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   @Override
-  public ColumnConfigDeserializer<FstIndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<FstIndexConfig> createDeserializer() {
     return IndexConfigDeserializer.fromIndexes("fst", getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.FST,
@@ -120,13 +120,13 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   @Override
-  public ReaderFactory getReaderFactory() {
-    return new ReaderFactory();
+  protected IndexReaderFactory<TextIndexReader> createReaderFactory() {
+    return ReaderFactory.INSTANCE;
   }
 
   public static TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
       throws IndexReaderConstraintException, IOException {
-    return INSTANCE.getReaderFactory().createIndexReader(dataBuffer, metadata);
+    return ReaderFactory.INSTANCE.createIndexReader(dataBuffer, metadata);
   }
 
   @Override
@@ -141,6 +141,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   public static class ReaderFactory extends IndexReaderFactory.Default<FstIndexConfig, TextIndexReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
     @Override
     protected IndexType<FstIndexConfig, TextIndexReader, ?> getIndexType() {
       return FstIndexType.INSTANCE;

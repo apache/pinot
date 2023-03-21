@@ -80,7 +80,7 @@ public class InvertedIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<IndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
     ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
         tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
         (acum, column) -> acum.put(column, IndexConfig.ENABLED));
@@ -107,7 +107,7 @@ public class InvertedIndexType
   }
 
   @Override
-  public IndexReaderFactory<InvertedIndexReader> getReaderFactory() {
+  protected IndexReaderFactory<InvertedIndexReader> createReaderFactory() {
     return new ReaderFactory();
   }
 
@@ -132,7 +132,7 @@ public class InvertedIndexType
 
   public InvertedIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws IOException {
-    return new ReaderFactory().createIndexReader(segmentReader, columnMetadata);
+    return ReaderFactory.INSTANCE.createIndexReader(segmentReader, columnMetadata);
   }
 
   @Override
@@ -142,6 +142,7 @@ public class InvertedIndexType
   }
 
   public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
     @Override
     public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)

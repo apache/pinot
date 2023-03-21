@@ -111,7 +111,7 @@ public class DictionaryIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<DictionaryIndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<DictionaryIndexConfig> createDeserializer() {
     // reads tableConfig.indexingConfig.noDictionaryConfig
     ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictConf = IndexConfigDeserializer.fromMap(
         tableConfig -> tableConfig.getIndexingConfig() == null ? Collections.emptyMap()
@@ -249,7 +249,7 @@ public class DictionaryIndexType
   }
 
   @Override
-  public IndexReaderFactory<Dictionary> getReaderFactory() {
+  protected IndexReaderFactory<Dictionary> createReaderFactory() {
     return new IndexReaderFactory.Default<DictionaryIndexConfig, Dictionary>() {
       @Override
       protected IndexType<DictionaryIndexConfig, Dictionary, ?> getIndexType() {

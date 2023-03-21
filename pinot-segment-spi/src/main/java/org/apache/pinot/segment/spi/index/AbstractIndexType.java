@@ -31,8 +31,11 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
 
   private final String _id;
   private ColumnConfigDeserializer<C> _deserializer;
+  private IndexReaderFactory<IR> _readerFactory;
 
-  protected abstract ColumnConfigDeserializer<C> getDeserializer();
+  protected abstract ColumnConfigDeserializer<C> createDeserializer();
+
+  protected abstract IndexReaderFactory<IR> createReaderFactory();
 
   public AbstractIndexType(String id) {
     _id = id;
@@ -46,9 +49,17 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
   @Override
   public Map<String, C> getConfig(TableConfig tableConfig, Schema schema) {
     if (_deserializer == null) {
-      _deserializer = getDeserializer();
+      _deserializer = createDeserializer();
     }
     return _deserializer.deserialize(tableConfig, schema);
+  }
+
+  @Override
+  public IndexReaderFactory<IR> getReaderFactory() {
+    if (_readerFactory == null) {
+      _readerFactory = createReaderFactory();
+    }
+    return _readerFactory;
   }
 
   @Override

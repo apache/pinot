@@ -91,7 +91,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   @Override
-  public ColumnConfigDeserializer<RangeIndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<RangeIndexConfig> createDeserializer() {
     return IndexConfigDeserializer.fromIndexes("range", getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           if (tableConfig.getIndexingConfig() == null) {
@@ -130,7 +130,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   @Override
-  public IndexReaderFactory<RangeIndexReader> getReaderFactory() {
+  protected IndexReaderFactory<RangeIndexReader> createReaderFactory() {
     return new ReaderFactory();
   }
 

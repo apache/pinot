@@ -127,7 +127,7 @@ public class ForwardIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<ForwardIndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
     ColumnConfigDeserializer<ForwardIndexConfig> fromFieldConfig = IndexConfigDeserializer.fromCollection(
         TableConfig::getFieldConfigList,
@@ -189,7 +189,7 @@ public class ForwardIndexType
   }
 
   @Override
-  public IndexReaderFactory<ForwardIndexReader> getReaderFactory() {
+  protected IndexReaderFactory<ForwardIndexReader> createReaderFactory() {
     return ForwardIndexReaderFactory.INSTANCE;
   }
 

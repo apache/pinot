@@ -68,7 +68,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
-  public ColumnConfigDeserializer<IndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
     return IndexConfigDeserializer.fromIndexes("null", getIndexConfigClass())
         .withFallbackAlternative(
             IndexConfigDeserializer.ifIndexingConfig(
@@ -84,7 +84,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
-  public IndexReaderFactory<NullValueVectorReader> getReaderFactory() {
+  protected IndexReaderFactory<NullValueVectorReader> createReaderFactory() {
     return new IndexReaderFactory<NullValueVectorReader>() {
       @Nullable
       @Override

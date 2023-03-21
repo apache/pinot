@@ -92,7 +92,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
-  public ColumnConfigDeserializer<TextIndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<TextIndexConfig> createDeserializer() {
     return IndexConfigDeserializer.fromIndexes("text", getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
@@ -148,7 +148,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
-  public IndexReaderFactory<TextIndexReader> getReaderFactory() {
+  protected IndexReaderFactory<TextIndexReader> createReaderFactory() {
     return new IndexReaderFactory<TextIndexReader>() {
       @Nullable
       @Override

@@ -72,7 +72,7 @@ public class BloomIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<BloomFilterConfig> getDeserializer() {
+  public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer() {
     return IndexConfigDeserializer.fromIndexes("bloom", getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(
@@ -114,6 +114,11 @@ public class BloomIndexType
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
+  }
+
+  @Override
+  protected IndexReaderFactory<BloomFilterReader> createReaderFactory() {
+    return ReaderFactory.INSTANCE;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<BloomFilterConfig, BloomFilterReader> {

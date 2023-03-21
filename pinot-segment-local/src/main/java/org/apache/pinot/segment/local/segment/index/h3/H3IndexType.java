@@ -78,7 +78,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
-  public ColumnConfigDeserializer<H3IndexConfig> getDeserializer() {
+  public ColumnConfigDeserializer<H3IndexConfig> createDeserializer() {
     return IndexConfigDeserializer.fromIndexes("h3", getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.H3,
@@ -99,7 +99,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
-  public IndexReaderFactory<H3IndexReader> getReaderFactory() {
+  protected IndexReaderFactory<H3IndexReader> createReaderFactory() {
     return new IndexReaderFactory.Default<H3IndexConfig, H3IndexReader>() {
       @Override
       protected IndexType<H3IndexConfig, H3IndexReader, ?> getIndexType() {
