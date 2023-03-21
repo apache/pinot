@@ -48,6 +48,7 @@ public class SegmentGenerationUtils {
   }
 
   private static final String OFFLINE = "OFFLINE";
+  private static final String REALTIME = "REALTIME";
   public static final String PINOT_PLUGINS_TAR_GZ = "pinot-plugins.tar.gz";
   public static final String PINOT_PLUGINS_DIR = "pinot-plugins-dir";
 
@@ -139,6 +140,9 @@ public class SegmentGenerationUtils {
     }
     if (tableJsonNode.has(OFFLINE)) {
       tableJsonNode = tableJsonNode.get(OFFLINE);
+    }
+    if (tableJsonNode.has(REALTIME)) {
+      tableJsonNode = tableJsonNode.get(REALTIME);
     }
     try {
       return JsonUtils.jsonNodeToObject(tableJsonNode, TableConfig.class);
