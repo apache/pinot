@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
+import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.request.BrokerRequest;
 
@@ -35,18 +38,19 @@ public interface SegmentPruner {
    * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
    * only once before calling other methods.
    */
-  void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
+  void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments, List<ZNRecord> znRecords);
 
   /**
    * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
    * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    */
-  void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
+  void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+      List<ZNRecord> znRecords);
 
   /**
    * Refreshes the metadata for the given segment (called when segment is getting refreshed).
    */
-  void refreshSegment(String segment);
+  void refreshSegment(String segment, @Nullable ZNRecord znRecord);
 
   /**
    * Prunes the segments queried by the given broker request, returns the selected segments to be queried.

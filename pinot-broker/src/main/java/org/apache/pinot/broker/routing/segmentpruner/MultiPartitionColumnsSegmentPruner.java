@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.segmentpruner;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,12 +27,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -58,33 +54,21 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
 
   private final String _tableNameWithType;
   private final Set<String> _partitionColumns;
-  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private final String _segmentZKMetadataPathPrefix;
   private final Map<String, Map<String, PartitionInfo>> _segmentColumnPartitionInfoMap = new ConcurrentHashMap<>();
 
-  public MultiPartitionColumnsSegmentPruner(String tableNameWithType, Set<String> partitionColumns,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public MultiPartitionColumnsSegmentPruner(String tableNameWithType, Set<String> partitionColumns) {
     _tableNameWithType = tableNameWithType;
     _partitionColumns = partitionColumns;
-    _propertyStore = propertyStore;
-    _segmentZKMetadataPathPrefix = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType) + "/";
   }
 
   @Override
-  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+      List<ZNRecord> znRecords) {
     // Bulk load partition info for all online segments
-    int numSegments = onlineSegments.size();
-    List<String> segments = new ArrayList<>(numSegments);
-    List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
+    int idx = 0;
     for (String segment : onlineSegments) {
-      segments.add(segment);
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
-    }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (int i = 0; i < numSegments; i++) {
-      String segment = segments.get(i);
       Map<String, PartitionInfo> columnPartitionInfoMap =
-          extractColumnPartitionInfoMapFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
+          extractColumnPartitionInfoMapFromSegmentZKMetadataZNRecord(segment, znRecords.get(idx++));
       if (columnPartitionInfoMap != null) {
         _segmentColumnPartitionInfoMap.put(segment, columnPartitionInfoMap);
       }
@@ -143,21 +127,22 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
 
   @Override
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments) {
+      Set<String> onlineSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
+    int idx = 0;
     for (String segment : onlineSegments) {
+      ZNRecord znRecord = znRecords.get(idx++);
       _segmentColumnPartitionInfoMap.computeIfAbsent(segment,
-          k -> extractColumnPartitionInfoMapFromSegmentZKMetadataZNRecord(k,
-              _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT)));
+          k -> extractColumnPartitionInfoMapFromSegmentZKMetadataZNRecord(k, znRecord));
     }
     _segmentColumnPartitionInfoMap.keySet().retainAll(onlineSegments);
   }
 
   @Override
-  public synchronized void refreshSegment(String segment) {
-    Map<String, PartitionInfo> columnPartitionInfo = extractColumnPartitionInfoMapFromSegmentZKMetadataZNRecord(segment,
-        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
+  public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
+    Map<String, PartitionInfo> columnPartitionInfo =
+        extractColumnPartitionInfoMapFromSegmentZKMetadataZNRecord(segment, znRecord);
     if (columnPartitionInfo != null) {
       _segmentColumnPartitionInfoMap.put(segment, columnPartitionInfo);
     } else {

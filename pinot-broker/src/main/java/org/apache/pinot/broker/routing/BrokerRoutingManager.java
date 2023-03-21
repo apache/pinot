@@ -43,6 +43,7 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSele
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelectorFactory;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataCache;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
@@ -105,6 +106,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private String _idealStatePathPrefix;
   private String _instanceConfigsPath;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  // TODO: Entries are never removed from map
+  private Map<String, SegmentZkMetadataCache> _segmentMetadataCacheMap;
 
   private Set<String> _routableServers;
 
@@ -123,6 +126,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
+    _segmentMetadataCacheMap = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -430,10 +434,13 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
     SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
     segmentSelector.init(idealState, externalView, preSelectedOnlineSegments);
+
+    // Register segment pruners and initialize segment zk metadata cache.
     List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-    for (SegmentPruner segmentPruner : segmentPruners) {
-      segmentPruner.init(idealState, externalView, preSelectedOnlineSegments);
-    }
+    SegmentZkMetadataCache segmentZkMetadataCache = new SegmentZkMetadataCache(tableNameWithType, _propertyStore,
+        segmentPruners);
+    segmentZkMetadataCache.init(idealState, externalView, preSelectedOnlineSegments);
+
     AdaptiveServerSelector adaptiveServerSelector =
         AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
     InstanceSelector instanceSelector =
@@ -490,7 +497,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
-            segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, timeBoundaryManager,
+            instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataCache, timeBoundaryManager,
             queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
@@ -635,9 +642,9 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     final String _externalViewPath;
     final SegmentPreSelector _segmentPreSelector;
     final SegmentSelector _segmentSelector;
-    final List<SegmentPruner> _segmentPruners;
     final InstanceSelector _instanceSelector;
     final Long _queryTimeoutMs;
+    final SegmentZkMetadataCache _segmentMetadataCache;
 
     // Cache IdealState and ExternalView version for the last update
     transient int _lastUpdateIdealStateVersion;
@@ -646,20 +653,20 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     transient TimeBoundaryManager _timeBoundaryManager;
 
     RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
-        SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
-        InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
+        SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, InstanceSelector instanceSelector,
+        int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion, SegmentZkMetadataCache segmentMetadataCache,
         @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
       _segmentPreSelector = segmentPreSelector;
       _segmentSelector = segmentSelector;
-      _segmentPruners = segmentPruners;
       _instanceSelector = instanceSelector;
       _lastUpdateIdealStateVersion = lastUpdateIdealStateVersion;
       _lastUpdateExternalViewVersion = lastUpdateExternalViewVersion;
       _timeBoundaryManager = timeBoundaryManager;
       _queryTimeoutMs = queryTimeoutMs;
+      _segmentMetadataCache = segmentMetadataCache;
     }
 
     String getTableNameWithType() {
@@ -693,10 +700,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     void onAssignmentChange(IdealState idealState, ExternalView externalView) {
       Set<String> onlineSegments = getOnlineSegments(idealState);
       Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
+      _segmentMetadataCache.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       _segmentSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
-      for (SegmentPruner segmentPruner : _segmentPruners) {
-        segmentPruner.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
-      }
       _instanceSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       if (_timeBoundaryManager != null) {
         _timeBoundaryManager.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
@@ -710,9 +715,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
 
     void refreshSegment(String segment) {
-      for (SegmentPruner segmentPruner : _segmentPruners) {
-        segmentPruner.refreshSegment(segment);
-      }
+      _segmentMetadataCache.refreshSegment(segment);
       if (_timeBoundaryManager != null) {
         _timeBoundaryManager.refreshSegment(segment);
       }
@@ -722,7 +725,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
       int numTotalSelectedSegments = selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
-        for (SegmentPruner segmentPruner : _segmentPruners) {
+        for (SegmentPruner segmentPruner : _segmentMetadataCache.getPruners()) {
           selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
         }
       }
