@@ -130,10 +130,14 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   // delay. Setting the alert on 7 time buckets of delay would be a good starting point.
   private static final String MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS = "mergeRollupTaskDelayInNumBuckets";
 
+  private static final String MERGE_ROLLUP_TASK_NUM_BUCKETS_TO_PROCESS = "mergeRollupTaskNumBucketsToProcess";
+
   // tableNameWithType -> mergeLevel -> watermarkMs
   private final Map<String, Map<String, Long>> _mergeRollupWatermarks = new HashMap<>();
   // tableNameWithType -> lowestLevelMaxValidBucketEndTime
   private final Map<String, Long> _tableLowestLevelMaxValidBucketEndTimeMs = new HashMap<>();
+  // tableNameWithType -> mergeLevel -> numberBucketsToProcess
+  private final Map<String, Map<String, Long>> _tableNumberBucketsToProcess = new HashMap<>();
 
   @Override
   public String getTaskType() {
@@ -211,6 +215,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
       }
 
+      // Get scheduling mode which is "processFromWatermark" by default. If "processAll" mode is enabled, there will be
+      // no watermark, and each round we pick the buckets in chronological order which have unmerged segments.
+      boolean processAll = MergeTask.PROCESS_ALL_MODE.equalsIgnoreCase(taskConfigs.get(MergeTask.MODE));
+
       ZNRecord mergeRollupTaskZNRecord = _clusterInfoAccessor
           .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
       int expectedVersion = mergeRollupTaskZNRecord != null ? mergeRollupTaskZNRecord.getVersion() : -1;
@@ -257,12 +265,18 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           continue;
         }
 
-        // Get watermark from MergeRollupTaskMetadata ZNode
-        // bucketStartMs = watermarkMs
-        // bucketEndMs = bucketStartMs + bucketMs
-        long watermarkMs =
-            getWatermarkMs(preSelectedSegments.get(0).getStartTimeMs(), bucketMs, mergeLevel, mergeRollupTaskMetadata);
-        long bucketStartMs = watermarkMs;
+        // Get bucket start/end time
+        long preSelectedSegStartTimeMs = preSelectedSegments.get(0).getStartTimeMs();
+        long bucketStartMs = preSelectedSegStartTimeMs / bucketMs * bucketMs;
+        long watermarkMs = 0;
+        if (!processAll) {
+          // Get watermark from MergeRollupTaskMetadata ZNode
+          // bucketStartMs = watermarkMs
+          // bucketEndMs = bucketStartMs + bucketMs
+          watermarkMs = getWatermarkMs(preSelectedSegStartTimeMs, bucketMs, mergeLevel,
+              mergeRollupTaskMetadata);
+          bucketStartMs = watermarkMs;
+        }
         long bucketEndMs = bucketStartMs + bucketMs;
         if (lowerMergeLevel == null) {
           long lowestLevelMaxValidBucketEndTimeMs = Long.MIN_VALUE;
@@ -275,12 +289,21 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           }
           _tableLowestLevelMaxValidBucketEndTimeMs.put(tableNameWithType, lowestLevelMaxValidBucketEndTimeMs);
         }
-        // Create delay metrics even if there's no task scheduled, this helps the case that the controller is restarted
+        // Create metrics even if there's no task scheduled, this helps the case that the controller is restarted
         // but the metrics are not available until the controller schedules a valid task
-        createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, null, watermarkMs, bufferMs, bucketMs);
-        if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
-          LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}) cannot be merged yet",
-              bucketStartMs, bucketEndMs, tableNameWithType, mergeLevel);
+        List<String> sortedMergeLevels =
+            sortedMergeLevelConfigs.stream().map(e -> e.getKey()).collect(Collectors.toList());
+        if (processAll) {
+          createOrUpdateNumBucketsToProcessMetrics(tableNameWithType, mergeLevel, lowerMergeLevel, bufferMs, bucketMs,
+              preSelectedSegments, sortedMergeLevels);
+        } else {
+          createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, null, watermarkMs, bufferMs, bucketMs);
+        }
+
+        if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata, processAll)) {
+          LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}, mode : {}) cannot be merged yet",
+              bucketStartMs, bucketEndMs, tableNameWithType, mergeLevel, processAll ? MergeTask.PROCESS_ALL_MODE
+                  : MergeTask.PROCESS_FROM_WATERMARK_MODE);
           continue;
         }
 
@@ -289,6 +312,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         List<SegmentZKMetadata> selectedSegmentsForBucket = new ArrayList<>();
         boolean hasUnmergedSegments = false;
         boolean hasSpilledOverData = false;
+        boolean areAllSegmentsReadyToMerge = true;
 
         // The for loop terminates in following cases:
         // 1. Found buckets with unmerged segments:
@@ -305,8 +329,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             long endTimeMs = preSelectedSegment.getEndTimeMs();
             if (endTimeMs >= bucketStartMs) {
               // For segments overlapping with current bucket, add to the result list
-              if (!isMergedSegment(preSelectedSegment, mergeLevel)) {
+              if (!isMergedSegment(preSelectedSegment, mergeLevel, sortedMergeLevels)) {
                 hasUnmergedSegments = true;
+              }
+              if (!isMergedSegment(preSelectedSegment, lowerMergeLevel, sortedMergeLevels)) {
+                areAllSegmentsReadyToMerge = false;
               }
               if (hasSpilledOverData(preSelectedSegment, bucketMs)) {
                 hasSpilledOverData = true;
@@ -317,7 +344,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             // Haven't find the first overlapping segment, continue to the next segment
           } else {
             // Has gone through all overlapping segments for current bucket
-            if (hasUnmergedSegments) {
+            if (hasUnmergedSegments && areAllSegmentsReadyToMerge) {
               // Add the bucket if there are unmerged segments
               selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
             }
@@ -330,13 +357,17 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               // TODO: If there are many small merged segments, we should merge them again
               selectedSegmentsForBucket = new ArrayList<>();
               hasUnmergedSegments = false;
+              areAllSegmentsReadyToMerge = true;
               bucketStartMs = (startTimeMs / bucketMs) * bucketMs;
               bucketEndMs = bucketStartMs + bucketMs;
-              if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
+              if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata, processAll)) {
                 break;
               }
-              if (!isMergedSegment(preSelectedSegment, mergeLevel)) {
+              if (!isMergedSegment(preSelectedSegment, mergeLevel, sortedMergeLevels)) {
                 hasUnmergedSegments = true;
+              }
+              if (!isMergedSegment(preSelectedSegment, lowerMergeLevel, sortedMergeLevels)) {
+                areAllSegmentsReadyToMerge = false;
               }
               if (hasSpilledOverData(preSelectedSegment, bucketMs)) {
                 hasSpilledOverData = true;
@@ -347,7 +378,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
 
         // Add the last bucket if it contains unmerged segments and is not added before
-        if (hasUnmergedSegments && (selectedSegmentsForAllBuckets.isEmpty() || (
+        if (hasUnmergedSegments && areAllSegmentsReadyToMerge && (selectedSegmentsForAllBuckets.isEmpty() || (
             selectedSegmentsForAllBuckets.get(selectedSegmentsForAllBuckets.size() - 1)
                 != selectedSegmentsForBucket))) {
           selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
@@ -365,7 +396,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             watermarkMs, newWatermarkMs);
 
         // Update the delay metrics
-        createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, lowerMergeLevel, newWatermarkMs, bufferMs, bucketMs);
+        if (!processAll) {
+          createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, lowerMergeLevel, newWatermarkMs, bufferMs,
+              bucketMs);
+        }
 
         // Create task configs
         int maxNumRecordsPerTask =
@@ -428,14 +462,17 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       }
 
       // Write updated watermark map to zookeeper
-      try {
-        _clusterInfoAccessor
-            .setMinionTaskMetadata(mergeRollupTaskMetadata, MinionConstants.MergeRollupTask.TASK_TYPE, expectedVersion);
-      } catch (ZkException e) {
-        LOGGER.error(
-            "Version changed while updating merge/rollup task metadata for table: {}, skip scheduling. There are "
-                + "multiple task schedulers for the same table, need to investigate!", tableNameWithType);
-        continue;
+      if (!processAll) {
+        try {
+          _clusterInfoAccessor
+              .setMinionTaskMetadata(mergeRollupTaskMetadata, MinionConstants.MergeRollupTask.TASK_TYPE,
+                  expectedVersion);
+        } catch (ZkException e) {
+          LOGGER.error(
+              "Version changed while updating merge/rollup task metadata for table: {}, skip scheduling. There are "
+                  + "multiple task schedulers for the same table, need to investigate!", tableNameWithType);
+          continue;
+        }
       }
       pinotTaskConfigs.addAll(pinotTaskConfigsForTable);
       LOGGER.info("Finished generating task configs for table: {} for task: {}, numTasks: {}", tableNameWithType,
@@ -481,9 +518,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       }
       final long finalEarliestStartTimeMsOfInProgressSegments = earliestStartTimeMsOfInProgressSegments;
       return allSegments.stream()
-              .filter(segmentZKMetadata -> segmentZKMetadata.getStatus().isCompleted()
-                  && segmentZKMetadata.getStartTimeMs() < finalEarliestStartTimeMsOfInProgressSegments)
-              .collect(Collectors.toList());
+          .filter(segmentZKMetadata -> segmentZKMetadata.getStatus().isCompleted()
+              && segmentZKMetadata.getStartTimeMs() < finalEarliestStartTimeMsOfInProgressSegments)
+          .collect(Collectors.toList());
     } else {
       return allSegments;
     }
@@ -545,25 +582,46 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   }
 
   /**
-   * Check if the segment is merged for give merge level
+   * Check if the segment is merged for given and higher merge levels
+   *
+   * @param segmentZKMetadata segment zk metadata
+   * @param baseMergeLevel base merge level
+   * @param sortedMergeLevels sorted merge levels based on buffer time period
+   * @return true if the segment is merged for the base merge level or any level higher than the base merge level
    */
-  private boolean isMergedSegment(SegmentZKMetadata segmentZKMetadata, String mergeLevel) {
+  private boolean isMergedSegment(SegmentZKMetadata segmentZKMetadata, String baseMergeLevel,
+      List<String> sortedMergeLevels) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
-    return customMap != null && mergeLevel.equalsIgnoreCase(
-        customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
+    if (baseMergeLevel == null) {
+      return true;
+    }
+    if (customMap == null || customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY) == null) {
+      return false;
+    }
+    String mergeLevel = customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY);
+    boolean isCurLevelLowerThanBase = true;
+    for (String currentMergeLevel : sortedMergeLevels) {
+      if (currentMergeLevel.equalsIgnoreCase(baseMergeLevel)) {
+        isCurLevelLowerThanBase = false;
+      }
+      if (!isCurLevelLowerThanBase && currentMergeLevel.equalsIgnoreCase(mergeLevel)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
    * Check if the bucket end time is valid
    */
   private boolean isValidBucketEndTime(long bucketEndMs, long bufferMs, @Nullable String lowerMergeLevel,
-      MergeRollupTaskMetadata mergeRollupTaskMetadata) {
+      MergeRollupTaskMetadata mergeRollupTaskMetadata, boolean processAll) {
     // Check that bucketEndMs <= now - bufferMs
     if (bucketEndMs > System.currentTimeMillis() - bufferMs) {
       return false;
     }
     // Check that bucketEndMs <= waterMark of the lower mergeLevel
-    if (lowerMergeLevel != null) {
+    if (lowerMergeLevel != null && !processAll) {
       Long lowerMergeLevelWatermarkMs = mergeRollupTaskMetadata.getWatermarkMap().get(lowerMergeLevel);
       return lowerMergeLevelWatermarkMs != null && bucketEndMs <= lowerMergeLevelWatermarkMs;
     }
@@ -713,6 +771,98 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   }
 
   /**
+   * Update the number buckets to process for the given table and merge level. We create the new gauge metric if
+   * the metric is not available.
+   * @param tableNameWithType table name with type
+   * @param mergeLevel merge level
+   * @param lowerMergeLevel lower merge level
+   * @param bufferTimeMs buffer time
+   * @param bucketTimeMs bucket time
+   * @param sortedSegments sorted segment list
+   * @param sortedMergeLevels sorted merge level list
+   */
+  private void createOrUpdateNumBucketsToProcessMetrics(String tableNameWithType, String mergeLevel,
+      String lowerMergeLevel, long bufferTimeMs, long bucketTimeMs,
+      List<SegmentZKMetadata> sortedSegments, List<String> sortedMergeLevels) {
+    ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
+    if (controllerMetrics == null) {
+      return;
+    }
+
+    // Find all buckets and segments that are ready to merge
+    List<List<SegmentZKMetadata>> selectedSegmentsForAllBuckets = new ArrayList<>();
+    List<SegmentZKMetadata> selectedSegmentsForBucket = new ArrayList<>();
+    long bucketStartMs = sortedSegments.get(0).getStartTimeMs() / bucketTimeMs * bucketTimeMs;
+    long bucketEndMs = bucketStartMs + bucketTimeMs;
+    boolean hasUnmergedSegments = false;
+    boolean isAllSegmentsReadyToMerge = true;
+
+    for (SegmentZKMetadata segment : sortedSegments) {
+      long startTimeMs = segment.getStartTimeMs();
+      if (startTimeMs < bucketEndMs) {
+        long endTimeMs = segment.getEndTimeMs();
+        if (endTimeMs >= bucketStartMs) {
+          // For segments overlapping with current bucket, add to the result list
+          if (!isMergedSegment(segment, mergeLevel, sortedMergeLevels)) {
+            hasUnmergedSegments = true;
+          }
+          if (!isMergedSegment(segment, lowerMergeLevel, sortedMergeLevels)) {
+            isAllSegmentsReadyToMerge = false;
+          }
+          selectedSegmentsForBucket.add(segment);
+        }
+        // endTimeMs < bucketStartMs
+        // Haven't find the first overlapping segment, continue to the next segment
+      } else {
+        // Has gone through all overlapping segments for current bucket
+        if (hasUnmergedSegments && isAllSegmentsReadyToMerge) {
+          // Add the bucket if there are unmerged segments
+          selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
+        }
+
+        // Start with a new bucket
+        selectedSegmentsForBucket = new ArrayList<>();
+        hasUnmergedSegments = false;
+        isAllSegmentsReadyToMerge = true;
+        bucketStartMs = (startTimeMs / bucketTimeMs) * bucketTimeMs;
+        bucketEndMs = bucketStartMs + bucketTimeMs;
+        if (bucketEndMs > System.currentTimeMillis() - bufferTimeMs) {
+          break;
+        }
+        if (!isMergedSegment(segment, mergeLevel, sortedMergeLevels)) {
+          hasUnmergedSegments = true;
+        }
+        if (!isMergedSegment(segment, lowerMergeLevel, sortedMergeLevels)) {
+          isAllSegmentsReadyToMerge = false;
+        }
+        selectedSegmentsForBucket.add(segment);
+      }
+    }
+
+    // Add the last bucket if it contains unmerged segments and is not added before
+    if (hasUnmergedSegments && isAllSegmentsReadyToMerge && (selectedSegmentsForAllBuckets.isEmpty() || (
+        selectedSegmentsForAllBuckets.get(selectedSegmentsForAllBuckets.size() - 1)
+            != selectedSegmentsForBucket))) {
+      selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
+    }
+
+    Map<String, Long> numBucketsToProcessForTable =
+        _tableNumberBucketsToProcess.computeIfAbsent(tableNameWithType, k -> new ConcurrentHashMap<>());
+    long finalCount = selectedSegmentsForAllBuckets.size();
+    numBucketsToProcessForTable.compute(mergeLevel, (k, v) -> {
+      if (v == null) {
+        LOGGER.info(
+            "Creating the gauge metric for tracking the merge/roll-up number buckets to process for table: {} "
+                + "and mergeLevel: {}.(bufferTimeMs={}, bucketTimeMs={}, numTimeBucketsToProcess={})"
+                + tableNameWithType, mergeLevel, bufferTimeMs, bucketTimeMs, finalCount);
+        controllerMetrics.setOrUpdateGauge(getMetricNameForNumBucketsToProcess(tableNameWithType, mergeLevel),
+            () -> _tableNumberBucketsToProcess.get(tableNameWithType).getOrDefault(mergeLevel, finalCount));
+      }
+      return finalCount;
+    });
+  }
+
+  /**
    * Reset the delay metrics for the given table name.
    *
    * @param tableNameWithType a table name with type
@@ -728,6 +878,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     if (watermarksForTable != null) {
       for (String mergeLevel : watermarksForTable.keySet()) {
         controllerMetrics.removeGauge(getMetricNameForTaskDelay(tableNameWithType, mergeLevel));
+      }
+    }
+
+    Map<String, Long> numBucketsToProcessForTable = _tableNumberBucketsToProcess.remove(tableNameWithType);
+    if (numBucketsToProcessForTable != null) {
+      for (String mergeLevel : numBucketsToProcessForTable.keySet()) {
+        controllerMetrics.removeGauge(getMetricNameForNumBucketsToProcess(tableNameWithType, mergeLevel));
       }
     }
   }
@@ -749,6 +906,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     if (watermarksForTable != null) {
       if (watermarksForTable.remove(mergeLevel) != null) {
         controllerMetrics.removeGauge(getMetricNameForTaskDelay(tableNameWithType, mergeLevel));
+      }
+    }
+
+    Map<String, Long> numBucketsToProcessForTable = _tableNumberBucketsToProcess.remove(tableNameWithType);
+    if (numBucketsToProcessForTable != null) {
+      if (numBucketsToProcessForTable.remove(mergeLevel) != null) {
+        controllerMetrics.removeGauge(getMetricNameForNumBucketsToProcess(tableNameWithType, mergeLevel));
       }
     }
   }
@@ -774,7 +938,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       tableConfigMap.put(tableConfig.getTableName(), tableConfig);
     }
 
-    for (String tableNameWithType : new ArrayList<>(_mergeRollupWatermarks.keySet())) {
+    Set<String> tables = new HashSet<>(_mergeRollupWatermarks.keySet());
+    tables.addAll(_tableNumberBucketsToProcess.keySet());
+
+    for (String tableNameWithType : tables) {
       TableConfig currentTableConfig = tableConfigMap.get(tableNameWithType);
       // Table does not exist in the cluster or merge task config is removed
       if (currentTableConfig == null) {
@@ -792,9 +959,20 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       Map<String, String> taskConfigs = currentTableConfig.getTaskConfig().getConfigsForTaskType(getTaskType());
       Map<String, Map<String, String>> mergeLevelToConfigs = MergeRollupTaskUtils.getLevelToConfigMap(taskConfigs);
       Map<String, Long> tableToWatermark = _mergeRollupWatermarks.get(tableNameWithType);
-      for (String mergeLevel : tableToWatermark.keySet()) {
-        if (!mergeLevelToConfigs.containsKey(mergeLevel)) {
-          resetDelayMetrics(tableNameWithType, mergeLevel);
+      if (tableToWatermark != null) {
+        for (String mergeLevel : tableToWatermark.keySet()) {
+          if (!mergeLevelToConfigs.containsKey(mergeLevel)) {
+            resetDelayMetrics(tableNameWithType, mergeLevel);
+          }
+        }
+      }
+
+      Map<String, Long> tableToNumBucketsToProcess = _tableNumberBucketsToProcess.get(tableNameWithType);
+      if (tableToNumBucketsToProcess != null) {
+        for (String mergeLevel : tableToNumBucketsToProcess.keySet()) {
+          if (!mergeLevelToConfigs.containsKey(mergeLevel)) {
+            resetDelayMetrics(tableNameWithType, mergeLevel);
+          }
         }
       }
     }
@@ -803,5 +981,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   private String getMetricNameForTaskDelay(String tableNameWithType, String mergeLevel) {
     // e.g. mergeRollupTaskDelayInNumBuckets.myTable_OFFLINE.daily
     return MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS + "." + tableNameWithType + "." + mergeLevel;
+  }
+
+  private String getMetricNameForNumBucketsToProcess(String tableNameWithType, String mergeLevel) {
+    return MERGE_ROLLUP_TASK_NUM_BUCKETS_TO_PROCESS + "." + tableNameWithType + "." + mergeLevel;
   }
 }
