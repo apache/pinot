@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.connector.spark.datasource
 
+import org.apache.pinot.common.datatable.DataTableFactory
 import org.apache.pinot.common.utils.DataSchema
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType
 import org.apache.pinot.connector.spark.common.PinotException
@@ -27,6 +28,7 @@ import org.apache.pinot.spi.utils.ByteArray
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
+import org.roaringbitmap.RoaringBitmap
 
 import scala.io.Source
 
@@ -158,6 +160,35 @@ class TypeConverterTest extends BaseTest {
     }
 
     exception.getMessage shouldEqual s"'longCol' not found in Pinot server response"
+  }
+
+  test("Converter should identify and correctly return null columns") {
+    val columnNames = Array("strCol", "intCol")
+    val columnTypes = Array(ColumnDataType.STRING, ColumnDataType.INT)
+    val dataSchema = new DataSchema(columnNames, columnTypes)
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4)
+
+    val dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema)
+    dataTableBuilder.startRow()
+    dataTableBuilder.setColumn(0, "null")
+    dataTableBuilder.setColumn(1, 5)
+    dataTableBuilder.finishRow()
+
+    val nullRowIds = new RoaringBitmap()
+    nullRowIds.add(0)
+    dataTableBuilder.setNullRowIds(nullRowIds)
+    dataTableBuilder.setNullRowIds(null)
+    val dataTable = dataTableBuilder.build()
+
+    val schema = StructType(
+      Seq(
+        StructField("strCol", StringType, true),
+        StructField("intCol", IntegerType, true)
+      )
+    )
+
+    val result = TypeConverter.pinotDataTableToInternalRows(dataTable, schema).head
+    result.get(0, StringType) shouldEqual null
   }
 
   test("Pinot schema should be converted to spark schema") {
