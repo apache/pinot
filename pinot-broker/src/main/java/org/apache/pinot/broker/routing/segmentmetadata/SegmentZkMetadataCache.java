@@ -29,10 +29,12 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.request.BrokerRequest;
 
 
 /**
- *
+ * {@code SegmentZkMetadataCache} is used to cache {@link ZNRecord} stored in {@link ZkHelixPropertyStore} for
+ * segments. This is used by {@link SegmentPruner#prune(BrokerRequest, Set)}.
  */
 public class SegmentZkMetadataCache {
   private final String _tableNameWithType;

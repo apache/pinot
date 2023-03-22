@@ -25,35 +25,14 @@ import org.apache.pinot.core.transport.ServerInstance;
 
 public class RoutingTable {
   private final Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
-  private final Map<ServerInstance, Map<Integer, List<String>>> _serverInstanceToPartitionedSegmentsMap;
   private final List<String> _unavailableSegments;
   private final int _numPrunedSegments;
-  private final boolean _isPartitionRouting;
 
-  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap,
-      List<String> unavailableSegments, int numPrunedSegments) {
+  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments,
+      int numPrunedSegments) {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
-    _serverInstanceToPartitionedSegmentsMap = null;
-    _isPartitionRouting = false;
     _unavailableSegments = unavailableSegments;
     _numPrunedSegments = numPrunedSegments;
-  }
-
-  public RoutingTable(Map<ServerInstance, Map<Integer, List<String>>> serverInstanceToPartitionedSegmentsMap,
-      List<String> unavailableSegments, int numPrunedSegments, boolean isPartitionRouting) {
-    _serverInstanceToPartitionedSegmentsMap = serverInstanceToPartitionedSegmentsMap;
-    _serverInstanceToSegmentsMap = null;
-    _isPartitionRouting = isPartitionRouting;
-    _unavailableSegments = unavailableSegments;
-    _numPrunedSegments = numPrunedSegments;
-  }
-
-  public boolean isPartitionRouting() {
-    return _isPartitionRouting;
-  }
-
-  public Map<ServerInstance, Map<Integer, List<String>>> getServerInstanceToPartitionedSegmentsMap() {
-    return _serverInstanceToPartitionedSegmentsMap;
   }
 
   public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {

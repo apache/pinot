@@ -106,8 +106,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private String _idealStatePathPrefix;
   private String _instanceConfigsPath;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  // TODO: Entries are never removed from map
-  private Map<String, SegmentZkMetadataCache> _segmentMetadataCacheMap;
 
   private Set<String> _routableServers;
 
@@ -126,7 +124,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
-    _segmentMetadataCacheMap = new ConcurrentHashMap<>();
   }
 
   @Override
