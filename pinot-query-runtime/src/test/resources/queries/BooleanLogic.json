@@ -55,11 +55,14 @@
     },
     "queries": [
       {
-        "note": "to be postgres compatible, this should throw an exception - but various other systems (like H2 and MySQL) support this",
+        "ignored": true,
+        "note": "H2 doesn't support this",
         "description": "check implicit cast between boolean and int",
         "sql": "select b = i FROM {tbl}"
       },
       {
+        "ignored": true,
+        "comment": "H2 doesn't support this",
         "description": "check implicit cast between boolean and double",
         "sql": "select b = d FROM {tbl}"
       },
@@ -70,6 +73,8 @@
         "sql": "select b = s FROM {tbl}"
       },
       {
+        "ignored": true,
+        "comment": "H2 doesn't support this",
         "description": "check implicit cast between boolean and numeric",
         "sql": "select b = n FROM {tbl}"
       },

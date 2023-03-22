@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -156,15 +158,27 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       } else if (l instanceof Long) {
         return Long.compare((Long) l, ((Number) r).longValue());
       } else if (l instanceof Float) {
-        if (DoubleMath.fuzzyEquals((Float) l, ((Number) r).floatValue(), DOUBLE_CMP_EPSILON)) {
+        float lf = (Float) l;
+        float rf = ((Number) r).floatValue();
+        if (DoubleMath.fuzzyEquals(lf, rf, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Float.compare((Float) l, ((Number) r).floatValue());
+        float maxf = Math.max(Math.abs(lf), Math.abs(rf));
+        if (DoubleMath.fuzzyEquals(lf / maxf, rf / maxf, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Float.compare(lf, rf);
       } else if (l instanceof Double) {
-        if (DoubleMath.fuzzyEquals((Double) l, ((Number) r).doubleValue(), DOUBLE_CMP_EPSILON)) {
+        double ld = (Double) l;
+        double rd = ((Number) r).doubleValue();
+        if (DoubleMath.fuzzyEquals(ld, rd, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Double.compare((Double) l, ((Number) r).doubleValue());
+        double maxd = Math.max(Math.abs(ld), Math.abs(rd));
+        if (DoubleMath.fuzzyEquals(ld / maxd, rd / maxd, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Double.compare(ld, rd);
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {
@@ -269,7 +283,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void addDataToH2(String tableName, Schema schema, List<GenericRow> rows)
-      throws SQLException {
+      throws SQLException, DecoderException {
     if (rows != null && rows.size() > 0) {
       // prepare the statement for ingestion
       List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
@@ -278,14 +292,21 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         params.append(",?");
       }
       PreparedStatement h2Statement =
-          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
+          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
 
       // insert data into table
       for (GenericRow row : rows) {
         int h2Index = 1;
         for (String fieldName : schema.getColumnNames()) {
           Object value = row.getValue(fieldName);
-          h2Statement.setObject(h2Index++, value);
+          switch (schema.getFieldSpecFor(fieldName).getDataType()) {
+            case BYTES:
+              h2Statement.setBytes(h2Index++, Hex.decodeHex((String) value));
+              break;
+            default:
+              h2Statement.setObject(h2Index++, value);
+              break;
+          }
         }
         h2Statement.execute();
       }
@@ -315,7 +336,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
           fieldType = "BOOLEAN";
           break;
         case BIG_DECIMAL:
-          fieldType = "NUMERIC";
+          fieldType = "NUMERIC(65535, 32767)";
           break;
         case BYTES:
           fieldType = "BYTEA";
@@ -362,6 +383,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _ignored;
       @JsonProperty("sql")
       public String _sql;
+      @JsonProperty("h2Sql")
+      public String _h2Sql;
       @JsonProperty("description")
       public String _description;
       @JsonProperty("outputs")
