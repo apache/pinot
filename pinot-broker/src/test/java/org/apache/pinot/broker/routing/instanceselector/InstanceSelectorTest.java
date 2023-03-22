@@ -111,12 +111,12 @@ public class InstanceSelectorTest {
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
 
-  private void createSegments(List<Pair<String, Long>> segmentCreationMillis) {
+  private void createSegments(List<Pair<String, Long>> segmentPushMillis) {
     List<String> segmentZKMetadataPaths = new ArrayList<>();
     List<ZNRecord> zkRecords = new ArrayList<>();
-    for (Pair<String, Long> segment : segmentCreationMillis) {
+    for (Pair<String, Long> segment : segmentPushMillis) {
       SegmentZKMetadata offlineSegmentZKMetadata0 = new SegmentZKMetadata(segment.getLeft());
-      offlineSegmentZKMetadata0.setCreationTime(segment.getRight());
+      offlineSegmentZKMetadata0.setPushTime(segment.getRight());
       offlineSegmentZKMetadata0.setTimeUnit(TimeUnit.MILLISECONDS);
       ZNRecord record = offlineSegmentZKMetadata0.toZNRecord();
       segmentZKMetadataPaths.add(
@@ -1393,8 +1393,8 @@ public class InstanceSelectorTest {
   public void testNewSegmentFromZKMetadataSelection(String selectorType) {
     String oldSeg = "segment0";
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentCreationTime);
+    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentPushTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1499,9 +1499,9 @@ public class InstanceSelectorTest {
     // Set segment0 as new segment
     String newSeg = "segment0";
     String oldSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
+    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
         Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
-    createSegments(segmentCreationTime);
+    createSegments(segmentPushTime);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
 
     // Set up instances
@@ -1555,8 +1555,8 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentCreationTime);
+    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentPushTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1634,8 +1634,8 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentCreationTime);
+    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentPushTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1784,8 +1784,8 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentCreationTime);
+    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentPushTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1852,10 +1852,10 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentCreationTime =
+    List<Pair<String, Long>> segmentPushTime =
         ImmutableList.of(Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100),
             Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentCreationTime);
+    createSegments(segmentPushTime);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances

@@ -19,8 +19,6 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -38,39 +36,34 @@ public class SegmentState {
   // 1) From ZK if we first see this segment via init call.
   // 2) Use wall time, if first see this segment from onAssignmentChange call.
   // 3) For old segment, we don't need to track creation time anymore, so this will be set to LONG.MIN.
-  private long _creationMillis;
+  private long _pushMillis;
 
-  private static class CompareByInstanceName implements Comparator<SegmentInstanceCandidate> {
-    public int compare(SegmentInstanceCandidate candidate1, SegmentInstanceCandidate candidate2) {
-      return candidate1.getInstance().compareTo(candidate2.getInstance());
-    }
-  }
 
-  public static SegmentState createSegmentState(long creationMillis) {
-    return new SegmentState(creationMillis);
+  public static SegmentState createSegmentState(long pushMillis) {
+    return new SegmentState(pushMillis);
   }
 
   public static SegmentState createDefaultSegmentState() {
     return new SegmentState(Long.MIN_VALUE);
   }
 
-  private SegmentState(long creationMillis) {
-    _creationMillis = creationMillis;
+  private SegmentState(long pushMillis) {
+    _pushMillis = pushMillis;
     _candidates = new ArrayList<>();
   }
 
   public boolean isNew(long nowMillis) {
-    return InstanceSelector.isNewSegment(_creationMillis, nowMillis);
+    return InstanceSelector.isNewSegment(_pushMillis, nowMillis);
   }
 
   public void promoteToOld() {
-    _creationMillis = Long.MIN_VALUE;
+    _pushMillis = Long.MIN_VALUE;
   }
 
-  public void resetCandidates(List<SegmentInstanceCandidate> candidates) {
+  public void setCandidates(List<SegmentInstanceCandidate> candidates) {
     // Sort the online instances for replica-group routing to work. For multiple segments with the same online
     // instances, if the list is sorted, the same index in the list will always point to the same instance.
-    Collections.sort(candidates, new CompareByInstanceName());
+    candidates.sort(null);
     _candidates = candidates;
   }
 
@@ -82,7 +75,7 @@ public class SegmentState {
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append("creation time millis:");
-    builder.append(_creationMillis);
+    builder.append(_pushMillis);
     for (SegmentInstanceCandidate candidate : _candidates) {
       builder.append("[");
       builder.append("Instance:");

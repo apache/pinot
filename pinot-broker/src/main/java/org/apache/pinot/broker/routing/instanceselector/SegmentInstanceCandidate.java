@@ -18,12 +18,19 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-/** Represents an instance candidate for segment.
- *  Note that instance can be online or offline.
+import javax.annotation.concurrent.Immutable;
+
+/**
+ * Represents an instance candidate for segment.
  */
-public class SegmentInstanceCandidate {
-  public static SegmentInstanceCandidate of(String instance, boolean isOnline) {
-    return new SegmentInstanceCandidate(instance, isOnline);
+@Immutable
+public class SegmentInstanceCandidate implements Comparable<SegmentInstanceCandidate> {
+  private final String _instance;
+  private final boolean _online;
+
+  public SegmentInstanceCandidate(String instance, boolean online) {
+    _instance = instance;
+    _online = online;
   }
 
   public String getInstance() {
@@ -31,14 +38,11 @@ public class SegmentInstanceCandidate {
   }
 
   public boolean isOnline() {
-    return _isOnline;
+    return _online;
   }
 
-  private SegmentInstanceCandidate(String instance, boolean isOnline) {
-    _instance = instance;
-    _isOnline = isOnline;
+  @Override
+  public int compareTo(SegmentInstanceCandidate other) {
+    return _instance.compareTo(other.getInstance());
   }
-
-  private final String _instance;
-  private final boolean _isOnline;
 }

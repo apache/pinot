@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.base.Preconditions;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,8 +27,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -35,7 +36,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
 
 /**
@@ -96,62 +96,45 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   @Override
   protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, SegmentState> oldSegmentStateMap, Map<String, SegmentState> newSegmentStateMap) {
-    // TODO: Add support for AdaptiveServerSelection.
-    // Iterate over the ideal state to
-    // 1) Know whether a segment is new or old
-    // New segment definition:
-    // - external view hasn't converged ideal state.
-    // - the segment hasn't seen error in any instance.
-    // 2) For new segment, fill in newSegmentTempSegmentToOnlineInstancesMap.
-    // 3) For old segment, remove it from the newSegmentStageMap and fill in oldSegmentToOnlineInstancesMap
-    // 4) Track every segment's ideal state in idealStateSegmentToInstancesMap, which we will use to do instance
-    // exclusion later.
     int segmentMapCapacity = HashUtil.getHashMapCapacity(onlineSegments.size());
     Map<String, Set<String>> idealStateSegmentToInstancesMap = new HashMap<>(segmentMapCapacity);
     Map<String, Set<String>> oldSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
     Map<String, Set<String>> newSegmentTempSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-      String segment = entry.getKey();
-      // Only track online segments
-      if (!onlineSegments.contains(segment)) {
-        continue;
-      }
-      Map<String, String> externalViewInstanceMap =
-          externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
-      Map<String, String> idealStateInstanceStateMap = entry.getValue();
-      Set<String> tempOnlineInstances = new HashSet<>();
-      boolean hasErrorInstance = false;
-      for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceMap.entrySet()) {
-        String instance = instanceStateEntry.getKey();
-        // Only track instance in ideal state.
-        if (!idealStateInstanceStateMap.containsKey(instance)) {
-          continue;
-        }
-        String state = instanceStateEntry.getValue();
-        if (InstanceSelector.isOnlineForServing(state)) {
-          tempOnlineInstances.add(instance);
-        } else if (state.equals(SegmentStateModel.ERROR)) {
-          // error or dropped state should not be considered as new anymore.
-          hasErrorInstance = true;
-        }
-      }
+    Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
+    // TODO: Add support for AdaptiveServerSelection.
+    // Iterate over the ideal state to
+    // 1) Know whether a segment is new or old
+    // New segment definition:
+    // - external view hasn't converged with ideal state.
+    // - the segment hasn't seen error in any instance.
+    // 2) For new segment, fill in newSegmentTempSegmentToOnlineInstancesMap.
+    // 3) For old segment, remove it from the newSegmentStageMap and fill in oldSegmentToOnlineInstancesMap
+    // 4) Track every segment's ideal state in idealStateSegmentToInstancesMap, which we will use to do instance
+    // exclusion later.
+    for (String segment : onlineSegments) {
+      Map<String, String> idealStateInstances = idealStateAssignment.get(segment);
+      Preconditions.checkState(idealStateInstances != null, "ideal state instances cannot be null");
+      Map<String, String> externalViewInstances = externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
+      Pair<Set<String>, Boolean> segmentInfo =
+          InstanceSelector.getSegmentInfo(externalViewInstances, idealStateInstances);
+      Set<String> onlineInstances = segmentInfo.getLeft();
+      boolean couldBeNew = segmentInfo.getRight();
       SegmentState state = newSegmentStateMap.get(segment);
-      if (state != null && tempOnlineInstances.size() != entry.getValue().size() && !hasErrorInstance) {
-        newSegmentTempSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
+      if (couldBeNew && state != null) {
+        newSegmentTempSegmentToOnlineInstancesMap.put(segment, onlineInstances);
       } else {
-        if (state == null) {
-          state = SegmentState.createDefaultSegmentState();
-        } else {
+        if (state != null) {
+          newSegmentStateMap.remove(segment);
           state.promoteToOld();
+        } else {
+          state = SegmentState.createDefaultSegmentState();
         }
-        newSegmentStateMap.remove(segment);
         oldSegmentStateMap.put(segment, state);
-        oldSegmentToOnlineInstancesMap.put(segment, tempOnlineInstances);
+        oldSegmentToOnlineInstancesMap.put(segment, onlineInstances);
       }
-      idealStateSegmentToInstancesMap.put(segment, idealStateInstanceStateMap.keySet());
+      idealStateSegmentToInstancesMap.put(segment, idealStateInstances.keySet());
     }
-
     // Get unavailable instances from oldSegmentToOnlineInstancesMap.
     // Note that we don't use new segments to set up unavailable instance.
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
@@ -159,7 +142,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       String segment = entry.getKey();
       Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
       Set<String> unavailableInstances =
-          unavailableInstancesMap.computeIfAbsent(instancesInIdealState, k -> new TreeSet<>());
+          unavailableInstancesMap.computeIfAbsent(instancesInIdealState, k -> new HashSet<>());
       Set<String> tempOnlineInstances = entry.getValue();
       for (String instance : instancesInIdealState) {
         if (!tempOnlineInstances.contains(instance)) {
@@ -179,12 +162,11 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       for (String instance : candidateInstance) {
         // Some instances are unavailable, add the remaining instances as online instance
         if (!unavailableInstances.contains(instance)) {
-          onlineInstanceCandidates.add(SegmentInstanceCandidate.of(instance, true));
+          onlineInstanceCandidates.add(new SegmentInstanceCandidate(instance, true));
         }
       }
-      SegmentState state =
-          oldSegmentStateMap.computeIfAbsent(segment, s -> SegmentState.createDefaultSegmentState());
-      state.resetCandidates(onlineInstanceCandidates);
+      SegmentState state = oldSegmentStateMap.computeIfAbsent(segment, s -> SegmentState.createDefaultSegmentState());
+      state.setCandidates(onlineInstanceCandidates);
     }
 
     // Set up instances in newSegmentStateMap for new segments.
@@ -198,10 +180,10 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       List<SegmentInstanceCandidate> candidates = new ArrayList<>();
       for (String instance : instancesInIdealState) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(SegmentInstanceCandidate.of(instance, onlineInstances.contains(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
         }
       }
-      state.resetCandidates(candidates);
+      state.setCandidates(candidates);
     }
   }
 }

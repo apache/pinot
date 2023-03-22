@@ -48,8 +48,8 @@ import org.slf4j.LoggerFactory;
 public class SegmentStateSnapshot {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStateSnapshot.class);
 
-  private Map<String, List<SegmentInstanceCandidate>> _segmentCandidates;
-  private Set<String> _unavailableSegments;
+  private final Map<String, List<SegmentInstanceCandidate>> _segmentCandidates;
+  private final Set<String> _unavailableSegments;
 
   /**
    * Create a segment state snapshot based on some in-memory states to be used for routing.
