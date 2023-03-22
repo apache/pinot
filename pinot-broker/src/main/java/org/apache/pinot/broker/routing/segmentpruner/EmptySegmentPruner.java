@@ -52,12 +52,12 @@ public class EmptySegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+  public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
       List<ZNRecord> znRecords) {
     // Bulk load info for all online segments
-    int idx = 0;
-    for (String segment : onlineSegments) {
-      if (isEmpty(segment, znRecords.get(idx++))) {
+    for (int idx = 0; idx < onlineSegments.size(); idx++) {
+      String segment = onlineSegments.get(idx);
+      if (isEmpty(segment, znRecords.get(idx))) {
         _emptySegments.add(segment);
       }
     }
@@ -65,14 +65,14 @@ public class EmptySegmentPruner implements SegmentPruner {
 
   @Override
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments, List<ZNRecord> znRecords) {
+      Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
     boolean emptySegmentsChanged = false;
-    int idx = 0;
-    for (String segment : onlineSegments) {
+    for (int idx = 0; idx < pulledSegments.size(); idx++) {
+      String segment = pulledSegments.get(idx);
       if (_segmentsLoaded.add(segment)) {
-        if (isEmpty(segment, znRecords.get(idx++))) {
+        if (isEmpty(segment, znRecords.get(idx))) {
           emptySegmentsChanged |= _emptySegments.add(segment);
         }
       }

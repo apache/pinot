@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.segmentmetadata;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.helix.AccessOption;
@@ -38,6 +39,7 @@ public class SegmentZkMetadataCache {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _segmentZKMetadataPathPrefix;
   private final List<SegmentPruner> _registeredPruners;
+  private final Set<String> _onlineSegmentsCached;
 
   public SegmentZkMetadataCache(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       List<SegmentPruner> segmentPruners) {
@@ -45,20 +47,24 @@ public class SegmentZkMetadataCache {
     _propertyStore = propertyStore;
     _segmentZKMetadataPathPrefix = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType) + "/";
     _registeredPruners = segmentPruners;
+    _onlineSegmentsCached = new HashSet<>();
   }
 
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    // Bulk load partition info for all online segments
-    int numSegments = onlineSegments.size();
-    List<String> segments = new ArrayList<>(numSegments);
-    List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : onlineSegments) {
-      segments.add(segment);
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
-    }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (SegmentPruner pruner : _registeredPruners) {
-      pruner.init(idealState, externalView, onlineSegments, znRecords);
+    if (_registeredPruners.size() > 0) {
+      // Bulk load partition info for all online segments
+      int numSegments = onlineSegments.size();
+      List<String> segments = new ArrayList<>(numSegments);
+      List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
+      for (String segment : onlineSegments) {
+        segments.add(segment);
+        segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
+      }
+      _onlineSegmentsCached.addAll(onlineSegments);
+      List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
+      for (SegmentPruner pruner : _registeredPruners) {
+        pruner.init(idealState, externalView, segments, znRecords);
+      }
     }
   }
 
@@ -68,23 +74,32 @@ public class SegmentZkMetadataCache {
 
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
-    int numSegments = onlineSegments.size();
-    List<String> segments = new ArrayList<>(numSegments);
-    List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : onlineSegments) {
-      segments.add(segment);
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
-    }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (SegmentPruner segmentPruner : _registeredPruners) {
-      segmentPruner.onAssignmentChange(idealState, externalView, onlineSegments, znRecords);
+    if (_registeredPruners.size() > 0) {
+      int numSegments = onlineSegments.size();
+      List<String> segments = new ArrayList<>(numSegments);
+      List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
+      for (String segment : onlineSegments) {
+        if (!_onlineSegmentsCached.contains(segment)) {
+          segments.add(segment);
+          segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
+        }
+      }
+      _onlineSegmentsCached.addAll(onlineSegments);
+      List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
+      for (SegmentPruner segmentPruner : _registeredPruners) {
+        segmentPruner.onAssignmentChange(idealState, externalView, onlineSegments, segments, znRecords);
+      }
+      _onlineSegmentsCached.retainAll(onlineSegments);
     }
   }
 
   public synchronized void refreshSegment(String segment) {
-    ZNRecord znRecord = _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT);
-    for (SegmentPruner segmentPruner : _registeredPruners) {
-      segmentPruner.refreshSegment(segment, znRecord);
+    if (_registeredPruners.size() > 0) {
+      ZNRecord znRecord = _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT);
+      for (SegmentPruner segmentPruner : _registeredPruners) {
+        segmentPruner.refreshSegment(segment, znRecord);
+      }
+      _onlineSegmentsCached.add(segment);
     }
   }
 }

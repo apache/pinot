@@ -71,12 +71,12 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+  public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
       List<ZNRecord> znRecords) {
     // Bulk load time info for all online segments
-    int idx = 0;
-    for (String segment : onlineSegments) {
-      Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, znRecords.get(idx++));
+    for (int idx = 0; idx < onlineSegments.size(); idx++) {
+      String segment = onlineSegments.get(idx);
+      Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, znRecords.get(idx));
       _intervalMap.put(segment, interval);
     }
     _intervalTree = new IntervalTree<>(_intervalMap);
@@ -103,12 +103,12 @@ public class TimeSegmentPruner implements SegmentPruner {
 
   @Override
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments, List<ZNRecord> znRecords) {
+      Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
-    int idx = 0;
-    for (String segment : onlineSegments) {
-      ZNRecord zNrecord = znRecords.get(idx++);
+    for (int idx = 0; idx < pulledSegments.size(); idx++) {
+      String segment = pulledSegments.get(idx);
+      ZNRecord zNrecord = znRecords.get(idx);
       _intervalMap.computeIfAbsent(segment, k -> extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord));
     }
     _intervalMap.keySet().retainAll(onlineSegments);

@@ -38,14 +38,14 @@ public interface SegmentPruner {
    * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
    * only once before calling other methods.
    */
-  void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments, List<ZNRecord> znRecords);
+  void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments, List<ZNRecord> znRecords);
 
   /**
    * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
    * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    */
   void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      List<ZNRecord> znRecords);
+      List<String> pulledSegments, List<ZNRecord> znRecords);
 
   /**
    * Refreshes the metadata for the given segment (called when segment is getting refreshed).

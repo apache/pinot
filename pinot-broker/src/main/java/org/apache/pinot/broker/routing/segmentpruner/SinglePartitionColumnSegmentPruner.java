@@ -59,12 +59,12 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+  public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
       List<ZNRecord> znRecords) {
     // Bulk load partition info for all online segments
-    int idx = 0;
-    for (String segment : onlineSegments) {
-      PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment, znRecords.get(idx++));
+    for (int idx = 0; idx < onlineSegments.size(); idx++) {
+      String segment = onlineSegments.get(idx);
+      PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment, znRecords.get(idx));
       if (partitionInfo != null) {
         _partitionInfoMap.put(segment, partitionInfo);
       }
@@ -113,12 +113,12 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
 
   @Override
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments, List<ZNRecord> znRecords) {
+      Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
-    int idx = 0;
-    for (String segment : onlineSegments) {
-      ZNRecord znRecord = znRecords.get(idx++);
+    for (int idx = 0; idx < pulledSegments.size(); idx++) {
+      String segment = pulledSegments.get(idx);
+      ZNRecord znRecord = znRecords.get(idx);
       _partitionInfoMap.computeIfAbsent(segment, k -> extractPartitionInfoFromSegmentZKMetadataZNRecord(k, znRecord));
     }
     _partitionInfoMap.keySet().retainAll(onlineSegments);
