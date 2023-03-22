@@ -21,10 +21,13 @@ package org.apache.pinot.core.query.optimizer.filter;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
+
 
 /**
  * This base class acts as a helper for any optimizer that is effectively removing filter conditions.
@@ -33,66 +36,106 @@ import org.apache.pinot.sql.FilterKind;
  */
 public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer {
 
-    protected static final Expression TRUE = RequestUtils.getLiteralExpression(true);
-    protected static final Expression FALSE = RequestUtils.getLiteralExpression(false);
+  protected static final Expression TRUE = RequestUtils.getLiteralExpression(true);
+  protected static final Expression FALSE = RequestUtils.getLiteralExpression(false);
 
-    @Override
-    public abstract Expression optimize(Expression filterExpression, @Nullable Schema schema);
+  /**
+   * This recursively optimizes each part of the filter expression. For any AND/OR/NOT,
+   * we optimize each child, then we optimize the remaining statement. If there is only
+   * a child statement, we optimize that.
+   */
+  @Override
+  public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
+    if (!canBeOptimized(filterExpression, schema)) {
+      return filterExpression;
+    }
 
-    /**
-     * If any of the operands of AND function is "false", then the AND function itself is false and can be replaced with
-     * "false" literal. Otherwise, remove all the "true" operands of the AND function. Similarly, if any of the operands
-     * of OR function is "true", then the OR function itself is true and can be replaced with "true" literal. Otherwise,
-     * remove all the "false" operands of the OR function.
-     */
-    protected Expression optimizeCurrent(Expression expression) {
-        Function function = expression.getFunctionCall();
-        String operator = function.getOperator();
-        List<Expression> operands = function.getOperands();
-        if (operator.equals(FilterKind.AND.name())) {
-            // If any of the literal operands are always false, then replace AND function with FALSE.
-            for (Expression operand : operands) {
-                if (isAlwaysFalse(operand)) {
-                    return FALSE;
-                }
-            }
+    Function function = filterExpression.getFunctionCall();
+    List<Expression> operands = function.getOperands();
+    FilterKind kind = FilterKind.valueOf(function.getOperator());
+    switch (kind) {
+      case AND:
+      case OR:
+      case NOT:
+        // Recursively traverse the expression tree to find an operator node that can be rewritten.
+        operands.forEach(operand -> optimize(operand, schema));
 
-            // Remove all Literal operands that are always true.
-            operands.removeIf(this::isAlwaysTrue);
-            if (operands.isEmpty()) {
-                return TRUE;
-            }
-        } else if (operator.equals(FilterKind.OR.name())) {
-            // If any of the literal operands are always true, then replace OR function with TRUE
-            for (Expression operand : operands) {
-                if (isAlwaysTrue(operand)) {
-                    return TRUE;
-                }
-            }
+        // We have rewritten the child operands, so rewrite the parent if needed.
+        return optimizeCurrent(filterExpression);
+      default:
+        return optimizeChild(filterExpression, schema);
+    }
+  }
 
-            // Remove all Literal operands that are always false.
-            operands.removeIf(this::isAlwaysFalse);
-            if (operands.isEmpty()) {
-                return FALSE;
-            }
-        } else if (operator.equals(FilterKind.NOT.name())) {
-            assert operands.size() == 1;
-            Expression operand = operands.get(0);
-            if (isAlwaysTrue(operand)) {
-                return FALSE;
-            }
-            if (isAlwaysFalse(operand)) {
-                return TRUE;
-            }
+  abstract boolean canBeOptimized(Expression filterExpression, @Nullable Schema schema);
+
+  /**
+   * Optimize any cases that are not AND/OR/NOT. This should be done by converting any cases
+   * that are always true to TRUE or always false to FALSE.
+   */
+  abstract Expression optimizeChild(Expression filterExpression, @Nullable Schema schema);
+
+  /**
+   * If any of the operands of AND function is "false", then the AND function itself is false and can be replaced with
+   * "false" literal. Otherwise, remove all the "true" operands of the AND function. Similarly, if any of the operands
+   * of OR function is "true", then the OR function itself is true and can be replaced with "true" literal. Otherwise,
+   * remove all the "false" operands of the OR function.
+   */
+  protected Expression optimizeCurrent(Expression expression) {
+    Function function = expression.getFunctionCall();
+    String operator = function.getOperator();
+    List<Expression> operands = function.getOperands();
+    if (operator.equals(FilterKind.AND.name())) {
+      // If any of the literal operands are always false, then replace AND function with FALSE.
+      for (Expression operand : operands) {
+        if (isAlwaysFalse(operand)) {
+          return FALSE;
         }
-        return expression;
-    }
+      }
 
-    protected boolean isAlwaysFalse(Expression operand) {
-        return operand.equals(FALSE);
-    }
+      // Remove all Literal operands that are always true.
+      operands.removeIf(this::isAlwaysTrue);
+      if (operands.isEmpty()) {
+        return TRUE;
+      }
+    } else if (operator.equals(FilterKind.OR.name())) {
+      // If any of the literal operands are always true, then replace OR function with TRUE
+      for (Expression operand : operands) {
+        if (isAlwaysTrue(operand)) {
+          return TRUE;
+        }
+      }
 
-    protected boolean isAlwaysTrue(Expression operand) {
-        return operand.equals(TRUE);
+      // Remove all Literal operands that are always false.
+      operands.removeIf(this::isAlwaysFalse);
+      if (operands.isEmpty()) {
+        return FALSE;
+      }
+    } else if (operator.equals(FilterKind.NOT.name())) {
+      assert operands.size() == 1;
+      Expression operand = operands.get(0);
+      if (isAlwaysTrue(operand)) {
+        return FALSE;
+      }
+      if (isAlwaysFalse(operand)) {
+        return TRUE;
+      }
     }
+    return expression;
+  }
+
+  private boolean isAlwaysFalse(Expression operand) {
+    return operand.equals(FALSE);
+  }
+
+  private boolean isAlwaysTrue(Expression operand) {
+    return operand.equals(TRUE);
+  }
+
+  /** Change the expression value to boolean literal with given value. */
+  protected static void setExpressionToBoolean(Expression expression, boolean value) {
+    expression.unsetFunctionCall();
+    expression.setType(ExpressionType.LITERAL);
+    expression.setLiteral(Literal.boolValue(value));
+  }
 }

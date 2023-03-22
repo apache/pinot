@@ -30,7 +30,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-
 /**
  * Numerical expressions of form "column <operator> literal", where operator can be '=', '!=', '>', '>=', '<', or '<=',
  * can compare a column of one datatype (say INT) with a literal of different datatype (say DOUBLE). These expressions
@@ -64,30 +63,23 @@ import org.apache.pinot.sql.FilterKind;
 public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   @Override
-  public Expression optimize(Expression expression, @Nullable Schema schema) {
-    ExpressionType type = expression.getType();
-    if (type != ExpressionType.FUNCTION || schema == null) {
-      // We have nothing to rewrite if expression is not a function or schema is null
-      return expression;
-    }
+  boolean canBeOptimized(Expression filterExpression, @Nullable Schema schema) {
+    ExpressionType type = filterExpression.getType();
+    // We have nothing to rewrite if expression is not a function or schema is null
+    return type == ExpressionType.FUNCTION && schema != null;
+  }
 
-    Function function = expression.getFunctionCall();
-    List<Expression> operands = function.getOperands();
+  @Override
+  Expression optimizeChild(Expression filterExpression, @Nullable Schema schema) {
+    Function function = filterExpression.getFunctionCall();
     FilterKind kind = FilterKind.valueOf(function.getOperator());
     switch (kind) {
-      case AND:
-      case OR:
-      case NOT:
-        // Recursively traverse the expression tree to find an operator node that can be rewritten.
-        operands.forEach(operand -> optimize(operand, schema));
-
-        // We have rewritten the child operands, so rewrite the parent if needed.
-        return optimizeCurrent(expression);
       case IS_NULL:
       case IS_NOT_NULL:
         // No need to try to optimize IS_NULL and IS_NOT_NULL operations on numerical columns.
         break;
       default:
+        List<Expression> operands = function.getOperands();
         // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
         Expression lhs = operands.get(0);
         Expression rhs = operands.get(1);
@@ -97,12 +89,12 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             switch (kind) {
               case EQUALS:
               case NOT_EQUALS:
-                return rewriteEqualsExpression(expression, kind, dataType, rhs);
+                return rewriteEqualsExpression(filterExpression, kind, dataType, rhs);
               case GREATER_THAN:
               case GREATER_THAN_OR_EQUAL:
               case LESS_THAN:
               case LESS_THAN_OR_EQUAL:
-                return rewriteRangeExpression(expression, kind, lhs, rhs, schema);
+                return rewriteRangeExpression(filterExpression, kind, lhs, rhs, schema);
               default:
                 break;
             }
@@ -110,7 +102,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         }
         break;
     }
-    return expression;
+    return filterExpression;
   }
 
   /**
@@ -406,11 +398,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       if (fieldSpec != null && fieldSpec.isSingleValueField()) {
         return fieldSpec.getDataType();
       }
-    } else if (expression.getType() == ExpressionType.FUNCTION
-        && "cast".equalsIgnoreCase(expression.getFunctionCall().getOperator())) {
+    } else if (expression.getType() == ExpressionType.FUNCTION && "cast".equalsIgnoreCase(
+        expression.getFunctionCall().getOperator())) {
       // expression is not identifier but we can also determine the data type.
-      String targetTypeLiteral = expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()
-          .toUpperCase();
+      String targetTypeLiteral =
+          expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue().toUpperCase();
       FieldSpec.DataType dataType;
       if ("INTEGER".equals(targetTypeLiteral)) {
         dataType = FieldSpec.DataType.INT;
@@ -439,12 +431,5 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       }
     }
     return false;
-  }
-
-  /** Change the expression value to boolean literal with given value. */
-  private static void setExpressionToBoolean(Expression expression, boolean value) {
-    expression.unsetFunctionCall();
-    expression.setType(ExpressionType.LITERAL);
-    expression.setLiteral(Literal.boolValue(value));
   }
 }

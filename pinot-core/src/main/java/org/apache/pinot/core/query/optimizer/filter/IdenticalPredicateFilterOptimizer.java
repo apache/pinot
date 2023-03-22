@@ -34,56 +34,30 @@ import org.apache.pinot.sql.FilterKind;
 public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   @Override
-  public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
-    Function function = filterExpression.getFunctionCall();
-    if (function == null) {
-      return filterExpression;
-    }
+  boolean canBeOptimized(Expression filterExpression, @Nullable Schema schema) {
+    // if there's no function call, there's no lhs or rhs
+    return filterExpression.getFunctionCall() != null;
+  }
 
-    List<Expression> operands = function.getOperands();
+  @Override
+  Expression optimizeChild(Expression filterExpression, @Nullable Schema schema) {
+    Function function = filterExpression.getFunctionCall();
     FilterKind kind = FilterKind.valueOf(function.getOperator());
     switch (kind) {
-      case AND:
-      case OR:
-      case NOT:
-        // Recursively traverse the expression tree to find an operator node that can be rewritten.
-        operands.forEach(operand -> optimize(operand, schema));
-
-        // We have rewritten the child operands, so rewrite the parent if needed.
-        return optimizeCurrent(filterExpression);
       case EQUALS:
         if (hasIdenticalLhsAndRhs(filterExpression)) {
-          return TRUE;
+          setExpressionToBoolean(filterExpression, true);
         }
-        return filterExpression;
+        break;
       case NOT_EQUALS:
         if (hasIdenticalLhsAndRhs(filterExpression)) {
-          return FALSE;
+          setExpressionToBoolean(filterExpression, false);
         }
-        return filterExpression;
+        break;
       default:
-        return filterExpression;
+        break;
     }
-  }
-
-  @Override
-  protected boolean isAlwaysFalse(Expression operand) {
-    if (super.isAlwaysFalse(operand)) {
-      return true;
-    } else if (hasIdenticalLhsAndRhs(operand)) {
-      return operand.getFunctionCall().getOperator().equals(FilterKind.NOT_EQUALS.name());
-    }
-    return false;
-  }
-
-  @Override
-  protected boolean isAlwaysTrue(Expression operand) {
-    if (super.isAlwaysTrue(operand)) {
-      return true;
-    } else if (hasIdenticalLhsAndRhs(operand)) {
-      return operand.getFunctionCall().getOperator().equals(FilterKind.EQUALS.name());
-    }
-    return false;
+    return filterExpression;
   }
 
   /**
@@ -96,7 +70,11 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
    * to return null and fail the query.
    */
   private boolean hasIdenticalLhsAndRhs(Expression operand) {
-    List<Expression> children = operand.getFunctionCall().getOperands();
+    Function function = operand.getFunctionCall();
+    if (function == null) {
+      return false;
+    }
+    List<Expression> children = function.getOperands();
     boolean hasTwoChildren = children.size() == 2;
     Expression firstChild = children.get(0);
     if (firstChild.getFunctionCall() == null || !hasTwoChildren) {
