@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import com.google.common.base.Joiner;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -87,6 +89,11 @@ public class PinotAppConfigs {
 
   public JVMConfig getJvmConfig() {
     return _jvmConfig;
+  }
+
+  public String getJvmInputArguments() {
+    Joiner joiner = Joiner.on(" ").skipNulls();
+    return String.format("JVM Input Arguments: %s", joiner.join(_jvmConfig._args));
   }
 
   public RuntimeConfig getRuntimeConfig() {

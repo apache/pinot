@@ -60,7 +60,7 @@ import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.minion.InMemoryTaskManagerStatusCache;
 import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
-import org.apache.pinot.common.utils.JvmUtils;
+import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
@@ -320,7 +320,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @Override
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
-    LOGGER.info(JvmUtils.getJvmInputArguments());
+    LOGGER.info(new PinotAppConfigs(getConfig()).getJvmInputArguments());
     Utils.logVersions();
 
     // Set up controller metrics

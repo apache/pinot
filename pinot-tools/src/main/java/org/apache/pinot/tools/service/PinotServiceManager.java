@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.utils.JvmUtils;
+import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.minion.MinionStarter;
@@ -108,6 +108,7 @@ public class PinotServiceManager {
   public String startController(String controllerStarterClassName, PinotConfiguration controllerConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Controller...");
+    LOGGER.info(new PinotAppConfigs(controllerConf).getJvmInputArguments());
     if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
@@ -126,6 +127,7 @@ public class PinotServiceManager {
   public String startBroker(String brokerStarterClassName, PinotConfiguration brokerConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Broker...");
+    LOGGER.info(new PinotAppConfigs(brokerConf).getJvmInputArguments());
     if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
@@ -155,7 +157,7 @@ public class PinotServiceManager {
   public String startServer(String serverStarterClassName, PinotConfiguration serverConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Server...");
-
+    LOGGER.info(new PinotAppConfigs(serverConf).getJvmInputArguments());
     if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
@@ -215,7 +217,6 @@ public class PinotServiceManager {
       LOGGER.info("Skip Starting Pinot Service Manager admin application");
     } else {
       LOGGER.info("Starting Pinot Service Manager admin application on port: {}", _port);
-      LOGGER.info(JvmUtils.getJvmInputArguments());
       _pinotServiceManagerAdminApplication = new PinotServiceManagerAdminApiApplication(this);
       _pinotServiceManagerAdminApplication.start(_port);
     }
