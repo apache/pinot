@@ -54,12 +54,12 @@ import org.apache.pinot.common.request.BrokerRequest;
  * segment.
  * <p>
  * Definition of new segment:
- * 1) Segment created more than 5 minutes ago.
- * - If we first see a segment via initialization, we look up segment creation time from zookeeper.
+ * 1) Segment pushed more than 5 minutes ago.
+ * - If we first see a segment via initialization, we look up segment push time from zookeeper.
  * - If we first see a segment via onAssignmentChange initialization, we use the calling time of onAssignmentChange
  * as approximation.
  * 2) We retire new segment as old when:
- * - The creation time is more than 5 minutes ago
+ * - The push time is more than 5 minutes ago
  * - Any instance for new segment is in error state
  * - External view for segment converges with ideal state.
  *

@@ -126,15 +126,15 @@ public class InstanceSelectorTest {
     Mockito.when(_propertyStore.get(eq(segmentZKMetadataPaths), any(), anyInt(), anyBoolean())).thenReturn(zkRecords);
   }
 
-  private IdealState createIdealState(Map<String, List<String>> onlineInstances) {
+  private IdealState createIdealState(Map<String, List<Pair<String, String>>> segmentState) {
     IdealState idealState = new IdealState(TABLE_NAME);
     Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
-    for (Map.Entry<String, List<String>> entry : onlineInstances.entrySet()) {
-      Map<String, String> idealStateInstanceStateMap = new TreeMap<>();
-      for (String instance : entry.getValue()) {
-        idealStateInstanceStateMap.put(instance, ONLINE);
+    for (Map.Entry<String, List<Pair<String, String>>> entry : segmentState.entrySet()) {
+      Map<String, String> externalViewInstanceStateMap = new TreeMap<>();
+      for (Pair<String, String> instanceState : entry.getValue()) {
+        externalViewInstanceStateMap.put(instanceState.getLeft(), instanceState.getRight());
       }
-      idealStateSegmentAssignment.put(entry.getKey(), idealStateInstanceStateMap);
+      idealStateSegmentAssignment.put(entry.getKey(), externalViewInstanceStateMap);
     }
     return idealState;
   }
@@ -1405,8 +1405,9 @@ public class InstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(instance0, instance1), newSeg, ImmutableList.of(instance0, instance1));
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
     IdealState idealState = createIdealState(idealSateMap);
 
     // Set up external view:
@@ -1512,8 +1513,9 @@ public class InstanceSelectorTest {
     // Ideal states for new segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap =
-        ImmutableMap.of(newSeg, ImmutableList.of(instance0, instance1), oldSeg, ImmutableList.of(instance0, instance1));
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1567,8 +1569,9 @@ public class InstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(instance0, instance1), newSeg, ImmutableList.of(instance0, instance1));
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1646,8 +1649,9 @@ public class InstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(instance0, instance1), newSeg, ImmutableList.of(instance0, instance1));
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1714,8 +1718,9 @@ public class InstanceSelectorTest {
     String instance1 = "instance1";
     Set<String> enabledInstances = ImmutableSet.of(instance0, instance1);
 
-    Map<String, List<String>> idealSateMap = ImmutableMap.of(oldSeg0, ImmutableList.of(instance0, instance1), oldSeg1,
-        ImmutableList.of(instance0, instance1));
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1735,8 +1740,10 @@ public class InstanceSelectorTest {
     // Add a new segment to ideal state with missing external view.
     String newSeg = "segment2";
     onlineSegments = ImmutableSet.of(oldSeg0, oldSeg1, newSeg);
-    idealSateMap = ImmutableMap.of(oldSeg0, ImmutableList.of(instance0, instance1), oldSeg1,
-        ImmutableList.of(instance0, instance1), newSeg, ImmutableList.of(instance0, instance1));
+    idealSateMap =
+        ImmutableMap.of(oldSeg0, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg1,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     idealState = createIdealState(idealSateMap);
     externalViewMap =
@@ -1796,8 +1803,9 @@ public class InstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(instance0, instance1), newSeg, ImmutableList.of(instance0, instance1));
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1867,8 +1875,9 @@ public class InstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:online]
     //   [segment1] -> [instance0:online, instance1:online]
-    Map<String, List<String>> idealSateMap =
-        ImmutableMap.of(oldSeg, ImmutableList.of(instance0, instance1), newSeg, ImmutableList.of(instance0, instance1));
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), newSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -1892,5 +1901,46 @@ public class InstanceSelectorTest {
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg));
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testExcludeIdealStateOffline(String selectorType) {
+    // Set segment0 as old segment
+    String newSeg = "segment0";
+    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentPushTime);
+    Set<String> onlineSegments = ImmutableSet.of(newSeg);
+
+    // Set up instances
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> enabledInstances = ImmutableSet.of(instance0, instance1);
+    // Set up ideal state:
+    // Ideal states for two segments
+    //   [segment0] -> [instance0:online, instance1:offline]
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(newSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, OFFLINE)));
+
+    IdealState idealState = createIdealState(idealSateMap);
+
+    // Set up external view:
+    // External view for two segments
+    //   [segment0] -> [instance0:offline, instance1:online]
+    Map<String, List<Pair<String, String>>> externalViewMap =
+        ImmutableMap.of(newSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)));
+
+    ExternalView externalView = createExternalView(externalViewMap);
+
+    InstanceSelector selector = createTestInstanceSelector(selectorType);
+    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+
+    // We don't mark segment as unavailable.
+    int requestId = 0;
+    Map<String, String> expectedBalancedInstanceSelectorResult = ImmutableMap.of();
+
+    InstanceSelector.SelectionResult selectionResult =
+        selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 }
