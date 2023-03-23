@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -71,7 +72,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
-  private final Map<String, ColumnMetadata> _columnMetadataMap;
+  private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
   private String _segmentName;
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
@@ -102,7 +103,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(InputStream metadataPropertiesInputStream, InputStream creationMetaInputStream)
       throws IOException {
     _indexDir = null;
-    _columnMetadataMap = new HashMap<>();
+    _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
 
     PropertiesConfiguration segmentMetadataPropertiesConfiguration =
@@ -122,7 +123,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(File indexDir)
       throws IOException {
     _indexDir = indexDir;
-    _columnMetadataMap = new HashMap<>();
+    _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
 
     PropertiesConfiguration segmentMetadataPropertiesConfiguration =
@@ -405,7 +406,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public Map<String, ColumnMetadata> getColumnMetadataMap() {
+  public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
     return _columnMetadataMap;
   }
 

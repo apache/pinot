@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -92,7 +93,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
 
   private SegmentGeneratorConfig _config;
-  private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
+  private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final IndexCreatorProvider _indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private final Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
@@ -114,7 +115,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
       throws Exception {
     _docIdCounter = 0;
     _config = segmentCreationSpec;
