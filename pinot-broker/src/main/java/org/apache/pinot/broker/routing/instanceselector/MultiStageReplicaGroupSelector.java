@@ -54,15 +54,11 @@ import org.slf4j.LoggerFactory;
 public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageReplicaGroupSelector.class);
 
-  private final String _tableNameWithType;
-  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private volatile InstancePartitions _instancePartitions;
 
   public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
-    _tableNameWithType = tableNameWithType;
-    _propertyStore = propertyStore;
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
   }
 
   @Override
@@ -85,7 +81,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  protected Map<String, String> select(List<String> segments, int requestId, SegmentStateSnapshot snapshot,
+  Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
       Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
@@ -93,20 +89,20 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     for (int iteration = 0; iteration < instancePartitions.getNumReplicaGroups(); iteration++) {
       int replicaGroup = (replicaGroupSelected + iteration) % instancePartitions.getNumReplicaGroups();
       try {
-        return tryAssigning(segments, snapshot, instancePartitions, replicaGroup);
+        return tryAssigning(segments, segmentStates, instancePartitions, replicaGroup);
       } catch (Exception e) {
         LOGGER.warn("Unable to select replica-group {} for table: {}", replicaGroup, _tableNameWithType, e);
       }
     }
-    throw new RuntimeException(String.format("Unable to find any replica-group to serve table: %s",
-        _tableNameWithType));
+    throw new RuntimeException(
+        String.format("Unable to find any replica-group to serve table: %s", _tableNameWithType));
   }
 
   /**
    * Returns a map from the segmentName to the corresponding server in the given replica-group. If the is not enabled,
    * we throw an exception.
    */
-  private Map<String, String> tryAssigning(List<String> segments, SegmentStateSnapshot snapshot,
+  private Map<String, String> tryAssigning(List<String> segments, SegmentStates segmentStates,
       InstancePartitions instancePartitions, int replicaId) {
     Set<String> instanceLookUpSet = new HashSet<>();
     for (int partition = 0; partition < instancePartitions.getNumPartitions(); partition++) {
@@ -115,11 +111,11 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     }
     Map<String, String> result = new HashMap<>();
     for (String segment : segments) {
-      List<SegmentInstanceCandidate> candidates = snapshot.getCandidates(segment);
-      boolean found = false;
+      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       // If candidates are null, we will throw an exception and log a warning.
-      for (SegmentInstanceCandidate enabledInstanceForSegment : candidates) {
-        SegmentInstanceCandidate candidate = enabledInstanceForSegment;
+      Preconditions.checkState(candidates != null, "Failed to find servers for segment: %s", segment);
+      boolean found = false;
+      for (SegmentInstanceCandidate candidate : candidates) {
         String instance = candidate.getInstance();
         if (instanceLookUpSet.contains(instance)) {
           found = true;
@@ -141,7 +137,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     // TODO: Evaluate whether we need to provide support for COMPLETE partitions.
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
     Preconditions.checkNotNull(tableType);
-    InstancePartitions instancePartitions = null;
+    InstancePartitions instancePartitions;
     if (tableType.equals(TableType.OFFLINE)) {
       instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
           InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType, tableType.name()));

@@ -166,7 +166,6 @@ public class SegmentZKMetadata implements ZKMetadata {
     setValue(Segment.TIER, tier);
   }
 
-  // Creation time in millis.
   public long getCreationTime() {
     return _znRecord.getLongField(Segment.CREATION_TIME, -1);
   }

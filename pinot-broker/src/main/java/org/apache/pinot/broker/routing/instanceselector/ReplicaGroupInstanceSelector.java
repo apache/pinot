@@ -62,20 +62,19 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
  * NUM_REPLICA_GROUPS_TO_QUERY is not supported is AdaptiveServerSelection is enabled.
  */
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
-  public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      Clock clock) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
+
+  public ReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
   }
 
   @Override
-  protected Map<String, String> select(List<String> segments, int requestId, SegmentStateSnapshot snapshot,
+  Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
       Map<String, String> queryOptions) {
-    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<String> serverRankList = new ArrayList<>();
-      List<String> candidateServers = fetchCandidateServersForQuery(segments, snapshot);
+      List<String> candidateServers = fetchCandidateServersForQuery(segments, segmentStates);
 
       // Fetch serverRankList before looping through all the segments. This is important to make sure that we pick
       // the least amount of instances for a query by referring to a single snapshot of the rankings.
@@ -84,95 +83,94 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       for (Pair<String, Double> entry : serverRankListWithScores) {
         serverRankList.add(entry.getLeft());
       }
-      selectServersUsingAdaptiverServerSelector(segments, requestId, segmentToSelectedInstanceMap, snapshot,
-          serverRankList);
+      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankList);
     } else {
       // Adaptive Server Selection is NOT enabled.
-      selectServersUsingRoundRobin(segments, requestId, segmentToSelectedInstanceMap, snapshot, queryOptions);
+      return selectServersUsingRoundRobin(segments, requestId, segmentStates, queryOptions);
     }
-
-    return segmentToSelectedInstanceMap;
   }
 
-  private void selectServersUsingRoundRobin(List<String> segments, int requestId,
-      Map<String, String> segmentToSelectedInstanceMap, SegmentStateSnapshot snapshot,
-      Map<String, String> queryOptions) {
+  private Map<String, String> selectServersUsingRoundRobin(List<String> segments, int requestId,
+      SegmentStates segmentStates, Map<String, String> queryOptions) {
+    Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
+    int numReplicaGroups = numReplicaGroupsToQuery == null ? 1 : numReplicaGroupsToQuery;
     int replicaOffset = 0;
-    Integer replicaGroup = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
-    int numReplicaGroupsToQuery = replicaGroup == null ? 1 : replicaGroup;
     for (String segment : segments) {
-      List<SegmentInstanceCandidate> candidateInstances = snapshot.getCandidates(segment);
-      // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
-      // has not been updated (we update all components for routing in sequence)
-      if (candidateInstances == null) {
+      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+      // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
+      // not been updated (we update all components for routing in sequence)
+      if (candidates == null) {
         continue;
       }
       // Round robin selection.
-      int numEnabledInstances = candidateInstances.size();
-      int instanceIdx = (requestId + replicaOffset) % numEnabledInstances;
-      SegmentInstanceCandidate selectedInstance = candidateInstances.get(instanceIdx);
+      int numCandidates = candidates.size();
+      int instanceIdx = (requestId + replicaOffset) % numCandidates;
+      SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
       // Only put online instance.
       // This can only be offline when it is a new segment.
       if (selectedInstance.isOnline()) {
-        segmentToSelectedInstanceMap.put(segment, selectedInstance.getInstance());
+        selectedServers.put(segment, selectedInstance.getInstance());
       }
-      if (numReplicaGroupsToQuery > numEnabledInstances) {
-        numReplicaGroupsToQuery = numEnabledInstances;
+      if (numReplicaGroups > numCandidates) {
+        numReplicaGroups = numCandidates;
       }
-      replicaOffset = (replicaOffset + 1) % numReplicaGroupsToQuery;
+      replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
+    return selectedServers;
   }
 
-  private void selectServersUsingAdaptiverServerSelector(List<String> segments, int requestId,
-      Map<String, String> segmentToSelectedInstanceMap, SegmentStateSnapshot snapshot, List<String> serverRankList) {
+  private Map<String, String> selectServersUsingAdaptiveServerSelector(List<String> segments, int requestId,
+      SegmentStates segmentStates, List<String> serverRankList) {
+    Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (String segment : segments) {
-      // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
-      // has not been updated (we update all components for routing in sequence)
-      List<SegmentInstanceCandidate> candidateInstances = snapshot.getCandidates(segment);
-      if (candidateInstances == null) {
+      // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
+      // not been updated (we update all components for routing in sequence)
+      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+      if (candidates == null) {
         continue;
       }
-
       // Round Robin.
-      int numEnabledInstances = candidateInstances.size();
-      int instanceIdx = requestId % numEnabledInstances;
-      SegmentInstanceCandidate selectedInstance = candidateInstances.get(instanceIdx);
+      int numCandidates = candidates.size();
+      int instanceIdx = requestId % numCandidates;
+      SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
       // Adaptive Server Selection
       // TODO: Support numReplicaGroupsToQuery with Adaptive Server Selection.
-      if (serverRankList.size() > 0) {
+      if (!serverRankList.isEmpty()) {
         int minIdx = Integer.MAX_VALUE;
-        for (int i = 0; i < numEnabledInstances; i++) {
-          int idx = serverRankList.indexOf(candidateInstances.get(i).getInstance());
+        for (SegmentInstanceCandidate candidate : candidates) {
+          int idx = serverRankList.indexOf(candidate.getInstance());
           if (idx == -1) {
             // Let's use the round-robin approach until stats for all servers are populated.
-            selectedInstance = candidateInstances.get(instanceIdx);
+            selectedInstance = candidates.get(instanceIdx);
             break;
           }
           if (idx < minIdx) {
             minIdx = idx;
-            selectedInstance = candidateInstances.get(i);
+            selectedInstance = candidate;
           }
         }
       }
       // Only put online instance.
       // This can only be offline when it is a new segment.
       if (selectedInstance.isOnline()) {
-        segmentToSelectedInstanceMap.put(segment, selectedInstance.getInstance());
+        selectedServers.put(segment, selectedInstance.getInstance());
       }
     }
+    return selectedServers;
   }
 
-  private List<String> fetchCandidateServersForQuery(List<String> segments, SegmentStateSnapshot snapshot) {
-    Set<String> tempServerSet = new HashSet<>();
+  private List<String> fetchCandidateServersForQuery(List<String> segments, SegmentStates segmentStates) {
+    Set<String> candidateServers = new HashSet<>();
     for (String segment : segments) {
-      List<SegmentInstanceCandidate> enabledInstances = snapshot.getCandidates(segment);
-      if (enabledInstances == null) {
+      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+      if (candidates == null) {
         continue;
       }
-      for (SegmentInstanceCandidate instance : enabledInstances) {
-        tempServerSet.add(instance.getInstance());
+      for (SegmentInstanceCandidate candidate : candidates) {
+        candidateServers.add(candidate.getInstance());
       }
     }
-    return new ArrayList<>(tempServerSet);
+    return new ArrayList<>(candidateServers);
   }
 }

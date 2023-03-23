@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import com.google.common.base.Preconditions;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -64,126 +62,106 @@ import org.apache.pinot.common.utils.HashUtil;
  * segments with the same assignment ([S1, S2, S3]) down on S1 to ensure that we always route the segments to the same
  * replica-group.
  *
- * Note that New segment won't be used to exclude instance from serving where new segment is unavailable.
- *
- *  </pre>
+ * Note that new segments won't be used to exclude instances from serving when the segment is unavailable.
+ * </pre>
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
-  public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      Clock clock) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
+
+  public StrictReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
   }
 
   /**
    * {@inheritDoc}
    *
    * <pre>
-   *  Instances unavailable in any old segment should not exist in oldNewSegmentStateMap entries or
-   *  newSegmentStateMap for segment with same ideal state instance.
+   * Instances unavailable for any old segment should not exist in _oldSegmentCandidatesMap or _newSegmentStateMap for
+   * segments with the same instances in ideal state.
    *
    * The maps are calculated in the following steps to meet the strict replica-group guarantee:
-   *   1. Check whether segment is new or old based on ideal state and external view and store the online instances for
-   *   each segment in new segment state map or old segment state.
-   *   2. For old segment, remove it from the newSegmentStateMap.
-   *   3. Use old segment state map to compare the instances from the ideal state and the external view and gather the
-   *   unavailable instances for each set of instances
-   *   4. Exclude the unavailable instances from the online instances map for both old and new segment map.
-   *   5. For old segment, add the remaining online instance to the map.
-   *   6. For new segment, add the ideal state instance to the map with online flags.
+   *   1. Compute the online instances for both old and new segments
+   *   2. Compare online instances for old segments with instances in ideal state and gather the unavailable instances
+   *   for each set of instances
+   *   3. Exclude the unavailable instances from the online instances map for both old and new segment map
    * </pre>
    */
   @Override
-  protected void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, SegmentState> oldSegmentStateMap, Map<String, SegmentState> newSegmentStateMap) {
-    int segmentMapCapacity = HashUtil.getHashMapCapacity(onlineSegments.size());
-    Map<String, Set<String>> idealStateSegmentToInstancesMap = new HashMap<>(segmentMapCapacity);
-    Map<String, Set<String>> oldSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
-    Map<String, Set<String>> newSegmentTempSegmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
-    Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+  void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+      Map<String, Long> newSegmentPushTimeMap) {
+    _oldSegmentCandidatesMap.clear();
+    int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentPushTimeMap.size());
+    _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
+
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
-    // TODO: Add support for AdaptiveServerSelection.
-    // Iterate over the ideal state to
-    // 1) Know whether a segment is new or old
-    // New segment definition:
-    // - external view hasn't converged with ideal state.
-    // - the segment hasn't seen error in any instance.
-    // 2) For new segment, fill in newSegmentTempSegmentToOnlineInstancesMap.
-    // 3) For old segment, remove it from the newSegmentStageMap and fill in oldSegmentToOnlineInstancesMap
-    // 4) Track every segment's ideal state in idealStateSegmentToInstancesMap, which we will use to do instance
-    // exclusion later.
+    Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+
+    // Get the online instances for the segments
+    Map<String, Set<String>> oldSegmentToOnlineInstancesMap =
+        new HashMap<>(HashUtil.getHashMapCapacity(onlineSegments.size()));
+    Map<String, Set<String>> newSegmentToOnlineInstancesMap = new HashMap<>(newSegmentMapCapacity);
     for (String segment : onlineSegments) {
-      Map<String, String> idealStateInstances = idealStateAssignment.get(segment);
-      Preconditions.checkState(idealStateInstances != null, "ideal state instances cannot be null");
-      Map<String, String> externalViewInstances = externalViewAssignment.getOrDefault(segment, Collections.emptyMap());
-      Pair<Set<String>, Boolean> segmentInfo =
-          InstanceSelector.getSegmentInfo(externalViewInstances, idealStateInstances);
-      Set<String> onlineInstances = segmentInfo.getLeft();
-      boolean couldBeNew = segmentInfo.getRight();
-      SegmentState state = newSegmentStateMap.get(segment);
-      if (couldBeNew && state != null) {
-        newSegmentTempSegmentToOnlineInstancesMap.put(segment, onlineInstances);
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      assert idealStateInstanceStateMap != null;
+      Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
+      Set<String> onlineInstances;
+      if (externalViewInstanceStateMap == null) {
+        onlineInstances = Collections.emptySet();
       } else {
-        if (state != null) {
-          newSegmentStateMap.remove(segment);
-          state.promoteToOld();
-        } else {
-          state = SegmentState.createDefaultSegmentState();
-        }
-        oldSegmentStateMap.put(segment, state);
+        onlineInstances = getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
+      }
+      if (newSegmentPushTimeMap.containsKey(segment)) {
+        newSegmentToOnlineInstancesMap.put(segment, onlineInstances);
+      } else {
         oldSegmentToOnlineInstancesMap.put(segment, onlineInstances);
       }
-      idealStateSegmentToInstancesMap.put(segment, idealStateInstances.keySet());
     }
-    // Get unavailable instances from oldSegmentToOnlineInstancesMap.
-    // Note that we don't use new segments to set up unavailable instance.
+
+    // Calculate the unavailable instances based on the old segments' online instances for each combination of instances
+    // in the ideal state
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
-      Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
+      Set<String> instancesInIdealState = idealStateAssignment.get(segment).keySet();
       Set<String> unavailableInstances =
           unavailableInstancesMap.computeIfAbsent(instancesInIdealState, k -> new HashSet<>());
-      Set<String> tempOnlineInstances = entry.getValue();
       for (String instance : instancesInIdealState) {
-        if (!tempOnlineInstances.contains(instance)) {
+        if (!entry.getValue().contains(instance)) {
           unavailableInstances.add(instance);
         }
       }
     }
 
-    // Set up 'segmentToOnlineInstancesMap' for old segments with the strict replica-group guarantee
+    // Iterate over the maps and exclude the unavailable instances
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
-      Set<String> candidateInstance = entry.getValue();
-      List<SegmentInstanceCandidate> onlineInstanceCandidates = new ArrayList<>();
-      Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
-      Set<String> unavailableInstances =
-          unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());
-      for (String instance : candidateInstance) {
-        // Some instances are unavailable, add the remaining instances as online instance
+      // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
+      Set<String> onlineInstances = entry.getValue();
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
+      List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
+      for (String instance : onlineInstances) {
         if (!unavailableInstances.contains(instance)) {
-          onlineInstanceCandidates.add(new SegmentInstanceCandidate(instance, true));
+          candidates.add(new SegmentInstanceCandidate(instance, true));
         }
       }
-      SegmentState state = oldSegmentStateMap.computeIfAbsent(segment, s -> SegmentState.createDefaultSegmentState());
-      state.setCandidates(onlineInstanceCandidates);
+      _oldSegmentCandidatesMap.put(segment, candidates);
     }
 
-    // Set up instances in newSegmentStateMap for new segments.
-    for (Map.Entry<String, Set<String>> entry : newSegmentTempSegmentToOnlineInstancesMap.entrySet()) {
+    for (Map.Entry<String, Set<String>> entry : newSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
-      Set<String> instancesInIdealState = idealStateSegmentToInstancesMap.get(segment);
-      Set<String> unavailableInstances =
-          unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());
-      SegmentState state = newSegmentStateMap.get(segment);
       Set<String> onlineInstances = entry.getValue();
-      List<SegmentInstanceCandidate> candidates = new ArrayList<>();
-      for (String instance : instancesInIdealState) {
-        if (!unavailableInstances.contains(instance)) {
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
+      List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
+      for (Map.Entry<String, String> instanceStateEntry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
+        String instance = instanceStateEntry.getKey();
+        if ((unavailableInstances == null || !unavailableInstances.contains(instance)) && isOnlineForRouting(
+            instanceStateEntry.getValue())) {
           candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
         }
       }
-      state.setCandidates(candidates);
+      _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentPushTimeMap.get(segment), candidates));
     }
   }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -45,7 +44,6 @@ public interface AdaptiveServerSelector {
    *
    * @return List of servers along with their values ranked from best to worst.
    */
-  @VisibleForTesting
   List<Pair<String, Double>> fetchAllServerRankingsWithScores();
 
   /**

@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -39,61 +35,7 @@ public interface InstanceSelector {
   long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
 
   static boolean isNewSegment(long pushMillis, long nowMillis) {
-    if (pushMillis == Long.MIN_VALUE) {
-      return false;
-    }
     return nowMillis - pushMillis <= NEW_SEGMENT_EXPIRATION_MILLIS;
-  }
-
-  static boolean isOnlineForServing(String state) {
-    return state.equals(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE) || state.equals(
-        CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
-  }
-
-  /**
-   * Check whether a segment is new and return the set of online instances.
-   *
-   * Segment could be new when:
-   * 1) We haven't seen error for the segment in external view.
-   * 2) External view hasn't converged with ideal state:
-   * - converge means: every online instance in ideal state should be online in external view.
-   * Note that segment with missing external view is defined as new.
-   * @param externalView
-   * @param idealState
-   * @return pair of online instances and whether the segment could be new.
-   */
-  static Pair<Set<String>, Boolean> getSegmentInfo(Map<String, String> externalView, Map<String, String> idealState) {
-    boolean hasError = false;
-    boolean hasConverged = true;
-    boolean isNew = true;
-    Set<String> onlineInstances = new HashSet<>();
-    // Only track online instances within the ideal state
-    // NOTE: When an instance is not in the ideal state, the instance will drop the segment soon, and it is not safe
-    // to query this instance for the segment. This could happen when a segment is moved from one instance to
-    // another instance.
-    for (Map.Entry<String, String> state : idealState.entrySet()) {
-      if (isOnlineForServing(state.getValue())) {
-        String externalViewState = externalView.get(state.getKey());
-        if (externalViewState == null) {
-          hasConverged = false;
-          continue;
-        }
-        if (externalViewState.equals(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
-          hasError = true;
-          hasConverged = false;
-          continue;
-        }
-        if (!isOnlineForServing(externalViewState)) {
-          hasConverged = false;
-        } else {
-          onlineInstances.add(state.getKey());
-        }
-      }
-    }
-    if (hasError || hasConverged) {
-      isNew = false;
-    }
-    return ImmutablePair.of(onlineInstances, isNew);
   }
 
   /**

@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -48,39 +47,43 @@ import org.apache.pinot.common.utils.HashUtil;
  * light-weight and will do best effort to balance the number of segments served by each selected server instance.
  */
 public class BalancedInstanceSelector extends BaseInstanceSelector {
-  public BalancedInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      Clock clock) {
-    super(tableNameWithType, brokerMetrics, adaptiveServerSelector, propertyStore, clock);
+
+  public BalancedInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
   }
 
   @Override
-  protected Map<String, String> select(List<String> segments, int requestId, SegmentStateSnapshot snapshot,
+  Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
       Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     if (_adaptiveServerSelector != null) {
       for (String segment : segments) {
-        TreeMap<String, Boolean> enabledInstancesMap = snapshot.getCandidatesAsMap(segment);
-        // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance
-        // selector has not been updated (we update all components for routing in sequence)
-        if (enabledInstancesMap == null) {
+        List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+        // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
+        // not been updated (we update all components for routing in sequence)
+        if (candidates == null) {
           continue;
         }
-        String selectedServer = _adaptiveServerSelector.select(new ArrayList<>(enabledInstancesMap.keySet()));
-        if (enabledInstancesMap.get(selectedServer)) {
-          segmentToSelectedInstanceMap.put(segment, selectedServer);
+        List<String> candidateInstances = new ArrayList<>(candidates.size());
+        for (SegmentInstanceCandidate candidate : candidates) {
+          candidateInstances.add(candidate.getInstance());
+        }
+        String selectedInstance = _adaptiveServerSelector.select(candidateInstances);
+        if (candidates.get(candidateInstances.indexOf(selectedInstance)).isOnline()) {
+          segmentToSelectedInstanceMap.put(segment, selectedInstance);
         }
       }
     } else {
       for (String segment : segments) {
-        List<SegmentInstanceCandidate> enabledInstances = snapshot.getCandidates(segment);
-        // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance
-        // selector has not been updated (we update all components for routing in sequence)
-        if (enabledInstances == null) {
+        List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+        // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
+        // not been updated (we update all components for routing in sequence)
+        if (candidates == null) {
           continue;
         }
-        int selectedIdx = requestId++ % enabledInstances.size();
-        SegmentInstanceCandidate selectedCandidate = enabledInstances.get(selectedIdx);
+        int selectedIdx = requestId++ % candidates.size();
+        SegmentInstanceCandidate selectedCandidate = candidates.get(selectedIdx);
         if (selectedCandidate.isOnline()) {
           segmentToSelectedInstanceMap.put(segment, selectedCandidate.getInstance());
         }

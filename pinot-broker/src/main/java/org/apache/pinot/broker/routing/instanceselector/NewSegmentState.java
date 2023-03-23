@@ -18,27 +18,34 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.util.List;
 import javax.annotation.concurrent.Immutable;
 
 
 /**
- * Represents an instance candidate for a segment.
+ * Contains the push time and candidate instances for a new segment.
  */
 @Immutable
-public class SegmentInstanceCandidate {
-  private final String _instance;
-  private final boolean _online;
+public class NewSegmentState {
+  // Segment push time. This could be
+  // 1) From ZK if we first see this segment via init call.
+  // 2) Use wall time, if first see this segment from onAssignmentChange call.
+  private final long _pushTimeMillis;
 
-  public SegmentInstanceCandidate(String instance, boolean online) {
-    _instance = instance;
-    _online = online;
+  // List of SegmentInstanceCandidate: which contains instance name and online flags.
+  // The candidates have to be in instance sorted order.
+  private final List<SegmentInstanceCandidate> _candidates;
+
+  public NewSegmentState(long pushTimeMillis, List<SegmentInstanceCandidate> candidates) {
+    _pushTimeMillis = pushTimeMillis;
+    _candidates = candidates;
   }
 
-  public String getInstance() {
-    return _instance;
+  public long getPushTimeMillis() {
+    return _pushTimeMillis;
   }
 
-  public boolean isOnline() {
-    return _online;
+  public List<SegmentInstanceCandidate> getCandidates() {
+    return _candidates;
   }
 }
