@@ -19,8 +19,6 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.HashMap;
-import java.util.Map;
 
 
 /**
@@ -115,20 +113,6 @@ public class ExecutionStats {
 
   @Override
   public String toString() {
-    Map<String, Object> map = new HashMap<>();
-    map.put(NUM_SERVERS_QUERIED, getNumServersQueried());
-    map.put(NUM_SERVERS_RESPONDED, getNumServersResponded());
-    map.put(NUM_DOCS_SCANNED, getNumDocsScanned());
-    map.put(NUM_ENTRIES_SCANNED_IN_FILTER, getNumEntriesScannedInFilter());
-    map.put(NUM_ENTRIES_SCANNED_POST_FILTER, getNumEntriesScannedPostFilter());
-    map.put(NUM_SEGMENTS_QUERIED, getNumSegmentsQueried());
-    map.put(NUM_SEGMENTS_PROCESSED, getNumSegmentsProcessed());
-    map.put(NUM_SEGMENTS_MATCHED, getNumSegmentsMatched());
-    map.put(NUM_CONSUMING_SEGMENTS_QUERIED, getNumConsumingSegmentsQueried());
-    map.put(MIN_CONSUMING_FRESHNESS_TIME_MS, getMinConsumingFreshnessTimeMs() + "ms");
-    map.put(TOTAL_DOCS, getTotalDocs());
-    map.put(NUM_GROUPS_LIMIT_REACHED, isNumGroupsLimitReached());
-    map.put(TIME_USED_MS, getTimeUsedMs() + "ms");
-    return map.toString();
+    return _brokerResponse.toString();
   }
 }
