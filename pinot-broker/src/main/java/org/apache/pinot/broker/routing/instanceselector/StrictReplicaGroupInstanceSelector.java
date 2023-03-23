@@ -142,8 +142,6 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
           unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       for (String instance : onlineInstances) {
-        // Note: unavailableInstances can't be null here because for every old segment' IS, we have one entry in the
-        // map.
         if (!unavailableInstances.contains(instance)) {
           candidates.add(new SegmentInstanceCandidate(instance, true));
         }
@@ -160,8 +158,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
       for (Map.Entry<String, String> instanceStateEntry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
         String instance = instanceStateEntry.getKey();
-        if (!unavailableInstances.contains(instance) && isOnlineForRouting(
-            instanceStateEntry.getValue())) {
+        if (!unavailableInstances.contains(instance) && isOnlineForRouting(instanceStateEntry.getValue())) {
           candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
         }
       }
