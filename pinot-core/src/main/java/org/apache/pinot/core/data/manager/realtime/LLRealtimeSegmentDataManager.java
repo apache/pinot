@@ -89,7 +89,6 @@ import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -1585,8 +1584,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void updateIngestionDelay(RowMetadata metadata) {
     if (metadata != null) {
-      _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(),
-          _partitionGroupId);
+      _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(),
+          metadata.getFirstStreamRecordIngestionTimeMs(), _partitionGroupId);
     }
   }
 
