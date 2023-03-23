@@ -118,10 +118,12 @@ public interface MessageBatch<T> {
   }
 
   /**
-   * We need this to determine ingestion delay when we receive only null messages (Tombstone messages)
-   * @return last metadata for a null message received by the string
+   * This is useful while determining ingestion delay for a message batch. Retaining metadata for last message in
+   * a batch can enable us to estimate the ingestion delay for the batch.
+   *
+   * @return null by default.
    */
-  default public StreamMessageMetadata getLastTombstoneMetadata() {
+  default public StreamMessageMetadata getLastMessageMetadata() {
     return null;
   }
 }

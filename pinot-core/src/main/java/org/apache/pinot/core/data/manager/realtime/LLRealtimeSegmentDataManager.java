@@ -620,16 +620,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
       if (messageCount == 0) {
-        // If we did not get any events but got some filtered Messages we assume we are up-to-date
-        // because we have processed all events of interest up to now. With this we avoid a ramping
-        // delay caused by one event followed by a long period of filtered messages.
-        // Extract metadata for last tombstone and compute the ingestion delay from there
-        RowMetadata lastTombstoneMetadata = messagesAndOffsets.getLastTombstoneMetadata();
-        if (lastTombstoneMetadata != null) {
-          // TBD update the latency with what we get from the tombstone metadata
-          updateIngestionDelay(lastTombstoneMetadata);
-        }
-        setIngestionDelayToZero();
+        // If we did not get any events but got some unfiltered messages, we attempt to estimate the ingestion
+        // delay from the metadata of the last unfiltered message received.
+        updateIngestionDelay(messagesAndOffsets.getLastMessageMetadata());
       }
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
@@ -1584,16 +1577,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param indexedMessagesCount
    */
   private void updateIngestionDelay(int indexedMessageCount) {
-    if ((indexedMessageCount > 0) && (_lastRowMetadata != null)) {
+    if (indexedMessageCount > 0) {
       // Record Ingestion delay for this partition
       updateIngestionDelay(_lastRowMetadata);
     }
   }
 
   private void updateIngestionDelay(RowMetadata metadata) {
-    _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(),
-        metadata.getFirstStreamRecordIngestionTimeMs(),
-        _partitionGroupId);
+    if (metadata != null) {
+      _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(),
+          _partitionGroupId);
+    }
   }
 
   /*
