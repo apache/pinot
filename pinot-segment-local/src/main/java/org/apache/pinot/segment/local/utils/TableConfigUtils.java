@@ -93,6 +93,7 @@ public final class TableConfigUtils {
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
+  private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
 
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
@@ -518,6 +519,28 @@ public final class TableConfigUtils {
                   String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
             }
           }
+        } else if (taskTypeConfigName.equals(UPSERT_COMPACTION_TASK_TYPE)) {
+          // check table is realtime
+          Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+              "UpsertCompactionTask only supports realtime tables!");
+          // check upsert enabled
+          Preconditions.checkState(tableConfig.isUpsertEnabled(),
+              "Upsert must be enabled for UpsertCompactionTask");
+          // check no malformed period
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
+          // check maxNumRecordsPerSegment
+          Preconditions.checkState(taskTypeConfig.containsKey("maxNumRecordsPerSegment"),
+              "maxNumRecordsPerSegment must be configured for UpsertCompactionTask");
+          Preconditions.checkState(
+              Integer.parseInt(taskTypeConfig.get("maxNumRecordsPerSegment")) > 0,
+              "maxNumRecordsPerSegment must be > 0");
+          // check segmentPartitionConfig
+          IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+          Preconditions.checkState(indexingConfig != null,
+              "indexingConfig must be configured for UpsertCompactionTask");
+          Preconditions.checkState(indexingConfig.getSegmentPartitionConfig() != null,
+              "segmentPartitionConfig must be configured for UpsertCompactionTask");
         }
       }
     }

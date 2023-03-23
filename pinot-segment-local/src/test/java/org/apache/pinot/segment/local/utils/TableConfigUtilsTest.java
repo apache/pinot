@@ -1691,6 +1691,30 @@ public class TableConfigUtilsTest {
     }
   }
 
+  @Test
+  public void testUpsertCompactionTaskConfig() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    Map<String, String> upsertCompactionTaskConfig =
+        ImmutableMap.of("schedule", "0 */10 * ? * * *",
+            "bucketTimePeriod", "6h",
+            "bufferTimePeriod", "5d",
+            "maxNumRecordsPerSegment","5000000");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(
+            Collections.singletonMap("myCol", new ColumnPartitionConfig(
+                "murmur", 1))))
+        .setTaskConfig(new TableTaskConfig(
+            ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+
+    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
+  }
+
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");

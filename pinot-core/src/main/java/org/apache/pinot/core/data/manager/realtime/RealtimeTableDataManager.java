@@ -483,7 +483,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // TODO(saurabh) refactor commons code with handleUpsert
     String segmentName = immutableSegment.getSegmentName();
     Integer partitionGroupId =
-        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
+        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null, null);
     Preconditions.checkNotNull(partitionGroupId,
         String.format("PartitionGroupId is not available for segment: '%s' (dedup-enabled table: %s)", segmentName,
             _tableNameWithType));
@@ -498,7 +498,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Adding immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
 
     Integer partitionId =
-        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
+        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null, null);
     Preconditions.checkNotNull(partitionId,
         String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
             _tableNameWithType));
