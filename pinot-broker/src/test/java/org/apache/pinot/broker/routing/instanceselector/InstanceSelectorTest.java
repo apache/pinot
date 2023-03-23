@@ -1886,4 +1886,54 @@ public class InstanceSelectorTest {
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(oldSeg));
   }
+
+  @Test(dataProvider = "selectorType")
+  public void testExcludeIdealStateOffline(String selectorType) {
+    // Set segment0 as old segment
+    String newSeg = "segment0";
+    String oldSeg = "segment1";
+
+    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(
+        Pair.of(newSeg, _mutableClock.millis() - 100),
+        Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
+
+    createSegments(segmentPushTime);
+    Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
+
+    // Set up instances
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> enabledInstances = ImmutableSet.of(instance0, instance1);
+    // Set up ideal state:
+    // Ideal states for two segments
+    //   [segment0] -> [instance0:online, instance1:offline]
+    Map<String, List<Pair<String, String>>> idealSateMap =
+        ImmutableMap.of(
+            newSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)),
+            oldSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)));
+
+    IdealState idealState = createIdealState(idealSateMap);
+
+    // Set up external view:
+    // External view for two segments
+    //   [segment0] -> [instance0:offline, instance1:online]
+    Map<String, List<Pair<String, String>>> externalViewMap =
+        ImmutableMap.of(
+            newSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)),
+            oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+
+    ExternalView externalView = createExternalView(externalViewMap);
+
+    InstanceSelector selector = createTestInstanceSelector(selectorType);
+    selector.init(enabledInstances, idealState, externalView, onlineSegments);
+
+    // We don't mark segment as unavailable.
+    int requestId = 0;
+    Map<String, String> expectedBalancedInstanceSelectorResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+
+    InstanceSelector.SelectionResult selectionResult =
+        selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
 }
