@@ -64,8 +64,9 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       _operatorStats.startTimer();
       TransferableBlock nextBlock = getNextBlock();
+      _operatorStats.endTimer(nextBlock);
+
       _operatorStats.recordRow(1, nextBlock.getNumRows());
-      _operatorStats.endTimer();
       if (nextBlock.isEndOfStreamBlock()) {
         if (nextBlock.isSuccessfulEndOfStreamBlock()) {
           for (MultiStageOperator op : getChildOperators()) {
