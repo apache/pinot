@@ -157,6 +157,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/tasktypes")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all task types")
   public Set<String> listTaskTypes() {
     return _pinotHelixTaskResourceManager.getTaskTypes();
@@ -165,6 +166,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/taskqueues")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all task queues (deprecated)")
   public Set<String> getTaskQueues() {
     return _pinotHelixTaskResourceManager.getTaskQueues();
@@ -189,6 +191,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/tasks")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type")
   public Set<String> getTasks(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
     return _pinotHelixTaskResourceManager.getTasks(taskType);
@@ -335,6 +338,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/tasks/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type (deprecated)")
   public Set<String> getTasksDeprecated(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
