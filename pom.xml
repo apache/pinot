@@ -1123,7 +1123,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>1.4.193</version>
+        <version>2.1.214</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -1210,11 +1210,16 @@
         <artifactId>h3</artifactId>
         <version>${h3.version}</version>
       </dependency>
-
       <dependency>
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
         <version>5.3.4</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mercateo</groupId>
+        <artifactId>test-clock</artifactId>
+        <version>1.0.2</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>

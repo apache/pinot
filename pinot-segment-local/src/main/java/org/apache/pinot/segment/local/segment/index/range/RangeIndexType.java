@@ -67,7 +67,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   public static final int DEFAULT_RANGE_INDEX_VERSION = 2;
   public static final RangeIndexType INSTANCE = new RangeIndexType();
 
-  RangeIndexType() {
+  private RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
   }
 

@@ -63,6 +63,7 @@ import org.slf4j.LoggerFactory;
 
 public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexReader, TextIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
+
   public static final TextIndexType INSTANCE = new TextIndexType();
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
 
