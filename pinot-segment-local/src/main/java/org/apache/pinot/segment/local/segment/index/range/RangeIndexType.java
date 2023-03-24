@@ -46,7 +46,7 @@ public class RangeIndexType implements IndexType<IndexConfig, IndexReader, Index
    */
   public static final RangeIndexType INSTANCE = new RangeIndexType();
 
-  RangeIndexType() {
+  private RangeIndexType() {
   }
 
   @Override
