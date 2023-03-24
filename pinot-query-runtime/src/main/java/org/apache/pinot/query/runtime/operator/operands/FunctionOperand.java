@@ -52,6 +52,9 @@ public class FunctionOperand extends TransformOperand {
     _resultName = computeColumnName(functionCall.getFunctionName(), _childOperandList);
     // TODO: Check type match between functionCall's data type and result type.
     _resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
+
+    boolean isTypeMatched = functionCall.getDataType() == _resultType.toDataType();
+    Preconditions.checkState(isTypeMatched, "Mismatch function data type and result type");
     _reusableOperandHolder = new Object[operandExpressions.size()];
   }
 
