@@ -26,6 +26,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -77,11 +78,9 @@ public class SelectionOperatorService {
     _offset = queryContext.getOffset();
     _numRowsToKeep = _offset + queryContext.getLimit();
     assert queryContext.getOrderByExpressions() != null;
-    // TODO: Do not use type compatible comparator for performance since we don't support different data schema on
-    //       server side combine
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        SelectionOperatorUtils.getTypeCompatibleComparator(queryContext.getOrderByExpressions(), _dataSchema,
-            _queryContext.isNullHandlingEnabled()));
+        OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
+            _queryContext.isNullHandlingEnabled()).reversed());
   }
 
   /**
