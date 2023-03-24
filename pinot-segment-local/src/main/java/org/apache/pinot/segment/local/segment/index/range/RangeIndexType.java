@@ -44,6 +44,7 @@ public class RangeIndexType implements IndexType<IndexConfig, IndexReader, Index
    *
    * This value should be equal to the one used in {@link org.apache.pinot.spi.config.table.IndexingConfig}
    */
+  public static final int DEFAULT_RANGE_INDEX_VERSION = 2;
   public static final RangeIndexType INSTANCE = new RangeIndexType();
 
   private RangeIndexType() {
