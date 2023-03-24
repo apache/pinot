@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Pinot Linter Test Set
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -76,7 +76,7 @@ jobs:
         testset: [ 1, 2 ]
     name: Pinot Unit Test Set ${{ matrix.testset }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -122,7 +122,7 @@ jobs:
         testset: [ 1, 2 ]
     name: Pinot Integration Test Set ${{ matrix.testset }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -223,7 +223,7 @@ jobs:
         java: [ 8, 11, 15 ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v3
         with:
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Build Presto Pinot Driver
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:

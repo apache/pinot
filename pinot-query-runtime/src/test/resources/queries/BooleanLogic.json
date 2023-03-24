@@ -58,13 +58,15 @@
         "ignored": true,
         "note": "H2 doesn't support this",
         "description": "check implicit cast between boolean and int",
-        "sql": "select b = i FROM {tbl}"
+        "sql": "select b = i FROM {tbl}",
+        "expectedException": "Values of types .* and .*  are not comparable"
       },
       {
         "ignored": true,
         "comment": "H2 doesn't support this",
         "description": "check implicit cast between boolean and double",
-        "sql": "select b = d FROM {tbl}"
+        "sql": "select b = d FROM {tbl}",
+        "expectedException": "Values of types .* and .*  are not comparable"
       },
       {
         "ignored": true,
@@ -76,7 +78,8 @@
         "ignored": true,
         "comment": "H2 doesn't support this",
         "description": "check implicit cast between boolean and numeric",
-        "sql": "select b = n FROM {tbl}"
+        "sql": "select b = n FROM {tbl}",
+        "expectedException": "Values of types .* and .*  are not comparable"
       },
       {
         "description": "implicit cast should fail between boolean and timestamp",
