@@ -58,13 +58,18 @@ import org.slf4j.LoggerFactory;
  * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
  * will output as many rows as input rows.
  *
+ * For queries using an 'ORDER BY' clause within the 'OVER()', this WindowAggregateOperator expects that the incoming
+ * keys are already ordered based on the 'ORDER BY' keys. No ordering is performed in this operator. The planner
+ * should handle adding a 'SortExchange' to do the ordering prior to pipelining the data to the upstream operators
+ * wherever ordering is required.
+ *
  * Note: This class performs aggregation over the double value of input.
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  *
  * TODO:
  *     1. Add support for rank window functions
  *     2. Add support for value window functions
- *     3. Add support for custom frames
+ *     3. Add support for custom frames (including ROWS support)
  *     4. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
  *     5. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
  */
@@ -81,6 +86,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private final DataSchema _resultSchema;
   private final WindowAggregateAccumulator[] _windowAccumulators;
   private final Map<Key, List<Object[]>> _partitionRows;
+  private final boolean _isPartitionByOnly;
 
   private TransferableBlock _upstreamErrorBlock;
 
@@ -108,8 +114,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     _inputOperator = inputOperator;
     _groupSet = groupSet;
-    boolean isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet);
-    _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection, isPartitionByOnly);
+    _isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet);
+    _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection, _isPartitionByOnly);
     _windowFrame = new WindowFrame(lowerBound, upperBound, windowFrameType);
 
     Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
@@ -197,8 +203,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   private TransferableBlock produceWindowAggregatedBlock() {
-    boolean isPartitionByOnly =
-        CollectionUtils.isEmpty(_orderSetInfo.getOrderSet()) || _orderSetInfo.isPartitionByOnly();
     Key emptyOrderKey = AggregationUtils.extractEmptyKey();
     List<Object[]> rows = new ArrayList<>(_numRows);
     for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
@@ -206,7 +210,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<Object[]> rowList = e.getValue();
       for (Object[] existingRow : rowList) {
         Object[] row = new Object[existingRow.length + _aggCalls.size()];
-        Key orderKey = isPartitionByOnly ? emptyOrderKey
+        Key orderKey = _isPartitionByOnly ? emptyOrderKey
             : AggregationUtils.extractRowKey(existingRow, _orderSetInfo.getOrderSet());
         System.arraycopy(existingRow, 0, row, 0, existingRow.length);
         for (int i = 0; i < _windowAccumulators.length; i++) {
@@ -227,6 +231,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
    * @return whether or not the operator is ready to move on (EOS or ERROR)
    */
   private boolean consumeInputBlocks() {
+    Key emptyOrderKey = AggregationUtils.extractEmptyKey();
     TransferableBlock block = _inputOperator.nextBlock();
     while (!block.isNoOpBlock()) {
       // setting upstream error block
@@ -238,14 +243,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
         return true;
       }
 
-      Key emptyOrderKey = AggregationUtils.extractEmptyKey();
       List<Object[]> container = block.getContainer();
       for (Object[] row : container) {
         _numRows++;
         // TODO: Revisit null direction handling for all query types
         Key key = AggregationUtils.extractRowKey(row, _groupSet);
-        Key orderKey = (CollectionUtils.isEmpty(_orderSetInfo.getOrderSet()) || _orderSetInfo.isPartitionByOnly())
-            ? emptyOrderKey : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
+        Key orderKey = _isPartitionByOnly ? emptyOrderKey
+            : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
         _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
         int aggCallsSize = _aggCalls.size();
         for (int i = 0; i < aggCallsSize; i++) {
