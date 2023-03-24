@@ -76,7 +76,7 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
         Object[] arguments = new Object[numOperands];
         for (int i = 0; i < numOperands; i++) {
           Literal literal = function.getOperands().get(i).getLiteral();
-          if (literal.getSetField() == Literal._Fields.NULL_VALUE) {
+          if (literal.isSetNullValue()) {
             arguments[i] = null;
           } else {
             arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();

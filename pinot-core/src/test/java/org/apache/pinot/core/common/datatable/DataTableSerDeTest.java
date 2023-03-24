@@ -614,9 +614,6 @@ public class DataTableSerDeTest {
             OBJECTS[rowId] = isNull ? null : RANDOM.nextDouble();
             dataTableBuilder.setColumn(colId, OBJECTS[rowId]);
             break;
-          case UNKNOWN:
-            dataTableBuilder.setColumn(colId, (Object) null);
-            break;
           case INT_ARRAY:
             int length = RANDOM.nextInt(20);
             int[] intArray = new int[length];
@@ -683,6 +680,9 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
+          case UNKNOWN:
+            dataTableBuilder.setColumn(colId, (Object) null);
+            break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
         }
@@ -746,10 +746,6 @@ public class DataTableSerDeTest {
               Assert.assertEquals(ObjectSerDeUtils.deserialize(customObject), OBJECTS[rowId], ERROR_MESSAGE);
             }
             break;
-          case UNKNOWN:
-            Object nulValue = newDataTable.getCustomObject(rowId, colId);
-            Assert.assertNull(nulValue, ERROR_MESSAGE);
-            break;
           case INT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
@@ -779,6 +775,10 @@ public class DataTableSerDeTest {
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
+            break;
+          case UNKNOWN:
+            Object nulValue = newDataTable.getCustomObject(rowId, colId);
+            Assert.assertNull(nulValue, ERROR_MESSAGE);
             break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
