@@ -43,6 +43,7 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.service.QueryConfig;
@@ -247,7 +248,8 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     // are not yet exhausted and we should wait for more data to be available
     TransferableBlock block =
         openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
-            : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+            : TransferableBlockUtils.getEndOfStreamTransferableBlock(
+                OperatorUtils.getMetadataFromOperatorStats(getOperatorStatsMap()));
     return block;
   }
 

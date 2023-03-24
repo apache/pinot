@@ -25,8 +25,6 @@ import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
@@ -40,7 +38,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   // TODO: Move to OperatorContext class.
   protected final OperatorStats _operatorStats;
   protected final Map<String, OperatorStats> _operatorStatsMap;
-  private final String _operatorId;
+  protected final String _operatorId;
   private final OpChainExecutionContext _context;
 
   public MultiStageOperator(OpChainExecutionContext context) {
@@ -68,19 +66,21 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
       _operatorStats.recordRow(1, nextBlock.getNumRows());
       if (nextBlock.isEndOfStreamBlock()) {
-        if (nextBlock.isSuccessfulEndOfStreamBlock()) {
-          for (MultiStageOperator op : getChildOperators()) {
-            _operatorStatsMap.putAll(op.getOperatorStatsMap());
-          }
-          if (!_operatorStats.getExecutionStats().isEmpty()) {
-            _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
-            _operatorStatsMap.put(_operatorId, _operatorStats);
-          }
-          return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-              OperatorUtils.getMetadataFromOperatorStats(_operatorStatsMap));
-        }
+        populateOperatorStatsMap(nextBlock);
       }
       return nextBlock;
+    }
+  }
+
+  protected void populateOperatorStatsMap(TransferableBlock nextBlock) {
+    if (nextBlock.isSuccessfulEndOfStreamBlock()) {
+      for (MultiStageOperator op : getChildOperators()) {
+        _operatorStatsMap.putAll(op.getOperatorStatsMap());
+      }
+      if (!_operatorStats.getExecutionStats().isEmpty()) {
+        _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
+        _operatorStatsMap.put(_operatorId, _operatorStats);
+      }
     }
   }
 

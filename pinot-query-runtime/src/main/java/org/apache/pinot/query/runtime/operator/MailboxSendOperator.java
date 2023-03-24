@@ -40,6 +40,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,10 +152,19 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       transferableBlock = _dataTableBlockBaseOperator.nextBlock();
       while (!transferableBlock.isNoOpBlock()) {
-        _exchange.send(transferableBlock);
         if (transferableBlock.isEndOfStreamBlock()) {
-          return transferableBlock;
+          if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
+            populateOperatorStatsMap(transferableBlock);
+            TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
+                OperatorUtils.getMetadataFromOperatorStats(_operatorStatsMap));
+            _exchange.send(eosBlockWithStats);
+            return eosBlockWithStats;
+          } else {
+            _exchange.send(transferableBlock);
+            return transferableBlock;
+          }
         }
+        _exchange.send(transferableBlock);
         transferableBlock = _dataTableBlockBaseOperator.nextBlock();
       }
     } catch (final Exception e) {
