@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.data.manager;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -27,6 +28,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public abstract class SegmentDataManager {
   private final long _loadTimeMs = System.currentTimeMillis();
+  private final AtomicBoolean _destroyed = new AtomicBoolean();
   private int _referenceCount = 1;
 
   public long getLoadTimeMs() {
@@ -71,5 +73,15 @@ public abstract class SegmentDataManager {
 
   public abstract IndexSegment getSegment();
 
-  public abstract void destroy();
+  /**
+   * Destroys the data manager and releases all the resources allocated.
+   * The data manager can only be destroyed once.
+   */
+  public void destroy() {
+    if (_destroyed.compareAndSet(false, true)) {
+      doDestroy();
+    }
+  }
+
+  protected abstract void doDestroy();
 }
