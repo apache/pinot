@@ -154,9 +154,6 @@ public class DataBlockBuilder {
           case OBJECT:
             setColumn(rowBuilder, byteBuffer, value);
             break;
-          case UNKNOWN:
-            setColumn(rowBuilder, byteBuffer, (Object) null);
-            break;
           // Multi-value column
           case INT_ARRAY:
             setColumn(rowBuilder, byteBuffer, (int[]) value);
@@ -219,6 +216,9 @@ public class DataBlockBuilder {
             long[] longs = new long[length];
             ArrayCopyUtils.copy(timestamps, longs, length);
             setColumn(rowBuilder, byteBuffer, longs);
+            break;
+          case UNKNOWN:
+            setColumn(rowBuilder, byteBuffer, (Object) null);
             break;
           default:
             throw new IllegalStateException(
@@ -347,11 +347,6 @@ public class DataBlockBuilder {
             setColumn(columnarBuilder, byteBuffer, (ByteArray) value);
           }
           break;
-        case UNKNOWN:
-          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
-            setColumn(columnarBuilder, byteBuffer, (Object) null);
-          }
-          break;
         case OBJECT:
           for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
             value = column[rowId];
@@ -468,6 +463,11 @@ public class DataBlockBuilder {
               value = nullPlaceholders[colId];
             }
             setColumn(columnarBuilder, byteBuffer, (String[]) value);
+          }
+          break;
+        case UNKNOWN:
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            setColumn(columnarBuilder, byteBuffer, (Object) null);
           }
           break;
         default:

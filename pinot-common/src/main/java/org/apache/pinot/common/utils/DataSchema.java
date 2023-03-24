@@ -263,7 +263,6 @@ public class DataSchema {
     JSON(STRING, ""),
     BYTES(new ByteArray(new byte[0])),
     OBJECT(null),
-    UNKNOWN(null),
     INT_ARRAY(new int[0]),
     LONG_ARRAY(new long[0]),
     FLOAT_ARRAY(new float[0]),
@@ -271,7 +270,8 @@ public class DataSchema {
     BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
     TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
     STRING_ARRAY(new String[0]),
-    BYTES_ARRAY(new byte[0][]);
+    BYTES_ARRAY(new byte[0][]),
+    UNKNOWN(null);
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final Ordering<ColumnDataType> NUMERIC_TYPE_ORDERING = Ordering.explicit(INT, LONG, FLOAT, DOUBLE);
