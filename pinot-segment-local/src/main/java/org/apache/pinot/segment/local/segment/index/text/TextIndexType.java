@@ -38,7 +38,9 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class TextIndexType implements IndexType<IndexConfig, IndexReader, IndexCreator> {
+
   public static final TextIndexType INSTANCE = new TextIndexType();
+
   private TextIndexType() {
   }
 
