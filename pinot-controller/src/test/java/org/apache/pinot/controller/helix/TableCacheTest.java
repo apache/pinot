@@ -128,7 +128,7 @@ public class TableCacheTest {
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
-    TEST_INSTANCE.getHelixResourceManager().updateSchema(schema, false);
+    TEST_INSTANCE.getHelixResourceManager().updateSchema(schema, false, false);
     // Wait for at most 10 seconds for the callback to update the schema in the cache
     // NOTE:
     // - Schema should never be null during the transitioning
