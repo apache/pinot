@@ -2265,11 +2265,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime LIMIT 1000000";
-    h2Query = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime";
+    h2Query = "SELECT CAST(ArrTime-DepTime AS FLOAT) FROM mytable GROUP BY CAST(ArrTime-DepTime AS FLOAT)";
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A LIMIT 1000000";
-    h2Query = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A";
+    h2Query = "SELECT CAST(ArrTime+DepTime AS FLOAT) AS A FROM mytable GROUP BY A";
     testQuery(pinotQuery, h2Query);
   }
 

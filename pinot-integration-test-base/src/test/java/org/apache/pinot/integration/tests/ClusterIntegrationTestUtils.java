@@ -53,7 +53,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -232,9 +231,9 @@ public class ClusterIntegrationTestUtils {
         break;
     }
     if (nullable) {
-      return fieldName + " " + h2FieldType;
+      return String.format("`%s` %s", fieldName, h2FieldType);
     } else {
-      return fieldName + " " + h2FieldType + " not null";
+      return String.format("`%s` %s not null", fieldName, h2FieldType);
     }
   }
 
@@ -561,8 +560,8 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
-   *  Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
-   *  query.
+   * Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
+   * query.
    */
   static void testQueryWithMatchingRowCount(String pinotQuery, String brokerUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
@@ -879,20 +878,36 @@ public class ClusterIntegrationTestUtils {
 
   private static String removeTrailingZeroForNumber(String value, String type) {
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DOUBLE") || type.toUpperCase()
+    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT")
+        || type.toUpperCase().equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION") || type.toUpperCase()
         .equals("BIGINT")) {
       try {
-        return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
+        String result = (new BigDecimal(value)).stripTrailingZeros().toPlainString();
+        if (type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT") || type.toUpperCase()
+            .equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION")) {
+          if (!result.contains("\\.")) {
+            return result + ".0";
+          }
+        }
       } catch (NumberFormatException e) {
       }
     }
     return value;
   }
 
+  public static boolean isParsable(String input) {
+    try {
+      Double.parseDouble(input);
+      return true;
+    } catch (NumberFormatException e) {
+      return false;
+    }
+  }
+
   public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
     // Fuzzy compare expected value and actual value
     boolean error = false;
-    if (NumberUtils.isParsable(h2Value)) {
+    if (isParsable(h2Value)) {
       double expectedValue = Double.parseDouble(h2Value);
       double actualValueBroker = Double.parseDouble(brokerValue);
       double actualValueConnection = Double.parseDouble(connectionValue);
