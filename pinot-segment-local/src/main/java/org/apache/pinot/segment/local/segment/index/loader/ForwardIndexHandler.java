@@ -301,15 +301,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           continue;
         }
 
-        // Note that RAW columns cannot be sorted.
-        // TODO: revisit the the possibility of converting noDictionary -> Dictionary when the column is sorted.
-        ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        if (existingColMetadata.isSorted()) {
-          LOGGER.warn("Raw column={} cannot be sorted and the dictionary won't be created. Falling back to use "
-              + "noDictionaryColumn..", column);
-          continue;
-        }
-
         columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
       } else if (existingDictColumns.contains(column) && newNoDictColumns.contains(column)) {
         // Existing column has dictionary. New config for the column is RAW.
