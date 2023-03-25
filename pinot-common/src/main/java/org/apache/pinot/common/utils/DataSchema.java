@@ -209,7 +209,8 @@ public class DataSchema {
     BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
     TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
     STRING_ARRAY(new String[0]),
-    BYTES_ARRAY(new byte[0][]);
+    BYTES_ARRAY(new byte[0][]),
+    UNKNOWN(null);
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final Ordering<ColumnDataType> NUMERIC_TYPE_ORDERING = Ordering.explicit(INT, LONG, FLOAT, DOUBLE);
@@ -315,6 +316,8 @@ public class DataSchema {
           return DataType.JSON;
         case BYTES:
           return DataType.BYTES;
+        case UNKNOWN:
+          return DataType.UNKNOWN;
         default:
           throw new IllegalStateException(String.format("Cannot convert ColumnDataType: %s to DataType", this));
       }
@@ -361,6 +364,7 @@ public class DataSchema {
           return toTimestampArray(value);
         case BYTES_ARRAY:
           return (byte[][]) value;
+        case UNKNOWN: // fall through
         case OBJECT:
           return (Serializable) value;
         default:
@@ -525,6 +529,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case UNKNOWN:
+          return UNKNOWN;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
