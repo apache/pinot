@@ -393,7 +393,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BOOLEAN(INT, false, true),
     TIMESTAMP(LONG, false, true),
     STRING(false, true),
-    UNKNOWN(false, true),
     JSON(STRING, false, false),
     BYTES(false, false),
     STRUCT(false, false),

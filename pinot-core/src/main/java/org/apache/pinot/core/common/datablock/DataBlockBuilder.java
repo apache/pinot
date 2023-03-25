@@ -154,9 +154,6 @@ public class DataBlockBuilder {
           case OBJECT:
             setColumn(rowBuilder, byteBuffer, value);
             break;
-          case UNKNOWN:
-            setColumn(rowBuilder, byteBuffer, (Object) null);
-            break;
           // Multi-value column
           case INT_ARRAY:
             setColumn(rowBuilder, byteBuffer, (int[]) value);
@@ -348,11 +345,6 @@ public class DataBlockBuilder {
               value = nullPlaceholders[colId];
             }
             setColumn(columnarBuilder, byteBuffer, (ByteArray) value);
-          }
-          break;
-        case UNKNOWN:
-          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
-            setColumn(columnarBuilder, byteBuffer, (Object) null);
           }
           break;
         case OBJECT:
