@@ -125,9 +125,11 @@ public class LiteralContext {
   public int getIntValue(){
     return _bigDecimalValue.intValue();
   }
+
   public double getDoubleValue(){
     return _bigDecimalValue.doubleValue();
   }
+
   public BigDecimal getBigDecimalValue() {
     return _bigDecimalValue;
   }
@@ -154,7 +156,7 @@ public class LiteralContext {
 
   @Override
   public int hashCode() {
-    return 31 * Objects.hashCode(_value) + Objects.hashCode(_type);
+    return Objects.hash(_value, _type);
   }
 
   @Override
