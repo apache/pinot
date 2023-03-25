@@ -301,10 +301,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           continue;
         }
 
-        // Note that RAW columns cannot be sorted.
-        ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        Preconditions.checkState(!existingColMetadata.isSorted(), "Raw column=" + column + " cannot be sorted.");
-
         columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
       } else if (existingDictColumns.contains(column) && newNoDictColumns.contains(column)) {
         // Existing column has dictionary. New config for the column is RAW.
