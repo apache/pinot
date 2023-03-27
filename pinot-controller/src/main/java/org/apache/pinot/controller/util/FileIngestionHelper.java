@@ -179,8 +179,7 @@ public class FileIngestionHelper {
     String sourceFileURIScheme = sourceFileURI.getScheme();
     if (!PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
       PinotFSFactory.register(sourceFileURIScheme, batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS),
-          IngestionConfigUtils.getInputFsProps(IngestionConfigUtils.getConfigMapWithPrefix(
-              batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX)));
+          IngestionConfigUtils.getInputFsProps(batchConfigMap));
     }
     PinotFSFactory.create(sourceFileURIScheme).copyToLocalFile(sourceFileURI, destFile);
   }
