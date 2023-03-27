@@ -2139,7 +2139,7 @@ public class ForwardIndexHandlerTest {
 
   @Test
   public void testAddOtherIndexWhenForwardIndexDisabledAndInvertedIndexOrDictionaryDisabled()
-      throws IOException {
+      throws Exception {
     SegmentMetadataImpl existingSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
     SegmentDirectory segmentLocalFSDirectory =
         new SegmentLocalFSDirectory(_segmentDirectory, existingSegmentMetadata, ReadMode.mmap);
@@ -2185,7 +2185,7 @@ public class ForwardIndexHandlerTest {
 
     if (columnMetadata.hasDictionary()) {
       assertTrue(writer.hasIndexFor(columnName, StandardIndexes.dictionary()));
-      Dictionary dictionary = DictionaryIndexType.INSTANCE.read(writer, columnMetadata);
+      Dictionary dictionary = DictionaryIndexType.read(writer, columnMetadata);
       assertEquals(columnMetadata.getCardinality(), dictionary.length());
     } else {
       assertFalse(writer.hasIndexFor(columnName, StandardIndexes.dictionary()));
@@ -2215,16 +2215,16 @@ public class ForwardIndexHandlerTest {
     assertTrue(writer.hasIndexFor(columnName, StandardIndexes.forward()));
 
     // Check Compression type in header
-    ForwardIndexReader fwdIndexReader = ForwardIndexType.INSTANCE.read(writer, columnMetadata);
+    ForwardIndexReader fwdIndexReader = ForwardIndexType.read(writer, columnMetadata);
     ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
     if (expectedCompressionType != null) {
       assertEquals(fwdIndexCompressionType.name(), expectedCompressionType.name());
     }
 
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(writer, columnMetadata)) {
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(writer, columnMetadata)) {
       Dictionary dictionary = null;
       if (columnMetadata.hasDictionary()) {
-        dictionary = DictionaryIndexType.INSTANCE.read(writer, columnMetadata);
+        dictionary = DictionaryIndexType.read(writer, columnMetadata);
       }
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndexReader, dictionary, null,
           columnMetadata.getMaxNumberOfMultiValues());

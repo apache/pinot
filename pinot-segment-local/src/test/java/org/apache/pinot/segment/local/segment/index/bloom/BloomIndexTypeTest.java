@@ -54,7 +54,7 @@ public class BloomIndexTypeTest {
   public class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(BloomFilterConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", BloomIndexType.INSTANCE), expected);
+      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.bloomFilter()), expected);
     }
 
     @Test
@@ -164,7 +164,7 @@ public class BloomIndexTypeTest {
 
   @Test
   public void testStandardIndex() {
-    assertSame(StandardIndexes.bloomFilter(), BloomIndexType.INSTANCE, "Standard index should use the same as "
-        + "the BloomIndexType static instance");
+    assertEquals(StandardIndexes.bloomFilter(), new BloomIndexPlugin().getIndexType(),
+        "Standard index should be equal to the instance returned by the plugin");
   }
 }

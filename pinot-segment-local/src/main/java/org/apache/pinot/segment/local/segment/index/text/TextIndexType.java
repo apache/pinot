@@ -63,11 +63,9 @@ import org.slf4j.LoggerFactory;
 
 public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexReader, TextIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
+  protected static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
 
-  public static final TextIndexType INSTANCE = new TextIndexType();
-  private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
-
-  private TextIndexType() {
+  protected TextIndexType() {
     super(StandardIndexes.TEXT_ID);
   }
 
@@ -150,32 +148,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
 
   @Override
   public IndexReaderFactory<TextIndexReader> getReaderFactory() {
-    return new IndexReaderFactory<TextIndexReader>() {
-      @Nullable
-      @Override
-      public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-          FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
-          throws IndexReaderConstraintException {
-        if (fieldIndexConfigs == null) {
-          return null;
-        }
-        if (metadata.getDataType() != FieldSpec.DataType.STRING) {
-          throw new IndexReaderConstraintException(metadata.getColumnName(), TextIndexType.INSTANCE,
-              "Text index is currently only supported on STRING type columns");
-        }
-        File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
-        FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(segmentDir, metadata.getColumnName());
-        if (textIndexFSTType == FSTType.NATIVE) {
-          // TODO: Support loading native text index from a PinotDataBuffer
-          return new NativeTextIndexReader(metadata.getColumnName(), segmentDir);
-        }
-        TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(TextIndexType.INSTANCE);
-        if (!indexConfig.isEnabled()) {
-          return null;
-        }
-        return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
-      }
-    };
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
@@ -187,5 +160,38 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+  }
+
+  public static class ReaderFactory implements IndexReaderFactory<TextIndexReader> {
+
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+
+    @Nullable
+    @Override
+    public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+          throws IndexReaderConstraintException {
+      if (fieldIndexConfigs == null) {
+        return null;
+      }
+      if (metadata.getDataType() != FieldSpec.DataType.STRING) {
+        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.text(),
+            "Text index is currently only supported on STRING type columns");
+      }
+      File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
+      FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(segmentDir, metadata.getColumnName());
+      if (textIndexFSTType == FSTType.NATIVE) {
+        // TODO: Support loading native text index from a PinotDataBuffer
+        return new NativeTextIndexReader(metadata.getColumnName(), segmentDir);
+      }
+      TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
+      if (!indexConfig.isEnabled()) {
+        return null;
+      }
+      return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
+    }
   }
 }

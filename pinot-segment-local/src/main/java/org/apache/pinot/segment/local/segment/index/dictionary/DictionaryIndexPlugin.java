@@ -25,8 +25,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class DictionaryIndexPlugin implements IndexPlugin<DictionaryIndexType> {
+  private static final DictionaryIndexType INSTANCE = new DictionaryIndexType();
+
   @Override
   public DictionaryIndexType getIndexType() {
-    return DictionaryIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

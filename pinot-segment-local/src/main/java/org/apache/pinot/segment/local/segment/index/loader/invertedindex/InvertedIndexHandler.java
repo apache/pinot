@@ -19,14 +19,12 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
-import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -40,6 +38,7 @@ import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCr
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +82,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
 
   @Override
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
-      throws IOException {
+      throws Exception {
     // Remove indices not set in table config any more.
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
@@ -115,7 +114,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
   }
 
   private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws IOException {
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
@@ -142,8 +141,9 @@ public class InvertedIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
 
-    try (DictionaryBasedInvertedIndexCreator creator = InvertedIndexType.INSTANCE.createIndexCreator(context)) {
-      try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(segmentWriter, columnMetadata);
+    try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()
+        .createIndexCreator(context, IndexConfig.ENABLED)) {
+      try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.

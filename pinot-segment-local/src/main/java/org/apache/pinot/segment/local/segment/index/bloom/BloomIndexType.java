@@ -50,9 +50,8 @@ import org.apache.pinot.spi.data.Schema;
 public class BloomIndexType
     extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>
     implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
-  public static final BloomIndexType INSTANCE = new BloomIndexType();
 
-  private BloomIndexType() {
+  protected BloomIndexType() {
     super(StandardIndexes.BLOOM_FILTER_ID);
   }
 
@@ -121,7 +120,7 @@ public class BloomIndexType
 
     @Override
     protected IndexType<BloomFilterConfig, BloomFilterReader, ?> getIndexType() {
-      return BloomIndexType.INSTANCE;
+      return StandardIndexes.bloomFilter();
     }
 
     @Override

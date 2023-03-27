@@ -933,7 +933,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       SegmentDirectory.Writer segmentWriter, File indexDir)
       throws Exception {
     try (ForwardIndexReader<?> reader = ForwardIndexType.getReader(segmentWriter, existingColMetadata)) {
-      Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, existingColMetadata);
+      Dictionary dictionary = DictionaryIndexType.read(segmentWriter, existingColMetadata);
       IndexCreationContext.Builder builder =
           IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(existingColMetadata);
       builder.withDictionary(false);

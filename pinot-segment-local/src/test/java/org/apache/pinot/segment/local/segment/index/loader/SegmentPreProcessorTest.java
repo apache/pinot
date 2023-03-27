@@ -911,7 +911,7 @@ public class SegmentPreProcessorTest {
       if (expectedCompressionType != null) {
         assertFalse(hasDictionary);
 
-        try (ForwardIndexReader fwdIndexReader = ForwardIndexType.INSTANCE.read(reader, columnMetadata)) {
+        try (ForwardIndexReader fwdIndexReader = ForwardIndexType.read(reader, columnMetadata)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
           assertEquals(compressionType, expectedCompressionType);
         }

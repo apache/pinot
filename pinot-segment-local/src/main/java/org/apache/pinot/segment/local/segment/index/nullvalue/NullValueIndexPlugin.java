@@ -25,8 +25,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class NullValueIndexPlugin implements IndexPlugin<NullValueIndexType> {
+
+  public static final NullValueIndexType INSTANCE = new NullValueIndexType();
   @Override
   public NullValueIndexType getIndexType() {
-    return NullValueIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

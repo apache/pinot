@@ -60,9 +60,8 @@ import org.apache.pinot.spi.data.Schema;
 
 public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, TextIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
-  public static final FstIndexType INSTANCE = new FstIndexType();
 
-  private FstIndexType() {
+  protected FstIndexType() {
     super(StandardIndexes.FST_ID);
   }
 
@@ -121,12 +120,12 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public ReaderFactory getReaderFactory() {
-    return new ReaderFactory();
+    return ReaderFactory.INSTANCE;
   }
 
   public static TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
       throws IndexReaderConstraintException, IOException {
-    return INSTANCE.getReaderFactory().createIndexReader(dataBuffer, metadata);
+    return ReaderFactory.INSTANCE.createIndexReader(dataBuffer, metadata);
   }
 
   @Override
@@ -141,15 +140,16 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   public static class ReaderFactory extends IndexReaderFactory.Default<FstIndexConfig, TextIndexReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
     @Override
     protected IndexType<FstIndexConfig, TextIndexReader, ?> getIndexType() {
-      return FstIndexType.INSTANCE;
+      return StandardIndexes.fst();
     }
 
     protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
         throws IndexReaderConstraintException, IOException {
       if (!metadata.hasDictionary()) {
-        throw new IndexReaderConstraintException(metadata.getColumnName(), FstIndexType.INSTANCE,
+        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.fst(),
             "This index requires a dictionary");
       }
       int magicHeader = dataBuffer.getInt(0);

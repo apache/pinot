@@ -25,8 +25,11 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class H3IndexPlugin implements IndexPlugin<H3IndexType> {
+
+  private static final H3IndexType INSTANCE = new H3IndexType();
+
   @Override
   public H3IndexType getIndexType() {
-    return H3IndexType.INSTANCE;
+    return INSTANCE;
   }
 }

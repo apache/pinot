@@ -37,7 +37,7 @@ import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.AbstractForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SameValueForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
-import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -169,14 +169,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // TODO: Dictionary creator holds all unique values on heap. Consider keeping dictionary instead of creator
         //       which uses off-heap memory.
 
-        DictionaryIndexType dictIdx = DictionaryIndexType.INSTANCE;
         // Index conf should be present if dictEnabledColumn is true. In case it doesn't, getConfig will throw an
         // exception
-        DictionaryIndexConfig dictConfig = config.getConfig(dictIdx);
+        DictionaryIndexConfig dictConfig = config.getConfig(StandardIndexes.dictionary());
         if (!dictConfig.isEnabled()) {
           throw new IllegalArgumentException("Dictionary index should be enabled");
         }
-        SegmentDictionaryCreator creator = dictIdx.createIndexCreator(context, dictConfig);
+        SegmentDictionaryCreator creator = new DictionaryIndexPlugin().getIndexType()
+            .createIndexCreator(context, dictConfig);
 
         try {
           creator.build(context.getSortedUniqueElementsArray());

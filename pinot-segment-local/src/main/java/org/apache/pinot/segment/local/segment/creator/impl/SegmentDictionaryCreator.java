@@ -64,7 +64,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary) {
     _columnName = fieldSpec.getName();
     _storedType = fieldSpec.getDataType().getStoredType();
-    _dictionaryFile = new File(indexDir, _columnName + DictionaryIndexType.INSTANCE.getFileExtension());
+    _dictionaryFile = new File(indexDir, _columnName + DictionaryIndexType.getFileExtension());
     _useVarLengthDictionary = useVarLengthDictionary;
   }
   @Override

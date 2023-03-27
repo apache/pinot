@@ -788,9 +788,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     ValueReader(ColumnMetadata columnMetadata)
         throws IOException {
-      _forwardIndexReader = ForwardIndexType.INSTANCE.read(_segmentWriter, columnMetadata);
+      _forwardIndexReader = ForwardIndexType.read(_segmentWriter, columnMetadata);
       if (columnMetadata.hasDictionary()) {
-        _dictionary = DictionaryIndexType.INSTANCE.read(_segmentWriter, columnMetadata);
+        _dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);
       } else {
         _dictionary = null;
       }

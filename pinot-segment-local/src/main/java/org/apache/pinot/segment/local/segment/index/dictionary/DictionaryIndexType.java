@@ -76,10 +76,9 @@ import org.slf4j.LoggerFactory;
 public class DictionaryIndexType
     extends AbstractIndexType<DictionaryIndexConfig, Dictionary, SegmentDictionaryCreator>
     implements ConfigurableFromIndexLoadingConfig<DictionaryIndexConfig> {
-  public static final DictionaryIndexType INSTANCE = new DictionaryIndexType();
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
 
-  private DictionaryIndexType() {
+  protected DictionaryIndexType() {
     super(StandardIndexes.DICTIONARY_ID);
   }
 
@@ -202,13 +201,14 @@ public class DictionaryIndexType
     return new SegmentDictionaryCreator(fieldSpec, indexDir, useVarLengthDictionary);
   }
 
-  public Dictionary read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
+  public static Dictionary read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws IOException {
-    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), this);
+    PinotDataBuffer dataBuffer =
+        segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
     return read(dataBuffer, columnMetadata, new DictionaryIndexConfig(false, true));
   }
 
-  public Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
+  public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
       throws IOException {
     FieldSpec.DataType dataType = metadata.getDataType();
     boolean loadOnHeap = indexConfig.isOnHeap();
@@ -250,46 +250,39 @@ public class DictionaryIndexType
 
   @Override
   public IndexReaderFactory<Dictionary> getReaderFactory() {
-    return new IndexReaderFactory.Default<DictionaryIndexConfig, Dictionary>() {
-      @Override
-      protected IndexType<DictionaryIndexConfig, Dictionary, ?> getIndexType() {
-        return DictionaryIndexType.INSTANCE;
-      }
-
-      @Override
-      protected Dictionary createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-          DictionaryIndexConfig indexConfig)
-          throws IOException, IndexReaderConstraintException {
-        return DictionaryIndexType.INSTANCE.read(dataBuffer, metadata, indexConfig);
-      }
-    };
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new IndexHandler() {
-      @Override
-      public void updateIndices(SegmentDirectory.Writer segmentWriter) {
-      }
-
-      @Override
-      public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
-        return false;
-      }
-
-      @Override
-      public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter) {
-      }
-    };
+    return IndexHandler.NoOp.INSTANCE;
   }
 
-  public String getFileExtension() {
+  public static String getFileExtension() {
     return V1Constants.Dict.FILE_EXTENSION;
   }
 
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return getFileExtension();
+  }
+
+  public static class ReaderFactory extends IndexReaderFactory.Default<DictionaryIndexConfig, Dictionary> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+    @Override
+    protected IndexType<DictionaryIndexConfig, Dictionary, ?> getIndexType() {
+      return StandardIndexes.dictionary();
+    }
+
+    @Override
+    protected Dictionary createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        DictionaryIndexConfig indexConfig)
+          throws IOException, IndexReaderConstraintException {
+      return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
+    }
   }
 }

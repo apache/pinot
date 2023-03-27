@@ -27,7 +27,6 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -81,7 +80,7 @@ public class RealtimeSegmentConverter {
     // realtime segment generation
     genConfig.setSegmentTimeValueCheck(false);
     if (_columnIndicesForRealtimeTable.getInvertedIndexColumns() != null) {
-      genConfig.setIndexOn(InvertedIndexType.INSTANCE, IndexConfig.ENABLED,
+      genConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED,
           _columnIndicesForRealtimeTable.getInvertedIndexColumns());
     }
 

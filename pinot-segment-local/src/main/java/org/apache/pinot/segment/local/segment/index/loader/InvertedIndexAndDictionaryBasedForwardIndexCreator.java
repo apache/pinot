@@ -247,8 +247,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private Map<String, String> createForwardIndexForSVColumn()
       throws IOException {
     try (BitmapInvertedIndexReader invertedIndexReader =
-        (BitmapInvertedIndexReader) InvertedIndexType.INSTANCE.read(_segmentWriter, _columnMetadata);
-        Dictionary dictionary = DictionaryIndexType.INSTANCE.read(_segmentWriter, _columnMetadata)) {
+        (BitmapInvertedIndexReader) InvertedIndexType.ReaderFactory
+            .INSTANCE.createSkippingForward(_segmentWriter, _columnMetadata);
+        Dictionary dictionary = DictionaryIndexType.read(_segmentWriter, _columnMetadata)) {
       boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
       int lengthOfLongestEntry = isFixedWidth ? -1 : 0;
       // Construct the forward index in the values buffer
@@ -283,8 +284,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private Map<String, String> createForwardIndexForMVColumn()
       throws IOException {
     try (BitmapInvertedIndexReader invertedIndexReader =
-        (BitmapInvertedIndexReader) InvertedIndexType.INSTANCE.read(_segmentWriter, _columnMetadata);
-        Dictionary dictionary = DictionaryIndexType.INSTANCE.read(_segmentWriter, _columnMetadata)) {
+        (BitmapInvertedIndexReader) InvertedIndexType.ReaderFactory.INSTANCE
+            .createSkippingForward(_segmentWriter, _columnMetadata);
+        Dictionary dictionary = DictionaryIndexType.read(_segmentWriter, _columnMetadata)) {
       // Construct the forward index length buffer and create the inverted index values and length buffers
       int[] maxNumberOfMultiValues = new int[]{0};
       final boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
