@@ -68,7 +68,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseSingleInputAgg
     super(arguments.get(0));
 
     if (arguments.size() > 1) {
-      Parameters parameters = new Parameters(arguments.get(1).getLiteralString());
+      Parameters parameters = new Parameters(arguments.get(1).getLiteral().getStringValue());
       _threshold = parameters._threshold;
       _log2m = parameters._log2m;
     } else {

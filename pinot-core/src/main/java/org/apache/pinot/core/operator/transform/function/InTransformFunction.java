@@ -66,7 +66,7 @@ public class InTransformFunction extends BaseTransformFunction {
     for (int i = 1; i < numArguments; i++) {
       TransformFunction valueFunction = arguments.get(i);
       if (valueFunction instanceof LiteralTransformFunction) {
-        stringValues.add(((LiteralTransformFunction) valueFunction).getLiteral());
+        stringValues.add(((LiteralTransformFunction) valueFunction).getStringLiteral());
       } else {
         allLiteralValues = false;
         break;

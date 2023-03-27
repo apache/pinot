@@ -55,8 +55,8 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
     _mainTransformFunction = firstArgument;
 
     _timeUnitTransformer = TimeUnitTransformerFactory.getTimeUnitTransformer(
-        TimeUnit.valueOf(((LiteralTransformFunction) arguments.get(1)).getLiteral().toUpperCase()),
-        ((LiteralTransformFunction) arguments.get(2)).getLiteral());
+        TimeUnit.valueOf(((LiteralTransformFunction) arguments.get(1)).getStringLiteral().toUpperCase()),
+        ((LiteralTransformFunction) arguments.get(2)).getStringLiteral());
   }
 
   @Override
