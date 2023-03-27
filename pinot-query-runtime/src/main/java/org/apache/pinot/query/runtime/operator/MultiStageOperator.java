@@ -39,6 +39,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   protected final OperatorStats _operatorStats;
   protected final Map<String, OperatorStats> _operatorStatsMap;
   protected final String _operatorId;
+  protected OpChainStats _opChainStats;
   private final OpChainExecutionContext _context;
 
   public MultiStageOperator(OpChainExecutionContext context) {
@@ -48,6 +49,12 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     _operatorStatsMap = new HashMap<>();
     _operatorId =
         Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
+    _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
+    _opChainStats = null;
+  }
+
+  public void attachOpChainStats(OpChainStats opChainStats) {
+    _opChainStats = opChainStats;
   }
 
   public Map<String, OperatorStats> getOperatorStatsMap() {
@@ -74,14 +81,19 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
   protected void populateOperatorStatsMap(TransferableBlock nextBlock) {
     if (nextBlock.isSuccessfulEndOfStreamBlock()) {
-      for (MultiStageOperator op : getChildOperators()) {
-        _operatorStatsMap.putAll(op.getOperatorStatsMap());
-      }
       if (!_operatorStats.getExecutionStats().isEmpty()) {
         _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
         _operatorStatsMap.put(_operatorId, _operatorStats);
       }
     }
+  }
+
+  public OperatorStats getOperatorStats() {
+    return _operatorStats;
+  }
+
+  public String getOperatorId() {
+    return _operatorId;
   }
 
   // Make it protected because we should always call nextBlock()

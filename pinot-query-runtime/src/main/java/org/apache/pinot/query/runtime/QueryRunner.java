@@ -53,6 +53,8 @@ import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
@@ -213,11 +215,14 @@ public class QueryRunner {
       OpChainExecutionContext opChainExecutionContext =
           new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(), _rootServer, deadlineMs,
               deadlineMs, distributedStagePlan.getMetadataMap());
+      OpChainStats opChainStats =
+          new OpChainStats(new OpChainId(requestId, _rootServer.virtualId(), sendNode.getStageId()).toString());
       mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext,
           new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema()),
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(),
           sendNode.getCollationDirections(), sendNode.isSortOnSender(), sendNode.getStageId(),
           sendNode.getReceiverStageId());
+      mailboxSendOperator.attachOpChainStats(opChainStats);
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
