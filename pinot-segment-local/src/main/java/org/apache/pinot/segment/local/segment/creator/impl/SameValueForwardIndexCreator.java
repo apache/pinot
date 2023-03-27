@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.creator.impl.fwd;
+package org.apache.pinot.segment.local.segment.creator.impl;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -24,7 +24,7 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class SameValueForwardIndexCreator implements ForwardIndexCreator {
+class SameValueForwardIndexCreator implements ForwardIndexCreator {
 
   private final Object _actualValue;
   private final ForwardIndexCreator _delegate;
