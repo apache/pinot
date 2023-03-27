@@ -339,15 +339,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
       String columnName = byColEntry.getKey();
-      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
-
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
       Object columnValueToIndex = row.getValue(columnName);
       if (columnValueToIndex == null) {
         throw new RuntimeException("Null value for column:" + columnName);
       }
+
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
+
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
       if (fieldSpec.isSingleValueField()) {
         indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
