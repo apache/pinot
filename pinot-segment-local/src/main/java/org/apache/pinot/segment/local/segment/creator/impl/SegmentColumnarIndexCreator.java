@@ -157,7 +157,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               || _config.isOptimizeDictionaryForMetrics() && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC)
           .onHeap(segmentCreationSpec.isOnHeap())
           .withForwardIndexDisabled(forwardIndexDisabled)
-          .withFixedLength(columnIndexCreationInfo.isFixedLength())
           .withTextCommitOnClose(true)
           .build();
 
