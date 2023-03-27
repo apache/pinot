@@ -26,8 +26,8 @@ public class HttpClientConfig {
   // Default config uses default values which are same as what Apache Commons Http-Client uses.
   public static final HttpClientConfig DEFAULT_HTTP_CLIENT_CONFIG = HttpClientConfig.newBuilder().build();
 
-  private static final String MAX_CONNS_CONFIG_NAME = "http.client.max_conns";
-  private static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.max_conns_per_route";
+  protected static final String MAX_CONNS_CONFIG_NAME = "http.client.max_conns";
+  protected static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.max_conns_per_route";
 
   private final int _maxConns;
   private final int _maxConnsPerRoute;
