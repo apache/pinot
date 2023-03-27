@@ -24,13 +24,14 @@ import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
  * Forward index creator for dictionary-encoded sorted single-value column.
  */
-public class SingleValueSortedForwardIndexCreator extends AbstractForwardIndexCreator {
+public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator {
   private final FixedByteSingleValueMultiColWriter _writer;
   private final int[] _minDocIds;
   private final int[] _maxDocIds;

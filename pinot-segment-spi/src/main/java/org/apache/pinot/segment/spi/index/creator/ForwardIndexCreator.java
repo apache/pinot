@@ -32,6 +32,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public interface ForwardIndexCreator extends IndexCreator {
 
   @Override
+  default void seal()
+      throws IOException {
+  }
+
+  @Override
   default void add(@Nonnull Object cellValue, int dictId) {
     if (dictId >= 0) {
       putDictId(dictId);

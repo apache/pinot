@@ -23,13 +23,14 @@ import java.io.IOException;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * Forward index creator for dictionary-encoded multi-value column.
  */
-public class MultiValueUnsortedForwardIndexCreator extends AbstractForwardIndexCreator {
+public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
   private final FixedBitMVForwardIndexWriter _writer;
 
   public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,

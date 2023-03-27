@@ -20,15 +20,16 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class SameValueForwardIndexCreator extends AbstractForwardIndexCreator {
+public class SameValueForwardIndexCreator implements ForwardIndexCreator {
 
   private final Object _actualValue;
-  private final AbstractForwardIndexCreator _delegate;
+  private final ForwardIndexCreator _delegate;
 
-  public SameValueForwardIndexCreator(Object value, AbstractForwardIndexCreator delegate) {
+  public SameValueForwardIndexCreator(Object value, ForwardIndexCreator delegate) {
     _actualValue = value;
     _delegate = delegate;
   }

@@ -34,7 +34,6 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.AbstractForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SameValueForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
@@ -198,10 +197,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
       // TODO: Remove this when values stored as ForwardIndex stop depending on TextIndex config
       IndexCreator oldFwdCreator = creatorsByIndex.get(forwardIdx);
-      if (oldFwdCreator instanceof AbstractForwardIndexCreator) { // this implies that oldFwdCreator != null
+      if (oldFwdCreator instanceof ForwardIndexCreator) { // this implies that oldFwdCreator != null
         Object fakeForwardValue = calculateAlternativeValue(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
-          AbstractForwardIndexCreator castedOldFwdCreator = (AbstractForwardIndexCreator) oldFwdCreator;
+          ForwardIndexCreator castedOldFwdCreator = (ForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
               new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
           creatorsByIndex.put(forwardIdx, fakeValueFwdCreator);
