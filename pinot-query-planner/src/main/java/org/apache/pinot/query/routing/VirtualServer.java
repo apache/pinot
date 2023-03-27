@@ -19,7 +19,10 @@
 
 package org.apache.pinot.query.routing;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
@@ -33,19 +36,19 @@ import org.apache.pinot.core.transport.ServerInstance;
 public class VirtualServer {
 
   private final ServerInstance _server;
-  private final int _virtualId;
+  private final Set<Integer> _partitionIds;
 
-  public VirtualServer(ServerInstance server, int virtualId) {
+  public VirtualServer(ServerInstance server, Collection<Integer> partitionIds) {
     _server = server;
-    _virtualId = virtualId;
+    _partitionIds = new HashSet<>(partitionIds);
   }
 
   public ServerInstance getServer() {
     return _server;
   }
 
-  public int getVirtualId() {
-    return _virtualId;
+  public Set<Integer> getPartitionIds() {
+    return _partitionIds;
   }
 
   public String getHostname() {
@@ -77,16 +80,16 @@ public class VirtualServer {
       return false;
     }
     VirtualServer that = (VirtualServer) o;
-    return _virtualId == that._virtualId && Objects.equals(_server, that._server);
+    return _partitionIds.equals(that._partitionIds) && Objects.equals(_server, that._server);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_server, _virtualId);
+    return Objects.hash(_server, _partitionIds);
   }
 
   @Override
   public String toString() {
-    return _virtualId + "@" + _server.getInstanceId();
+    return _partitionIds + "@" + _server.getInstanceId();
   }
 }

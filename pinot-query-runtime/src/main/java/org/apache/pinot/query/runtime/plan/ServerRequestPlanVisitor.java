@@ -49,6 +49,7 @@ import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
@@ -106,10 +107,13 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     }
     LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     pinotQuery.setExplain(false);
+    // TODO: we use partition 0 here for non-partition-aware request. Change this to partition-aware requests:
+    //   create 1 request per-partition and directly link that with mailbox associated with that partition.
+    VirtualServer virtualServer = stagePlan.getServer();
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
-            new VirtualServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
-            timeBoundaryInfo);
+            new VirtualServerAddress(virtualServer.getHostname(), virtualServer.getPort(), 0),
+            stagePlan.getMetadataMap(), pinotQuery, tableType, timeBoundaryInfo);
 
     // visit the plan and create query physical plan.
     ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);

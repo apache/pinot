@@ -20,13 +20,17 @@ package org.apache.pinot.query.routing;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Range;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -37,6 +41,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+
+import static org.apache.calcite.util.Util.range;
 
 
 /**
@@ -98,10 +104,11 @@ public class WorkerManager {
               "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
         }
       }
+      // TODO: see the leaf stage doesn't allow control of partition yet. see: {@link ServerRequestPlanVisitor#build}
       stageMetadata.setServerInstances(new ArrayList<>(
           serverInstanceToSegmentsMap.keySet()
               .stream()
-              .map(server -> new VirtualServer(server, 0)) // the leaf stage only has one server, so always use 0 here
+              .map(server -> new VirtualServer(server, Collections.singletonList(0)))
               .collect(Collectors.toList())));
       stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);
     } else if (PlannerUtils.isRootStage(stageId)) {
@@ -109,7 +116,7 @@ public class WorkerManager {
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
       stageMetadata.setServerInstances(Lists.newArrayList(
-          new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), 0)));
+          new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), Collections.singletonList(0))));
     } else {
       // --- INTERMEDIATE STAGES ---
       // TODO: actually make assignment strategy decisions for intermediate stages
@@ -120,6 +127,7 @@ public class WorkerManager {
 
   private static List<VirtualServer> assignServers(Collection<ServerInstance> servers,
       boolean requiresSingletonInstance, Map<String, String> options) {
+    // TODO: support partition-aware routing and worker assignment.
     int stageParallelism = Integer.parseInt(
         options.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.STAGE_PARALLELISM, "1"));
 
@@ -129,6 +137,7 @@ public class WorkerManager {
     if (requiresSingletonInstance) {
       matchingIdx = RANDOM.nextInt(servers.size());
     }
+    int partitionCount = 0;
     for (ServerInstance server : servers) {
       if (matchingIdx == -1 || idx == matchingIdx) {
         String hostname = server.getHostname();
@@ -136,10 +145,11 @@ public class WorkerManager {
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
-          for (int virtualId = 0; virtualId < stageParallelism; virtualId++) {
-            if (matchingIdx == -1 || virtualId == 0) {
-              serverInstances.add(new VirtualServer(server, virtualId));
-            }
+          if (matchingIdx == -1) {
+            serverInstances.add(new VirtualServer(server, range(partitionCount, partitionCount + stageParallelism)));
+          } else {
+            // for singleton exchange, add 0 as the default parallelism as the requirement of singleton
+            serverInstances.add(new VirtualServer(server, Collections.singletonList(0)));
           }
         }
       }

@@ -86,7 +86,7 @@ public class QueryRunner {
   private MailboxService<TransferableBlock> _mailboxService;
   private String _hostname;
   private int _port;
-  private VirtualServerAddress _rootServer;
+  private VirtualServerAddress _rootServerAddress;
   // Query worker threads are used for (1) running intermediate stage operators (2) running segment level operators
   /**
    * Query worker threads are used for:
@@ -126,7 +126,7 @@ public class QueryRunner {
         CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
     // always use 0 for root server ID as all data is processed by one node at the global root
-    _rootServer = new VirtualServerAddress(_hostname, _port, 0);
+    _rootServerAddress = new VirtualServerAddress(_hostname, _port, 0);
     _helixManager = helixManager;
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
@@ -169,10 +169,14 @@ public class QueryRunner {
       runLeafStage(distributedStagePlan, requestMetadataMap, deadlineMs, requestId);
     } else {
       StageNode stageRoot = distributedStagePlan.getStageRoot();
-      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
-          new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, deadlineMs,
-              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
-      _scheduler.register(rootOperator);
+      VirtualServer virtualServer = distributedStagePlan.getServer();
+      for (int partitionId : virtualServer.getPartitionIds()) {
+        OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
+            new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, deadlineMs,
+                new VirtualServerAddress(virtualServer.getHostname(), virtualServer.getPort(), partitionId),
+                distributedStagePlan.getMetadataMap()));
+        _scheduler.register(rootOperator);
+      }
     }
   }
 
@@ -212,7 +216,7 @@ public class QueryRunner {
               + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       OpChainExecutionContext opChainExecutionContext =
-          new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(), _rootServer, deadlineMs,
+          new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(), _rootServerAddress, deadlineMs,
               deadlineMs, distributedStagePlan.getMetadataMap());
       MultiStageOperator leafStageOperator =
           new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());

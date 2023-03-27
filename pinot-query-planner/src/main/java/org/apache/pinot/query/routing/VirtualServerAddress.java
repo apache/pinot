@@ -23,14 +23,11 @@ import java.util.Objects;
 
 
 /**
- * Represents the address of a {@link VirtualServer} containing
- * both the ID of the specific virtualized server and the physical
- * internet address in id@hostname:port format.
+ * Represents the address of a {@link VirtualServer} containing both the PartitionID and the physical internet address
+ * in the format of partition_id@hostname:port.
  *
- * <p>This is needed in addition to {@code VirtualServer} because there
- * are some parts of the code that don't have enough information to
- * construct the full {@code VirtualServer} and only require the
- * hostname, port and virtualId.</p>
+ * <p>This is needed in addition to {@code VirtualServer} because there are some parts of the code that works with
+ * single partition (such as mailboxes). </p>
  */
 public class VirtualServerAddress {
 
@@ -42,10 +39,6 @@ public class VirtualServerAddress {
     _hostname = hostname;
     _port = port;
     _virtualId = virtualId;
-  }
-
-  public VirtualServerAddress(VirtualServer server) {
-    this(server.getHostname(), server.getQueryMailboxPort(), server.getVirtualId());
   }
 
   /**
