@@ -130,7 +130,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       if (fieldSpec == null) {
         Preconditions.checkState(schema.hasColumn(columnName),
-            "Cannot create inverted index for column: %s because it is not in schema", columnName);
+            "Cannot create index for column: %s because it is not in schema", columnName);
       }
       if (fieldSpec.isVirtualColumn()) {
         LOGGER.warn("Ignoring index creation for virtual column " + columnName);
