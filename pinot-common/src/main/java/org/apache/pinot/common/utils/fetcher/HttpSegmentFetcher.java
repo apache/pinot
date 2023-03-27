@@ -32,16 +32,18 @@ import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 
 public class HttpSegmentFetcher extends BaseSegmentFetcher {
+  private static final String CONFIG_PREFIX = "pinot.segment.fetcher.";
   protected FileUploadDownloadClient _httpClient;
 
   @Override
   protected void doInit(PinotConfiguration config) {
-    _httpClient = new FileUploadDownloadClient();
+    _httpClient = new FileUploadDownloadClient(getHttpClientConfig(config));
   }
 
   @Override
@@ -158,5 +160,19 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
       _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
       throw e;
     }
+  }
+
+  public static HttpClientConfig getHttpClientConfig(PinotConfiguration pinotConfiguration) {
+    HttpClientConfig.Builder builder = HttpClientConfig.newBuilder();
+    String maxConns = pinotConfiguration.getProperty(CONFIG_PREFIX + HttpClientConfig.MAX_CONNS_CONFIG_NAME);
+    if (maxConns != null) {
+      builder.withMaxConns(Integer.parseInt(maxConns));
+    }
+    String maxConnsPerRoute =
+        pinotConfiguration.getProperty(CONFIG_PREFIX + HttpClientConfig.MAX_CONNS_PER_ROUTE_CONFIG_NAME);
+    if (maxConnsPerRoute != null) {
+      builder.withMaxConnsPerRoute(Integer.parseInt(maxConnsPerRoute));
+    }
+    return builder.build();
   }
 }
