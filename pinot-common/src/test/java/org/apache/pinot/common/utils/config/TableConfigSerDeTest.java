@@ -64,11 +64,12 @@ import static org.testng.Assert.*;
 
 
 public class TableConfigSerDeTest {
-
+  private static final double NO_DICTIONARY_THRESHOLD_RATIO = 0.72;
   @Test
   public void testSerDe()
       throws IOException {
-    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable");
+    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setNoDictionarySizeRatioThreshold(NO_DICTIONARY_THRESHOLD_RATIO).setOptimizeDictionaryForMetrics(true);
     {
       // Default table config
       TableConfig tableConfig = tableConfigBuilder.build();
@@ -367,6 +368,8 @@ public class TableConfigSerDeTest {
     assertNull(tableConfig.getInstanceAssignmentConfigMap());
     assertNull(tableConfig.getSegmentAssignmentConfigMap());
     assertNull(tableConfig.getFieldConfigList());
+    assertEquals(tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(), true);
+    assertEquals(tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(), NO_DICTIONARY_THRESHOLD_RATIO);
 
     // Serialize
     ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
