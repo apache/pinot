@@ -254,9 +254,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private <C extends IndexConfig> void tryCreateIndexCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
-    C declaration = fieldIndexConfigs.getConfig(index);
-    if (declaration.isEnabled() && index.shouldBeCreated(context, fieldIndexConfigs)) {
-      creatorsByIndex.put(index, index.createIndexCreator(context, declaration));
+    C config = fieldIndexConfigs.getConfig(index);
+    if (config.isEnabled() && index.shouldBeCreated(context, fieldIndexConfigs)) {
+      creatorsByIndex.put(index, index.createIndexCreator(context, config));
     }
   }
 
