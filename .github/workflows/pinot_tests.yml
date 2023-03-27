@@ -224,7 +224,7 @@ jobs:
       matrix:
         # We only test LTS Java versions
         # TODO: add JDK 17 once ready. see: https://github.com/apache/pinot/issues/8529
-        java: [ 8, 11, 15 ]
+        java: [ 8, 11, 15, 17, 20 ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v3
@@ -245,6 +245,8 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
+        env:
+          PINOT_JAVA_VERSION: ${{ matrix.java }}
 
   presto-driver-build:
     if: github.repository == 'apache/pinot'
