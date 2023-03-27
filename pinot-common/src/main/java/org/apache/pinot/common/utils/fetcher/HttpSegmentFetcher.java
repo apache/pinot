@@ -43,7 +43,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
 
   @Override
   protected void doInit(PinotConfiguration config) {
-    _httpClient = new FileUploadDownloadClient(getHttpClientConfig(config));
+    _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config, CONFIG_PREFIX).build());
   }
 
   @Override
@@ -160,19 +160,5 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
       _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
       throw e;
     }
-  }
-
-  public static HttpClientConfig getHttpClientConfig(PinotConfiguration pinotConfiguration) {
-    HttpClientConfig.Builder builder = HttpClientConfig.newBuilder();
-    String maxConns = pinotConfiguration.getProperty(CONFIG_PREFIX + HttpClientConfig.MAX_CONNS_CONFIG_NAME);
-    if (maxConns != null) {
-      builder.withMaxConns(Integer.parseInt(maxConns));
-    }
-    String maxConnsPerRoute =
-        pinotConfiguration.getProperty(CONFIG_PREFIX + HttpClientConfig.MAX_CONNS_PER_ROUTE_CONFIG_NAME);
-    if (maxConnsPerRoute != null) {
-      builder.withMaxConnsPerRoute(Integer.parseInt(maxConnsPerRoute));
-    }
-    return builder.build();
   }
 }

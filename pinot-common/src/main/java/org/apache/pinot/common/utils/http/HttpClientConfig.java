@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.common.utils.http;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+
+
 public class HttpClientConfig {
-  // Http-client is used in many places in the code. A caller may choose to add its own prefix to these configs.
-  public static final String MAX_CONNS_CONFIG_NAME = "http.client.max_conns";
-  public static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.max_conns_per_route";
   // Default config uses default values which are same as what Apache Commons Http-Client uses.
   public static final HttpClientConfig DEFAULT_HTTP_CLIENT_CONFIG = HttpClientConfig.newBuilder().build();
+
+  private static final String MAX_CONNS_CONFIG_NAME = "http.client.max_conns";
+  private static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.max_conns_per_route";
+
   private final int _maxConns;
   private final int _maxConnsPerRoute;
 
@@ -42,6 +47,25 @@ public class HttpClientConfig {
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  /**
+   * Creates a {@link HttpClientConfig.Builder} and initializes it with relevant configs from the provided
+   * configuration. Since http-clients are used in a bunch of places in the code, each use-case can have their own
+   * prefix for their config. This builder ensures that the suffix for http-client related configs is the same across
+   * all use-cases.
+   */
+  public static Builder newBuilder(PinotConfiguration pinotConfiguration, String prefix) {
+    Builder builder = new Builder();
+    String maxConns = pinotConfiguration.getProperty(prefix + MAX_CONNS_CONFIG_NAME);
+    if (StringUtils.isNotEmpty(maxConns)) {
+      builder.withMaxConns(Integer.parseInt(maxConns));
+    }
+    String maxConnsPerRoute = pinotConfiguration.getProperty(prefix + MAX_CONNS_PER_ROUTE_CONFIG_NAME);
+    if (StringUtils.isNotEmpty(maxConnsPerRoute)) {
+      builder.withMaxConnsPerRoute(Integer.parseInt(maxConnsPerRoute));
+    }
+    return builder;
   }
 
   public static class Builder {
