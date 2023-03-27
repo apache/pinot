@@ -380,7 +380,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       case BOOLEAN:
         return "BOOLEAN";
       case BIG_DECIMAL:
-        return "NUMERIC(65535, 32767)";
+        return "NUMERIC(1200, 600)";
       case BYTES:
         return "BYTEA";
       case TIMESTAMP:
