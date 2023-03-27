@@ -33,6 +33,13 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
  * Used to persist the null bitmap on disk. This is used by SegmentCreator while indexing rows.
+ *
+ * Although this class implements {@link IndexCreator}, it is not intended to be used as a normal IndexCreator.
+ * Specifically, neither {@link #add(Object, int)} or {@link #add(Object[], int[])} should be called on this object.
+ * In order to make sure these methods are not being called, they throw exceptions in this class.
+ *
+ * This requirement is a corollary from the fact that the {@link IndexCreator} contract assumes the value will never be
+ * null, which is true for all index creators types unless this one.
  */
 public class NullValueVectorCreator implements IndexCreator {
   private final MutableRoaringBitmap _nullBitmap = new MutableRoaringBitmap();
