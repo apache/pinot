@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
@@ -40,7 +39,6 @@ import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -75,8 +73,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private int _fstDataSize;
   private int _numBitMaps;
 
-  public NativeTextIndexCreator(String column, File indexDir,
-      @Nullable Object rawValueForTextIndex, FieldSpec fieldSpec)
+  public NativeTextIndexCreator(String column, File indexDir)
       throws IOException {
     _columnName = column;
     _fstBuilder = new FSTBuilder();
