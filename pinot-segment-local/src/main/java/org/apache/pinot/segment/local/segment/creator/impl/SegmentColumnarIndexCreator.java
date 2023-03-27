@@ -91,7 +91,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   /**
    * Contains, indexed by column name, the creator associated with each index type.
    *
-   * Indexes that are {@link #skipIndexType(IndexType) skipped} are not included here.
+   * Indexes that {@link #hasSpecialLifecycle(IndexType) have a special lyfecycle} are not included here.
    */
   private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
@@ -192,12 +192,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
           Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
-        if (skipIndexType(index)) {
+        if (hasSpecialLifecycle(index)) {
           continue;
         }
-        if (config.getConfig(index).isEnabled()) {
-          tryCreateCreator(creatorsByIndex, index, context, config);
-        }
+        tryCreateIndexCreator(creatorsByIndex, index, context, config);
       }
       // TODO: Remove this when values stored as ForwardIndex stop depending on TextIndex config
       IndexCreator oldFwdCreator = creatorsByIndex.get(forwardIdx);
@@ -244,7 +242,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * Returns true if the given index type has their own construction lifecycle and therefore should not be instantiated
    * in the general index loop and shouldn't be notified of each new column.
    */
-  private boolean skipIndexType(IndexType<?, ?, ?> indexType) {
+  private boolean hasSpecialLifecycle(IndexType<?, ?, ?> indexType) {
     return indexType == StandardIndexes.nullValueVector() || indexType == StandardIndexes.dictionary();
   }
 
@@ -254,7 +252,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * This code needs to be in a specific method instead of inlined in the main loop in order to be able to use the
    * limited generic capabilities of Java.
    */
-  private <C extends IndexConfig> void tryCreateCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
+  private <C extends IndexConfig> void tryCreateIndexCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
     C declaration = fieldIndexConfigs.getConfig(index);
