@@ -138,6 +138,10 @@ public class FileUploadDownloadClient implements AutoCloseable {
     _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, sslContext);
   }
 
+  public FileUploadDownloadClient(HttpClientConfig httpClientConfig, SSLContext sslContext) {
+    _httpClient = new HttpClient(httpClientConfig, sslContext);
+  }
+
   public HttpClient getHttpClient() {
     return _httpClient;
   }

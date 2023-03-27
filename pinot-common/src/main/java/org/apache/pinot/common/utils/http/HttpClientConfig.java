@@ -32,7 +32,7 @@ public class HttpClientConfig {
   private final int _maxConns;
   private final int _maxConnsPerRoute;
 
-  HttpClientConfig(int maxConns, int maxConnsPerRoute) {
+  private HttpClientConfig(int maxConns, int maxConnsPerRoute) {
     _maxConns = maxConns;
     _maxConnsPerRoute = maxConnsPerRoute;
   }
@@ -43,10 +43,6 @@ public class HttpClientConfig {
 
   public int getMaxConnsPerRoute() {
     return _maxConnsPerRoute;
-  }
-
-  public static Builder newBuilder() {
-    return new Builder();
   }
 
   /**
@@ -68,11 +64,15 @@ public class HttpClientConfig {
     return builder;
   }
 
+  private static Builder newBuilder() {
+    return new Builder();
+  }
+
   public static class Builder {
     private int _maxConns = 20;
     private int _maxConnsPerRoute = 2;
 
-    Builder() {
+    private Builder() {
     }
 
     public Builder withMaxConns(int maxConns) {
