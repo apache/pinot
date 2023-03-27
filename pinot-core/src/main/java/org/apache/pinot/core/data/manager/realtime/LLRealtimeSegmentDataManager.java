@@ -527,9 +527,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
+    boolean noTransformedRows = true;
 
     TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean prematureExit = false;
+    RowMetadata msgMetadata = null;
+
     for (int index = 0; index < messageCount; index++) {
       prematureExit = _shouldStop || endCriteriaReached();
       if (prematureExit) {
@@ -562,7 +565,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       // Decode message
       StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
-      RowMetadata msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
+      msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
       if (decodedRow.getException() != null) {
         // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
         // decode error
@@ -591,7 +594,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
                   reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
         }
-        for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
+        List<GenericRow> transformedRows = reusedResult.getTransformedRows();
+        if (transformedRows.size() > 0) {
+          noTransformedRows = false;
+        }
+        for (GenericRow transformedRow : transformedRows) {
           try {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
@@ -614,13 +621,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _numRowsConsumed++;
       streamMessageCount++;
     }
-    updateIngestionDelay(indexedMessageCount);
+    updateIngestionDelay(indexedMessageCount, noTransformedRows, msgMetadata);
     updateCurrentDocumentCountMetrics();
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
       if (messageCount == 0) {
-        // If we did not get any events but got some unfiltered messages, we attempt to estimate the ingestion
-        // delay from the metadata of the last unfiltered message received.
+        // If we received events from the stream but all were filtered, we attempt to estimate the ingestion
+        // delay from the metadata of the last filtered message received.
         updateIngestionDelay(messagesAndOffsets.getLastMessageMetadata());
       }
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
@@ -1573,12 +1580,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   /*
    * Updates the ingestion delay if messages were processed using the time stamp for the last consumed event.
    *
-   * @param indexedMessagesCount
+   * @param indexedMessagesCount: greater than 0 if at least one row was transformed successfully.
+   * @param noTransformedRows: true if there were no transformed rows in the current message batch.
+   * @param rowMetadata: if noTransformedRows is true, this holds the metadata for the last row processed.
    */
-  private void updateIngestionDelay(int indexedMessageCount) {
+  private void updateIngestionDelay(int indexedMessageCount, boolean noTransformedRows, RowMetadata rowMetadata) {
     if (indexedMessageCount > 0) {
       // Record Ingestion delay for this partition
       updateIngestionDelay(_lastRowMetadata);
+    } else if (noTransformedRows) {
+      // If there was no transformed rows in a batch we still use the last metadata to record ingestion delay
+      updateIngestionDelay(rowMetadata);
     }
   }
 
