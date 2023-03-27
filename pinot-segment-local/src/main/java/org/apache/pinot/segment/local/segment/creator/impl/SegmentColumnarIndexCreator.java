@@ -393,12 +393,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (dictEnabledColumn) {
       return null;
     }
-    TextIndexConfig textDeclaration = configs.getConfig(StandardIndexes.text());
-    if (!textDeclaration.isEnabled()) {
+    TextIndexConfig textConfig = configs.getConfig(StandardIndexes.text());
+    if (!textConfig.isEnabled()) {
       return null;
     }
 
-    Object alternativeValue = textDeclaration.getRawValueForTextIndex();
+    Object alternativeValue = textConfig.getRawValueForTextIndex();
 
     if (alternativeValue == null) {
       return null;
