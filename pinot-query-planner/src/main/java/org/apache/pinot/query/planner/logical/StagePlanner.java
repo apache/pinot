@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
@@ -30,9 +29,10 @@ import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.physical.PhysicalPlanContext;
+import org.apache.pinot.query.planner.physical.PhysicalPlanVisitor;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
@@ -84,12 +84,12 @@ public class StagePlanner {
         new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getStageId(),
             RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, globalSenderNode);
 
-    QueryPlan queryPlan = StageMetadataVisitor.attachMetadata(relRoot.fields, globalReceiverNode);
-
-    // assign workers to each stage.
-    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
-      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId, _plannerContext.getOptions());
-    }
+    // perform physical plan conversion and assign workers to each stage.
+    PhysicalPlanContext physicalPlanContext = new PhysicalPlanContext(
+        _workerManager, _requestId, _plannerContext, relRoot.fields
+    );
+    PhysicalPlanVisitor.INSTANCE.constructPhysicalPlan(globalReceiverNode, physicalPlanContext);
+    QueryPlan queryPlan = physicalPlanContext.getQueryPlan();
 
     // Run physical optimizations
     runPhysicalOptimizers(queryPlan);
