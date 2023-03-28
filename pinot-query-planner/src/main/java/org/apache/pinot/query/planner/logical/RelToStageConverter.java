@@ -24,7 +24,9 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -47,6 +49,7 @@ import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.stage.UncollectNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -88,6 +91,8 @@ public final class RelToStageConverter {
       return convertLogicalWindow((LogicalWindow) node, currentStageId);
     } else if (node instanceof SetOp) {
       return convertLogicalSetOp((SetOp) node, currentStageId);
+    } else if (node instanceof Uncollect) {
+      return convertLogicalUncollect((Uncollect) node, currentStageId);
     } else {
       throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
     }
@@ -96,6 +101,10 @@ public final class RelToStageConverter {
   private static StageNode convertLogicalSetOp(SetOp node, int currentStageId) {
     return new SetOpNode(SetOpNode.SetOpType.fromObject(node), currentStageId, toDataSchema(node.getRowType()),
         node.all);
+  }
+
+  private static StageNode convertLogicalUncollect(Uncollect node, int currentStageId) {
+    return new UncollectNode(currentStageId, toDataSchema(node.getRowType()));
   }
 
   private static StageNode convertLogicalValues(LogicalValues node, int currentStageId) {

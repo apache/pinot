@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.stage.UncollectNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 
@@ -87,6 +88,13 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   public Void visitSetOp(SetOpNode setOpNode, DispatchablePlanContext context) {
     setOpNode.getInputs().forEach(input -> input.visit(this, context));
     getStageMetadata(setOpNode, context);
+    return null;
+  }
+
+  @Override
+  public Void visitUncollect(UncollectNode uncollectNode, DispatchablePlanContext context) {
+    uncollectNode.getInputs().get(0).visit(this, context);
+    getStageMetadata(uncollectNode, context);
     return null;
   }
 

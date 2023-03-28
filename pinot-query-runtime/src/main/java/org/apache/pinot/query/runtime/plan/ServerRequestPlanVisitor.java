@@ -48,6 +48,7 @@ import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.stage.UncollectNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -187,6 +188,11 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   @Override
   public Void visitSetOp(SetOpNode setOpNode, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("SetOp not yet supported!");
+  }
+
+  @Override
+  public Void visitUncollect(UncollectNode uncollectNode, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Uncollect not yet supported!");
   }
 
   @Override

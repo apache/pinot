@@ -1,0 +1,43 @@
+{
+  "unnest_tests": {
+    "queries": [
+      {
+        "description": "Unnest one column",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, au.mcol5 FROM a CROSS JOIN (SELECT UNNEST(col5) as mcol5 FROM a) AS au;",
+        "output": []
+      },
+      {
+        "description": "Unnest one column",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, mcol5, mcol6 FROM a CROSS JOIN UNNEST(col5) AS t2(mcol5) CROSS JOIN UNNEST(col6) AS t3(mcol6)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], mcol5=[$7], mcol6=[$8])",
+          "\n  LogicalCorrelate(correlation=[$cor1], joinType=[inner], requiredColumns=[{5}])",
+          "\n    LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{4}])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n      Uncollect",
+          "\n        LogicalProject(col5=[$cor0.col5])",
+          "\n          LogicalValues(tuples=[[{ 0 }]])",
+          "\n    Uncollect",
+          "\n      LogicalProject(col6=[$cor1.col6])",
+          "\n        LogicalValues(tuples=[[{ 0 }]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Unnest two columns",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, mcol5, mcol6 FROM a CROSS JOIN UNNEST(col5, col6) AS t(mcol5, mcol6)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], mcol5=[$7], mcol6=[$8])",
+          "\n  LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{4, 5}])",
+          "\n    LogicalTableScan(table=[[a]])",
+          "\n    Uncollect",
+          "\n      LogicalProject(col5=[$cor0.col5], col6=[$cor0.col6])",
+          "\n        LogicalValues(tuples=[[{ 0 }]])",
+          "\n"
+        ]
+      }
+    ]
+  }
+}

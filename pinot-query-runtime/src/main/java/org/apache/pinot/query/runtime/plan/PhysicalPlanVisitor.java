@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.stage.UncollectNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
@@ -107,6 +108,11 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   public MultiStageOperator visitSetOp(SetOpNode setOpNode, PlanRequestContext context) {
     throw new UnsupportedOperationException(
         "Stage node of type SetOpNode: " + setOpNode.getSetOpType() + " is not supported!");
+  }
+
+  @Override
+  public MultiStageOperator visitUncollect(UncollectNode uncollectNode, PlanRequestContext context) {
+    throw new UnsupportedOperationException("Stage node of type UncollectNode is not supported!");
   }
 
   @Override

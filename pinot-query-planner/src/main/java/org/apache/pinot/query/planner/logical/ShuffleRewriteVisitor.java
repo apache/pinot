@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.stage.UncollectNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 
@@ -85,6 +86,11 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
     Set<Integer> newPartitionKeys = new HashSet<>();
     setOpNode.getInputs().forEach(input -> newPartitionKeys.addAll(input.visit(this, context)));
     return newPartitionKeys;
+  }
+
+  @Override
+  public Set<Integer> visitUncollect(UncollectNode uncollectNode, Void context) {
+    throw new UnsupportedOperationException("Uncollect not yet supported!");
   }
 
   @Override

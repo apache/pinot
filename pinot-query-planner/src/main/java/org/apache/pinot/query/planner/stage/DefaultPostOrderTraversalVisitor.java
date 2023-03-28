@@ -90,4 +90,10 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements StageNod
     node.getInputs().forEach(input -> input.visit(this, context));
     return process(node, context);
   }
+
+  @Override
+  public T visitUncollect(UncollectNode node, C context) {
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
+  }
 }
