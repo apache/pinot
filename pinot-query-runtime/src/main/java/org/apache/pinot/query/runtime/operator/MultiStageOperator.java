@@ -53,6 +53,10 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     _opChainStats = opChainStats;
   }
 
+  public OpChainStats getOpChainStats() {
+    return _opChainStats;
+  }
+
   @Override
   public TransferableBlock nextBlock() {
     if (Tracing.ThreadAccountantOps.isInterrupted()) {

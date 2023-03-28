@@ -43,7 +43,6 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.service.QueryConfig;
@@ -246,18 +245,10 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     // should be hit first, but is defensive) (2) every mailbox that was opened
     // returned an EOS block. in every other scenario, there are mailboxes that
     // are not yet exhausted and we should wait for more data to be available
-    if (openMailboxCount > 0 && openMailboxCount > eosMailboxCount) {
-      // There are still mailboxes that are not exhausted, so we should wait for more data to be available
-      return TransferableBlockUtils.getNoOpTransferableBlock();
-    } else {
-      // All mailboxes are exhausted, so we should return EOS
-      if (_opChainStats != null) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-            OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-      } else {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-    }
+    TransferableBlock block =
+        openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
+            : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    return block;
   }
 
   private void cleanUpResourcesOnError() {
