@@ -239,7 +239,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
               // Literal value is less than the bounds of INT. > and >= expressions will always be true because an
               // INT column will always have a value greater than or equal to Integer.MIN_VALUE. < and <= expressions
               // will always be false, because an INT column will never have values less than Integer.MIN_VALUE.
-              return getExpressionFromBoolean(kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(
+                  kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Long literal value falls within the bounds of INT column, server will successfully convert the literal
               // value when needed.
