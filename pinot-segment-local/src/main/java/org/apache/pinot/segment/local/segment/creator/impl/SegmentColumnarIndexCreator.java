@@ -363,7 +363,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private boolean shouldCreateDictionaryWithinThreshold(ColumnIndexCreationInfo info,
       SegmentGeneratorConfig config, FieldSpec spec) {
-    long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
+    long dictionarySize = info.getDistinctValueCount() * (long) spec.getDataType().size();
     long forwardIndexSize =
         ((long) info.getTotalNumberOfEntries()
             * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1) + Byte.SIZE - 1) / Byte.SIZE;
