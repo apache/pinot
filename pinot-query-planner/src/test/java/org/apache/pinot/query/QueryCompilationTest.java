@@ -120,18 +120,18 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("0@Server_localhost_2", "0@Server_localhost_1")
-                : ImmutableList.of("0@Server_localhost_1"));
+            tables.get(0).equals("a") ? ImmutableList.of("[0]@Server_localhost_2", "[0]@Server_localhost_1")
+                : ImmutableList.of("[0]@Server_localhost_1"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toSet()),
-            ImmutableSet.of("0@Server_localhost_1", "0@Server_localhost_2"));
+            ImmutableSet.of("[0]@Server_localhost_1", "[0]@Server_localhost_2"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toSet()),
-            ImmutableSet.of("0@Server_localhost_3"));
+            ImmutableSet.of("[0]@Server_localhost_3"));
       }
     }
   }
@@ -165,7 +165,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "0@Server_localhost_2");
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "[0]@Server_localhost_2");
 
     query = "SELECT * FROM d";
     queryPlan = _queryEnvironment.planQuery(query);
@@ -240,12 +240,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // table scan stages; for tableB it should have only 1
         Assert.assertEquals(e.getValue().getServerInstances().stream()
                 .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
-            ImmutableList.of("0@Server_localhost_1"));
+            ImmutableList.of("[0]@Server_localhost_1"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(e.getValue().getServerInstances().stream()
                 .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
-            ImmutableList.of("0@Server_localhost_1", "0@Server_localhost_2"));
+            ImmutableList.of("[0]@Server_localhost_1", "[0]@Server_localhost_2"));
       }
     }
   }
