@@ -503,7 +503,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
-    LOGGER.info(new PinotAppConfigs(getConfig()).getJvmInputArguments());
+    LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
 
     // install default SSL context if necessary (even if not force-enabled everywhere)

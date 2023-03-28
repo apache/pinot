@@ -320,7 +320,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @Override
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
-    LOGGER.info(new PinotAppConfigs(getConfig()).getJvmInputArguments());
+    LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     Utils.logVersions();
 
     // Set up controller metrics

@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Joiner;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -88,11 +87,6 @@ public class PinotAppConfigs {
 
   public JVMConfig getJvmConfig() {
     return _jvmConfig;
-  }
-
-  public String getJvmInputArguments() {
-    Joiner joiner = Joiner.on(" ").skipNulls();
-    return String.format("JVM Input Arguments: %s", joiner.join(_jvmConfig._args));
   }
 
   public RuntimeConfig getRuntimeConfig() {

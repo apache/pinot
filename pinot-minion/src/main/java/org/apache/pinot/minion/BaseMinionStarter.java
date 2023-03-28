@@ -168,7 +168,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot minion: {} (Version: {})", _instanceId, PinotVersion.VERSION);
-    LOGGER.info(new PinotAppConfigs(getConfig()).getJvmInputArguments());
+    LOGGER.info("Minion configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 

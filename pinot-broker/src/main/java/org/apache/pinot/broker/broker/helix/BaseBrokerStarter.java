@@ -224,7 +224,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot broker (Version: {})", PinotVersion.VERSION);
-    LOGGER.info(new PinotAppConfigs(getConfig()).getJvmInputArguments());
+    LOGGER.info("Broker configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     _isStarting = true;
     Utils.logVersions();
 
