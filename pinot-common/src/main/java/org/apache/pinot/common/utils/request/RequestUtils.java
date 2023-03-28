@@ -175,7 +175,7 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getUnknownLiteralExpression() {
+  public static Expression getNullLiteralExpression() {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setNullValue(true);
     return expression;
@@ -183,7 +183,7 @@ public class RequestUtils {
 
   public static Expression getLiteralExpression(Object object) {
     if (object == null) {
-      return getUnknownLiteralExpression();
+      return getNullLiteralExpression();
     }
     if (object instanceof Integer || object instanceof Long) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
