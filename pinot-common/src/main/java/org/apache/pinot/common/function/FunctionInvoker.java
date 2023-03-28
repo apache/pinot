@@ -32,12 +32,17 @@ import org.apache.pinot.common.utils.PinotDataType;
  */
 public class FunctionInvoker {
   private final Method _method;
+  // If true, the function should return null if any of its argument is null
+  // Otherwise, the function should deal with null in its own implementation.
+  private final boolean _isNullIntolerant;
+
   private final Class<?>[] _parameterClasses;
   private final PinotDataType[] _parameterTypes;
   private final Object _instance;
 
   public FunctionInvoker(FunctionInfo functionInfo) {
     _method = functionInfo.getMethod();
+    _isNullIntolerant = !functionInfo.hasNullableParameters();
     Class<?>[] parameterClasses = _method.getParameterTypes();
     int numParameters = parameterClasses.length;
     _parameterClasses = new Class<?>[numParameters];
@@ -123,6 +128,13 @@ public class FunctionInvoker {
    * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
    */
   public Object invoke(Object[] arguments) {
+    if (_isNullIntolerant) {
+      for (Object arg : arguments) {
+        if (arg == null) {
+          return null;
+        }
+      }
+    }
     try {
       return _method.invoke(_instance, arguments);
     } catch (Exception e) {

@@ -18,16 +18,11 @@
  */
 package org.apache.pinot.core.query.utils;
 
-import com.google.common.base.Preconditions;
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -44,103 +39,67 @@ public class OrderByComparatorFactory {
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
       ColumnContext[] orderByColumnContexts, boolean nullHandlingEnabled, int from, int to) {
-    Preconditions.checkArgument(to <= orderByExpressions.size(),
-        "Trying to access %sth position of orderByExpressions with size %s", to, orderByExpressions.size());
-    Preconditions.checkArgument(to <= orderByColumnContexts.length,
-        "Trying to access %sth position of orderByExpressionMetadata with size %s", to, orderByColumnContexts.length);
-    Preconditions.checkArgument(from < to, "FROM (%s) must be lower than TO (%s)", from, to);
+    assert 0 <= from && from < to && to <= orderByExpressions.size();
 
-    // Compare all single-value columns
-    int numOrderByExpressions = to - from;
-    List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
+    // Check if all expressions are single-valued
     for (int i = from; i < to; i++) {
-      if (orderByColumnContexts[i].isSingleValue()) {
-        valueIndexList.add(i);
-      } else {
-        // MV columns should not be part of the selection order by only list
+      if (!orderByColumnContexts[i].isSingleValue()) {
+        // MV columns should not be part of the selection order-by list
         throw new BadQueryRequestException(
             String.format("MV expression: %s should not be included in the ORDER-BY clause",
                 orderByExpressions.get(i)));
       }
     }
 
-    int numValuesToCompare = valueIndexList.size();
-    int[] valueIndices = new int[numValuesToCompare];
-    FieldSpec.DataType[] storedTypes = new FieldSpec.DataType[numValuesToCompare];
+    return getComparator(orderByExpressions, nullHandlingEnabled, from, to);
+  }
+
+  public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
+      boolean nullHandlingEnabled) {
+    return getComparator(orderByExpressions, nullHandlingEnabled, 0, orderByExpressions.size());
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
+      boolean nullHandlingEnabled, int from, int to) {
+    assert 0 <= from && from < to && to <= orderByExpressions.size();
+
     // Use multiplier -1 or 1 to control ascending/descending order
-    int[] multipliers = new int[numValuesToCompare];
-    for (int i = 0; i < numValuesToCompare; i++) {
-      int valueIndex = valueIndexList.get(i);
-      valueIndices[i] = valueIndex;
-      storedTypes[i] = orderByColumnContexts[valueIndex].getDataType().getStoredType();
-      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? 1 : -1;
+    int[] multipliers = new int[to];
+    for (int i = from; i < to; i++) {
+      multipliers[i] = orderByExpressions.get(i).isAsc() ? 1 : -1;
     }
 
     if (nullHandlingEnabled) {
       return (Object[] o1, Object[] o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-          // TODO: Evaluate the performance of casting to Comparable and avoid the switch
-          Object v1 = o1[index];
-          Object v2 = o2[index];
+        for (int i = from; i < to; i++) {
+          Comparable v1 = (Comparable) o1[i];
+          Comparable v2 = (Comparable) o2[i];
           if (v1 == null) {
             // The default null ordering is: 'NULLS LAST', regardless of the ordering direction.
             return v2 == null ? 0 : -multipliers[i];
           } else if (v2 == null) {
             return multipliers[i];
           }
-          int result = compareCols(v1, v2, storedTypes[i], multipliers[i]);
+          int result = v1.compareTo(v2);
           if (result != 0) {
-            return result;
+            return result * multipliers[i];
           }
         }
         return 0;
       };
     } else {
       return (Object[] o1, Object[] o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-          // TODO: Evaluate the performance of casting to Comparable and avoid the switch
-          int result = compareCols(o1[index], o2[index], storedTypes[i], multipliers[i]);
+        for (int i = from; i < to; i++) {
+          Comparable v1 = (Comparable) o1[i];
+          Comparable v2 = (Comparable) o2[i];
+          int result = v1.compareTo(v2);
           if (result != 0) {
-            return result;
+            return result * multipliers[i];
           }
         }
         return 0;
       };
     }
-  }
-
-  private static int compareCols(Object v1, Object v2, FieldSpec.DataType type, int multiplier) {
-
-    // TODO: Evaluate the performance of casting to Comparable and avoid the switch
-    int result;
-    switch (type) {
-      case INT:
-        result = ((Integer) v1).compareTo((Integer) v2);
-        break;
-      case LONG:
-        result = ((Long) v1).compareTo((Long) v2);
-        break;
-      case FLOAT:
-        result = ((Float) v1).compareTo((Float) v2);
-        break;
-      case DOUBLE:
-        result = ((Double) v1).compareTo((Double) v2);
-        break;
-      case BIG_DECIMAL:
-        result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
-        break;
-      case STRING:
-        result = ((String) v1).compareTo((String) v2);
-        break;
-      case BYTES:
-        result = ((ByteArray) v1).compareTo((ByteArray) v2);
-        break;
-      // NOTE: Multi-value columns are not comparable, so we should not reach here
-      default:
-        throw new IllegalStateException();
-    }
-    return result * multiplier;
   }
 }

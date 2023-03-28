@@ -73,7 +73,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
     TransformFunction keyValueFunction = arguments.get(1);
     Preconditions.checkState(keyValueFunction instanceof LiteralTransformFunction,
         "Key value must be a literal (number or string)");
-    String keyValue = ((LiteralTransformFunction) keyValueFunction).getLiteral();
+    String keyValue = ((LiteralTransformFunction) keyValueFunction).getStringLiteral();
     _keyDictId = keyColumnDictionary.indexOf(keyValue);
 
     _valueColumnFunction = arguments.get(2);

@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -51,6 +52,8 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _limit;
+  private final boolean _nullHandlingEnabled;
+  private final RoaringBitmap[] _nullBitmaps;
 
   private int _numDocsScanned = 0;
 
@@ -59,6 +62,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     _indexSegment = indexSegment;
     _expressions = expressions;
     _projectOperator = projectOperator;
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
 
     int numExpressions = expressions.size();
     _blockValSets = new BlockValSet[numExpressions];
@@ -72,7 +76,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
           DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
-
+    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
     _limit = queryContext.getLimit();
   }
 
@@ -95,8 +99,23 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     int numDocs = valueBlock.getNumDocs();
     int numDocsToReturn = Math.min(_limit - _numDocsScanned, numDocs);
     List<Object[]> rows = new ArrayList<>(numDocsToReturn);
-    for (int i = 0; i < numDocsToReturn; i++) {
-      rows.add(blockValueFetcher.getRow(i));
+    if (_nullHandlingEnabled) {
+      for (int i = 0; i < numExpressions; i++) {
+        _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
+      }
+      for (int docId = 0; docId < numDocsToReturn; docId++) {
+        Object[] values = blockValueFetcher.getRow(docId);
+        for (int colId = 0; colId < numExpressions; colId++) {
+          if (_nullBitmaps[colId] != null && _nullBitmaps[colId].contains(docId)) {
+            values[colId] = null;
+          }
+        }
+        rows.add(values);
+      }
+    } else {
+      for (int i = 0; i < numDocsToReturn; i++) {
+        rows.add(blockValueFetcher.getRow(i));
+      }
     }
     _numDocsScanned += numDocs;
     return new SelectionResultsBlock(_dataSchema, rows);

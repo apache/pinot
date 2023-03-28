@@ -42,6 +42,7 @@ import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
+import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
@@ -167,6 +168,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot minion: {} (Version: {})", _instanceId, PinotVersion.VERSION);
+    LOGGER.info("Minion configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 

@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 
 public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngineIntegrationTest {
   private static final String SCHEMA_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
   private static final String TEST_TENANT = "TestTenant";
 
   @Override

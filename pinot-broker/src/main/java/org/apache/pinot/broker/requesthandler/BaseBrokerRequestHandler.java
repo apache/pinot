@@ -57,6 +57,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -305,11 +306,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
-      if (serverPinotQuery.getDataSource() == null) {
+      DataSource dataSource = serverPinotQuery.getDataSource();
+      if (dataSource == null) {
         LOGGER.info("Data source (FROM clause) not found in request {}: {}", request, query);
         requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
         return new BrokerResponseNative(
             QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Data source (FROM clause) not found"));
+      }
+      if (dataSource.getJoin() != null) {
+        LOGGER.info("JOIN is not supported in request {}: {}", request, query);
+        requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+        return new BrokerResponseNative(
+            QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "JOIN is not supported"));
+      }
+      if (dataSource.getTableName() == null) {
+        LOGGER.info("Table name not found in request {}: {}", request, query);
+        requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+        return new BrokerResponseNative(
+            QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Table name not found"));
       }
 
       try {
@@ -321,8 +335,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
 
-      String tableName = getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache);
-      serverPinotQuery.getDataSource().setTableName(tableName);
+      String tableName = getActualTableName(dataSource.getTableName(), _tableCache);
+      dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
 
@@ -1346,6 +1360,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       case BINARY_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
+        break;
+      case NULL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
+        row.add(null);
         break;
       default:
         break;

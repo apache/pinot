@@ -56,10 +56,10 @@ public class AdditionTransformFunction extends BaseTransformFunction {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
         DataType dataType = literalTransformFunction.getResultMetadata().getDataType();
         if (dataType == DataType.BIG_DECIMAL) {
-          _literalBigDecimalSum = _literalBigDecimalSum.add(new BigDecimal(literalTransformFunction.getLiteral()));
+          _literalBigDecimalSum = _literalBigDecimalSum.add(literalTransformFunction.getBigDecimalLiteral());
           _resultDataType = DataType.BIG_DECIMAL;
         } else {
-          _literalDoubleSum += Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          _literalDoubleSum += ((LiteralTransformFunction) argument).getDoubleLiteral();
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {

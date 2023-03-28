@@ -71,10 +71,10 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteralString()));
+      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral().getStringValue()));
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteralString()));
+      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral().getStringValue()));
     }
     // must be some h3 index
     assert _h3IndexReader != null : "the column must have H3 index setup.";
