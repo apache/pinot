@@ -154,6 +154,7 @@ public class PinotServiceManager {
   public String startServer(String serverStarterClassName, PinotConfiguration serverConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Server...");
+
     if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
