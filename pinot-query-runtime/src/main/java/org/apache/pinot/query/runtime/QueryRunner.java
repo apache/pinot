@@ -52,6 +52,7 @@ import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
@@ -217,8 +218,10 @@ public class QueryRunner {
               deadlineMs, distributedStagePlan.getMetadataMap());
       OpChainStats opChainStats =
           new OpChainStats(new OpChainId(requestId, _rootServer.virtualId(), sendNode.getStageId()).toString());
-      mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext,
-          new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema()),
+      MultiStageOperator leafStageOperator =
+          new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
+      leafStageOperator.attachOpChainStats(opChainStats);
+      mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext, leafStageOperator,
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(),
           sendNode.getCollationDirections(), sendNode.isSortOnSender(), sendNode.getStageId(),
           sendNode.getReceiverStageId());

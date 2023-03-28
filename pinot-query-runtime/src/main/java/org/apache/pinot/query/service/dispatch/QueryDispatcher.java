@@ -55,6 +55,8 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -281,10 +283,12 @@ public class QueryDispatcher {
       VirtualServerAddress server, long timeoutMs) {
     OpChainExecutionContext context =
         new OpChainExecutionContext(mailboxService, jobId, stageId, server, timeoutMs, timeoutMs, stageMetadataMap);
+    OpChainStats stats = new OpChainStats(new OpChainId(jobId, server.virtualId(), stageId).toString());
     // timeout is set for reduce stage
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(context, RelDistribution.Type.RANDOM_DISTRIBUTED, Collections.emptyList(),
             Collections.emptyList(), false, false, dataSchema, stageId, reducerStageId);
+    mailboxReceiveOperator.attachOpChainStats(stats);
     return mailboxReceiveOperator;
   }
 

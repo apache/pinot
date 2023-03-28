@@ -216,8 +216,8 @@ public class MailboxReceiveOperator extends MultiStageOperator {
                 return block;
               }
             } else {
-              if (!block.getResultMetadata().isEmpty()) {
-                _operatorStatsMap.putAll(block.getResultMetadata());
+              if (_opChainStats != null && !block.getResultMetadata().isEmpty()) {
+                _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
               }
               eosMailboxCount++;
             }
@@ -246,11 +246,18 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     // should be hit first, but is defensive) (2) every mailbox that was opened
     // returned an EOS block. in every other scenario, there are mailboxes that
     // are not yet exhausted and we should wait for more data to be available
-    TransferableBlock block =
-        openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
-            : TransferableBlockUtils.getEndOfStreamTransferableBlock(
-                OperatorUtils.getMetadataFromOperatorStats(getOperatorStatsMap()));
-    return block;
+    if (openMailboxCount > 0 && openMailboxCount > eosMailboxCount) {
+      // There are still mailboxes that are not exhausted, so we should wait for more data to be available
+      return TransferableBlockUtils.getNoOpTransferableBlock();
+    } else {
+      // All mailboxes are exhausted, so we should return EOS
+      if (_opChainStats != null) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+            OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+      } else {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
+    }
   }
 
   private void cleanUpResourcesOnError() {

@@ -19,9 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Joiner;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -37,7 +35,6 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
   // TODO: Move to OperatorContext class.
   protected final OperatorStats _operatorStats;
-  protected final Map<String, OperatorStats> _operatorStatsMap;
   protected final String _operatorId;
   protected OpChainStats _opChainStats;
   private final OpChainExecutionContext _context;
@@ -46,7 +43,6 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     _context = context;
     _operatorStats =
         new OperatorStats(_context, toExplainString());
-    _operatorStatsMap = new HashMap<>();
     _operatorId =
         Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
     _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
@@ -55,10 +51,6 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
   public void attachOpChainStats(OpChainStats opChainStats) {
     _opChainStats = opChainStats;
-  }
-
-  public Map<String, OperatorStats> getOperatorStatsMap() {
-    return _operatorStatsMap;
   }
 
   @Override
@@ -83,7 +75,9 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     if (nextBlock.isSuccessfulEndOfStreamBlock()) {
       if (!_operatorStats.getExecutionStats().isEmpty()) {
         _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
-        _operatorStatsMap.put(_operatorId, _operatorStats);
+        if (_opChainStats != null) {
+          _opChainStats.getOperatorStatsMap().put(_operatorId, _operatorStats);
+        }
       }
     }
   }

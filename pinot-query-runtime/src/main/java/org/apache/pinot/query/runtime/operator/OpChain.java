@@ -43,11 +43,19 @@ public class OpChain implements AutoCloseable {
     _receivingMailbox = new HashSet<>(receivingMailboxes);
     _id = new OpChainId(requestId, virtualServerId, stageId);
     _stats = new OpChainStats(_id.toString());
-    _root.attachOpChainStats(_stats);
+//    _root.attachOpChainStats(_stats);
+    attachStatsToOperator(_root);
   }
 
   public OpChain(OpChainExecutionContext context, MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes) {
     this(root, receivingMailboxes, context.getServer().virtualId(), context.getRequestId(), context.getStageId());
+  }
+
+  public void attachStatsToOperator(MultiStageOperator op) {
+    op.attachOpChainStats(_stats);
+    for (MultiStageOperator child : op.getChildOperators()) {
+      attachStatsToOperator(child);
+    }
   }
 
   public Operator<TransferableBlock> getRoot() {

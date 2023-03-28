@@ -154,7 +154,6 @@ public class MailboxSendOperator extends MultiStageOperator {
       while (!transferableBlock.isNoOpBlock()) {
         if (transferableBlock.isEndOfStreamBlock()) {
           if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
-            populateOpChainStats(this, _opChainStats);
             TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
                 OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
             _exchange.send(eosBlockWithStats);
@@ -176,13 +175,6 @@ public class MailboxSendOperator extends MultiStageOperator {
       }
     }
     return transferableBlock;
-  }
-
-  public void populateOpChainStats(MultiStageOperator op, OpChainStats opChainStats) {
-    opChainStats.getOperatorStatsMap().putAll(op.getOperatorStatsMap());
-    for (MultiStageOperator childOp : op.getChildOperators()) {
-      populateOpChainStats(childOp, opChainStats);
-    }
   }
 
   @Override
