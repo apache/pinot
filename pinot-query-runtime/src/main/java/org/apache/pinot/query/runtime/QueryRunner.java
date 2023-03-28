@@ -173,7 +173,7 @@ public class QueryRunner {
       for (int partitionId : virtualServer.getPartitionIds()) {
         OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
             new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, deadlineMs,
-                new VirtualServerAddress(virtualServer.getHostname(), virtualServer.getPort(), partitionId),
+                new VirtualServerAddress(virtualServer.getHostname(), virtualServer.getQueryMailboxPort(), partitionId),
                 distributedStagePlan.getMetadataMap()));
         _scheduler.register(rootOperator);
       }

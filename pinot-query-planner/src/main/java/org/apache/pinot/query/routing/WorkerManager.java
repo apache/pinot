@@ -20,7 +20,6 @@ package org.apache.pinot.query.routing;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Range;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -29,8 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import org.apache.commons.lang.math.IntRange;
+import org.apache.calcite.util.Util;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -41,8 +39,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
-
-import static org.apache.calcite.util.Util.range;
 
 
 /**
@@ -146,7 +142,8 @@ public class WorkerManager {
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
           if (matchingIdx == -1) {
-            serverInstances.add(new VirtualServer(server, range(partitionCount, partitionCount + stageParallelism)));
+            serverInstances.add(new VirtualServer(server, Util.range(partitionCount,
+                partitionCount + stageParallelism)));
           } else {
             // for singleton exchange, add 0 as the default parallelism as the requirement of singleton
             serverInstances.add(new VirtualServer(server, Collections.singletonList(0)));

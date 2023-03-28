@@ -86,11 +86,11 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
   private boolean _isSortedBlockConstructed;
 
-  private static MailboxIdentifier toMailboxId(VirtualServer sender, long jobId, int senderStageId,
+  private static MailboxIdentifier toMailboxId(VirtualServer sender, int partitionId, long jobId, int senderStageId,
       int receiverStageId, VirtualServerAddress receiver) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, senderStageId),
-        new VirtualServerAddress(sender),
+        new VirtualServerAddress(sender.getHostname(), sender.getQueryMailboxPort(), partitionId),
         receiver,
         senderStageId,
         receiverStageId);
@@ -135,13 +135,20 @@ public class MailboxReceiveOperator extends MultiStageOperator {
         // see: https://github.com/apache/pinot/issues/9611
         _sendingMailbox = Collections.emptyList();
       } else {
-        _sendingMailbox =
-            Collections.singletonList(toMailboxId(singletonInstance, jobId, senderStageId, receiverStageId, receiver));
+        _sendingMailbox = new ArrayList<>();
+        for (int partitionId : singletonInstance.getPartitionIds()) {
+          _sendingMailbox.add(toMailboxId(singletonInstance, partitionId, jobId, senderStageId, receiverStageId,
+              receiver));
+        }
       }
     } else {
-      _sendingMailbox = new ArrayList<>(sendingStageInstances.size());
+      // TODO: worker assignment strategy v2: once partition-aware assignment is enabled. we no longer need to assign
+      // connection from all sending mailbox, only those that requires RelTrait/RelDistribution changes
+      _sendingMailbox = new ArrayList<>();
       for (VirtualServer instance : sendingStageInstances) {
-        _sendingMailbox.add(toMailboxId(instance, jobId, senderStageId, receiverStageId, receiver));
+        for (int partitionId : instance.getPartitionIds()) {
+          _sendingMailbox.add(toMailboxId(instance, partitionId, jobId, senderStageId, receiverStageId, receiver));
+        }
       }
     }
     _collationKeys = collationKeys;

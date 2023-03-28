@@ -73,7 +73,7 @@ public class MailboxSendOperatorTest {
 
     Mockito.when(_server.getHostname()).thenReturn("mock");
     Mockito.when(_server.getQueryMailboxPort()).thenReturn(0);
-    Mockito.when(_server.getVirtualId()).thenReturn(0);
+    Mockito.when(_server.getPartitionIds()).thenReturn(Collections.singletonList(0));
   }
 
   @AfterMethod
@@ -205,8 +205,8 @@ public class MailboxSendOperatorTest {
     stageMetadata.setServerInstances(ImmutableList.of(_server));
     Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(DEFAULT_RECEIVER_STAGE_ID, stageMetadata);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_SENDER_STAGE_ID, new VirtualServerAddress(_server),
-            deadlineMs, deadlineMs, stageMetadataMap);
+        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_SENDER_STAGE_ID, new VirtualServerAddress(
+            _server.getHostname(), _server.getQueryMailboxPort(), 0), deadlineMs, deadlineMs, stageMetadataMap);
     return context;
   }
 }

@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.query.runtime.plan.serde;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -60,8 +65,9 @@ public class QueryPlanSerDeUtils {
         .putAllStageMetadata(stageMetadataMapToProtoMap(distributedStagePlan.getMetadataMap())).build();
   }
 
-  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
-      "(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)\\((?<grpc>[0-9]+):(?<service>[0-9]+):(?<mailbox>[0-9]+)\\)");
+  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile("\\[(?<partitionIds>[0-9,]+)\\]"
+      + "@(?<host>[^:]+):(?<port>[0-9]+)"
+      + "\\((?<grpc>[0-9]+):(?<service>[0-9]+):(?<mailbox>[0-9]+)\\)");
 
   public static VirtualServer stringToInstance(String serverInstanceString) {
     Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(serverInstanceString);
@@ -74,13 +80,17 @@ public class QueryPlanSerDeUtils {
     // Skipped netty and grpc port as they are not used in worker instance.
     return new VirtualServer(new WorkerInstance(matcher.group("host"), Integer.parseInt(matcher.group("port")),
         Integer.parseInt(matcher.group("grpc")), Integer.parseInt(matcher.group("service")),
-        Integer.parseInt(matcher.group("mailbox"))), Integer.parseInt(matcher.group("virtualid")));
+        Integer.parseInt(matcher.group("mailbox"))), toList(matcher.group("partitionIds")));
   }
 
   public static String instanceToString(VirtualServer serverInstance) {
-    return String.format("%s@%s:%s(%s:%s:%s)", serverInstance.getVirtualId(), serverInstance.getHostname(),
-        serverInstance.getPort(), serverInstance.getGrpcPort(), serverInstance.getQueryServicePort(),
-        serverInstance.getQueryMailboxPort());
+    return String.format("[%s]@%s:%s(%s:%s:%s)", StringUtils.join(serverInstance.getPartitionIds(), ','),
+        serverInstance.getHostname(), serverInstance.getPort(), serverInstance.getGrpcPort(),
+        serverInstance.getQueryServicePort(), serverInstance.getQueryMailboxPort());
+  }
+
+  private static Collection<Integer> toList(String partitionIds) {
+    return Arrays.stream(StringUtils.split(partitionIds, ',')).map(Integer::parseInt).collect(Collectors.toList());
   }
 
   public static Map<Integer, StageMetadata> protoMapToStageMetadataMap(Map<Integer, Worker.StageMetadata> protoMap) {
@@ -140,7 +150,8 @@ public class QueryPlanSerDeUtils {
         tableToSegmentMap.put(tableEntry.getKey(),
             Worker.SegmentList.newBuilder().addAllSegments(tableEntry.getValue()).build());
       }
-      builder.putInstanceToSegmentMap(instanceToString(new VirtualServer(instanceEntry.getKey(), 0)),
+      builder.putInstanceToSegmentMap(
+          instanceToString(new VirtualServer(instanceEntry.getKey(), Collections.singletonList(0))),
           Worker.SegmentMap.newBuilder().putAllTableTypeToSegmentList(tableToSegmentMap).build());
     }
     // time boundary info

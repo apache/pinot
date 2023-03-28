@@ -74,7 +74,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @VisibleForTesting
   interface MailboxIdGenerator {
-    MailboxIdentifier generate(VirtualServer server);
+    MailboxIdentifier generate(VirtualServerAddress receivingServer);
   }
 
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator dataTableBlockBaseOperator,
@@ -83,7 +83,8 @@ public class MailboxSendOperator extends MultiStageOperator {
       int receiverStageId) {
     this(context, dataTableBlockBaseOperator, exchangeType, keySelector, collationKeys, collationDirections,
         isSortOnSender,
-        (server) -> toMailboxId(server, context.getRequestId(), senderStageId, receiverStageId, context.getServer()),
+        (receiver) -> toMailboxId(receiver, context.getRequestId(), senderStageId, receiverStageId,
+            context.getServer()),
         BlockExchange::getExchange, receiverStageId);
   }
 
@@ -104,7 +105,8 @@ public class MailboxSendOperator extends MultiStageOperator {
       for (VirtualServer serverInstance : receivingStageInstances) {
         if (serverInstance.getHostname().equals(mailboxService.getHostname())
             && serverInstance.getQueryMailboxPort() == mailboxService.getMailboxPort()) {
-          if (singletonInstance != null && singletonInstance.getServer().equals(serverInstance.getServer())) {
+          if (serverInstance.getPartitionIds().size() > 1 || (singletonInstance != null
+              && singletonInstance.getServer().equals(serverInstance.getServer()))) {
             throw new IllegalArgumentException("Cannot issue query with stageParallelism > 1 for queries that "
                 + "use SINGLETON exchange. This is an internal limitation that is being worked on - reissue "
                 + "your query again without stageParallelism.");
@@ -114,10 +116,14 @@ public class MailboxSendOperator extends MultiStageOperator {
         }
       }
       Preconditions.checkNotNull(singletonInstance, "Unable to find receiving instance for singleton exchange");
-      receivingMailboxes = Collections.singletonList(mailboxIdGenerator.generate(singletonInstance));
+      receivingMailboxes = Collections.singletonList(mailboxIdGenerator.generate(new VirtualServerAddress(
+          singletonInstance.getHostname(), singletonInstance.getPort(), 0)));
     } else {
       receivingMailboxes = receivingStageInstances
           .stream()
+          .flatMap(receivingInstance -> receivingInstance.getPartitionIds().stream().map(partitionId ->
+              new VirtualServerAddress(receivingInstance.getHostname(), receivingInstance.getQueryMailboxPort(),
+                  partitionId)))
           .map(mailboxIdGenerator::generate)
           .collect(Collectors.toList());
     }
@@ -190,11 +196,12 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange.cancel(t);
   }
 
-  private static JsonMailboxIdentifier toMailboxId(
-      VirtualServer destination, long jobId, int senderStageId, int receiverStageId, VirtualServerAddress sender) {
+  private static JsonMailboxIdentifier toMailboxId(VirtualServerAddress receiver, long jobId,
+      int senderStageId, int receiverStageId, VirtualServerAddress sender) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, senderStageId),
         sender,
-        new VirtualServerAddress(destination), senderStageId, receiverStageId);
+        receiver,
+        senderStageId, receiverStageId);
   }
 }

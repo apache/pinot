@@ -199,10 +199,12 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int server2port = 456;
+    int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int mailboxPort = 789;
     Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
@@ -245,12 +247,14 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int server2port = 456;
+    int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int mailboxPort = server2port;
+    int mailboxPort = server2Port;
     Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
     Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
 
@@ -261,7 +265,7 @@ public class MailboxReceiveOperatorTest {
     VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
+        new VirtualServerAddress(serverHost, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
 
@@ -297,12 +301,14 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int server2port = 456;
+    int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int mailboxPort = server2port;
+    int mailboxPort = server2Port;
     Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
     Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
 
@@ -313,7 +319,7 @@ public class MailboxReceiveOperatorTest {
     VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
+        new VirtualServerAddress(serverHost, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     // Receive null mailbox during timeout.
@@ -350,12 +356,14 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int server2port = 456;
+    int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int mailboxPort = server2port;
+    int mailboxPort = server2Port;
     Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
     Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
 
@@ -366,7 +374,7 @@ public class MailboxReceiveOperatorTest {
     VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
+        new VirtualServerAddress(serverHost, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -402,12 +410,14 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int server2port = 456;
+    int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int mailboxPort = server2port;
+    int mailboxPort = server2Port;
     Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
     Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
 
@@ -418,7 +428,7 @@ public class MailboxReceiveOperatorTest {
     VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
+        new VirtualServerAddress(serverHost, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Object[] expRow = new Object[]{1, 1};
@@ -461,12 +471,14 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int server2port = 456;
+    int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
-    int mailboxPort = server2port;
+    int mailboxPort = server2Port;
     Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
     Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
 
@@ -477,7 +489,7 @@ public class MailboxReceiveOperatorTest {
     VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
+        new VirtualServerAddress(serverHost, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Exception e = new Exception("errorBlock");
@@ -515,11 +527,13 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(server1Host);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     String server2Host = "hash2";
     int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(server2Host);
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int jobId = 456;
     int stageId = 0;
@@ -575,11 +589,13 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(server1Host);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     String server2Host = "hash2";
     int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(server2Host);
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int jobId = 456;
     int stageId = 0;
@@ -636,11 +652,13 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(server1Host);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     String server2Host = "hash2";
     int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(server2Host);
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int jobId = 456;
     int stageId = 0;
@@ -698,11 +716,13 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(server1Host);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     String server2Host = "hash2";
     int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(server2Host);
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int jobId = 456;
     int stageId = 0;
@@ -757,11 +777,13 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(server1Host);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     String server2Host = "hash2";
     int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(server2Host);
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int jobId = 456;
     int stageId = 0;
@@ -812,11 +834,13 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(server1Host);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     String server2Host = "hash2";
     int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(server2Host);
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int jobId = 456;
     int stageId = 0;
@@ -893,11 +917,13 @@ public class MailboxReceiveOperatorTest {
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(server1Host);
     Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+    Mockito.when(_server1.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     String server2Host = "hash2";
     int server2Port = 456;
     Mockito.when(_server2.getHostname()).thenReturn(server2Host);
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
+    Mockito.when(_server2.getPartitionIds()).thenReturn(Collections.singletonList(0));
 
     int jobId = 456;
     int stageId = 0;

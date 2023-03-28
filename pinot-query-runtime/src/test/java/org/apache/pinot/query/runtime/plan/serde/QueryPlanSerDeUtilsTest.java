@@ -19,12 +19,11 @@
 
 package org.apache.pinot.query.runtime.plan.serde;
 
+import java.util.Arrays;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
 
 
 public class QueryPlanSerDeUtilsTest {
@@ -33,7 +32,7 @@ public class QueryPlanSerDeUtilsTest {
   public void shouldSerializeServer() {
     // Given:
     VirtualServer server = Mockito.mock(VirtualServer.class);
-    Mockito.when(server.getVirtualId()).thenReturn(1);
+    Mockito.when(server.getPartitionIds()).thenReturn(Arrays.asList(0, 1));
     Mockito.when(server.getHostname()).thenReturn("Server_192.987.1.123");
     Mockito.when(server.getPort()).thenReturn(80);
     Mockito.when(server.getGrpcPort()).thenReturn(10);
@@ -44,19 +43,19 @@ public class QueryPlanSerDeUtilsTest {
     String serialized = QueryPlanSerDeUtils.instanceToString(server);
 
     // Then:
-    Assert.assertEquals(serialized, "1@Server_192.987.1.123:80(10:20:30)");
+    Assert.assertEquals(serialized, "[0,1]@Server_192.987.1.123:80(10:20:30)");
   }
 
   @Test
   public void shouldDeserializeServerString() {
     // Given:
-    String serverString = "1@Server_192.987.1.123:80(10:20:30)";
+    String serverString = "[0,1]@Server_192.987.1.123:80(10:20:30)";
 
     // When:
     VirtualServer server = QueryPlanSerDeUtils.stringToInstance(serverString);
 
     // Then:
-    Assert.assertEquals(server.getVirtualId(), 1);
+    Assert.assertEquals(server.getPartitionIds(), Arrays.asList(0, 1));
     Assert.assertEquals(server.getHostname(), "Server_192.987.1.123");
     Assert.assertEquals(server.getPort(), 80);
     Assert.assertEquals(server.getGrpcPort(), 10);

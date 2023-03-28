@@ -19,10 +19,10 @@
 
 package org.apache.pinot.query.routing;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
@@ -36,18 +36,18 @@ import org.apache.pinot.core.transport.ServerInstance;
 public class VirtualServer {
 
   private final ServerInstance _server;
-  private final Set<Integer> _partitionIds;
+  private final List<Integer> _partitionIds;
 
   public VirtualServer(ServerInstance server, Collection<Integer> partitionIds) {
     _server = server;
-    _partitionIds = new HashSet<>(partitionIds);
+    _partitionIds = new ArrayList<>(partitionIds);
   }
 
   public ServerInstance getServer() {
     return _server;
   }
 
-  public Set<Integer> getPartitionIds() {
+  public List<Integer> getPartitionIds() {
     return _partitionIds;
   }
 
