@@ -56,9 +56,7 @@ import org.apache.pinot.spi.data.Schema;
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<H3IndexConfig> {
 
-  public static final H3IndexType INSTANCE = new H3IndexType();
-
-  private H3IndexType() {
+  protected H3IndexType() {
     super(StandardIndexes.H3_ID);
   }
 
@@ -100,18 +98,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
 
   @Override
   protected IndexReaderFactory<H3IndexReader> createReaderFactory() {
-    return new IndexReaderFactory.Default<H3IndexConfig, H3IndexReader>() {
-      @Override
-      protected IndexType<H3IndexConfig, H3IndexReader, ?> getIndexType() {
-        return H3IndexType.INSTANCE;
-      }
-
-      @Override
-      protected H3IndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-          H3IndexConfig indexConfig) {
-        return new ImmutableH3IndexReader(dataBuffer);
-      }
-    };
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
@@ -123,5 +110,24 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
+  }
+
+  public static class ReaderFactory extends IndexReaderFactory.Default<H3IndexConfig, H3IndexReader> {
+
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+
+    @Override
+    protected IndexType<H3IndexConfig, H3IndexReader, ?> getIndexType() {
+      return StandardIndexes.h3();
+    }
+
+    @Override
+    protected H3IndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        H3IndexConfig indexConfig) {
+      return new ImmutableH3IndexReader(dataBuffer);
+    }
   }
 }

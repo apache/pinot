@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -83,7 +82,7 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, StandardIndexes.forward());
     }
     if (invertedIndexFile != null) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, InvertedIndexType.INSTANCE);
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, StandardIndexes.inverted());
     }
     File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());

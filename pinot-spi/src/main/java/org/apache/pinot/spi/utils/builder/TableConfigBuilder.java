@@ -103,6 +103,10 @@ public class TableConfigBuilder {
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
+  private boolean _optimizeDictionaryForMetrics;
+  // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
+  // only when _optimizeDictionaryForMetrics is set to true.
+  private double _noDictionarySizeRatioThreshold;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -253,6 +257,16 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setInvertedIndexColumns(List<String> invertedIndexColumns) {
     _invertedIndexColumns = invertedIndexColumns;
+    return this;
+  }
+
+  public TableConfigBuilder setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
+    _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
+    return this;
+  }
+
+  public TableConfigBuilder setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {
+    _noDictionarySizeRatioThreshold = noDictionarySizeRatioThreshold;
     return this;
   }
 
@@ -444,6 +458,8 @@ public class TableConfigBuilder {
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
+    indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
+    indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

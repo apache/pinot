@@ -311,10 +311,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           continue;
         }
 
-        // Note that RAW columns cannot be sorted.
-        ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        Preconditions.checkState(!existingColMetadata.isSorted(), "Raw column=" + column + " cannot be sorted.");
-
         columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
       } else if (existingDictColumns.contains(column) && !newIsDict) {
         // Existing column has dictionary. New config for the column is RAW.
@@ -933,7 +929,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       SegmentDirectory.Writer segmentWriter, File indexDir)
       throws Exception {
     try (ForwardIndexReader<?> reader = ForwardIndexType.getReader(segmentWriter, existingColMetadata)) {
-      Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, existingColMetadata);
+      Dictionary dictionary = DictionaryIndexType.read(segmentWriter, existingColMetadata);
       IndexCreationContext.Builder builder =
           IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(existingColMetadata);
       builder.withDictionary(false);

@@ -46,7 +46,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private final int _numDocs;
 
   @SuppressWarnings("unchecked")
-  public BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
     _invertedIndexReader = (InvertedIndexReader<ImmutableRoaringBitmap>) dataSource.getInvertedIndex();
     _docIds = null;

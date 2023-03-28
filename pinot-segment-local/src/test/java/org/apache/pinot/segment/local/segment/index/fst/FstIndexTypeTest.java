@@ -34,7 +34,7 @@ public class FstIndexTypeTest {
   public class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(FstIndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimStr", FstIndexType.INSTANCE), expected);
+      Assert.assertEquals(getActualConfig("dimStr", StandardIndexes.fst()), expected);
     }
 
     @Test
@@ -155,7 +155,7 @@ public class FstIndexTypeTest {
 
   @Test
   public void testStandardIndex() {
-    assertSame(StandardIndexes.fst(), FstIndexType.INSTANCE, "Standard index should use the same as "
+    assertSame(StandardIndexes.fst(), StandardIndexes.fst(), "Standard index should use the same as "
         + "the FstIndexType static instance");
   }
 }

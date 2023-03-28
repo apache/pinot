@@ -25,8 +25,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class RangeIndexPlugin implements IndexPlugin<RangeIndexType> {
+  public static final RangeIndexType INSTANCE = new RangeIndexType();
+
   @Override
   public RangeIndexType getIndexType() {
-    return RangeIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

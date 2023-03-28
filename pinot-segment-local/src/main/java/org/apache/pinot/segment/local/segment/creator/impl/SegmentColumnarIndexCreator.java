@@ -34,10 +34,8 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.AbstractForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SameValueForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
-import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -91,7 +89,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   /**
    * Contains, indexed by column name, the creator associated with each index type.
    *
-   * Indexes that are {@link #skipIndexType(IndexType) skipped} are not included here.
+   * Indexes that {@link #hasSpecialLifecycle(IndexType) have a special lyfecycle} are not included here.
    */
   private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
@@ -130,7 +128,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       if (fieldSpec == null) {
         Preconditions.checkState(schema.hasColumn(columnName),
-            "Cannot create inverted index for column: %s because it is not in schema", columnName);
+            "Cannot create index for column: %s because it is not in schema", columnName);
       }
       if (fieldSpec.isVirtualColumn()) {
         LOGGER.warn("Ignoring index creation for virtual column " + columnName);
@@ -157,7 +155,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               || _config.isOptimizeDictionaryForMetrics() && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC)
           .onHeap(segmentCreationSpec.isOnHeap())
           .withForwardIndexDisabled(forwardIndexDisabled)
-          .withFixedLength(columnIndexCreationInfo.isFixedLength())
           .withTextCommitOnClose(true)
           .build();
 
@@ -169,14 +166,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // TODO: Dictionary creator holds all unique values on heap. Consider keeping dictionary instead of creator
         //       which uses off-heap memory.
 
-        DictionaryIndexType dictIdx = DictionaryIndexType.INSTANCE;
         // Index conf should be present if dictEnabledColumn is true. In case it doesn't, getConfig will throw an
         // exception
-        DictionaryIndexConfig dictConfig = config.getConfig(dictIdx);
+        DictionaryIndexConfig dictConfig = config.getConfig(StandardIndexes.dictionary());
         if (!dictConfig.isEnabled()) {
           throw new IllegalArgumentException("Dictionary index should be enabled");
         }
-        SegmentDictionaryCreator creator = dictIdx.createIndexCreator(context, dictConfig);
+        SegmentDictionaryCreator creator = new DictionaryIndexPlugin().getIndexType()
+            .createIndexCreator(context, dictConfig);
 
         try {
           creator.build(context.getSortedUniqueElementsArray());
@@ -192,19 +189,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
           Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
-        if (skipIndexType(index)) {
+        if (hasSpecialLifecycle(index)) {
           continue;
         }
-        if (config.getConfig(index).isEnabled()) {
-          tryCreateCreator(creatorsByIndex, index, context, config);
-        }
+        tryCreateIndexCreator(creatorsByIndex, index, context, config);
       }
       // TODO: Remove this when values stored as ForwardIndex stop depending on TextIndex config
       IndexCreator oldFwdCreator = creatorsByIndex.get(forwardIdx);
-      if (oldFwdCreator instanceof AbstractForwardIndexCreator) { // this implies that oldFwdCreator != null
+      if (oldFwdCreator instanceof ForwardIndexCreator) { // this implies that oldFwdCreator != null
         Object fakeForwardValue = calculateAlternativeValue(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
-          AbstractForwardIndexCreator castedOldFwdCreator = (AbstractForwardIndexCreator) oldFwdCreator;
+          ForwardIndexCreator castedOldFwdCreator = (ForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
               new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
           creatorsByIndex.put(forwardIdx, fakeValueFwdCreator);
@@ -244,7 +239,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * Returns true if the given index type has their own construction lifecycle and therefore should not be instantiated
    * in the general index loop and shouldn't be notified of each new column.
    */
-  private boolean skipIndexType(IndexType<?, ?, ?> indexType) {
+  private boolean hasSpecialLifecycle(IndexType<?, ?, ?> indexType) {
     return indexType == StandardIndexes.nullValueVector() || indexType == StandardIndexes.dictionary();
   }
 
@@ -254,12 +249,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * This code needs to be in a specific method instead of inlined in the main loop in order to be able to use the
    * limited generic capabilities of Java.
    */
-  private <C extends IndexConfig> void tryCreateCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
+  private <C extends IndexConfig> void tryCreateIndexCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
-    C declaration = fieldIndexConfigs.getConfig(index);
-    if (declaration.isEnabled() && index.shouldBeCreated(context, fieldIndexConfigs)) {
-      creatorsByIndex.put(index, index.createIndexCreator(context, declaration));
+    C config = fieldIndexConfigs.getConfig(index);
+    if (config.isEnabled()) {
+      creatorsByIndex.put(index, index.createIndexCreator(context, config));
     }
   }
 
@@ -342,15 +337,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
       String columnName = byColEntry.getKey();
-      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
-
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
       Object columnValueToIndex = row.getValue(columnName);
       if (columnValueToIndex == null) {
         throw new RuntimeException("Null value for column:" + columnName);
       }
+
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
+
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
       if (fieldSpec.isSingleValueField()) {
         indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
@@ -395,12 +391,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (dictEnabledColumn) {
       return null;
     }
-    TextIndexConfig textDeclaration = configs.getConfig(StandardIndexes.text());
-    if (!textDeclaration.isEnabled()) {
+    TextIndexConfig textConfig = configs.getConfig(StandardIndexes.text());
+    if (!textConfig.isEnabled()) {
       return null;
     }
 
-    Object alternativeValue = textDeclaration.getRawValueForTextIndex();
+    Object alternativeValue = textConfig.getRawValueForTextIndex();
 
     if (alternativeValue == null) {
       return null;

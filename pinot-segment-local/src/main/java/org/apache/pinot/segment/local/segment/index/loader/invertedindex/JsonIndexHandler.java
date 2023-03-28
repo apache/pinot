@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -28,7 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
-import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -156,7 +154,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
   }
 
   private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws IOException {
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
     IndexCreationContext context = IndexCreationContext.builder()
@@ -164,10 +162,10 @@ public class JsonIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, columnMetadata);
-        JsonIndexCreator jsonIndexCreator = JsonIndexType.INSTANCE.createIndexCreator(context, config)) {
+        Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata);
+        JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         int dictId = forwardIndexReader.getDictId(i, readerContext);
@@ -178,7 +176,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
   }
 
   private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws IOException {
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
     IndexCreationContext context = IndexCreationContext.builder()
@@ -186,9 +184,9 @@ public class JsonIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        JsonIndexCreator jsonIndexCreator = JsonIndexType.INSTANCE.createIndexCreator(context, config)) {
+        JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         jsonIndexCreator.add(forwardIndexReader.getString(i, readerContext));

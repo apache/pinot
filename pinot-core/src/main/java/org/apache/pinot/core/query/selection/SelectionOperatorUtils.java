@@ -43,7 +43,6 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -260,19 +259,6 @@ public class SelectionOperatorUtils {
 
   /**
    * Build a {@link DataTable} from a {@link Collection} of selection rows with {@link DataSchema}. (Server side)
-   * <p>The passed in data schema stored the column data type that can cover all actual data types for that column.
-   * <p>The actual data types for each column in rows can be different but must be compatible with each other.
-   * <p>Before write each row into the data table, first convert it to match the data types in data schema.
-   *
-   * TODO: Type compatibility is not supported for selection order-by because all segments on the same server shared the
-   *       same comparator. Another solution is to always use the table schema to execute the query (preferable because
-   *       type compatible checks are expensive).
-   *
-   * @param rows {@link Collection} of selection rows.
-   * @param dataSchema data schema.
-   * @param nullHandlingEnabled whether null handling is enabled.
-   * @return data table.
-   * @throws IOException
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
       boolean nullHandlingEnabled)
@@ -309,22 +295,22 @@ public class SelectionOperatorUtils {
         switch (storedColumnDataTypes[i]) {
           // Single-value column
           case INT:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).intValue());
+            dataTableBuilder.setColumn(i, (int) columnValue);
             break;
           case LONG:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).longValue());
+            dataTableBuilder.setColumn(i, (long) columnValue);
             break;
           case FLOAT:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).floatValue());
+            dataTableBuilder.setColumn(i, (float) columnValue);
             break;
           case DOUBLE:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
+            dataTableBuilder.setColumn(i, (double) columnValue);
             break;
           case BIG_DECIMAL:
             dataTableBuilder.setColumn(i, (BigDecimal) columnValue);
             break;
           case STRING:
-            dataTableBuilder.setColumn(i, ((String) columnValue));
+            dataTableBuilder.setColumn(i, (String) columnValue);
             break;
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
@@ -335,43 +321,13 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, (int[]) columnValue);
             break;
           case LONG_ARRAY:
-            // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
-            if (columnValue instanceof int[]) {
-              int[] ints = (int[]) columnValue;
-              int length = ints.length;
-              long[] longs = new long[length];
-              ArrayCopyUtils.copy(ints, longs, length);
-              dataTableBuilder.setColumn(i, longs);
-            } else {
-              dataTableBuilder.setColumn(i, (long[]) columnValue);
-            }
+            dataTableBuilder.setColumn(i, (long[]) columnValue);
             break;
           case FLOAT_ARRAY:
             dataTableBuilder.setColumn(i, (float[]) columnValue);
             break;
           case DOUBLE_ARRAY:
-            // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
-            if (columnValue instanceof int[]) {
-              int[] ints = (int[]) columnValue;
-              int length = ints.length;
-              double[] doubles = new double[length];
-              ArrayCopyUtils.copy(ints, doubles, length);
-              dataTableBuilder.setColumn(i, doubles);
-            } else if (columnValue instanceof long[]) {
-              long[] longs = (long[]) columnValue;
-              int length = longs.length;
-              double[] doubles = new double[length];
-              ArrayCopyUtils.copy(longs, doubles, length);
-              dataTableBuilder.setColumn(i, doubles);
-            } else if (columnValue instanceof float[]) {
-              float[] floats = (float[]) columnValue;
-              int length = floats.length;
-              double[] doubles = new double[length];
-              ArrayCopyUtils.copy(floats, doubles, length);
-              dataTableBuilder.setColumn(i, doubles);
-            } else {
-              dataTableBuilder.setColumn(i, (double[]) columnValue);
-            }
+            dataTableBuilder.setColumn(i, (double[]) columnValue);
             break;
           case STRING_ARRAY:
             dataTableBuilder.setColumn(i, (String[]) columnValue);
@@ -591,86 +547,6 @@ public class SelectionOperatorUtils {
       columnToIndexMap.put(columns[i], i);
     }
     return columnToIndexMap;
-  }
-
-  /**
-   * Helper method to get the type-compatible {@link Comparator} for selection rows. (Inter segment)
-   * <p>Type-compatible comparator allows compatible types to compare with each other.
-   *
-   * @return flexible {@link Comparator} for selection rows.
-   */
-  public static Comparator<Object[]> getTypeCompatibleComparator(List<OrderByExpressionContext> orderByExpressions,
-      DataSchema dataSchema, boolean isNullHandlingEnabled) {
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-
-    // Compare all single-value columns
-    int numOrderByExpressions = orderByExpressions.size();
-    List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      if (!columnDataTypes[i].isArray()) {
-        valueIndexList.add(i);
-      }
-    }
-
-    int numValuesToCompare = valueIndexList.size();
-    int[] valueIndices = new int[numValuesToCompare];
-    boolean[] useDoubleComparison = new boolean[numValuesToCompare];
-    // Use multiplier -1 or 1 to control ascending/descending order
-    int[] multipliers = new int[numValuesToCompare];
-    for (int i = 0; i < numValuesToCompare; i++) {
-      int valueIndex = valueIndexList.get(i);
-      valueIndices[i] = valueIndex;
-      if (columnDataTypes[valueIndex].isNumber()) {
-        useDoubleComparison[i] = true;
-      }
-      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
-    }
-
-    if (isNullHandlingEnabled) {
-      return (o1, o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-          Object v1 = o1[index];
-          Object v2 = o2[index];
-          if (v1 == null) {
-            // The default null ordering is: 'NULLS LAST'.
-            return v2 == null ? 0 : -multipliers[i];
-          } else if (v2 == null) {
-            return multipliers[i];
-          }
-          int result;
-          if (useDoubleComparison[i]) {
-            result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-          } else {
-            //noinspection unchecked
-            result = ((Comparable) v1).compareTo(v2);
-          }
-          if (result != 0) {
-            return result * multipliers[i];
-          }
-        }
-        return 0;
-      };
-    } else {
-      return (o1, o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-          Object v1 = o1[index];
-          Object v2 = o2[index];
-          int result;
-          if (useDoubleComparison[i]) {
-            result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-          } else {
-            //noinspection unchecked
-            result = ((Comparable) v1).compareTo(v2);
-          }
-          if (result != 0) {
-            return result * multipliers[i];
-          }
-        }
-        return 0;
-      };
-    }
   }
 
   /**

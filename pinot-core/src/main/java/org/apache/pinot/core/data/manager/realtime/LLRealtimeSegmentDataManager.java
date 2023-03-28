@@ -1238,7 +1238,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  public void destroy() {
+  protected void doDestroy() {
     try {
       stop();
     } catch (InterruptedException e) {

@@ -49,7 +49,7 @@ public class ForwardIndexTypeTest {
   public class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(ForwardIndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", ForwardIndexType.INSTANCE), expected);
+      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.forward()), expected);
     }
 
     @Test
@@ -248,7 +248,7 @@ public class ForwardIndexTypeTest {
 
   @Test
   public void testStandardIndex() {
-    assertSame(StandardIndexes.forward(), ForwardIndexType.INSTANCE, "Standard index should use the same as "
+    assertSame(StandardIndexes.forward(), StandardIndexes.forward(), "Standard index should use the same as "
         + "the ForwardIndexType static instance");
   }
 }

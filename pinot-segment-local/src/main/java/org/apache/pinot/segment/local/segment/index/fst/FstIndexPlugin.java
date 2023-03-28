@@ -25,8 +25,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class FstIndexPlugin implements IndexPlugin<FstIndexType> {
+  private static final FstIndexType INSTANCE = new FstIndexType();
+
   @Override
   public FstIndexType getIndexType() {
-    return FstIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

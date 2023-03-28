@@ -20,15 +20,12 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
-import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -156,20 +153,24 @@ public class H3IndexHandler extends BaseIndexHandler {
   }
 
   private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws IOException {
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
+
+    FieldIndexConfigs colIndexConf = _fieldIndexConfigs.get(columnName);
 
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .build();
-    H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3());
+    H3IndexConfig config = colIndexConf.getConfig(StandardIndexes.h3());
 
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = StandardIndexes.forward().getReaderFactory()
+        .createIndexReader(segmentWriter, colIndexConf, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, columnMetadata);
-        GeoSpatialIndexCreator h3IndexCreator = H3IndexType.INSTANCE.createIndexCreator(context, config)) {
+        Dictionary dictionary = StandardIndexes.dictionary().getReaderFactory()
+            .createIndexReader(segmentWriter, colIndexConf, columnMetadata);
+        GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         int dictId = forwardIndexReader.getDictId(i, readerContext);

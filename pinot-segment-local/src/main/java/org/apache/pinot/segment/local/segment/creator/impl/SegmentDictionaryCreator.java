@@ -45,7 +45,16 @@ import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-
+/**
+ * The IndexCreator for dictionaries.
+ *
+ * Although this class implements {@link IndexCreator}, it is not intended to be used as a normal IndexCreator.
+ * Specifically, neither {@link #add(Object, int)} or {@link #add(Object[], int[])} should be called on this object.
+ * In order to make sure these methods are not being called, they throw exceptions in this class.
+ *
+ * This requirement is a corollary from the fact that the {@link IndexCreator} contract assumes the dictionary id can be
+ * calculated before calling {@code add} methods.
+ */
 public class SegmentDictionaryCreator implements IndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
 
@@ -64,19 +73,19 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary) {
     _columnName = fieldSpec.getName();
     _storedType = fieldSpec.getDataType().getStoredType();
-    _dictionaryFile = new File(indexDir, _columnName + DictionaryIndexType.INSTANCE.getFileExtension());
+    _dictionaryFile = new File(indexDir, _columnName + DictionaryIndexType.getFileExtension());
     _useVarLengthDictionary = useVarLengthDictionary;
   }
   @Override
   public void add(@Nonnull Object value, int dictId)
       throws IOException {
-    throw new UnsupportedOperationException("Dictionary indexes should not be build as a normal index");
+    throw new UnsupportedOperationException("Dictionaries should not be build as a normal index");
   }
 
   @Override
   public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
       throws IOException {
-    throw new UnsupportedOperationException("Dictionary indexes should not be build as a normal index");
+    throw new UnsupportedOperationException("Dictionaries should not be build as a normal index");
   }
 
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir) {

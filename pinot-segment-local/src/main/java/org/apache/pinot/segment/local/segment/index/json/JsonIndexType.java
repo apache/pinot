@@ -53,9 +53,8 @@ import org.apache.pinot.spi.data.Schema;
 
 public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<JsonIndexConfig> {
-  public static final JsonIndexType INSTANCE = new JsonIndexType();
 
-  private JsonIndexType() {
+  protected JsonIndexType() {
     super(StandardIndexes.JSON_ID);
   }
 
@@ -103,7 +102,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
   @Override
   protected IndexReaderFactory<JsonIndexReader> createReaderFactory() {
-    return new ReaderFactory();
+    return ReaderFactory.INSTANCE;
   }
 
   public static JsonIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata)
@@ -123,9 +122,14 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<JsonIndexConfig, JsonIndexReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+
     @Override
     protected IndexType<JsonIndexConfig, JsonIndexReader, ?> getIndexType() {
-      return JsonIndexType.INSTANCE;
+      return StandardIndexes.json();
     }
 
     @Override
@@ -138,11 +142,11 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
     public static JsonIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
         throws IndexReaderConstraintException {
       if (!metadata.getFieldSpec().isSingleValueField()) {
-        throw new IndexReaderConstraintException(metadata.getColumnName(), JsonIndexType.INSTANCE,
+        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.json(),
             "Json index is currently only supported on single-value columns");
       }
       if (metadata.getFieldSpec().getDataType().getStoredType() != FieldSpec.DataType.STRING) {
-        throw new IndexReaderConstraintException(metadata.getColumnName(), JsonIndexType.INSTANCE,
+        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.json(),
             "Json index is currently only supported on STRING columns");
       }
       return new ImmutableJsonIndexReader(dataBuffer, metadata.getTotalDocs());

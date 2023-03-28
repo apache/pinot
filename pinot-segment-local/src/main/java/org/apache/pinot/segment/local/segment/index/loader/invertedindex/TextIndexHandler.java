@@ -188,7 +188,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         .build();
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         TextIndexCreator textIndexCreator = StandardIndexes.text().createIndexCreator(context, config)) {
       if (columnMetadata.isSingleValue()) {
@@ -217,7 +217,7 @@ public class TextIndexHandler extends BaseIndexHandler {
       // text index on dictionary encoded SV column
       // read forward index to get dictId
       // read the raw value from dictionary using dictId
-      try (Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, columnMetadata)) {
+      try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
         for (int docId = 0; docId < numDocs; docId++) {
           int dictId = forwardIndexReader.getDictId(docId, readerContext);
           textIndexCreator.add(dictionary.getStringValue(dictId));
@@ -241,7 +241,7 @@ public class TextIndexHandler extends BaseIndexHandler {
       // text index on dictionary encoded MV column
       // read forward index to get dictId
       // read the raw value from dictionary using dictId
-      try (Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, columnMetadata)) {
+      try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
         int maxNumEntries = columnMetadata.getMaxNumberOfMultiValues();
         int[] dictIdBuffer = new int[maxNumEntries];
         String[] valueBuffer = new String[maxNumEntries];

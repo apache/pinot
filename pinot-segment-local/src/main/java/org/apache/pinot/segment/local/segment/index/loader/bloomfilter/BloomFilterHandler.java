@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.bloom.BloomIndexType;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -119,7 +118,8 @@ public class BloomFilterHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .build();
-    try (BloomFilterCreator bloomFilterCreator = BloomIndexType.INSTANCE.createIndexCreator(context, bloomFilterConfig);
+    try (BloomFilterCreator bloomFilterCreator =
+        StandardIndexes.bloomFilter().createIndexCreator(context, bloomFilterConfig);
         Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
       int length = dictionary.length();
       for (int i = 0; i < length; i++) {
@@ -300,7 +300,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       case STRING:
       case BYTES:
         PinotDataBuffer buf = segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
-        return DictionaryIndexType.INSTANCE.read(buf, columnMetadata, new DictionaryIndexConfig(false, true));
+        return DictionaryIndexType.read(buf, columnMetadata, new DictionaryIndexConfig(false, true));
       default:
         throw new IllegalStateException(
             "Unsupported data type: " + dataType + " for column: " + columnMetadata.getColumnName());

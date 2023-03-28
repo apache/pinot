@@ -25,6 +25,7 @@ import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWrit
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -33,7 +34,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * data type (STRING,
  * BYTES).
  */
-public class MultiValueVarByteRawIndexCreator extends AbstractForwardIndexCreator {
+public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
 
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 

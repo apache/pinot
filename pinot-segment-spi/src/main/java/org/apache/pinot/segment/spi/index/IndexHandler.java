@@ -45,4 +45,24 @@ public interface IndexHandler {
    */
   void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
     throws Exception;
+
+  public static class NoOp implements IndexHandler {
+    public static final NoOp INSTANCE = new NoOp();
+
+    private NoOp() {
+    }
+
+    @Override
+    public void updateIndices(SegmentDirectory.Writer segmentWriter) {
+    }
+
+    @Override
+    public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+      return false;
+    }
+
+    @Override
+    public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter) {
+    }
+  }
 }

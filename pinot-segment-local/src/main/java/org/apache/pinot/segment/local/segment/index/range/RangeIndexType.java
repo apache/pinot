@@ -65,9 +65,8 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
    * This value should be equal to the one used in {@link org.apache.pinot.spi.config.table.IndexingConfig}
    */
   public static final int DEFAULT_RANGE_INDEX_VERSION = 2;
-  public static final RangeIndexType INSTANCE = new RangeIndexType();
 
-  RangeIndexType() {
+  protected RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
   }
 
@@ -131,7 +130,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
 
   @Override
   protected IndexReaderFactory<RangeIndexReader> createReaderFactory() {
-    return new ReaderFactory();
+    return ReaderFactory.INSTANCE;
   }
 
   public static RangeIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
@@ -151,9 +150,15 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<RangeIndexConfig, RangeIndexReader> {
+
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+
     @Override
     protected IndexType<RangeIndexConfig, RangeIndexReader, ?> getIndexType() {
-      return RangeIndexType.INSTANCE;
+      return StandardIndexes.range();
     }
 
     @Override
@@ -171,7 +176,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
       } else if (version == BitSlicedRangeIndexCreator.VERSION) {
         return new BitSlicedRangeIndexReader(dataBuffer, metadata);
       }
-      throw new IndexReaderConstraintException(metadata.getColumnName(), RangeIndexType.INSTANCE,
+      throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.range(),
           "Unknown range index version " + version);
     }
   }

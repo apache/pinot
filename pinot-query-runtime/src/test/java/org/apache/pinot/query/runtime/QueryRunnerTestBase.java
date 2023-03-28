@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -59,6 +61,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.h2.jdbc.JdbcArray;
 import org.testng.Assert;
 
 
@@ -156,15 +159,27 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       } else if (l instanceof Long) {
         return Long.compare((Long) l, ((Number) r).longValue());
       } else if (l instanceof Float) {
-        if (DoubleMath.fuzzyEquals((Float) l, ((Number) r).floatValue(), DOUBLE_CMP_EPSILON)) {
+        float lf = (Float) l;
+        float rf = ((Number) r).floatValue();
+        if (DoubleMath.fuzzyEquals(lf, rf, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Float.compare((Float) l, ((Number) r).floatValue());
+        float maxf = Math.max(Math.abs(lf), Math.abs(rf));
+        if (DoubleMath.fuzzyEquals(lf / maxf, rf / maxf, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Float.compare(lf, rf);
       } else if (l instanceof Double) {
-        if (DoubleMath.fuzzyEquals((Double) l, ((Number) r).doubleValue(), DOUBLE_CMP_EPSILON)) {
+        double ld = (Double) l;
+        double rd = ((Number) r).doubleValue();
+        if (DoubleMath.fuzzyEquals(ld, rd, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Double.compare((Double) l, ((Number) r).doubleValue());
+        double maxd = Math.max(Math.abs(ld), Math.abs(rd));
+        if (DoubleMath.fuzzyEquals(ld / maxd, rd / maxd, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Double.compare(ld, rd);
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {
@@ -179,6 +194,35 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return ((ByteArray) l).compareTo(new ByteArray((byte[]) r));
       } else if (l instanceof Timestamp) {
         return ((Timestamp) l).compareTo((Timestamp) r);
+      } else if (l instanceof int[]) {
+        int[] larray = (int[]) l;
+        Object[] rarray;
+        try {
+          rarray = (Object[]) ((JdbcArray) r).getArray();
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+        for (int idx = 0; idx < larray.length; idx++) {
+          Number relement = (Number) rarray[idx];
+          if (larray[idx] != relement.intValue()) {
+            return -1;
+          }
+        }
+        return 0;
+      } else if (l instanceof String[]) {
+        String[] larray = (String[]) l;
+        Object[] rarray;
+        try {
+          rarray = (Object[]) ((JdbcArray) r).getArray();
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+        for (int idx = 0; idx < larray.length; idx++) {
+          if (!larray[idx].equals(rarray[idx])) {
+            return -1;
+          }
+        }
+        return 0;
       } else {
         throw new RuntimeException("non supported type " + l.getClass());
       }
@@ -217,7 +261,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected Schema constructSchema(String schemaName, List<QueryTestCase.ColumnAndType> columnAndTypes) {
     Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
     for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
-      builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      if (columnAndType._isSingleValue) {
+        builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      } else {
+        builder.addMultiValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      }
     }
     // TODO: ts is built-in, but we should allow user overwrite
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
@@ -269,7 +317,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void addDataToH2(String tableName, Schema schema, List<GenericRow> rows)
-      throws SQLException {
+      throws SQLException, DecoderException {
     if (rows != null && rows.size() > 0) {
       // prepare the statement for ingestion
       List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
@@ -278,14 +326,27 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         params.append(",?");
       }
       PreparedStatement h2Statement =
-          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
+          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
 
       // insert data into table
       for (GenericRow row : rows) {
         int h2Index = 1;
         for (String fieldName : schema.getColumnNames()) {
           Object value = row.getValue(fieldName);
-          h2Statement.setObject(h2Index++, value);
+          if (value instanceof List) {
+            h2Statement.setArray(h2Index++,
+                _h2Connection.createArrayOf(getH2FieldType(schema.getFieldSpecFor(fieldName).getDataType()),
+                    ((List) value).toArray()));
+          } else {
+            switch (schema.getFieldSpecFor(fieldName).getDataType()) {
+              case BYTES:
+                h2Statement.setBytes(h2Index++, Hex.decodeHex((String) value));
+                break;
+              default:
+                h2Statement.setObject(h2Index++, value);
+                break;
+            }
+          }
         }
         h2Statement.execute();
       }
@@ -296,39 +357,37 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     List<String> fieldNamesAndTypes = new ArrayList<>(pinotSchema.size());
     for (String fieldName : pinotSchema.getColumnNames()) {
       FieldSpec.DataType dataType = pinotSchema.getFieldSpecFor(fieldName).getDataType();
-      String fieldType;
-      switch (dataType) {
-        case INT:
-        case LONG:
-          fieldType = "bigint";
-          break;
-        case STRING:
-          fieldType = "varchar(128)";
-          break;
-        case FLOAT:
-          fieldType = "real";
-          break;
-        case DOUBLE:
-          fieldType = "double";
-          break;
-        case BOOLEAN:
-          fieldType = "BOOLEAN";
-          break;
-        case BIG_DECIMAL:
-          fieldType = "NUMERIC";
-          break;
-        case BYTES:
-          fieldType = "BYTEA";
-          break;
-        case TIMESTAMP:
-          fieldType = "TIMESTAMP";
-          break;
-        default:
-          throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
+      String fieldType = getH2FieldType(dataType);
+      if (!pinotSchema.getFieldSpecFor(fieldName).isSingleValueField()) {
+        fieldType += " ARRAY";
       }
       fieldNamesAndTypes.add(fieldName + " " + fieldType);
     }
     return fieldNamesAndTypes;
+  }
+
+  private static String getH2FieldType(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT:
+      case LONG:
+        return "bigint";
+      case STRING:
+        return "varchar(128)";
+      case FLOAT:
+        return "real";
+      case DOUBLE:
+        return "double";
+      case BOOLEAN:
+        return "BOOLEAN";
+      case BIG_DECIMAL:
+        return "NUMERIC(1200, 600)";
+      case BYTES:
+        return "BYTEA";
+      case TIMESTAMP:
+        return "TIMESTAMP";
+      default:
+        throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
+    }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -362,6 +421,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _ignored;
       @JsonProperty("sql")
       public String _sql;
+      @JsonProperty("h2Sql")
+      public String _h2Sql;
       @JsonProperty("description")
       public String _description;
       @JsonProperty("outputs")
@@ -377,6 +438,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       String _name;
       @JsonProperty("type")
       String _type;
+      @JsonProperty("isSingleValue")
+      boolean _isSingleValue = true;
     }
   }
 }

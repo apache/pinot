@@ -57,7 +57,7 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
         "The first argument must be of type BYTES , but was %s", transformFunction.getResultMetadata().getDataType());
     if (transformFunction instanceof LiteralTransformFunction) {
       _firstLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
+          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getStringLiteral()));
     } else {
       _firstArgument = transformFunction;
     }
@@ -69,7 +69,7 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
         "The second argument must be of type BYTES , but was %s", transformFunction.getResultMetadata().getDataType());
     if (transformFunction instanceof LiteralTransformFunction) {
       _secondLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
+          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getStringLiteral()));
     } else {
       _secondArgument = transformFunction;
     }

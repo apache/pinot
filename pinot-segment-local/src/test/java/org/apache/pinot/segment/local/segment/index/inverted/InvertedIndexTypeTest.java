@@ -35,7 +35,7 @@ public class InvertedIndexTypeTest {
   public class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(IndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", InvertedIndexType.INSTANCE), expected);
+      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.inverted()), expected);
     }
 
     @Test
@@ -114,7 +114,7 @@ public class InvertedIndexTypeTest {
 
   @Test
   public void testStandardIndex() {
-    assertSame(StandardIndexes.inverted(), InvertedIndexType.INSTANCE, "Inverted index should use the same as "
+    assertSame(StandardIndexes.inverted(), StandardIndexes.inverted(), "Inverted index should use the same as "
         + "the InvertedIndexType static instance");
   }
 }

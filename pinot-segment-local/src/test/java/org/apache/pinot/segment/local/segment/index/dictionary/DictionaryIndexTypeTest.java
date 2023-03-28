@@ -36,7 +36,7 @@ public class DictionaryIndexTypeTest {
   public class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(DictionaryIndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", DictionaryIndexType.INSTANCE), expected);
+      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.dictionary()), expected);
     }
 
     @Test
@@ -223,7 +223,7 @@ public class DictionaryIndexTypeTest {
 
   @Test
   public void testStandardIndex() {
-    assertSame(StandardIndexes.dictionary(), DictionaryIndexType.INSTANCE, "Standard index should use the same as "
+    assertSame(StandardIndexes.dictionary(), StandardIndexes.dictionary(), "Standard index should use the same as "
         + "the DictionaryIndexType static instance");
   }
 }

@@ -117,6 +117,7 @@ public interface IndexCreationContext {
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
           .withSortedUniqueElementsArray(columnIndexCreationInfo.getSortedUniqueElementsArray())
           .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
+          .withFixedLength(columnIndexCreationInfo.isFixedLength())
           .sorted(columnIndexCreationInfo.isSorted());
     }
 

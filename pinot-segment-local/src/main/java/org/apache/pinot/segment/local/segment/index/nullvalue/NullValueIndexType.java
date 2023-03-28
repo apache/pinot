@@ -45,9 +45,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
 
-  public static final NullValueIndexType INSTANCE = new NullValueIndexType();
-
-  private NullValueIndexType() {
+  protected NullValueIndexType() {
     super(StandardIndexes.NULL_VALUE_VECTOR_ID);
   }
 
@@ -85,44 +83,39 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   protected IndexReaderFactory<NullValueVectorReader> createReaderFactory() {
-    return new IndexReaderFactory<NullValueVectorReader>() {
-      @Nullable
-      @Override
-      public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
-          FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
-          throws IOException {
-        // For historical and test reasons, NullValueIndexType doesn't really care about its config
-        // if there is a buffer for this index, it is read even if the config explicitly ask to disable it.
-        if (!segmentReader.hasIndexFor(metadata.getColumnName(), NullValueIndexType.INSTANCE)) {
-          return null;
-        }
-        PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), NullValueIndexType.INSTANCE);
-        return new NullValueVectorReaderImpl(buffer);
-      }
-    };
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new IndexHandler() {
-      @Override
-      public void updateIndices(SegmentDirectory.Writer segmentWriter) {
-      }
-
-      @Override
-      public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
-        return false;
-      }
-
-      @Override
-      public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter) {
-      }
-    };
+    return IndexHandler.NoOp.INSTANCE;
   }
 
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
+  }
+
+  public static class ReaderFactory implements IndexReaderFactory<NullValueVectorReader> {
+
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+
+    @Nullable
+    @Override
+    public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+          throws IOException {
+      // For historical and test reasons, NullValueIndexType doesn't really care about its config
+      // if there is a buffer for this index, it is read even if the config explicitly ask to disable it.
+      if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector())) {
+        return null;
+      }
+      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector());
+      return new NullValueVectorReaderImpl(buffer);
+    }
   }
 }

@@ -16,16 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.common.utils.request;
 
-package org.apache.pinot.segment.local.segment.creator.impl.fwd;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
-import java.io.IOException;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 
-
-public abstract class AbstractForwardIndexCreator implements ForwardIndexCreator {
-  @Override
-  public void seal()
-      throws IOException {
+public class RequestUtilsTest {
+  @Test
+  public void testNullLiteralParsing() {
+    SqlLiteral nullLiteral = SqlLiteral.createNull(SqlParserPos.ZERO);
+    Expression nullExpr = RequestUtils.getLiteralExpression(nullLiteral);
+    Assert.assertEquals(nullExpr.getType(), ExpressionType.LITERAL);
+    Assert.assertEquals(nullExpr.getLiteral().getNullValue(), true);
   }
 }

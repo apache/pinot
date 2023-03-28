@@ -1556,7 +1556,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexReader3.close();
   }
 
-  //@Test
+  @Test
   public void testMultiThreadedLuceneRealtime()
       throws Exception {
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");

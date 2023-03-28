@@ -20,14 +20,12 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
@@ -154,7 +152,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
   }
 
   private void createFSTIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws IOException {
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
@@ -177,8 +175,8 @@ public class FSTIndexHandler extends BaseIndexHandler {
         .build();
     FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.fst());
 
-    try (TextIndexCreator fstIndexCreator = FstIndexType.INSTANCE.createIndexCreator(context, config);
-        Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, columnMetadata)) {
+    try (TextIndexCreator fstIndexCreator = StandardIndexes.fst().createIndexCreator(context, config);
+        Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
         fstIndexCreator.add(dictionary.getStringValue(dictId));
       }

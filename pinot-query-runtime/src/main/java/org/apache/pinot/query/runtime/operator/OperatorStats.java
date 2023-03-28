@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
@@ -42,6 +43,7 @@ public class OperatorStats {
   private int _numRows = 0;
   private long _startTimeMs = -1;
   private final Map<String, String> _executionStats;
+  private boolean _processingStarted = false;
 
   public OperatorStats(OpChainExecutionContext context, String operatorType) {
     this(context.getRequestId(), context.getStageId(), context.getServer(), operatorType);
@@ -63,9 +65,15 @@ public class OperatorStats {
     }
   }
 
-  public void endTimer() {
+  public void endTimer(TransferableBlock block) {
     if (_executeStopwatch.isRunning()) {
       _executeStopwatch.stop();
+    }
+    if (!_processingStarted && block.isNoOpBlock()) {
+      _startTimeMs = -1;
+      _executeStopwatch.reset();
+    } else {
+      _processingStarted = true;
     }
   }
 

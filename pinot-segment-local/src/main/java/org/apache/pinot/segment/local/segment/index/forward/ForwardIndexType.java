@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -56,9 +57,7 @@ public class ForwardIndexType
     extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
 
-  public static final ForwardIndexType INSTANCE = new ForwardIndexType();
-
-  private ForwardIndexType() {
+  protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
   }
 
@@ -193,6 +192,12 @@ public class ForwardIndexType
     return ForwardIndexReaderFactory.INSTANCE;
   }
 
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+      ColumnMetadata metadata)
+      throws IndexReaderConstraintException, IOException {
+    return StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);
+  }
+
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     if (columnMetadata.isSingleValue()) {
@@ -216,17 +221,17 @@ public class ForwardIndexType
   public static ForwardIndexReader<?> getReader(SegmentDirectory.Reader segmentReader,
       ColumnMetadata columnMetadata)
       throws IOException {
-    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), INSTANCE);
-    return INSTANCE.read(dataBuffer, columnMetadata);
+    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
+    return read(dataBuffer, columnMetadata);
   }
 
-  public ForwardIndexReader read(SegmentDirectory.Reader directory, ColumnMetadata metadata)
+  public static ForwardIndexReader read(SegmentDirectory.Reader directory, ColumnMetadata metadata)
       throws IOException {
-    PinotDataBuffer buffer = directory.getIndexFor(metadata.getColumnName(), this);
+    PinotDataBuffer buffer = directory.getIndexFor(metadata.getColumnName(), StandardIndexes.forward());
     return ForwardIndexReaderFactory.createIndexReader(buffer, metadata);
   }
 
-  public ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
+  public static ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     return ForwardIndexReaderFactory.createIndexReader(dataBuffer, metadata);
   }
 }

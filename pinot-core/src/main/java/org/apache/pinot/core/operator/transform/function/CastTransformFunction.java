@@ -54,7 +54,7 @@ public class CastTransformFunction extends BaseTransformFunction {
     boolean sourceSV = sourceMetadata.isSingleValue();
     TransformFunction castFormatTransformFunction = arguments.get(1);
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
-      String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getLiteral().toUpperCase();
+      String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getStringLiteral().toUpperCase();
       switch (targetType) {
         case "INT":
         case "INTEGER":
