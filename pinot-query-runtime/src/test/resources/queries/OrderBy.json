@@ -165,7 +165,7 @@
     "tables": {
       "l": {
         "schema": [
-          {"name": "key", "type": "STRING"},
+          {"name": "lkey", "type": "STRING"},
           {"name": "lval", "type": "INT"}
         ],
         "inputs": [
@@ -179,7 +179,7 @@
       },
       "r": {
         "schema": [
-          {"name": "key", "type": "STRING"},
+          {"name": "rkey", "type": "STRING"},
           {"name": "rval", "type": "INT"}
         ],
         "inputs": [
@@ -194,25 +194,25 @@
     },
     "queries": [
       {
-        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY lval, rval LIMIT 2 OFFSET 1",
+        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY lval, rval LIMIT 2 OFFSET 1",
         "keepOutputRowOrder": true
       },
       {
-        "sql": "SELECT lval FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY lval, rval LIMIT 2 OFFSET 1",
+        "sql": "SELECT lval FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY lval, rval LIMIT 2 OFFSET 1",
         "keepOutputRowOrder": true
       },
       {
-        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY {l}.key",
+        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY {l}.lkey",
         "keepOutputRowOrder": false,
-        "comments": "TODO: Setting 'keepOutputRowOrder' fails in this test, look into why. Most likely due to multiple rows for each ORDER BY {l}.key"
+        "comments": "TODO: Setting 'keepOutputRowOrder' fails in this test, look into why. Most likely due to multiple rows for each ORDER BY {l}.lkey"
       },
       {
-        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY {r}.key",
+        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY {r}.rkey",
         "keepOutputRowOrder": false,
-        "comments": "TODO: Setting 'keepOutputRowOrder' fails in this test, look into why. Most likely due to multiple rows for each ORDER BY {r}.key"
+        "comments": "TODO: Setting 'keepOutputRowOrder' fails in this test, look into why. Most likely due to multiple rows for each ORDER BY {r}.rkey"
       },
       {
-        "sql": "SELECT {l}.key, SUM(lval), SUM(rval) FROM {l} JOIN {r} ON {l}.key = {r}.key GROUP BY {l}.key ORDER BY {l}.key",
+        "sql": "SELECT {l}.lkey, SUM(lval), SUM(rval) FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey GROUP BY {l}.lkey ORDER BY {l}.lkey",
         "keepOutputRowOrder": true
       }
     ]

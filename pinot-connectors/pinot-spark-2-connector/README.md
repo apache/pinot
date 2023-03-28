@@ -28,12 +28,14 @@ Detailed read model documentation is here; [Spark-Pinot Connector Read Model](do
 ## Features
 - Query realtime, offline or hybrid tables
 - Distributed, parallel scan
+- Streaming reads using gRPC (optional)
 - SQL support instead of PQL
 - Column and filter push down to optimize performance
 - Overlap between realtime and offline segments is queried exactly once for hybrid tables
 - Schema discovery 
   - Dynamic inference
   - Static analysis of case class
+- Supports query options
 
 ## Quick Start
 ```scala

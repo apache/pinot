@@ -54,7 +54,8 @@ class PinotScanBuilder(readParameters: PinotDataSourceReadOptions)
       readParameters.tableType,
       timeBoundaryInfo,
       currentSchema.fieldNames,
-      whereCondition
+      whereCondition,
+      readParameters.queryOptions
     )
 
     new PinotScan(scanQuery, currentSchema, readParameters)

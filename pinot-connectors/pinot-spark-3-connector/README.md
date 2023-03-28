@@ -35,6 +35,7 @@ Detailed read model documentation is here; [Spark-Pinot Connector Read Model](do
 - Schema discovery 
   - Dynamic inference
   - Static analysis of case class
+- Supports query options
 
 ## Quick Start
 ```scala

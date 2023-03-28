@@ -3,7 +3,7 @@
     "tables": {
       "l": {
         "schema": [
-          {"name": "key", "type": "STRING"},
+          {"name": "lkey", "type": "STRING"},
           {"name": "lval", "type": "INT"}
         ],
         "inputs": [
@@ -17,7 +17,7 @@
       },
       "r": {
         "schema": [
-          {"name": "key", "type": "STRING"},
+          {"name": "rkey", "type": "STRING"},
           {"name": "rval", "type": "INT"}
         ],
         "inputs": [
@@ -33,9 +33,9 @@
     "queries": [
       {"sql": "SET stageParallelism=2; SELECT * FROM {l} WHERE lval > 3"},
       {"sql": "SET stageParallelism=2; SELECT * FROM {l} WHERE lval > 3 ORDER BY lval LIMIT 1"},
-      {"sql": "SET stageParallelism=2; SELECT key, SUM(lval) FROM {l} GROUP BY key"},
-      {"sql": "SET stageParallelism=2; SELECT {l}.key, {l}.lval, {r}.rval FROM {l} JOIN {r} ON {l}.key = {r}.key"},
-      {"sql": "SET stageParallelism=2; SELECT {l}.key, SUM({l}.lval + {r}.rval) FROM {l} JOIN {r} ON {l}.key = {r}.key GROUP BY {l}.key"},
+      {"sql": "SET stageParallelism=2; SELECT lkey, SUM(lval) FROM {l} GROUP BY lkey"},
+      {"sql": "SET stageParallelism=2; SELECT {l}.lkey, {l}.lval, {r}.rval FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey"},
+      {"sql": "SET stageParallelism=2; SELECT {l}.lkey, SUM({l}.lval + {r}.rval) FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey GROUP BY {l}.lkey"},
       {"sql": "SET stageParallelism=2; SELECT * FROM {l} WHERE lval NOT IN (SELECT rval FROM {r} WHERE rval > 2)"},
       {"sql": "SET stageParallelism=2; SELECT * FROM {l}, {r}"}
     ]

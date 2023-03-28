@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilt
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,9 +48,19 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
 
   private final File _bloomFilterFile;
   private final BloomFilter<String> _bloomFilter;
+  private final FieldSpec.DataType _dataType;
 
+  // TODO: This method is here for compatibility reasons, should be removed in future PRs
+  //  exit_criteria: Not needed in Apache Pinot once #10184 is merged
+  @Deprecated
   public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
       BloomFilterConfig bloomFilterConfig) {
+    this(indexDir, columnName, cardinality, bloomFilterConfig, null);
+  }
+
+  public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
+      BloomFilterConfig bloomFilterConfig, FieldSpec.DataType dataType) {
+    _dataType = dataType;
     _bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
     // Calculate the actual fpp with regards to the max size for the bloom filter
     double fpp = bloomFilterConfig.getFpp();
@@ -60,6 +71,11 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
     }
     LOGGER.info("Creating bloom filter with cardinality: {}, fpp: {}", cardinality, fpp);
     _bloomFilter = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), cardinality, fpp);
+  }
+
+  @Override
+  public FieldSpec.DataType getDataType() {
+    return _dataType;
   }
 
   @Override
