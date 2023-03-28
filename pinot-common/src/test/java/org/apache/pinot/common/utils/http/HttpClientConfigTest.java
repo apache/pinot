@@ -29,11 +29,10 @@ public class HttpClientConfigTest {
 
   @Test
   public void testNewBuilder() {
-    String testConfigPrefix = "pinot.test.";
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
-    pinotConfiguration.setProperty(testConfigPrefix + HttpClientConfig.MAX_CONNS_CONFIG_NAME, "123");
-    pinotConfiguration.setProperty(testConfigPrefix + HttpClientConfig.MAX_CONNS_PER_ROUTE_CONFIG_NAME, "11");
-    HttpClientConfig httpClientConfig = HttpClientConfig.newBuilder(pinotConfiguration, testConfigPrefix).build();
+    pinotConfiguration.setProperty(HttpClientConfig.MAX_CONNS_CONFIG_NAME, "123");
+    pinotConfiguration.setProperty(HttpClientConfig.MAX_CONNS_PER_ROUTE_CONFIG_NAME, "11");
+    HttpClientConfig httpClientConfig = HttpClientConfig.newBuilder(pinotConfiguration).build();
     Assert.assertEquals(123, httpClientConfig.getMaxConns());
     Assert.assertEquals(11, httpClientConfig.getMaxConnsPerRoute());
   }

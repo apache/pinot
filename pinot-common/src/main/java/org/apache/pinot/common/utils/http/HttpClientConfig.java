@@ -48,16 +48,16 @@ public class HttpClientConfig {
   /**
    * Creates a {@link HttpClientConfig.Builder} and initializes it with relevant configs from the provided
    * configuration. Since http-clients are used in a bunch of places in the code, each use-case can have their own
-   * prefix for their config. This builder ensures that the suffix for http-client related configs is the same across
-   * all use-cases.
+   * prefix for their config. The caller should call {@link PinotConfiguration#subset(String)} to remove their prefix
+   * and this builder will look for exact matches of its relevant configs.
    */
-  public static Builder newBuilder(PinotConfiguration pinotConfiguration, String prefix) {
+  public static Builder newBuilder(PinotConfiguration pinotConfiguration) {
     Builder builder = new Builder();
-    String maxConns = pinotConfiguration.getProperty(prefix + MAX_CONNS_CONFIG_NAME);
+    String maxConns = pinotConfiguration.getProperty(MAX_CONNS_CONFIG_NAME);
     if (StringUtils.isNotEmpty(maxConns)) {
       builder.withMaxConns(Integer.parseInt(maxConns));
     }
-    String maxConnsPerRoute = pinotConfiguration.getProperty(prefix + MAX_CONNS_PER_ROUTE_CONFIG_NAME);
+    String maxConnsPerRoute = pinotConfiguration.getProperty(MAX_CONNS_PER_ROUTE_CONFIG_NAME);
     if (StringUtils.isNotEmpty(maxConnsPerRoute)) {
       builder.withMaxConnsPerRoute(Integer.parseInt(maxConnsPerRoute));
     }

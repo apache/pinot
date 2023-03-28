@@ -70,6 +70,6 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
     }
 
     SSLContext sslContext = new ClientSSLContextGenerator(sslConfig).generate();
-    _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config, CONFIG_PREFIX).build(), sslContext);
+    _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config).build(), sslContext);
   }
 }

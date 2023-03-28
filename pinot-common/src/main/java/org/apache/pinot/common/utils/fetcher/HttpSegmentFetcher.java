@@ -38,12 +38,11 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 
 public class HttpSegmentFetcher extends BaseSegmentFetcher {
-  protected static final String CONFIG_PREFIX = "pinot.segment.fetcher.";
   protected FileUploadDownloadClient _httpClient;
 
   @Override
   protected void doInit(PinotConfiguration config) {
-    _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config, CONFIG_PREFIX).build());
+    _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config).build());
   }
 
   @Override
