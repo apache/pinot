@@ -99,20 +99,20 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     Preconditions.checkArgument(arguments.size() >= 2 && arguments.size() <= 5,
         "Between two to five arguments are required, example: %s", EXAMPLE_INVOCATION);
-    String unit = ((LiteralTransformFunction) arguments.get(0)).getLiteral().toLowerCase();
+    String unit = ((LiteralTransformFunction) arguments.get(0)).getStringLiteral().toLowerCase();
     TransformFunction valueArgument = arguments.get(1);
     Preconditions.checkArgument(
         !(valueArgument instanceof LiteralTransformFunction) && valueArgument.getResultMetadata().isSingleValue(),
         "The second argument of dateTrunc transform function must be a single-valued column or a transform function");
     _mainTransformFunction = valueArgument;
     String inputTimeUnitStr =
-        (arguments.size() >= 3) ? ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase()
+        (arguments.size() >= 3) ? ((LiteralTransformFunction) arguments.get(2)).getStringLiteral().toUpperCase()
             : TimeUnit.MILLISECONDS.name();
     _inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
 
-    String timeZone = arguments.size() >= 4 ? ((LiteralTransformFunction) arguments.get(3)).getLiteral() : UTC_TZ;
+    String timeZone = arguments.size() >= 4 ? ((LiteralTransformFunction) arguments.get(3)).getStringLiteral() : UTC_TZ;
     String outputTimeUnitStr =
-        arguments.size() >= 5 ? ((LiteralTransformFunction) arguments.get(4)).getLiteral().toUpperCase()
+        arguments.size() >= 5 ? ((LiteralTransformFunction) arguments.get(4)).getStringLiteral().toUpperCase()
             : inputTimeUnitStr;
     TimeZoneKey timeZoneKey = TimeZoneKey.getTimeZoneKey(timeZone);
 

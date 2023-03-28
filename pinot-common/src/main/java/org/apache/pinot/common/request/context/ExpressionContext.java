@@ -65,15 +65,6 @@ public class ExpressionContext {
     _literal = literal;
   }
 
-  // TODO: Refactor all of the usage for getLiteralString.
-  @Deprecated
-  public String getLiteralString() {
-    if (_literal == null || _literal.getValue() == null) {
-      return null;
-    }
-    return _literal.getValue().toString();
-  }
-
   public Type getType() {
     return _type;
   }

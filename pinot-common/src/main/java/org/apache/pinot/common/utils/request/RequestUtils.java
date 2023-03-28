@@ -122,10 +122,12 @@ public class RequestUtils {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
     } else {
-      // TODO: Support null literal and other types.
       switch (node.getTypeName()) {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
+          break;
+        case NULL:
+          literal.setNullValue(true);
           break;
         default:
           literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
@@ -173,7 +175,16 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getNullLiteralExpression() {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setNullValue(true);
+    return expression;
+  }
+
   public static Expression getLiteralExpression(Object object) {
+    if (object == null) {
+      return getNullLiteralExpression();
+    }
     if (object instanceof Integer || object instanceof Long) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
