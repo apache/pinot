@@ -754,8 +754,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     String fwdIndexFileExtension;
     if (isSingleValue) {
-      // Raw columns cannot be sorted.
-      fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      if (existingColMetadata.isSorted()) {
+        fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      } else {
+        fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      }
     } else {
       fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     }
