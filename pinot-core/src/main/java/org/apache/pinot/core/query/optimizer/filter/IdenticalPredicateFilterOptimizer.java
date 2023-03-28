@@ -45,13 +45,13 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
     FilterKind kind = FilterKind.valueOf(function.getOperator());
     switch (kind) {
       case EQUALS:
-        if (hasIdenticalLhsAndRhs(filterExpression)) {
-          setExpressionToBoolean(filterExpression, true);
+        if (hasIdenticalLhsAndRhs(function.getOperands())) {
+          return TRUE;
         }
         break;
       case NOT_EQUALS:
-        if (hasIdenticalLhsAndRhs(filterExpression)) {
-          setExpressionToBoolean(filterExpression, false);
+        if (hasIdenticalLhsAndRhs(function.getOperands())) {
+          return FALSE;
         }
         break;
       default:
@@ -68,15 +68,13 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
    * We return false specifically after every check to ensure we're only continuing when
    * the input looks as expected. Otherwise, it's easy to for one of the operand functions
    * to return null and fail the query.
+   *
+   * TODO: The rewrite is already happening in PredicateComparisonRewriter.updateFunctionExpression(),
+   * so we might just compare the lhs and rhs there.
    */
-  private boolean hasIdenticalLhsAndRhs(Expression operand) {
-    Function function = operand.getFunctionCall();
-    if (function == null) {
-      return false;
-    }
-    List<Expression> children = function.getOperands();
-    boolean hasTwoChildren = children.size() == 2;
-    Expression firstChild = children.get(0);
+  private boolean hasIdenticalLhsAndRhs(List<Expression> operands) {
+    boolean hasTwoChildren = operands.size() == 2;
+    Expression firstChild = operands.get(0);
     if (firstChild.getFunctionCall() == null || !hasTwoChildren) {
       return false;
     }
@@ -94,7 +92,7 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
         minusOperandSecondChild)) {
       return false;
     }
-    Expression secondChild = children.get(1);
+    Expression secondChild = operands.get(1);
     return isLiteralZero(secondChild);
   }
 

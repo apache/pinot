@@ -127,7 +127,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             int converted = (int) actual;
             if (converted != actual) {
               // Long value does not fall within the bounds of INT column.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace long value with converted int value.
               rhs.getLiteral().setLongValue(converted);
@@ -138,7 +138,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             float converted = (float) actual;
             if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
               // Long to float conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace long value with converted float value.
               rhs.getLiteral().setDoubleValue(converted);
@@ -149,7 +149,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             double converted = (double) actual;
             if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
               // Long to double conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace long value with converted double value.
               rhs.getLiteral().setDoubleValue(converted);
@@ -168,7 +168,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             int converted = (int) actual;
             if (converted != actual) {
               // Double value does not fall within the bounds of INT column.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace double value with converted int value.
               rhs.getLiteral().setLongValue(converted);
@@ -179,7 +179,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             long converted = (long) actual;
             if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
               // Double to long conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace double value with converted long value.
               rhs.getLiteral().setLongValue(converted);
@@ -190,7 +190,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             float converted = (float) actual;
             if (converted != actual) {
               // Double to float conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace double value with converted float value.
               rhs.getLiteral().setDoubleValue(converted);
@@ -234,13 +234,12 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
               // INT column can never have a value greater than Integer.MAX_VALUE. < and <= expressions will always be
               // true, because an INT column will always have values greater than or equal to Integer.MIN_VALUE and less
               // than or equal to Integer.MAX_VALUE.
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0) {
               // Literal value is less than the bounds of INT. > and >= expressions will always be true because an
               // INT column will always have a value greater than or equal to Integer.MIN_VALUE. < and <= expressions
               // will always be false, because an INT column will never have values less than Integer.MIN_VALUE.
-              setExpressionToBoolean(range,
-                  kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Long literal value falls within the bounds of INT column, server will successfully convert the literal
               // value when needed.
@@ -291,10 +290,10 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             int comparison = Double.compare(actual, converted);
             if (comparison > 0 && converted == Integer.MAX_VALUE) {
               // Literal value is greater than the bounds of INT.
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0 && converted == Integer.MIN_VALUE) {
               // Literal value is less than the bounds of INT.
-              setExpressionToBoolean(range,
+              return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Literal value falls within the bounds of INT.
@@ -311,10 +310,10 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
             if (comparison > 0 && converted == Long.MAX_VALUE) {
               // Literal value is greater than the bounds of LONG.
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0 && converted == Long.MIN_VALUE) {
               // Literal value is less than the bounds of LONG.
-              setExpressionToBoolean(range,
+              return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Rewrite range operator
@@ -329,10 +328,10 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             float converted = (float) actual;
             if (converted == Float.POSITIVE_INFINITY) {
               // Literal value is greater than the bounds of FLOAT
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (converted == Float.NEGATIVE_INFINITY) {
               // Literal value is less than the bounds of LONG.
-              setExpressionToBoolean(range,
+              return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               int comparison = Double.compare(actual, converted);

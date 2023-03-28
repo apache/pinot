@@ -21,9 +21,7 @@ package org.apache.pinot.core.query.optimizer.filter;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
@@ -58,7 +56,7 @@ public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer
       case OR:
       case NOT:
         // Recursively traverse the expression tree to find an operator node that can be rewritten.
-        operands.forEach(operand -> optimize(operand, schema));
+        operands.replaceAll(operand -> optimize(operand, schema));
 
         // We have rewritten the child operands, so rewrite the parent if needed.
         return optimizeCurrent(filterExpression);
@@ -88,54 +86,44 @@ public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer
     if (operator.equals(FilterKind.AND.name())) {
       // If any of the literal operands are always false, then replace AND function with FALSE.
       for (Expression operand : operands) {
-        if (isAlwaysFalse(operand)) {
+        if (operand.equals(FALSE)) {
           return FALSE;
         }
       }
 
       // Remove all Literal operands that are always true.
-      operands.removeIf(this::isAlwaysTrue);
+      operands.removeIf(operand -> operand.equals(TRUE));
       if (operands.isEmpty()) {
         return TRUE;
       }
     } else if (operator.equals(FilterKind.OR.name())) {
       // If any of the literal operands are always true, then replace OR function with TRUE
       for (Expression operand : operands) {
-        if (isAlwaysTrue(operand)) {
+        if (operand.equals(TRUE)) {
           return TRUE;
         }
       }
 
       // Remove all Literal operands that are always false.
-      operands.removeIf(this::isAlwaysFalse);
+      operands.removeIf(operand -> operand.equals(FALSE));
       if (operands.isEmpty()) {
         return FALSE;
       }
     } else if (operator.equals(FilterKind.NOT.name())) {
       assert operands.size() == 1;
       Expression operand = operands.get(0);
-      if (isAlwaysTrue(operand)) {
+      if (operand.equals(TRUE)) {
         return FALSE;
       }
-      if (isAlwaysFalse(operand)) {
+      if (operand.equals(FALSE)) {
         return TRUE;
       }
     }
     return expression;
   }
 
-  private boolean isAlwaysFalse(Expression operand) {
-    return operand.equals(FALSE);
-  }
-
-  private boolean isAlwaysTrue(Expression operand) {
-    return operand.equals(TRUE);
-  }
-
   /** Change the expression value to boolean literal with given value. */
-  protected static void setExpressionToBoolean(Expression expression, boolean value) {
-    expression.unsetFunctionCall();
-    expression.setType(ExpressionType.LITERAL);
-    expression.setLiteral(Literal.boolValue(value));
+  protected static Expression getExpressionFromBoolean(boolean value) {
+    return value ? TRUE : FALSE;
   }
 }
