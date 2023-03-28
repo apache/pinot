@@ -21,8 +21,8 @@ package org.apache.pinot.compat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Function;
 import java.io.File;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -304,16 +303,8 @@ public class StreamOp extends BaseOp {
 
   private void waitForDocsLoaded(String tableName, long targetDocs, long timeoutMs) {
     LOGGER.info("Wait Doc to load ...");
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          return fetchExistingTotalDocs(tableName) == targetDocs;
-        } catch (Exception e) {
-          return null;
-        }
-      }
-    }, 100L, timeoutMs, "Failed to load " + targetDocs + " documents", true);
+    TestUtils.waitForCondition(
+        () -> fetchExistingTotalDocs(tableName) == targetDocs, 100L, timeoutMs,
+        "Failed to load " + targetDocs + " documents", true, Duration.ofSeconds(1));
   }
 }
