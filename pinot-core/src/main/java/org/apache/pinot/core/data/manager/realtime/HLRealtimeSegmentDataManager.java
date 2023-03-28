@@ -469,7 +469,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public void destroy() {
+  protected void doDestroy() {
     LOGGER.info("Trying to shutdown RealtimeSegmentDataManager : {}!", _segmentName);
     _isShuttingDown = true;
     try {

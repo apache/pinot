@@ -25,6 +25,7 @@ import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
@@ -230,6 +231,9 @@ public class RequestContextUtils {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
+    if (thriftExpression.getLiteral().getSetField() == Literal._Fields.NULL_VALUE) {
+      return "null";
+    }
     return thriftExpression.getLiteral().getFieldValue().toString();
   }
 
@@ -356,6 +360,6 @@ public class RequestContextUtils {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    return expressionContext.getLiteralString();
+    return expressionContext.getLiteral().getStringValue();
   }
 }

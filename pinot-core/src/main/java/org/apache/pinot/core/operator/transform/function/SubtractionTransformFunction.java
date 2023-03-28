@@ -68,9 +68,9 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
       if (argument instanceof LiteralTransformFunction) {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
         if (_resultDataType == DataType.BIG_DECIMAL) {
-          _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral());
+          _bigDecimalLiterals[i] = literalTransformFunction.getBigDecimalLiteral();
         } else {
-          _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          _doubleLiterals[i] = ((LiteralTransformFunction) argument).getDoubleLiteral();
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {
