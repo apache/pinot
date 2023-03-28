@@ -39,21 +39,64 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
  *   included in a Pinot distribution. {@link StandardIndexes} contains one get method for each standard index,
  *   providing a typesafe way to get these references. Instead of having to write something like
  *   {@code (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
- *   IndexService.getInstance().getOrThrow("bloom_filter")},
+ *   IndexService.getInstance().get("bloom_filter")},
  *   a caller can simply use {@link StandardIndexes#bloomFilter()}
  * </p>
  */
 @SuppressWarnings("unchecked")
 public class StandardIndexes {
+  public static final String FORWARD_ID = "forward_index";
+  public static final String DICTIONARY_ID = "dictionary";
+  public static final String NULL_VALUE_VECTOR_ID = "nullvalue_vector";
+  public static final String BLOOM_FILTER_ID = "bloom_filter";
+  public static final String FST_ID = "fst_index";
+  public static final String INVERTED_ID = "inverted_index";
+  public static final String JSON_ID = "json_index";
+  public static final String RANGE_ID = "range_index";
+  public static final String TEXT_ID = "text_index";
+  public static final String H3_ID = "h3_index";
+
   private StandardIndexes() {
   }
 
-  // Other methods like bloomFilter() should be created for each index.
-  // This class may be changed in the future by adding a way to override index implementations in needed, like
-  // current IndexOverrides
+  public static IndexType<?, ?, ?> forward() {
+    return IndexService.getInstance().get(FORWARD_ID);
+  }
+
+  public static IndexType<?, ?, ?> dictionary() {
+    return IndexService.getInstance().get(DICTIONARY_ID);
+  }
+
+  public static IndexType<?, ?, ?> nullValueVector() {
+    return IndexService.getInstance().get(NULL_VALUE_VECTOR_ID);
+  }
 
   public static IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator> bloomFilter() {
     return (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
-        IndexService.getInstance().get("bloom_filter");
+        IndexService.getInstance().get(BLOOM_FILTER_ID);
+  }
+
+  public static IndexType<?, ?, ?> fst() {
+    return IndexService.getInstance().get(FST_ID);
+  }
+
+  public static IndexType<?, ?, ?> inverted() {
+    return IndexService.getInstance().get(INVERTED_ID);
+  }
+
+  public static IndexType<?, ?, ?> json() {
+    return IndexService.getInstance().get(JSON_ID);
+  }
+
+  public static IndexType<?, ?, ?> range() {
+    return IndexService.getInstance().get(RANGE_ID);
+  }
+
+  public static IndexType<?, ?, ?> text() {
+    return IndexService.getInstance().get(TEXT_ID);
+  }
+
+  public static IndexType<?, ?, ?> h3() {
+    return IndexService.getInstance().get(H3_ID);
   }
 }
