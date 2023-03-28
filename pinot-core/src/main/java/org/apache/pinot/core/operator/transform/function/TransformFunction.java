@@ -74,6 +74,9 @@ public interface TransformFunction {
    */
   int[] transformToDictIdsSV(ValueBlock valueBlock);
 
+  /**
+   * Transforms the data from the given value block to single-valued dictionary ids with null bit vector.
+   */
   default Pair<int[], RoaringBitmap> transformToDictIdsSVWithNull(ValueBlock block) {
     return ImmutablePair.of(transformToDictIdsSV(block), getNullBitmap(block));
   }
@@ -83,6 +86,9 @@ public interface TransformFunction {
    */
   int[][] transformToDictIdsMV(ValueBlock valueBlock);
 
+  /**
+   * Transforms the data from the given value block to multi-valued dictionary ids with null bit vector.
+   */
   default Pair<int[][], RoaringBitmap> transformToDictIdsMVWithNull(ValueBlock valueBlock) {
     return ImmutablePair.of(transformToDictIdsMV(valueBlock), getNullBitmap(valueBlock));
   }
