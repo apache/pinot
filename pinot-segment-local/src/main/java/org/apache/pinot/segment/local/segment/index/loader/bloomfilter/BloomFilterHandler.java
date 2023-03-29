@@ -300,7 +300,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       case STRING:
       case BYTES:
         PinotDataBuffer buf = segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
-        return DictionaryIndexType.read(buf, columnMetadata, new DictionaryIndexConfig(false, true));
+        return DictionaryIndexType.read(buf, columnMetadata, DictionaryIndexConfig.DEFAULT_OFFHEAP);
       default:
         throw new IllegalStateException(
             "Unsupported data type: " + dataType + " for column: " + columnMetadata.getColumnName());

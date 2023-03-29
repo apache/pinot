@@ -200,7 +200,7 @@ public class DictionaryIndexType
       throws IOException {
     PinotDataBuffer dataBuffer =
         segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
-    return read(dataBuffer, columnMetadata, new DictionaryIndexConfig(false, true));
+    return read(dataBuffer, columnMetadata, DictionaryIndexConfig.DEFAULT_OFFHEAP);
   }
 
   public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
