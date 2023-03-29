@@ -1419,7 +1419,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
-      _resourceTmpDir = new File(resourceDataDir, "_tmp");
+      _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
       if (!_resourceTmpDir.exists()) {
         _resourceTmpDir.mkdirs();
       }

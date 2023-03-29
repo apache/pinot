@@ -22,6 +22,8 @@ import com.google.common.base.Function;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.time.Duration;
+import java.time.Instant;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -111,6 +113,40 @@ public class TestUtils {
   }
 
   /**
+   * Like {@link #waitForCondition(Function, long, long, String, boolean)}, but supports functions that throw checked
+   * exceptions.
+   *
+   * The first time every logPeriod that the function throws an exception, it is printed in the standard error.
+   */
+  public static void waitForCondition(SupplierWithException<Boolean> condition, long checkIntervalMs, long timeoutMs,
+      @Nullable String errorMessage, boolean raiseError, @Nullable Duration logPeriod) {
+    long endTime = System.currentTimeMillis() + timeoutMs;
+    Instant lastError = Instant.now();
+    String errorMessageSuffix = errorMessage != null ? ", error message: " + errorMessage : "";
+    while (System.currentTimeMillis() < endTime) {
+      try {
+        if (Boolean.TRUE.equals(condition.get())) {
+          return;
+        }
+        Thread.sleep(checkIntervalMs);
+      } catch (InterruptedException e) {
+        break;
+      } catch (Exception e) {
+        if (logPeriod != null) {
+          Instant now = Instant.now();
+          if (logPeriod.compareTo(Duration.between(lastError, now)) < 0) {
+            e.printStackTrace();
+          }
+          lastError = now;
+        }
+      }
+    }
+    if (raiseError) {
+      Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
+    }
+  }
+
+  /**
    * Wait for a result to be returned
    *
    * @param supplier result value supplier
@@ -120,12 +156,36 @@ public class TestUtils {
    */
   public static <T> T waitForResult(SupplierWithException<T> supplier, long timeoutMs)
       throws InterruptedException {
+    return waitForResult(supplier, timeoutMs, null);
+  }
+
+  /**
+   * Like {@link #waitForResult(SupplierWithException, long)}, but optionally prints in stderr the first error found
+   * every given log period.
+   * @param supplier result value supplier
+   * @param timeoutMs timeout
+   * @param logPeriod how often logs will be printed. The longer the duration, the fewer the logs.
+   * @return result value (non-throwable)
+   * @throws InterruptedException if {@code Thread.sleep()} is interrupted
+   */
+  public static <T> T waitForResult(SupplierWithException<T> supplier, long timeoutMs, @Nullable Duration logPeriod)
+      throws InterruptedException {
     long tEnd = System.currentTimeMillis() + timeoutMs;
+    Instant lastError = Instant.now();
     while (tEnd > System.currentTimeMillis()) {
       try {
         return supplier.get();
-      } catch (Throwable ignore) {
-        // ignore
+      } catch (InterruptedException e) {
+        throw new IllegalStateException("Waiting interrupted after "
+            + (System.currentTimeMillis() + timeoutMs - tEnd) + "ms");
+      } catch (Throwable t) {
+        if (logPeriod != null) {
+          Instant now = Instant.now();
+          if (logPeriod.compareTo(Duration.between(lastError, now)) < 0) {
+            t.printStackTrace();
+          }
+          lastError = now;
+        }
       }
 
       Thread.sleep(1000);
