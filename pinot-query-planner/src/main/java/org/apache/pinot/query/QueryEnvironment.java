@@ -82,6 +82,8 @@ public class QueryEnvironment {
   private final WorkerManager _workerManager;
   private final TableCache _tableCache;
 
+  private RelRoot _relRoot;
+
   public QueryEnvironment(TypeFactory typeFactory, CalciteSchema rootSchema, WorkerManager workerManager,
       TableCache tableCache) {
     _typeFactory = typeFactory;
@@ -133,6 +135,13 @@ public class QueryEnvironment {
   }
 
   /**
+   * Returns the RelRoot generated after compiling the query.
+   */
+  public RelRoot getRelRoot() {
+    return _relRoot;
+  }
+
+  /**
    * Plan a SQL query.
    *
    * This function is thread safe since we construct a new PlannerContext every time.
@@ -147,8 +156,8 @@ public class QueryEnvironment {
   public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return toDispatchablePlan(relRoot, plannerContext, requestId);
+      _relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      return toDispatchablePlan(_relRoot, plannerContext, requestId);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -172,11 +181,11 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      _relRoot = compileQuery(explain.getExplicandum(), plannerContext);
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      return PlannerUtils.explainPlan(relRoot.rel, format, level);
+      return PlannerUtils.explainPlan(_relRoot.rel, format, level);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }

@@ -21,11 +21,15 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -51,6 +55,7 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
@@ -156,6 +161,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           String plan = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
+          boolean hasAccess = hasTableAccess(requesterIdentity, _queryEnvironment.getRelRoot().rel);
+          if (!hasAccess) {
+            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+            LOGGER.info("Access denied for requestId {}", requestId);
+            requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+            return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+          }
+
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
@@ -167,6 +180,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+    }
+
+    // Perform table level access validation.
+    boolean hasAccess = hasTableAccess(requesterIdentity, _queryEnvironment.getRelRoot().rel);
+    if (!hasAccess) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.info("Access denied for requestId {}", requestId);
+      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
 
     boolean traceEnabled = Boolean.parseBoolean(
@@ -219,6 +241,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     return brokerResponse;
+  }
+
+  private boolean hasTableAccess(RequesterIdentity requesterIdentity, RelNode relRoot) {
+    Set<String> tableNames = new HashSet<>(RelOptUtil.findAllTableQualifiedNames(relRoot));
+    return _accessControlFactory.create().hasAccess(requesterIdentity, tableNames);
   }
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
