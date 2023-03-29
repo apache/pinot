@@ -33,17 +33,17 @@ import org.apache.pinot.common.request.BrokerRequest;
 
 
 /**
- * {@code SegmentZkMetadataCache} is used to cache {@link ZNRecord} stored in {@link ZkHelixPropertyStore} for
+ * {@code SegmentZkMetadataFetcher} is used to cache {@link ZNRecord} stored in {@link ZkHelixPropertyStore} for
  * segments. This is used by {@link SegmentPruner#prune(BrokerRequest, Set)}.
  */
-public class SegmentZkMetadataCache {
+public class SegmentZkMetadataFetcher {
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _segmentZKMetadataPathPrefix;
   private final List<SegmentPruner> _registeredPruners;
   private final Set<String> _onlineSegmentsCached;
 
-  public SegmentZkMetadataCache(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public SegmentZkMetadataFetcher(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       List<SegmentPruner> segmentPruners) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
@@ -53,7 +53,7 @@ public class SegmentZkMetadataCache {
   }
 
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    if (_registeredPruners.size() > 0) {
+    if (!_registeredPruners.isEmpty()) {
       // Bulk load partition info for all online segments
       int numSegments = onlineSegments.size();
       List<String> segments = new ArrayList<>(numSegments);
@@ -76,7 +76,7 @@ public class SegmentZkMetadataCache {
 
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
-    if (_registeredPruners.size() > 0) {
+    if (!_registeredPruners.isEmpty()) {
       int numSegments = onlineSegments.size();
       List<String> segments = new ArrayList<>(numSegments);
       List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
@@ -96,7 +96,7 @@ public class SegmentZkMetadataCache {
   }
 
   public synchronized void refreshSegment(String segment) {
-    if (_registeredPruners.size() > 0) {
+    if (!_registeredPruners.isEmpty()) {
       ZNRecord znRecord = _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT);
       for (SegmentPruner segmentPruner : _registeredPruners) {
         segmentPruner.refreshSegment(segment, znRecord);
