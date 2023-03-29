@@ -159,7 +159,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         invertedIndexColumns);
 
     _segmentEndTimeThreshold = _start + _streamConfig.getFlushThresholdTimeMillis();
-    _resourceTmpDir = new File(resourceDataDir, "_tmp");
+    _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
     if (!_resourceTmpDir.exists()) {
       _resourceTmpDir.mkdirs();
     }
