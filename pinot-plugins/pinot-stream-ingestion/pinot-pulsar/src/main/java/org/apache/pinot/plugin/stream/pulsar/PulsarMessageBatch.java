@@ -35,15 +35,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A {@link MessageBatch} for collecting messages from pulsar topic
- *
  * When 'enableKeyValueStitch' flag is enabled, existing {@link org.apache.pinot.spi.stream.StreamMessageDecoder}
  * plugins will not work. A custom decoder will be needed to unpack key and value byte arrays and decode
  * them independently.
  */
 public class PulsarMessageBatch implements MessageBatch<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarMessageBatch.class);
-  private List<Message<byte[]>> _messageList = new ArrayList<>();
-  private static ByteBuffer _lengthBuf = ByteBuffer.allocate(4);
+  private final List<Message<byte[]>> _messageList = new ArrayList<>();
+  private static final ByteBuffer LENGTH_BUF = ByteBuffer.allocate(4);
   private final boolean _enableKeyValueStitch;
 
   public PulsarMessageBatch(Iterable<Message<byte[]>> iterable, boolean enableKeyValueStitch) {
@@ -114,7 +113,8 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
                 ((BatchMessageIdImpl) currentMessageId).getAcker());
       }
     } else {
-      nextMessageId = DefaultImplementation.newMessageId(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
+      nextMessageId = DefaultImplementation.getDefaultImplementation()
+          .newMessageId(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
     }
     return new MessageIdStreamOffset(nextMessageId);
   }
@@ -132,13 +132,12 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
     int keyLen = keyBytes.length;
     int valueLen = valueBytes.length;
     int totalByteArrayLength = 8 + keyLen + valueLen;
-    try {
-      ByteArrayOutputStream bos = new ByteArrayOutputStream(totalByteArrayLength);
-      _lengthBuf.clear();
-      bos.write(_lengthBuf.putInt(keyLen).array());
+    try (ByteArrayOutputStream bos = new ByteArrayOutputStream(totalByteArrayLength)) {
+      LENGTH_BUF.clear();
+      bos.write(LENGTH_BUF.putInt(keyLen).array());
       bos.write(keyBytes);
-      _lengthBuf.clear();
-      bos.write(_lengthBuf.putInt(valueLen).array());
+      LENGTH_BUF.clear();
+      bos.write(LENGTH_BUF.putInt(valueLen).array());
       bos.write(valueBytes);
       return bos.toByteArray();
     } catch (Exception e) {
