@@ -68,7 +68,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         if (!InetAddresses.isInetAddress(hostName)) {
           httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
         }
-        int statusCode = _httpClient.downloadFile(uri, dest, _authProvider, httpHeaders);
+        int statusCode = _httpClient.downloadFile(uri, _socketTimeoutMs, dest, _authProvider, httpHeaders);
         _logger
             .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
                 statusCode);
@@ -151,7 +151,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   public void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
       throws Exception {
     try {
-      int statusCode = _httpClient.downloadFile(uri, dest, _authProvider);
+      int statusCode = _httpClient.downloadFile(uri, dest, _authProvider, _socketTimeoutMs);
       _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
           statusCode);
     } catch (Exception e) {
