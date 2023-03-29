@@ -362,8 +362,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     public void accumulate(Key key, Key orderKey, Object[] row) {
       if (_isPartitionByOnly) {
-        Preconditions.checkState(orderKey.equals(_emptyOrderKey) || orderKey.equals(key),
-            "Partition by only query has a non-empty order by key different from partition by key!");
         accumulate(key, row);
         return;
       }
@@ -392,8 +390,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     public Object getResultForKeys(Key key, Key orderKey) {
       if (_isPartitionByOnly) {
-        Preconditions.checkState(orderKey.equals(_emptyOrderKey) || orderKey.equals(key),
-            "Partition by only query has a non-empty order by key different from partition by key!");
         return _results.get(key);
       } else {
         return _orderByResults.get(key).getOrderByResults().get(orderKey);
