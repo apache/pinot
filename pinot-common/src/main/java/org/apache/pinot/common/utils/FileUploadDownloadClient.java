@@ -1165,6 +1165,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * Download a file.
    *
    * @param uri URI
+   * @param socketTimeoutMs socketTimeoutMs
    * @param dest File destination
    * @param authProvider auth provider
    * @param httpHeaders http headers
