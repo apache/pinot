@@ -224,13 +224,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo, SegmentGeneratorConfig segmentCreationSpec) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(config);
     // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
-    if (config.getConfig(StandardIndexes.forward()).isEnabled() && columnIndexCreationInfo.isSorted()) {
-      builder.add(StandardIndexes.forward(), new ForwardIndexConfig.Builder()
+    ForwardIndexConfig fwdConfig = config.getConfig(StandardIndexes.forward());
+    if (!fwdConfig.isEnabled() && columnIndexCreationInfo.isSorted()) {
+      builder.add(StandardIndexes.forward(), new ForwardIndexConfig.Builder(fwdConfig)
           .withLegacyProperties(segmentCreationSpec.getColumnProperties(), columnName)
           .build());
     }
     // Initialize inverted index creator; skip creating inverted index if sorted
-    if (config.getConfig(StandardIndexes.inverted()).isEnabled() && columnIndexCreationInfo.isSorted()) {
+    if (columnIndexCreationInfo.isSorted()) {
       builder.undeclare(StandardIndexes.inverted());
     }
     return builder.build();
