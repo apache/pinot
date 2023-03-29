@@ -84,6 +84,10 @@ public class OpChainStats {
     }
   }
 
+  public long getExecutionTime() {
+    return _executeStopwatch.elapsed(TimeUnit.MILLISECONDS);
+  }
+
   @Override
   public String toString() {
     return String.format("(%s) Queued Count: %s, Executing Time: %sms, Queued Time: %sms", _id, _queuedCount.get(),
