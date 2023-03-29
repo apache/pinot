@@ -196,9 +196,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
       // TODO: Remove this when values stored as ForwardIndex stop depending on TextIndex config
       IndexCreator oldFwdCreator = creatorsByIndex.get(forwardIdx);
-      if (oldFwdCreator instanceof ForwardIndexCreator) { // this implies that oldFwdCreator != null
+      if (oldFwdCreator != null) {
         Object fakeForwardValue = calculateAlternativeValue(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
+          @SuppressWarnings("unchecked")
           ForwardIndexCreator castedOldFwdCreator = (ForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
               new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
