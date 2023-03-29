@@ -48,13 +48,13 @@ public class NullValueVectorCreator implements IndexCreator {
   @Override
   public void add(@Nonnull Object value, int dictId)
       throws IOException {
-    throw new UnsupportedOperationException("NullValueVector should not be build as a normal index");
+    throw new UnsupportedOperationException("NullValueVector should not be built as a normal index");
   }
 
   @Override
   public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
       throws IOException {
-    throw new UnsupportedOperationException("NullValueVector should not be build as a normal index");
+    throw new UnsupportedOperationException("NullValueVector should not be built as a normal index");
   }
 
   public NullValueVectorCreator(File indexDir, String columnName) {
