@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -216,7 +217,9 @@ public class MailboxReceiveOperator extends MultiStageOperator {
               }
             } else {
               if (_opChainStats != null && !block.getResultMetadata().isEmpty()) {
-                _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
+                for (Map.Entry<String, OperatorStats> entry : block.getResultMetadata().entrySet()) {
+                  _opChainStats.getOperatorStatsMap().compute(entry.getKey(), (_key, _value) -> entry.getValue());
+                }
               }
               eosMailboxCount++;
             }
