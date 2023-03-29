@@ -93,8 +93,7 @@ public class ForwardIndexCreatorFactory {
    */
   public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File file, ChunkCompressionType compressionType,
       String column, FieldSpec.DataType dataType, int totalDocs, int lengthOfLongestEntry,
-      boolean deriveNumDocsPerChunk,
-      int writerVersion)
+      boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     switch (dataType.getStoredType()) {
       case INT:
