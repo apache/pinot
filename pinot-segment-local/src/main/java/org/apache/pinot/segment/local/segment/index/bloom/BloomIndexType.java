@@ -74,9 +74,9 @@ public class BloomIndexType
   public ColumnConfigDeserializer<BloomFilterConfig> getDeserializer() {
     return IndexConfigDeserializer.fromIndexes("bloom", getIndexConfigClass())
         .withExclusiveAlternative(
-            IndexConfigDeserializer.ifIndexingConfig( // reads tableConfig.indexingConfig.bloomFilterConfigs
+            IndexConfigDeserializer.ifIndexingConfig(// reads tableConfig.indexingConfig.bloomFilterConfigs
                 IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())
-                  .withFallbackAlternative( // reads tableConfig.indexingConfig.bloomFilterColumns
+                  .withFallbackAlternative(// reads tableConfig.indexingConfig.bloomFilterColumns
                       IndexConfigDeserializer.fromCollection(
                           tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
                           (accum, column) -> accum.put(column, BloomFilterConfig.DEFAULT)))

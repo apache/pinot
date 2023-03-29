@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.util.Map;
-import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
 
