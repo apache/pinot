@@ -136,8 +136,8 @@ public class TestUtils {
           Instant now = Instant.now();
           if (logPeriod.compareTo(Duration.between(lastError, now)) < 0) {
             e.printStackTrace();
+            lastError = now;
           }
-          lastError = now;
         }
       }
     }
