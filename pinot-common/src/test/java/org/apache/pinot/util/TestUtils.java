@@ -121,8 +121,9 @@ public class TestUtils {
   public static void waitForCondition(SupplierWithException<Boolean> condition, long checkIntervalMs, long timeoutMs,
       @Nullable String errorMessage, boolean raiseError, @Nullable Duration logPeriod) {
     long endTime = System.currentTimeMillis() + timeoutMs;
-    Instant lastError = Instant.now();
+    Instant errorLogInstant = Instant.EPOCH;
     String errorMessageSuffix = errorMessage != null ? ", error message: " + errorMessage : "";
+    Throwable lastError = null;
     while (System.currentTimeMillis() < endTime) {
       try {
         if (Boolean.TRUE.equals(condition.get())) {
@@ -132,17 +133,18 @@ public class TestUtils {
       } catch (InterruptedException e) {
         break;
       } catch (Exception e) {
+        lastError = e;
         if (logPeriod != null) {
           Instant now = Instant.now();
-          if (logPeriod.compareTo(Duration.between(lastError, now)) < 0) {
-            e.printStackTrace();
-            lastError = now;
+          if (logPeriod.compareTo(Duration.between(errorLogInstant, now)) < 0) {
+            LOGGER.warn("Error while waiting for condition", e);
+            errorLogInstant = now;
           }
         }
       }
     }
     if (raiseError) {
-      Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
+      Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix, lastError);
     }
   }
 
