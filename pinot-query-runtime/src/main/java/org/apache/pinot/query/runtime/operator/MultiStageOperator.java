@@ -46,15 +46,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     _operatorId =
         Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
     _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
-    _opChainStats = null;
-  }
-
-  public void attachOpChainStats(OpChainStats opChainStats) {
-    _opChainStats = opChainStats;
-  }
-
-  public OpChainStats getOpChainStats() {
-    return _opChainStats;
+    _opChainStats = _context.getStats();
   }
 
   @Override
