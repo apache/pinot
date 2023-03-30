@@ -22,6 +22,5 @@ import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
 
 
 public interface MutableInvertedIndexProvider {
-  @Deprecated
   MutableInvertedIndex newInvertedIndex(MutableIndexContext.Inverted context);
 }
