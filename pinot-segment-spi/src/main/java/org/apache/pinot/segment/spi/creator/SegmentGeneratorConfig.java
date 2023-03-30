@@ -79,6 +79,7 @@ public class SegmentGeneratorConfig implements Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
   public static final double DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD = 0.85d;
+  public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
 
   private final TableConfig _tableConfig;
   private final Map<String, String> _customProperties = new HashMap<>();
@@ -219,7 +220,7 @@ public class SegmentGeneratorConfig implements Serializable {
       // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
       if (indexingConfig.getInvertedIndexColumns() != null) {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
+        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP)))
             || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
           setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, indexingConfig.getInvertedIndexColumns());
         }
