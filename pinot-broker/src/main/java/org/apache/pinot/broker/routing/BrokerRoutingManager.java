@@ -492,7 +492,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(tableNameWithType, _propertyStore);
     for (SegmentZkMetadataFetchListener listener : segmentPruners) {
-      segmentZkMetadataFetcher.registerListener(listener);
+      segmentZkMetadataFetcher.register(listener);
     }
     segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
 

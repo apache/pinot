@@ -38,7 +38,7 @@ public class SegmentZkMetadataFetcher {
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _segmentZKMetadataPathPrefix;
-  private final List<SegmentZkMetadataFetchListener> _registeredListeners;
+  private final List<SegmentZkMetadataFetchListener> _listeners;
   private final Set<String> _onlineSegmentsCached;
 
   private boolean _initialized;
@@ -47,7 +47,7 @@ public class SegmentZkMetadataFetcher {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _segmentZKMetadataPathPrefix = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType) + "/";
-    _registeredListeners = new ArrayList<>();
+    _listeners = new ArrayList<>();
     _onlineSegmentsCached = new HashSet<>();
     _initialized = false;
   }
@@ -55,7 +55,7 @@ public class SegmentZkMetadataFetcher {
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     if (!_initialized) {
       _initialized = true;
-      if (!_registeredListeners.isEmpty()) {
+      if (!_listeners.isEmpty()) {
         // Bulk load partition info for all online segments
         int numSegments = onlineSegments.size();
         List<String> segments = new ArrayList<>(numSegments);
@@ -66,7 +66,7 @@ public class SegmentZkMetadataFetcher {
         }
         _onlineSegmentsCached.addAll(onlineSegments);
         List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-        for (SegmentZkMetadataFetchListener listener : _registeredListeners) {
+        for (SegmentZkMetadataFetchListener listener : _listeners) {
           listener.init(idealState, externalView, segments, znRecords);
         }
       }
@@ -75,34 +75,35 @@ public class SegmentZkMetadataFetcher {
     }
   }
 
-  public void registerListener(SegmentZkMetadataFetchListener listener) {
+  public void register(SegmentZkMetadataFetchListener listener) {
     if (!_initialized) {
-      _registeredListeners.add(listener);
+      _listeners.add(listener);
     } else {
       throw new RuntimeException("Segment zk metadata fetcher has already been initialized! "
           + "Unable to register more listeners.");
     }
   }
 
-  public List<SegmentZkMetadataFetchListener> getRegisteredListeners() {
-    return _registeredListeners;
+  public List<SegmentZkMetadataFetchListener> getListeners() {
+    return _listeners;
   }
 
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
-    if (!_registeredListeners.isEmpty()) {
+    if (!_listeners.isEmpty()) {
       int numSegments = onlineSegments.size();
       List<String> segments = new ArrayList<>(numSegments);
       List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
+
       for (String segment : onlineSegments) {
-        if (!_onlineSegmentsCached.contains(segment)) {
+        if (_onlineSegmentsCached.add(segment)) {
           segments.add(segment);
           segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
         }
       }
       _onlineSegmentsCached.addAll(onlineSegments);
       List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-      for (SegmentZkMetadataFetchListener listener : _registeredListeners) {
+      for (SegmentZkMetadataFetchListener listener : _listeners) {
         listener.onAssignmentChange(idealState, externalView, onlineSegments, segments, znRecords);
       }
       _onlineSegmentsCached.retainAll(onlineSegments);
@@ -110,9 +111,9 @@ public class SegmentZkMetadataFetcher {
   }
 
   public synchronized void refreshSegment(String segment) {
-    if (!_registeredListeners.isEmpty()) {
+    if (!_listeners.isEmpty()) {
       ZNRecord znRecord = _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT);
-      for (SegmentZkMetadataFetchListener listener : _registeredListeners) {
+      for (SegmentZkMetadataFetchListener listener : _listeners) {
         listener.refreshSegment(segment, znRecord);
       }
       _onlineSegmentsCached.add(segment);

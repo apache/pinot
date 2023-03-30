@@ -53,16 +53,16 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     // empty listener at beginning
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME,
         mockPropertyStore);
-    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 0);
+    assertEquals(segmentZkMetadataFetcher.getListeners().size(), 0);
 
     // should allow register new listener
-    segmentZkMetadataFetcher.registerListener(mock(SegmentZkMetadataFetchListener.class));
-    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 1);
+    segmentZkMetadataFetcher.register(mock(SegmentZkMetadataFetchListener.class));
+    assertEquals(segmentZkMetadataFetcher.getListeners().size(), 1);
 
     // should not allow register new listener once initialized
     segmentZkMetadataFetcher.init(idealState, externalView, Collections.singleton("foo"));
     try {
-      segmentZkMetadataFetcher.registerListener(mock(SegmentZkMetadataFetchListener.class));
+      segmentZkMetadataFetcher.register(mock(SegmentZkMetadataFetchListener.class));
       fail();
     } catch (RuntimeException rte) {
       assertTrue(rte.getMessage().contains("has already been initialized"));
@@ -86,7 +86,7 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
 
-    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 0);
+    assertEquals(segmentZkMetadataFetcher.getListeners().size(), 0);
     segmentZkMetadataFetcher.init(idealState, externalView, Collections.singleton("foo"));
     Mockito.verify(mockPropertyStore, times(0)).get(any(), any(), anyInt(), anyBoolean());
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, Collections.singleton("foo"));
@@ -113,13 +113,13 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     SegmentPruner pruner2 = mock(SegmentPruner.class);
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME,
         mockPropertyStore);
-    segmentZkMetadataFetcher.registerListener(pruner1);
-    segmentZkMetadataFetcher.registerListener(pruner2);
+    segmentZkMetadataFetcher.register(pruner1);
+    segmentZkMetadataFetcher.register(pruner2);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = mock(IdealState.class);
     ExternalView externalView = mock(ExternalView.class);
 
-    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 2);
+    assertEquals(segmentZkMetadataFetcher.getListeners().size(), 2);
     // should call property store once for "foo" and "bar" as a batch
     segmentZkMetadataFetcher.init(idealState, externalView, ImmutableSet.of("foo", "bar"));
     verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("foo", "bar")), any(), anyInt(), anyBoolean());
