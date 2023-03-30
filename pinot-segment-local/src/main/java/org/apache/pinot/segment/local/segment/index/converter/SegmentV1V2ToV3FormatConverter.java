@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
