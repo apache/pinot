@@ -154,6 +154,9 @@ public class MailboxSendOperator extends MultiStageOperator {
       while (!transferableBlock.isNoOpBlock()) {
         if (transferableBlock.isEndOfStreamBlock()) {
           if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
+            //Stats need to be populated here because the block is being sent to the mailbox
+            // and the receiving opChain will not be able to access the stats from the previous opChain
+            populateOperatorStatsMap();
             TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
                 OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
             _exchange.send(eosBlockWithStats);

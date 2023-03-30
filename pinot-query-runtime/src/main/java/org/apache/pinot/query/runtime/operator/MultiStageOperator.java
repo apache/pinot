@@ -60,20 +60,19 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       _operatorStats.endTimer(nextBlock);
 
       _operatorStats.recordRow(1, nextBlock.getNumRows());
-      if (nextBlock.isEndOfStreamBlock()) {
-        populateOperatorStatsMap(nextBlock);
+      _operatorStats.endTimer(nextBlock);
+      if (nextBlock.isSuccessfulEndOfStreamBlock()) {
+        populateOperatorStatsMap();
       }
       return nextBlock;
     }
   }
 
-  protected void populateOperatorStatsMap(TransferableBlock nextBlock) {
-    if (nextBlock.isSuccessfulEndOfStreamBlock()) {
-      if (!_operatorStats.getExecutionStats().isEmpty()) {
-        _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
-        if (_opChainStats != null) {
-          _opChainStats.getOperatorStatsMap().compute(_operatorId, (_key, _value) -> _operatorStats);
-        }
+  protected void populateOperatorStatsMap() {
+    if (!_operatorStats.getExecutionStats().isEmpty()) {
+      _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
+      if (_opChainStats != null) {
+        _opChainStats.getOperatorStatsMap().compute(_operatorId, (_key, _value) -> _operatorStats);
       }
     }
   }

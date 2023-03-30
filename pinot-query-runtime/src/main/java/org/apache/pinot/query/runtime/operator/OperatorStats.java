@@ -35,6 +35,7 @@ public class OperatorStats {
   // TODO: add a operatorId for better tracking purpose.
   private final int _stageId;
   private final long _requestId;
+
   private final VirtualServerAddress _serverAddress;
 
   private final String _operatorType;
