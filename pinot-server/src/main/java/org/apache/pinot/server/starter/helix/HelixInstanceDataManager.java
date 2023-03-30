@@ -78,9 +78,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
-  // TODO: Make this configurable
-  private static final long EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L; // 20 minutes
-  private static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
 
@@ -205,7 +202,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteTable(String tableNameWithType)
       throws Exception {
     // Wait externalview to converge
-    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS;
+    long endTimeMs = System.currentTimeMillis() + _instanceDataManagerConfig.getExternalViewDroppedMaxWaitMs();
     do {
       ExternalView externalView = _helixManager.getHelixDataAccessor()
           .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
@@ -222,7 +219,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         });
         return;
       }
-      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+      Thread.sleep(_instanceDataManagerConfig.getExternalViewCheckIntervalMs());
     } while (System.currentTimeMillis() < endTimeMs);
     throw new TimeoutException(
         "Timeout while waiting for ExternalView to converge for the table to delete: " + tableNameWithType);
