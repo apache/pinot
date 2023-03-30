@@ -23,11 +23,10 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -80,7 +79,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentGeneratorConfig _config;
   private RecordReader _recordReader;
   private SegmentPreIndexStatsContainer _segmentStats;
-  private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
+  // NOTE: Use TreeMap so that the columns are ordered alphabetically
+  private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private SegmentCreator _indexCreator;
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private Schema _dataSchema;
@@ -175,7 +175,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Initialize index creation
     _segmentIndexCreationInfo = new SegmentIndexCreationInfo();
-    _indexCreationInfoMap = new HashMap<>();
+    _indexCreationInfoMap = new TreeMap<>();
 
     // Check if has star tree
     _indexCreator = new SegmentColumnarIndexCreator();

@@ -9,8 +9,8 @@
           "\nLogicalProject(avg=[/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)])",
           "\n    LogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col4=[$0], col2=[$1], col3=[$2])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
@@ -24,8 +24,8 @@
           "\nLogicalProject(avg=[/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], max=[$2])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], max=[MAX($2)])",
           "\n    LogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()], max=[MAX($0)])",
-          "\n        LogicalProject(col4=[$0], col2=[$1], col3=[$2])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], max=[MAX($2)])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"

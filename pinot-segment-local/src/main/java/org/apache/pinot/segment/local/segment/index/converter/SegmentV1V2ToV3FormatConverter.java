@@ -28,7 +28,6 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -66,7 +65,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     Preconditions.checkNotNull(v2SegmentDirectory, "Segment directory should not be null");
 
     Preconditions.checkState(v2SegmentDirectory.exists() && v2SegmentDirectory.isDirectory(),
-        "Segment directory: " + v2SegmentDirectory.toString() + " must exist and should be a directory");
+        "Segment directory: " + v2SegmentDirectory + " must exist and should be a directory");
 
     LOGGER.info("Converting segment: {} to v3 format", v2SegmentDirectory);
 
@@ -86,7 +85,6 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
     createMetadataFile(v2SegmentDirectory, v3TempDirectory);
     copyCreationMetadataIfExists(v2SegmentDirectory, v3TempDirectory);
-    copyLuceneTextIndexIfExists(v2SegmentDirectory, v3TempDirectory);
     copyIndexData(v2SegmentDirectory, v2Metadata, v3TempDirectory);
 
     File newLocation = SegmentDirectoryPaths.segmentDirectoryFor(v2SegmentDirectory, SegmentVersion.v3);
@@ -147,31 +145,20 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         SegmentDirectory v3Segment = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
             .load(v3Directory.toURI(), new SegmentDirectoryLoaderContext.Builder().setSegmentName(v2Metadata.getName())
                 .setSegmentDirectoryConfigs(configuration).build())) {
-
-      // for each dictionary and each fwdIndex, copy that to newDirectory buffer
-      Set<String> allColumns = v2Metadata.getAllColumns();
       try (SegmentDirectory.Reader v2DataReader = v2Segment.createReader();
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
-        for (String column : allColumns) {
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.DICTIONARY);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.FORWARD_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.NULLVALUE_VECTOR);
+        for (String column : v2Metadata.getAllColumns()) {
+          for (ColumnIndexType indexType : ColumnIndexType.values()) {
+            // NOTE: Text index is copied separately
+            if (indexType != ColumnIndexType.TEXT_INDEX) {
+              copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
+            }
+          }
         }
-
-        // Other indexes are intentionally stored at the end of the single file
-        for (String column : allColumns) {
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.INVERTED_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.FST_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.JSON_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.H3_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.RANGE_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.BLOOM_FILTER);
-        }
-
         v3DataWriter.save();
       }
     }
-
+    copyLuceneTextIndexIfExists(v2Directory, v3Directory);
     copyStarTreeV2(v2Directory, v3Directory);
   }
 

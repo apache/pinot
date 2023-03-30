@@ -190,8 +190,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         } else {
           return ((BigDecimal) l).compareTo(new BigDecimal((String) r));
         }
+      } else if (l instanceof byte[]) {
+        if (r instanceof byte[]) {
+          return ByteArray.compare((byte[]) l, (byte[]) r);
+        } else {
+          return ByteArray.compare((byte[]) l, ((ByteArray) r).getBytes());
+        }
       } else if (l instanceof ByteArray) {
-        return ((ByteArray) l).compareTo(new ByteArray((byte[]) r));
+        if (r instanceof ByteArray) {
+          return ((ByteArray) l).compareTo((ByteArray) r);
+        } else {
+          return ByteArray.compare(((ByteArray) l).getBytes(), (byte[]) r);
+        }
       } else if (l instanceof Timestamp) {
         return ((Timestamp) l).compareTo((Timestamp) r);
       } else if (l instanceof int[]) {

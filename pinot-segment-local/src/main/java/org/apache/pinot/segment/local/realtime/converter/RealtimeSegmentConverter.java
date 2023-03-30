@@ -34,6 +34,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -125,8 +126,10 @@ public class RealtimeSegmentConverter {
   @VisibleForTesting
   public static Schema getUpdatedSchema(Schema original) {
     Schema newSchema = new Schema();
-    for (String col : original.getPhysicalColumnNames()) {
-      newSchema.addField(original.getFieldSpecFor(col));
+    for (FieldSpec fieldSpec : original.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
     }
     return newSchema;
   }
