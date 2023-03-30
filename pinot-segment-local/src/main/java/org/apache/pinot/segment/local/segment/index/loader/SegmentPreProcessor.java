@@ -114,7 +114,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       indexHandlers.add(forwardHandler);
       forwardHandler.updateIndices(segmentWriter);
 
-      // Now that ForwardIndexHandler.updateIndeces has been updated, we can run all other indexes in any order
+      // Now that ForwardIndexHandler.updateIndices has been updated, we can run all other indexes in any order
 
       _segmentMetadata = new SegmentMetadataImpl(indexDir);
       _segmentDirectory.reloadMetadata();
