@@ -132,6 +132,7 @@ public class TestUtils {
         }
         Thread.sleep(checkIntervalMs);
       } catch (InterruptedException e) {
+        lastError = e;
         break;
       } catch (Exception e) {
         lastError = e;
