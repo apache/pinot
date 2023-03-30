@@ -18,39 +18,15 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
 /**
  * The segment pruner prunes the selected segments based on the query.
  */
-public interface SegmentPruner {
-
-  /**
-   * Initializes the segment pruner with the ideal state, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
-   * only once before calling other methods.
-   */
-  void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments, List<ZNRecord> znRecords);
-
-  /**
-   * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
-   * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
-   */
-  void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      List<String> pulledSegments, List<ZNRecord> znRecords);
-
-  /**
-   * Refreshes the metadata for the given segment (called when segment is getting refreshed).
-   */
-  void refreshSegment(String segment, @Nullable ZNRecord znRecord);
+public interface SegmentPruner extends SegmentZkMetadataFetchListener {
 
   /**
    * Prunes the segments queried by the given broker request, returns the selected segments to be queried.

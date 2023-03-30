@@ -265,8 +265,9 @@ public class SegmentPrunerTest extends ControllerTest {
 
     SinglePartitionColumnSegmentPruner singlePartitionColumnSegmentPruner =
         new SinglePartitionColumnSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN_1);
-    SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore,
-        Collections.singletonList(singlePartitionColumnSegmentPruner));
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME,
+        _propertyStore);
+    segmentZkMetadataFetcher.registerListener(singlePartitionColumnSegmentPruner);
     Set<String> onlineSegments = new HashSet<>();
     segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
     assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest1, Collections.emptySet()),
@@ -352,8 +353,8 @@ public class SegmentPrunerTest extends ControllerTest {
     MultiPartitionColumnsSegmentPruner multiPartitionColumnsSegmentPruner =
         new MultiPartitionColumnsSegmentPruner(OFFLINE_TABLE_NAME,
             Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()));
-    segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore,
-        Collections.singletonList(multiPartitionColumnsSegmentPruner));
+    segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.registerListener(multiPartitionColumnsSegmentPruner);
     segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
     assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest1, Collections.emptySet()),
         Collections.emptySet());
@@ -408,7 +409,8 @@ public class SegmentPrunerTest extends ControllerTest {
         _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME,
-        _propertyStore, Collections.singletonList(segmentPruner));
+        _propertyStore);
+    segmentZkMetadataFetcher.registerListener(segmentPruner);
     segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
     assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
@@ -421,8 +423,8 @@ public class SegmentPrunerTest extends ControllerTest {
     // Initialize with non-empty onlineSegments
     // Segments without metadata (not updated yet) should not be pruned
     segmentPruner = SegmentPrunerFactory.createTimeSegmentPruner(tableConfig, _propertyStore);
-    segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME, _propertyStore,
-        Collections.singletonList(segmentPruner));
+    segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.registerListener(segmentPruner);
     String newSegment = "newSegment";
     onlineSegments.add(newSegment);
     segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
@@ -552,7 +554,8 @@ public class SegmentPrunerTest extends ControllerTest {
 
     TimeSegmentPruner segmentPruner = SegmentPrunerFactory.createTimeSegmentPruner(tableConfig, _propertyStore);
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME,
-        _propertyStore, Collections.singletonList(segmentPruner));
+        _propertyStore);
+    segmentZkMetadataFetcher.registerListener(segmentPruner);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, RAW_TABLE_NAME);
     DateTimeFormatSpec dateTimeFormatSpec = schema.getSpecForTimeColumn(TIME_COLUMN).getFormatSpec();
 
@@ -594,7 +597,8 @@ public class SegmentPrunerTest extends ControllerTest {
 
     TimeSegmentPruner segmentPruner = SegmentPrunerFactory.createTimeSegmentPruner(tableConfig, _propertyStore);
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME,
-        _propertyStore, Collections.singletonList(segmentPruner));
+        _propertyStore);
+    segmentZkMetadataFetcher.registerListener(segmentPruner);
     Set<String> onlineSegments = new HashSet<>();
     String segment0 = "segment0";
     onlineSegments.add(segment0);
@@ -625,7 +629,8 @@ public class SegmentPrunerTest extends ControllerTest {
     // init with list of segments
     EmptySegmentPruner segmentPruner = new EmptySegmentPruner(tableConfig);
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME,
-        _propertyStore, Collections.singletonList(segmentPruner));
+        _propertyStore);
+    segmentZkMetadataFetcher.registerListener(segmentPruner);
     Set<String> onlineSegments = new HashSet<>();
     String segment0 = "segment0";
     onlineSegments.add(segment0);
@@ -643,8 +648,8 @@ public class SegmentPrunerTest extends ControllerTest {
 
     // init with empty list of segments
     segmentPruner = new EmptySegmentPruner(tableConfig);
-    segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME, _propertyStore,
-        Collections.singletonList(segmentPruner));
+    segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.registerListener(segmentPruner);
     onlineSegments.clear();
     segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());

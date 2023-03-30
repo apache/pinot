@@ -37,21 +37,56 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.AssertJUnit.fail;
 
 
 public class SegmentZkMetadataFetcherTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
 
   @Test
+  public void testSegmentZkMetadataFetcherShouldNotAllowIncorrectRegisterOrInitBehavior() {
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
+    IdealState idealState = Mockito.mock(IdealState.class);
+    ExternalView externalView = Mockito.mock(ExternalView.class);
+
+    // empty listener at beginning
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME,
+        mockPropertyStore);
+    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 0);
+
+    // should allow register new listener
+    segmentZkMetadataFetcher.registerListener(mock(SegmentZkMetadataFetchListener.class));
+    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 1);
+
+    // should not allow register new listener once initialized
+    segmentZkMetadataFetcher.init(idealState, externalView, Collections.singleton("foo"));
+    try {
+      segmentZkMetadataFetcher.registerListener(mock(SegmentZkMetadataFetchListener.class));
+      fail();
+    } catch (RuntimeException rte) {
+      assertTrue(rte.getMessage().contains("has already been initialized"));
+    }
+
+    // should not allow duplicate init either
+    try {
+      segmentZkMetadataFetcher.init(idealState, externalView, Collections.singleton("foo"));
+      fail();
+    } catch (RuntimeException rte) {
+      assertTrue(rte.getMessage().contains("has already been initialized"));
+    }
+  }
+
+  @Test
   public void testSegmentZkMetadataFetcherShouldNotPullZkWhenNoPrunerRegistered() {
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME,
-        mockPropertyStore, Collections.emptyList());
+        mockPropertyStore);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
 
-    assertEquals(segmentZkMetadataFetcher.getPruners().size(), 0);
+    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 0);
     segmentZkMetadataFetcher.init(idealState, externalView, Collections.singleton("foo"));
     Mockito.verify(mockPropertyStore, times(0)).get(any(), any(), anyInt(), anyBoolean());
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, Collections.singleton("foo"));
@@ -77,12 +112,14 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     SegmentPruner pruner1 = mock(SegmentPruner.class);
     SegmentPruner pruner2 = mock(SegmentPruner.class);
     SegmentZkMetadataFetcher segmentZkMetadataFetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME,
-        mockPropertyStore, Arrays.asList(pruner1, pruner2));
+        mockPropertyStore);
+    segmentZkMetadataFetcher.registerListener(pruner1);
+    segmentZkMetadataFetcher.registerListener(pruner2);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = mock(IdealState.class);
     ExternalView externalView = mock(ExternalView.class);
 
-    assertEquals(segmentZkMetadataFetcher.getPruners().size(), 2);
+    assertEquals(segmentZkMetadataFetcher.getRegisteredListeners().size(), 2);
     // should call property store once for "foo" and "bar" as a batch
     segmentZkMetadataFetcher.init(idealState, externalView, ImmutableSet.of("foo", "bar"));
     verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("foo", "bar")), any(), anyInt(), anyBoolean());
