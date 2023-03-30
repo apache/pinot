@@ -53,6 +53,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
@@ -93,8 +94,7 @@ public class HttpClient implements AutoCloseable {
     SSLContext context = sslContext != null ? sslContext : TlsUtils.getSslContext();
     // Set NoopHostnameVerifier to skip validating hostname when uploading/downloading segments.
     SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(context, NoopHostnameVerifier.INSTANCE);
-    _httpClient = HttpClients.custom().setMaxConnTotal(httpClientConfig.getMaxConns())
-        .setMaxConnPerRoute(httpClientConfig.getMaxConnsPerRoute()).setSSLSocketFactory(csf).build();
+    _httpClient = buildCloseableHttpClient(httpClientConfig, csf);
   }
 
   public static HttpClient getInstance() {
@@ -464,6 +464,18 @@ public class HttpClient implements AutoCloseable {
   public static void setTimeout(RequestBuilder requestBuilder, int socketTimeoutMs) {
     RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(socketTimeoutMs).build();
     requestBuilder.setConfig(requestConfig);
+  }
+
+  private static CloseableHttpClient buildCloseableHttpClient(HttpClientConfig httpClientConfig,
+      SSLConnectionSocketFactory csf) {
+    HttpClientBuilder httpClientBuilder = HttpClients.custom().setSSLSocketFactory(csf);
+    if (httpClientConfig.getMaxConnTotal() > 0) {
+      httpClientBuilder.setMaxConnTotal(httpClientConfig.getMaxConnTotal());
+    }
+    if (httpClientConfig.getMaxConnPerRoute() > 0) {
+      httpClientBuilder.setMaxConnPerRoute(httpClientConfig.getMaxConnPerRoute());
+    }
+    return httpClientBuilder.build();
   }
 
   private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {

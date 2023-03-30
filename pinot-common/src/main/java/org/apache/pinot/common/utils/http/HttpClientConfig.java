@@ -26,23 +26,23 @@ public class HttpClientConfig {
   // Default config uses default values which are same as what Apache Commons Http-Client uses.
   public static final HttpClientConfig DEFAULT_HTTP_CLIENT_CONFIG = HttpClientConfig.newBuilder().build();
 
-  protected static final String MAX_CONNS_CONFIG_NAME = "http.client.max_conns";
-  protected static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.max_conns_per_route";
+  protected static final String MAX_CONNS_CONFIG_NAME = "http.client.maxConnTotal";
+  protected static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.maxConnPerRoute";
 
-  private final int _maxConns;
-  private final int _maxConnsPerRoute;
+  private final int _maxConnTotal;
+  private final int _maxConnPerRoute;
 
-  private HttpClientConfig(int maxConns, int maxConnsPerRoute) {
-    _maxConns = maxConns;
-    _maxConnsPerRoute = maxConnsPerRoute;
+  private HttpClientConfig(int maxConnTotal, int maxConnPerRoute) {
+    _maxConnTotal = maxConnTotal;
+    _maxConnPerRoute = maxConnPerRoute;
   }
 
-  public int getMaxConns() {
-    return _maxConns;
+  public int getMaxConnTotal() {
+    return _maxConnTotal;
   }
 
-  public int getMaxConnsPerRoute() {
-    return _maxConnsPerRoute;
+  public int getMaxConnPerRoute() {
+    return _maxConnPerRoute;
   }
 
   /**
@@ -69,8 +69,8 @@ public class HttpClientConfig {
   }
 
   public static class Builder {
-    private int _maxConns = 20;
-    private int _maxConnsPerRoute = 2;
+    private int _maxConns = -1;
+    private int _maxConnsPerRoute = -1;
 
     private Builder() {
     }

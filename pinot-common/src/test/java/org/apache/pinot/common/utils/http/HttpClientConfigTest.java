@@ -22,18 +22,22 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
-
 
 public class HttpClientConfigTest {
 
   @Test
   public void testNewBuilder() {
+    // Ensure config values are picked up by the builder.
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(HttpClientConfig.MAX_CONNS_CONFIG_NAME, "123");
     pinotConfiguration.setProperty(HttpClientConfig.MAX_CONNS_PER_ROUTE_CONFIG_NAME, "11");
     HttpClientConfig httpClientConfig = HttpClientConfig.newBuilder(pinotConfiguration).build();
-    Assert.assertEquals(123, httpClientConfig.getMaxConns());
-    Assert.assertEquals(11, httpClientConfig.getMaxConnsPerRoute());
+    Assert.assertEquals(123, httpClientConfig.getMaxConnTotal());
+    Assert.assertEquals(11, httpClientConfig.getMaxConnPerRoute());
+
+    // Ensure default builder uses negative values
+    HttpClientConfig defaultConfig = HttpClientConfig.newBuilder(new PinotConfiguration()).build();
+    Assert.assertTrue(defaultConfig.getMaxConnTotal() < 0, "default value should be < 0");
+    Assert.assertTrue(defaultConfig.getMaxConnPerRoute() < 0, "default value should be < 0");
   }
 }
