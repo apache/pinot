@@ -31,8 +31,8 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.planner.physical.PhysicalPlanContext;
-import org.apache.pinot.query.planner.physical.PhysicalPlanVisitor;
+import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
+import org.apache.pinot.query.planner.physical.DispatchablePlanVisitor;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
@@ -85,10 +85,10 @@ public class StagePlanner {
             RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, globalSenderNode);
 
     // perform physical plan conversion and assign workers to each stage.
-    PhysicalPlanContext physicalPlanContext = new PhysicalPlanContext(
+    DispatchablePlanContext physicalPlanContext = new DispatchablePlanContext(
         _workerManager, _requestId, _plannerContext, relRoot.fields
     );
-    PhysicalPlanVisitor.INSTANCE.constructPhysicalPlan(globalReceiverNode, physicalPlanContext);
+    DispatchablePlanVisitor.INSTANCE.constructDispatchablePlan(globalReceiverNode, physicalPlanContext);
     QueryPlan queryPlan = physicalPlanContext.getQueryPlan();
 
     // Run physical optimizations

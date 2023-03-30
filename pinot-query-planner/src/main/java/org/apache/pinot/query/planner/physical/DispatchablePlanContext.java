@@ -26,14 +26,14 @@ import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
-public class PhysicalPlanContext {
+public class DispatchablePlanContext {
   private final WorkerManager _workerManager;
   private final long _requestId;
   private final PlannerContext _plannerContext;
   private final List<Pair<Integer, String>> _fields;
   private final QueryPlan _queryPlan;
 
-  public PhysicalPlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
+  public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
       List<Pair<Integer, String>> resultFields) {
     _workerManager = workerManager;
     _requestId = requestId;

@@ -33,10 +33,10 @@ import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 
 
-public class PhysicalPlanVisitor implements StageNodeVisitor<Void, PhysicalPlanContext> {
-  public static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
+public class DispatchablePlanVisitor implements StageNodeVisitor<Void, DispatchablePlanContext> {
+  public static final DispatchablePlanVisitor INSTANCE = new DispatchablePlanVisitor();
 
-  private PhysicalPlanVisitor() {
+  private DispatchablePlanVisitor() {
   }
 
   /**
@@ -44,24 +44,24 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Void, PhysicalPlanC
    * @param globalReceiverNode
    * @param physicalPlanContext
    */
-  public void constructPhysicalPlan(StageNode globalReceiverNode, PhysicalPlanContext physicalPlanContext) {
-    globalReceiverNode.visit(PhysicalPlanVisitor.INSTANCE, physicalPlanContext);
+  public void constructDispatchablePlan(StageNode globalReceiverNode, DispatchablePlanContext physicalPlanContext) {
+    globalReceiverNode.visit(DispatchablePlanVisitor.INSTANCE, physicalPlanContext);
     computeWorkerAssignment(globalReceiverNode, physicalPlanContext);
   }
 
-  private StageMetadata getStageMetadata(StageNode node, PhysicalPlanContext context) {
+  private StageMetadata getStageMetadata(StageNode node, DispatchablePlanContext context) {
     return context.getQueryPlan().getStageMetadataMap().computeIfAbsent(
         node.getStageId(), (id) -> new StageMetadata());
   }
 
-  private void computeWorkerAssignment(StageNode node, PhysicalPlanContext context) {
+  private void computeWorkerAssignment(StageNode node, DispatchablePlanContext context) {
     int stageId = node.getStageId();
     context.getWorkerManager().assignWorkerToStage(stageId, context.getQueryPlan().getStageMetadataMap().get(stageId),
         context.getRequestId(), context.getPlannerContext().getOptions());
   }
 
   @Override
-  public Void visitAggregate(AggregateNode node, PhysicalPlanContext context) {
+  public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     StageMetadata stageMetadata = getStageMetadata(node, context);
     stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
@@ -69,7 +69,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Void, PhysicalPlanC
   }
 
   @Override
-  public Void visitWindow(WindowNode node, PhysicalPlanContext context) {
+  public Void visitWindow(WindowNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     StageMetadata stageMetadata = getStageMetadata(node, context);
     // TODO: Figure out a way to parallelize Empty OVER() and OVER(ORDER BY) so the computation can be done across
@@ -81,21 +81,21 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Void, PhysicalPlanC
   }
 
   @Override
-  public Void visitFilter(FilterNode node, PhysicalPlanContext context) {
+  public Void visitFilter(FilterNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getStageMetadata(node, context);
     return null;
   }
 
   @Override
-  public Void visitJoin(JoinNode node, PhysicalPlanContext context) {
+  public Void visitJoin(JoinNode node, DispatchablePlanContext context) {
     node.getInputs().forEach(join -> join.visit(this, context));
     getStageMetadata(node, context);
     return null;
   }
 
   @Override
-  public Void visitMailboxReceive(MailboxReceiveNode node, PhysicalPlanContext context) {
+  public Void visitMailboxReceive(MailboxReceiveNode node, DispatchablePlanContext context) {
     node.getSender().visit(this, context);
     getStageMetadata(node, context);
 
@@ -108,7 +108,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Void, PhysicalPlanC
   }
 
   @Override
-  public Void visitMailboxSend(MailboxSendNode node, PhysicalPlanContext context) {
+  public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getStageMetadata(node, context);
 
@@ -118,14 +118,14 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Void, PhysicalPlanC
   }
 
   @Override
-  public Void visitProject(ProjectNode node, PhysicalPlanContext context) {
+  public Void visitProject(ProjectNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getStageMetadata(node, context);
     return null;
   }
 
   @Override
-  public Void visitSort(SortNode node, PhysicalPlanContext context) {
+  public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     StageMetadata stageMetadata = getStageMetadata(node, context);
     stageMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
@@ -133,14 +133,14 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Void, PhysicalPlanC
   }
 
   @Override
-  public Void visitTableScan(TableScanNode node, PhysicalPlanContext context) {
+  public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
     StageMetadata stageMetadata = getStageMetadata(node, context);
     stageMetadata.addScannedTable(node.getTableName());
     return null;
   }
 
   @Override
-  public Void visitValue(ValueNode node, PhysicalPlanContext context) {
+  public Void visitValue(ValueNode node, DispatchablePlanContext context) {
     getStageMetadata(node, context);
     return null;
   }
