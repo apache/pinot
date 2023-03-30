@@ -373,7 +373,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
 
     // The compression type for an existing segment can only be determined by reading the forward index header.
-    try (ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.getReader(segmentReader, existingColMetadata)) {
+    try (ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(segmentReader, existingColMetadata)) {
       ChunkCompressionType existingCompressionType = fwdIndexReader.getCompressionType();
       Preconditions.checkState(existingCompressionType != null,
           "Existing compressionType cannot be null for raw forward index column=" + column);
@@ -444,7 +444,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private void rewriteRawMVForwardIndexForCompressionChange(String column, ColumnMetadata existingColMetadata,
       File indexDir, SegmentDirectory.Writer segmentWriter, ChunkCompressionType newCompressionType)
       throws Exception {
-    try (ForwardIndexReader<?> reader = ForwardIndexType.getReader(segmentWriter, existingColMetadata)) {
+    try (ForwardIndexReader<?> reader = ForwardIndexType.read(segmentWriter, existingColMetadata)) {
       // For VarByte MV columns like String and Bytes, the storage representation of each row contains the following
       // components:
       // 1. bytes required to store the actual elements of the MV row (A)
@@ -485,7 +485,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private void rewriteRawSVForwardIndexForCompressionChange(String column, ColumnMetadata existingColMetadata,
       File indexDir, SegmentDirectory.Writer segmentWriter, ChunkCompressionType newCompressionType)
       throws Exception {
-    try (ForwardIndexReader<?> reader = ForwardIndexType.getReader(segmentWriter, existingColMetadata)) {
+    try (ForwardIndexReader<?> reader = ForwardIndexType.read(segmentWriter, existingColMetadata)) {
       int lengthOfLongestEntry = reader.getLengthOfLongestEntry();
 
       IndexCreationContext context = IndexCreationContext.builder()
@@ -829,7 +829,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       throws Exception {
     int numDocs = existingColMetadata.getTotalDocs();
 
-    try (ForwardIndexReader<?> reader = ForwardIndexType.getReader(segmentWriter, existingColMetadata)) {
+    try (ForwardIndexReader<?> reader = ForwardIndexType.read(segmentWriter, existingColMetadata)) {
       // Note: Special Null handling is not necessary here. This is because, the existing default null value in the
       // raw forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also,
       // null value vectors maintain a bitmap of docIds. No handling is necessary there.
@@ -857,7 +857,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private void writeDictEnabledForwardIndex(String column, ColumnMetadata existingColMetadata,
       SegmentDirectory.Writer segmentWriter, File indexDir, SegmentDictionaryCreator dictionaryCreator)
       throws Exception {
-    try (ForwardIndexReader<?> reader = ForwardIndexType.getReader(segmentWriter, existingColMetadata)) {
+    try (ForwardIndexReader<?> reader = ForwardIndexType.read(segmentWriter, existingColMetadata)) {
       int lengthOfLongestEntry = reader.getLengthOfLongestEntry();
       IndexCreationContext.Builder builder =
           IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(existingColMetadata)
@@ -931,7 +931,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private void rewriteDictToRawForwardIndex(String column, ColumnMetadata existingColMetadata,
       SegmentDirectory.Writer segmentWriter, File indexDir)
       throws Exception {
-    try (ForwardIndexReader<?> reader = ForwardIndexType.getReader(segmentWriter, existingColMetadata)) {
+    try (ForwardIndexReader<?> reader = ForwardIndexType.read(segmentWriter, existingColMetadata)) {
       Dictionary dictionary = DictionaryIndexType.read(segmentWriter, existingColMetadata);
       IndexCreationContext.Builder builder =
           IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(existingColMetadata);

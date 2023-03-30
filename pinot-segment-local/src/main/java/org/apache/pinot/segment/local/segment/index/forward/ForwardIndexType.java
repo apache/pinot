@@ -192,12 +192,6 @@ public class ForwardIndexType
     return ForwardIndexReaderFactory.INSTANCE;
   }
 
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-      ColumnMetadata metadata)
-      throws IndexReaderConstraintException, IOException {
-    return StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);
-  }
-
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     if (columnMetadata.isSingleValue()) {
@@ -217,21 +211,34 @@ public class ForwardIndexType
 
   /**
    * Returns the forward index reader for the given column.
+   *
+   * This method will return the default reader, skipping any index overload.
    */
-  public static ForwardIndexReader<?> getReader(SegmentDirectory.Reader segmentReader,
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader,
       ColumnMetadata columnMetadata)
       throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
     return read(dataBuffer, columnMetadata);
   }
 
-  public static ForwardIndexReader read(SegmentDirectory.Reader directory, ColumnMetadata metadata)
-      throws IOException {
-    PinotDataBuffer buffer = directory.getIndexFor(metadata.getColumnName(), StandardIndexes.forward());
-    return ForwardIndexReaderFactory.createIndexReader(buffer, metadata);
-  }
-
+  /**
+   * Returns the forward index reader for the given column.
+   *
+   * This method will return the default reader, skipping any index overload.
+   */
   public static ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     return ForwardIndexReaderFactory.createIndexReader(dataBuffer, metadata);
+  }
+
+  /**
+   * Returns the forward index reader for the given column.
+   *
+   * This method will delegate on {@link StandardIndexes}, so the correct reader will be returned even when using
+   * index overload.
+   */
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+      ColumnMetadata metadata)
+      throws IndexReaderConstraintException, IOException {
+    return StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);
   }
 }

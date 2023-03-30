@@ -139,7 +139,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
         .build();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
         .createIndexCreator(context, bloomFilterConfig);
-        ForwardIndexReader forwardIndexReader = ForwardIndexType.getReader(segmentWriter, columnMetadata);
+        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       if (columnMetadata.isSingleValue()) {
         // SV
