@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue;
 
 import com.google.common.base.Preconditions;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -79,24 +80,40 @@ public class ColumnMinMaxValueGenerator {
     }
   }
 
-  private Set<String> getColumnsToAddMinMaxValue() {
+  private List<String> getColumnsToAddMinMaxValue() {
     Schema schema = _segmentMetadata.getSchema();
-    Set<String> columnsToAddMinMaxValue = new HashSet<>(schema.getPhysicalColumnNames());
+    List<String> columnsToAddMinMaxValue = new ArrayList<>();
 
     // mode ALL - use all columns
     // mode NON_METRIC - use all dimensions and time columns
     // mode TIME - use only time columns
     switch (_columnMinMaxValueGeneratorMode) {
-      case TIME:
-        columnsToAddMinMaxValue.removeAll(schema.getDimensionNames());
-        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+      case ALL:
+        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+          if (!fieldSpec.isVirtualColumn()) {
+            columnsToAddMinMaxValue.add(fieldSpec.getName());
+          }
+        }
         break;
       case NON_METRIC:
-        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+          if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
+            columnsToAddMinMaxValue.add(fieldSpec.getName());
+          }
+        }
+        break;
+      case TIME:
+        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+          if (!fieldSpec.isVirtualColumn() && (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME
+              || fieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME)) {
+            columnsToAddMinMaxValue.add(fieldSpec.getName());
+          }
+        }
         break;
       default:
-        break;
+        throw new IllegalStateException("Unsupported generator mode: " + _columnMinMaxValueGeneratorMode);
     }
+
     return columnsToAddMinMaxValue;
   }
 

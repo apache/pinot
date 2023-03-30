@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -75,7 +76,8 @@ public class SegmentGeneratorConfig implements Serializable {
   public static final double DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD = 0.85d;
 
   private final TableConfig _tableConfig;
-  private final Map<String, String> _customProperties = new HashMap<>();
+  // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
+  private final TreeMap<String, String> _customProperties = new TreeMap<>();
   private final Set<String> _rawIndexCreationColumns = new HashSet<>();
   private final Map<String, ChunkCompressionType> _rawIndexCompressionType = new HashMap<>();
   private final List<String> _invertedIndexCreationColumns = new ArrayList<>();

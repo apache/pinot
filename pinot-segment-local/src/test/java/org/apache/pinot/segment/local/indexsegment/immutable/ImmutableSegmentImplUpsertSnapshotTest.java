@@ -23,6 +23,7 @@ import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -111,7 +112,7 @@ public class ImmutableSegmentImplUpsertSnapshotTest {
     driver.init(config);
     driver.build();
     _segmentMetadata = Mockito.mock(SegmentMetadataImpl.class);
-    Mockito.when(_segmentMetadata.getColumnMetadataMap()).thenReturn(new HashMap<>());
+    Mockito.when(_segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>());
     Mockito.when(_segmentMetadata.getIndexDir()).thenReturn(INDEX_DIR);
     _immutableSegmentImpl = new ImmutableSegmentImpl(_segmentDirectory, _segmentMetadata, new HashMap<>(), null);
 

@@ -174,6 +174,9 @@ public class CalciteSqlParser {
       }
       tableNames.addAll(extractTableNamesFromNode(((SqlWith) sqlNode).body));
       tableNames.removeAll(aliases);
+    } else if (sqlNode instanceof SqlExplain) {
+      SqlExplain explain = (SqlExplain) sqlNode;
+      tableNames.addAll(extractTableNamesFromNode(explain.getExplicandum()));
     }
     return tableNames;
   }
