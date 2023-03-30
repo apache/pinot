@@ -399,24 +399,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return null;
     }
 
-    Object alternativeValue = textConfig.getRawValueForTextIndex();
+    Object rawValue = textConfig.getRawValueForTextIndex();
 
-    if (alternativeValue == null) {
+    if (rawValue == null) {
       return null;
     } else if (!fieldSpec.isSingleValueField()) {
       if (fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING) {
-        if (!(alternativeValue instanceof String[])) {
-          alternativeValue = new String[]{String.valueOf(alternativeValue)};
+        if (!(rawValue instanceof String[])) {
+          rawValue = new String[]{String.valueOf(rawValue)};
         }
       } else if (fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
-        if (!(alternativeValue instanceof String[])) {
-          alternativeValue = new byte[][]{String.valueOf(alternativeValue).getBytes(StandardCharsets.UTF_8)};
+        if (!(rawValue instanceof String[])) {
+          rawValue = new byte[][]{String.valueOf(rawValue).getBytes(StandardCharsets.UTF_8)};
         }
       } else {
         throw new RuntimeException("Text Index is only supported for STRING and BYTES stored type");
       }
     }
-    return alternativeValue;
+    return rawValue;
   }
 
   @Override
