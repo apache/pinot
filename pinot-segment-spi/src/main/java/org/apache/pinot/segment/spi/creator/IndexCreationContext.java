@@ -143,7 +143,7 @@ public interface IndexCreationContext {
           .withMaxNumberOfMultiValueElements(columnMetadata.getMaxNumberOfMultiValues());
     }
 
-    public Builder withIsOptimizedDictionary(boolean optimized) {
+    public Builder withOptimizedDictionary(boolean optimized) {
       _optimizedDictionary = optimized;
       return this;
     }
