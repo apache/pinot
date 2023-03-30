@@ -114,7 +114,7 @@ public class ForwardIndexCreatorFactory {
 
   /**
    * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is single valued.
+   * Assumes that column to be indexed is multi-valued.
    *
    * @param file Output index file
    * @param column Column name
