@@ -98,9 +98,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
           if (fieldConfigList == null) {
             return Collections.emptyMap();
           }
-          // TODO(index-spi): This doesn't feel right, but it is here to keep backward compatibility.
-          //  If there are two text indexes in two different columns and one explicitly specifies LUCENE and the but
-          //  the other specifies native, both are created as native. No error is thrown and no log is shown.
           FSTType fstType = FSTType.LUCENE;
           for (FieldConfig fieldConfig : fieldConfigList) {
             if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
