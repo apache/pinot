@@ -19,15 +19,24 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
-/**
- * Index creator for text indexes.
- *
- * In order to create FST indexes, {@link FSTIndexCreator} must be used.
- */
-public interface TextIndexCreator extends IndexCreator {
+public interface FSTIndexCreator extends IndexCreator {
+
+  @Override
+  default void add(@Nonnull Object value, int dictId)
+      throws IOException {
+    // FST indexes should do nothing when called for each row
+  }
+
+  @Override
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+      throws IOException {
+    // FST indexes should do nothing when called for each row
+  }
 
   /**
    * Adds the next document.
@@ -38,10 +47,4 @@ public interface TextIndexCreator extends IndexCreator {
    * Adds a set of documents to the index
    */
   void add(String[] document, int length);
-
-  /**
-   * Seals the index and flushes it to disk.
-   */
-  void seal()
-      throws IOException;
 }

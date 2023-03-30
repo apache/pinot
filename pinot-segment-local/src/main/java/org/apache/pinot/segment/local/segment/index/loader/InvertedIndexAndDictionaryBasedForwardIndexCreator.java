@@ -113,7 +113,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private PinotDataBuffer _forwardIndexMaxSizeBuffer;
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
-      boolean dictionaryEnabled, ForwardIndexConfig forwConf, SegmentDirectory.Writer segmentWriter,
+      boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
       boolean isTemporaryForwardIndex)
       throws IOException {
     _columnName = columnName;
@@ -144,7 +144,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       fileExtension = _singleValue ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
           : V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
     }
-    _forwardIndexConfig = forwConf;
+    _forwardIndexConfig = fwdConf;
     _forwardIndexFile = new File(indexDir, columnName + fileExtension);
     _forwardIndexValueBufferFile = new File(indexDir, columnName + FORWARD_INDEX_VALUE_BUFFER_SUFFIX);
     _forwardIndexLengthBufferFile = new File(indexDir, columnName + FORWARD_INDEX_LENGTH_BUFFER_SUFFIX);

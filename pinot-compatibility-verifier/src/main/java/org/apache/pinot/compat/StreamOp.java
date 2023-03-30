@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -303,8 +304,14 @@ public class StreamOp extends BaseOp {
 
   private void waitForDocsLoaded(String tableName, long targetDocs, long timeoutMs) {
     LOGGER.info("Wait Doc to load ...");
+    AtomicLong loadedDocs = new AtomicLong(-1);
     TestUtils.waitForCondition(
-        () -> fetchExistingTotalDocs(tableName) == targetDocs, 100L, timeoutMs,
-        "Failed to load " + targetDocs + " documents", true, Duration.ofSeconds(1));
+        () -> {
+          long existingTotalDocs = fetchExistingTotalDocs(tableName);
+          loadedDocs.set(existingTotalDocs);
+          return existingTotalDocs == targetDocs;
+        }, 100L, timeoutMs,
+        "Failed to load " + targetDocs + " documents. Found " + loadedDocs.get() + " instead", true,
+        Duration.ofSeconds(1));
   }
 }

@@ -22,6 +22,7 @@ package org.apache.pinot.segment.spi.index;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
@@ -97,8 +98,8 @@ public class StandardIndexes {
         IndexService.getInstance().get(BLOOM_FILTER_ID);
   }
 
-  public static IndexType<FstIndexConfig, TextIndexReader, TextIndexCreator> fst() {
-    return (IndexType<FstIndexConfig, TextIndexReader, TextIndexCreator>)
+  public static IndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> fst() {
+    return (IndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>)
         IndexService.getInstance().get(FST_ID);
   }
 

@@ -118,10 +118,7 @@ public class InvertedIndexType
       return reader;
     }
     ForwardIndexReader fwdReader = indexContainer.getIndex(StandardIndexes.forward());
-    if (fwdReader != null && fwdReader instanceof SortedIndexReader) {
-      return (SortedIndexReader) fwdReader;
-    }
-    return null;
+    return fwdReader instanceof SortedIndexReader ? (SortedIndexReader) fwdReader : null;
   }
 
   @Override

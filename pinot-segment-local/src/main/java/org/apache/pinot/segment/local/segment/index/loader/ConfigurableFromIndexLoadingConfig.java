@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.util.Map;
-import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
 
@@ -32,14 +31,16 @@ public interface ConfigurableFromIndexLoadingConfig<C extends IndexConfig> {
 
 
   /**
-   * Returns a {@link ColumnConfigDeserializer} that can be used to deserialize the index config.
+   * Returns a map that can be used to get the index config.
    *
-   * This deserializer is used with higher priority whenever the index configuration needs to be read from an
+   * This map is used with higher priority whenever the index configuration needs to be read from an
    * {@link IndexLoadingConfig}.
    *
    * Sometimes {@link IndexLoadingConfig} is not completely configured and
    * {@link IndexLoadingConfig#getAllKnownColumns()} does not return all columns in the table.
-   * Therefore the returned deserializer can be partial.
+   * Therefore the returned map may not have an entry for each column in the actual schema.
+   *
+   * @return a map whose keys are the column names and the values are the index configuration for that column.
    */
   Map<String, C> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig);
 }

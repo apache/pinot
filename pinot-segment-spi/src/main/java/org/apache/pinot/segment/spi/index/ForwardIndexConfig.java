@@ -96,6 +96,12 @@ public class ForwardIndexConfig extends IndexConfig {
     public Builder() {
     }
 
+    public Builder(ForwardIndexConfig other) {
+      _chunkCompressionType = other.getChunkCompressionType();
+      _deriveNumDocsPerChunk = other._deriveNumDocsPerChunk;
+      _rawIndexWriterVersion = other._rawIndexWriterVersion;
+    }
+
     public Builder withCompressionType(ChunkCompressionType chunkCompressionType) {
       _chunkCompressionType = chunkCompressionType;
       return this;

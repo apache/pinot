@@ -104,15 +104,18 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Update single-column indices, like inverted index, json index etc.
-
-      // ForwardIndexHandler may modify the segment metadata while rewriting forward index to create a dictionary
-      // This new metadata is needed to construct other indexes like RangeIndex.
-      // Therefore we need to be sure that ForwardIndexHandler is processed before all other indexes
-
       List<IndexHandler> indexHandlers = new ArrayList<>();
+
+      // We cannot just create all the index handlers in a random order.
+      // Specifically, ForwardIndexHandler needs to be executed first. This is because it modifies the segment metadata
+      // while rewriting forward index to create a dictionary. Some other handlers (like the range one) assume that
+      // metadata was already been modified by ForwardIndexHandler.
       IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
       indexHandlers.add(forwardHandler);
       forwardHandler.updateIndices(segmentWriter);
+
+      // Now that ForwardIndexHandler.updateIndeces has been updated, we can run all other indexes in any order
+
       _segmentMetadata = new SegmentMetadataImpl(indexDir);
       _segmentDirectory.reloadMetadata();
 

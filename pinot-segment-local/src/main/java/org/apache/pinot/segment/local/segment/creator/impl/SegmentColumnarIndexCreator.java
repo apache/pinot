@@ -196,9 +196,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
       // TODO: Remove this when values stored as ForwardIndex stop depending on TextIndex config
       IndexCreator oldFwdCreator = creatorsByIndex.get(forwardIdx);
-      if (oldFwdCreator instanceof ForwardIndexCreator) { // this implies that oldFwdCreator != null
-        Object fakeForwardValue = calculateAlternativeValue(dictEnabledColumn, config, fieldSpec);
+      if (oldFwdCreator != null) {
+        Object fakeForwardValue = calculateRawValueForTextIndex(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
+          @SuppressWarnings("unchecked")
           ForwardIndexCreator castedOldFwdCreator = (ForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
               new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
@@ -223,13 +224,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo, SegmentGeneratorConfig segmentCreationSpec) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(config);
     // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
-    if (config.getConfig(StandardIndexes.forward()).isEnabled() && columnIndexCreationInfo.isSorted()) {
-      builder.add(StandardIndexes.forward(), new ForwardIndexConfig.Builder()
+    ForwardIndexConfig fwdConfig = config.getConfig(StandardIndexes.forward());
+    if (!fwdConfig.isEnabled() && columnIndexCreationInfo.isSorted()) {
+      builder.add(StandardIndexes.forward(), new ForwardIndexConfig.Builder(fwdConfig)
           .withLegacyProperties(segmentCreationSpec.getColumnProperties(), columnName)
           .build());
     }
     // Initialize inverted index creator; skip creating inverted index if sorted
-    if (config.getConfig(StandardIndexes.inverted()).isEnabled() && columnIndexCreationInfo.isSorted()) {
+    if (columnIndexCreationInfo.isSorted()) {
       builder.undeclare(StandardIndexes.inverted());
     }
     return builder.build();
@@ -387,7 +389,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Nullable
-  private Object calculateAlternativeValue(boolean dictEnabledColumn, FieldIndexConfigs configs, FieldSpec fieldSpec) {
+  private Object calculateRawValueForTextIndex(boolean dictEnabledColumn, FieldIndexConfigs configs,
+      FieldSpec fieldSpec) {
     if (dictEnabledColumn) {
       return null;
     }
@@ -396,24 +399,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return null;
     }
 
-    Object alternativeValue = textConfig.getRawValueForTextIndex();
+    Object rawValue = textConfig.getRawValueForTextIndex();
 
-    if (alternativeValue == null) {
+    if (rawValue == null) {
       return null;
     } else if (!fieldSpec.isSingleValueField()) {
       if (fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING) {
-        if (!(alternativeValue instanceof String[])) {
-          alternativeValue = new String[]{String.valueOf(alternativeValue)};
+        if (!(rawValue instanceof String[])) {
+          rawValue = new String[]{String.valueOf(rawValue)};
         }
       } else if (fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
-        if (!(alternativeValue instanceof String[])) {
-          alternativeValue = new byte[][]{String.valueOf(alternativeValue).getBytes(StandardCharsets.UTF_8)};
+        if (!(rawValue instanceof String[])) {
+          rawValue = new byte[][]{String.valueOf(rawValue).getBytes(StandardCharsets.UTF_8)};
         }
       } else {
         throw new RuntimeException("Text Index is only supported for STRING and BYTES stored type");
       }
     }
-    return alternativeValue;
+    return rawValue;
   }
 
   @Override
