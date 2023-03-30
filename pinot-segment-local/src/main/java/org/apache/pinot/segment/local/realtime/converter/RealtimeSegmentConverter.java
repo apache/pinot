@@ -130,11 +130,13 @@ public class RealtimeSegmentConverter {
   }
 
   private <C extends IndexConfig> void addIndexOrDefault(SegmentGeneratorConfig genConfig,
-      IndexType<C, ?, ?> indexType, Collection<String> columns, C defaultConfig) {
+      IndexType<C, ?, ?> indexType, @Nullable Collection<String> columns, C defaultConfig) {
     Map<String, C> config = indexType.getConfig(genConfig.getTableConfig(), genConfig.getSchema());
-    for (String column : columns) {
-      C colConf = config.get(column);
-      genConfig.setIndexOn(indexType, colConf == null ? defaultConfig : colConf, column);
+    if (columns != null) {
+      for (String column : columns) {
+        C colConf = config.get(column);
+        genConfig.setIndexOn(indexType, colConf == null ? defaultConfig : colConf, column);
+      }
     }
   }
 
