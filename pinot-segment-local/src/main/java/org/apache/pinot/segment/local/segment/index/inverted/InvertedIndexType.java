@@ -132,7 +132,7 @@ public class InvertedIndexType
     return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig);
   }
 
-  private static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
+  public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 
     private ReaderFactory() {
