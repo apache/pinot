@@ -124,11 +124,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
-  public boolean storedAsBuffer() {
-    return false;
-  }
-
-  @Override
   protected IndexReaderFactory<TextIndexReader> createReaderFactory() {
     return ReaderFactory.INSTANCE;
   }

@@ -91,15 +91,6 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
 
   String getFileExtension(ColumnMetadata columnMetadata);
 
-  /**
-   * Returns whether the index is stored as a buffer or not.
-   *
-   * Most indexes are stored as a buffer, but for example TextIndexType is stored in a separate lucene file.
-   */
-  default boolean storedAsBuffer() {
-    return true;
-  }
-
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig);
 }
