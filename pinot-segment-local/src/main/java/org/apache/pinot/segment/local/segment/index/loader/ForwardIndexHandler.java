@@ -144,8 +144,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             _tmpForwardIndexColumns.add(column);
             break;
           case ENABLE_FORWARD_INDEX:
-            ColumnMetadata columnMetadata = createForwardIndexIfNeeded(segmentWriter, column,
-                false);
+            ColumnMetadata columnMetadata = createForwardIndexIfNeeded(segmentWriter, column, false);
             if (columnMetadata.hasDictionary()) {
               if (!segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
                 throw new IllegalStateException(String.format("Dictionary should still exist after rebuilding "
