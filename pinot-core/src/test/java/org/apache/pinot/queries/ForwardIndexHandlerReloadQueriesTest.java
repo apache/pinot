@@ -35,7 +35,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -191,7 +190,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     _invertedIndexColumns = Arrays.asList("column8", "column9");
     segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
     segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-    RangeIndexConfig config = new RangeIndexConfig(RangeIndexType.DEFAULT_RANGE_INDEX_VERSION);
+    RangeIndexConfig config = RangeIndexConfig.DEFAULT;
     segmentGeneratorConfig.setIndexOn(StandardIndexes.range(), config, _rangeIndexColumns);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable

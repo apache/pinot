@@ -26,6 +26,7 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class RangeIndexConfig extends IndexConfig {
+  public static final RangeIndexConfig DEFAULT = new RangeIndexConfig(true, 2);
   public static final RangeIndexConfig DISABLED = new RangeIndexConfig(false, null);
 
   private final int _version;

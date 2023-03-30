@@ -59,13 +59,6 @@ import org.apache.pinot.spi.data.Schema;
 public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<RangeIndexConfig> {
 
-  /**
-   * The default range index version used when not specified in the TableConfig.
-   *
-   * This value should be equal to the one used in {@link org.apache.pinot.spi.config.table.IndexingConfig}
-   */
-  public static final int DEFAULT_RANGE_INDEX_VERSION = 2;
-
   protected RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
   }
@@ -102,7 +95,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
           }
           int rangeVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
           if (rangeVersion == 0) {
-            rangeVersion = DEFAULT_RANGE_INDEX_VERSION;
+            rangeVersion = RangeIndexConfig.DEFAULT.getVersion();
           }
           Map<String, RangeIndexConfig> result = new HashMap<>();
           for (String col : rangeIndexColumns) {

@@ -339,7 +339,7 @@ public class SegmentGeneratorConfig implements Serializable {
   @VisibleForTesting
   public void setRangeIndexCreationColumns(List<String> rangeIndexCreationColumns) {
     if (rangeIndexCreationColumns != null) {
-      setIndexOn(StandardIndexes.range(), new RangeIndexConfig(2), rangeIndexCreationColumns);
+      setIndexOn(StandardIndexes.range(), RangeIndexConfig.DEFAULT, rangeIndexCreationColumns);
     }
   }
 

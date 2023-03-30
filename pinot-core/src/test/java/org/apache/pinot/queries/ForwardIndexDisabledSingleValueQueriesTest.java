@@ -35,7 +35,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -179,7 +178,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6", "column7"));
     segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
         _forwardIndexDisabledColumns);
-    RangeIndexConfig rangeIndexConfig = new RangeIndexConfig(RangeIndexType.DEFAULT_RANGE_INDEX_VERSION);
+    RangeIndexConfig rangeIndexConfig = RangeIndexConfig.DEFAULT;
     segmentGeneratorConfig.setIndexOn(StandardIndexes.range(), rangeIndexConfig, "column6");
 
     // Build the index segment.
