@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -82,7 +83,8 @@ public class SegmentGeneratorConfig implements Serializable {
   public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
 
   private final TableConfig _tableConfig;
-  private final Map<String, String> _customProperties = new HashMap<>();
+  // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
+  private final TreeMap<String, String> _customProperties = new TreeMap<>();
   private final Set<String> _rawIndexCreationColumns = new HashSet<>();
   private final Map<String, ChunkCompressionType> _rawIndexCompressionType = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();

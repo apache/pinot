@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -84,7 +85,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
 
   private SegmentGeneratorConfig _config;
-  private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
+  private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   /**
    * Contains, indexed by column name, the creator associated with each index type.
@@ -102,7 +103,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
       throws Exception {
     _docIdCounter = 0;
     _config = segmentCreationSpec;

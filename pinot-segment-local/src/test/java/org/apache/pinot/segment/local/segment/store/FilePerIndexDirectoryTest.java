@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
@@ -260,7 +261,7 @@ public class FilePerIndexDirectoryTest {
 
     // Need segmentMetadata to tell the full set of columns in this segment.
     when(_segmentMetadata.getAllColumns())
-        .thenReturn(new HashSet<>(Arrays.asList("col1", "col2", "col3", "col4", "col5", "foo", "bar")));
+        .thenReturn(new TreeSet<>(Arrays.asList("col1", "col2", "col3", "col4", "col5", "foo", "bar")));
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.forward()),
           new HashSet<>(Arrays.asList("col1", "col3")));

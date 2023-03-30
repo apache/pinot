@@ -28,8 +28,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration.ConfigurationException;
@@ -101,7 +101,7 @@ public class SingleFileIndexDirectoryTest {
     }
     writtenBuffer.close();
 
-    Mockito.when(_segmentMetadata.getAllColumns()).thenReturn(new HashSet<String>(Arrays.asList("foo")));
+    Mockito.when(_segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Arrays.asList("foo")));
     try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
         ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", StandardIndexes.dictionary())) {
       assertEquals(1024, readBuffer.size());
@@ -300,7 +300,7 @@ public class SingleFileIndexDirectoryTest {
       FileUtils.touch(srcTmp);
     }
     File dstTmp = new File(TEMP_DIR, UUID.randomUUID().toString());
-    Map<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(ImmutableMap
+    TreeMap<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(ImmutableMap
         .of(new IndexKey("foo", StandardIndexes.inverted()),
             new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 0),
             new IndexKey("foo", StandardIndexes.forward()),
@@ -364,7 +364,7 @@ public class SingleFileIndexDirectoryTest {
 
     // Need segmentMetadata to tell the full set of columns in this segment.
     when(_segmentMetadata.getAllColumns())
-        .thenReturn(new HashSet<>(Arrays.asList("col1", "col2", "col3", "col4", "foo", "bar")));
+        .thenReturn(new TreeSet<>(Arrays.asList("col1", "col2", "col3", "col4", "foo", "bar")));
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.forward()),
           new HashSet<>(Arrays.asList("col1", "col3")));

@@ -3065,6 +3065,18 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tableNames.get(1), "tbl2");
     Assert.assertEquals(tableNames.get(2), "tbl3");
     Assert.assertEquals(tableNames.get(3), "tbl4");
+
+    // query with aliases, JOIN, IN/NOT-IN, group-by and explain
+    query = "explain plan for with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1), "
+        + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
+        + "select sum(col1) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from tbl4)";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+    Assert.assertEquals(tableNames.get(2), "tbl3");
+    Assert.assertEquals(tableNames.get(3), "tbl4");
   }
 
   @Test
