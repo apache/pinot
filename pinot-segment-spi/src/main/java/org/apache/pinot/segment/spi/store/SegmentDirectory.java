@@ -56,7 +56,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  *     SegmentDirectory.Reader reader =
  *           segmentDir.createReader();
  *     try {
- *       PinotDataBufferOld col1Dictionary = reader.getIndexFor("col1Dictionary", DictoionaryIndexType.INSTANCE);
+ *       PinotDataBufferOld col1Dictionary = reader.getIndexFor("col1Dictionary", StandardIndexes.dictionary());
  *     } catch (Exception e) {
  *       // handle error
  *     } finally {
