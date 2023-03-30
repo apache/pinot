@@ -91,11 +91,11 @@ public class DictionaryIndexType
   public Map<String, DictionaryIndexConfig> fromIndexLoadingConfig(
       IndexLoadingConfig indexLoadingConfig) {
     Map<String, DictionaryIndexConfig> result = new HashMap<>();
-    Set<String> noDictionaryColumns = indexLoadingConfig.getNoDictionaryColumns();
+    Set<String> noDictionaryCols = indexLoadingConfig.getNoDictionaryColumns();
     Set<String> onHeapCols = indexLoadingConfig.getOnHeapDictionaryColumns();
     Set<String> varLengthCols = indexLoadingConfig.getVarLengthDictionaryColumns();
     for (String column : indexLoadingConfig.getAllKnownColumns()) {
-      if (noDictionaryColumns.contains(column)) {
+      if (noDictionaryCols.contains(column)) {
         result.put(column, DictionaryIndexConfig.disabled());
       } else {
         result.put(column, new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column)));
