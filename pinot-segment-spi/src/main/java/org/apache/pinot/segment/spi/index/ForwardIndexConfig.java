@@ -34,13 +34,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class ForwardIndexConfig extends IndexConfig {
   public static final int DEFAULT_RAW_WRITER_VERSION = 2;
   public static final ForwardIndexConfig DISABLED = new ForwardIndexConfig(false, null, null, null);
+  public static final ForwardIndexConfig DEFAULT = new Builder().build();
 
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
   private final boolean _deriveNumDocsPerChunk;
   private final int _rawIndexWriterVersion;
-
-  public static final ForwardIndexConfig DEFAULT = new Builder().build();
 
   @JsonCreator
   public ForwardIndexConfig(@Nullable @JsonProperty("enabled") Boolean enabled,
