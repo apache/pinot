@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -32,8 +33,8 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -94,11 +95,12 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(_tableName);
     genConfig.setOutDir(_outputPath);
     genConfig.setSegmentName(_segmentName);
-    TextIndexConfig textConfig = new TextIndexConfigBuilder(genConfig.getFSTIndexType()).build();
-    genConfig.setIndexOn(StandardIndexes.text(), textConfig, _columnIndicesForRealtimeTable.getTextIndexColumns());
 
-    FstIndexConfig fstConfig = new FstIndexConfig(genConfig.getFSTIndexType());
-    genConfig.setIndexOn(StandardIndexes.fst(), fstConfig, _columnIndicesForRealtimeTable.getFstIndexColumns());
+    addIndexOrDefault(genConfig, StandardIndexes.text(), _columnIndicesForRealtimeTable.getTextIndexColumns(),
+        new TextIndexConfigBuilder(genConfig.getFSTIndexType()).build());
+
+    addIndexOrDefault(genConfig, StandardIndexes.fst(), _columnIndicesForRealtimeTable.getFstIndexColumns(),
+        new FstIndexConfig(genConfig.getFSTIndexType()));
 
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
@@ -124,6 +126,15 @@ public class RealtimeSegmentConverter {
         int numPartitions = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitions().size();
         serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
       }
+    }
+  }
+
+  private <C extends IndexConfig> void addIndexOrDefault(SegmentGeneratorConfig genConfig,
+      IndexType<C, ?, ?> indexType, Collection<String> columns, C defaultConfig) {
+    Map<String, C> config = indexType.getConfig(genConfig.getTableConfig(), genConfig.getSchema());
+    for (String column : columns) {
+      C colConf = config.get(column);
+      genConfig.setIndexOn(indexType, colConf == null ? defaultConfig : colConf, column);
     }
   }
 

@@ -98,26 +98,12 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
           if (fieldConfigList == null) {
             return Collections.emptyMap();
           }
-          FSTType fstType = FSTType.LUCENE;
-          for (FieldConfig fieldConfig : fieldConfigList) {
-            if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
-              Map<String, String> properties = fieldConfig.getProperties();
-              if (TextIndexUtils.isFstTypeNative(properties)) {
-                fstType = FSTType.NATIVE;
-              }
-            }
-          }
           Map<String, TextIndexConfig> result = new HashMap<>();
           for (FieldConfig fieldConfig : fieldConfigList) {
             if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
               String column = fieldConfig.getName();
               Map<String, String> properties = fieldConfig.getProperties();
-              // TODO(index-spi): This is how the index type should be detected
-              FSTType actualFstType = TextIndexUtils.isFstTypeNative(properties) ? FSTType.NATIVE : FSTType.LUCENE;
-              if (actualFstType != fstType) {
-                LOGGER.warn("Column {} text index is specified as {}, but {} will be used to keep backward guarantees",
-                    column, fstType, actualFstType);
-              }
+              FSTType fstType = TextIndexUtils.isFstTypeNative(properties) ? FSTType.NATIVE : FSTType.LUCENE;
               result.put(column, new TextIndexConfigBuilder(fstType).withProperties(properties).build());
             }
           }
