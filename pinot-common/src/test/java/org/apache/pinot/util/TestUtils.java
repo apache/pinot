@@ -124,6 +124,7 @@ public class TestUtils {
     Instant errorLogInstant = Instant.EPOCH;
     String errorMessageSuffix = errorMessage != null ? ", error message: " + errorMessage : "";
     Throwable lastError = null;
+    int numErrors = 0;
     while (System.currentTimeMillis() < endTime) {
       try {
         if (Boolean.TRUE.equals(condition.get())) {
@@ -135,6 +136,7 @@ public class TestUtils {
       } catch (Exception e) {
         lastError = e;
         if (logPeriod != null) {
+          numErrors++;
           Instant now = Instant.now();
           if (logPeriod.compareTo(Duration.between(errorLogInstant, now)) < 0) {
             LOGGER.warn("Error while waiting for condition", e);
@@ -144,7 +146,8 @@ public class TestUtils {
       }
     }
     if (raiseError) {
-      Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix, lastError);
+      Assert.fail("Failed to meet condition in " + timeoutMs + "ms after " + numErrors + " errors"
+          + errorMessageSuffix, lastError);
     }
   }
 
