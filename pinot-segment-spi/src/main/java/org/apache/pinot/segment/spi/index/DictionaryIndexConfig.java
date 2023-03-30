@@ -78,7 +78,11 @@ public class DictionaryIndexConfig extends IndexConfig {
 
   @Override
   public String toString() {
-    return "DictionaryIndexConfig{" + "\"onHeap\":" + _onHeap + ", \"useVarLengthDictionary\":"
-        + _useVarLengthDictionary + "}";
+    if (isEnabled()) {
+      return "DictionaryIndexConfig{" + "\"onHeap\":" + _onHeap + ", \"useVarLengthDictionary\":"
+          + _useVarLengthDictionary + "}";
+    } else {
+      return "DictionaryIndexConfig{" + "\"enabled\": false}";
+    }
   }
 }

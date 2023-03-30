@@ -166,11 +166,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // TODO: Dictionary creator holds all unique values on heap. Consider keeping dictionary instead of creator
         //       which uses off-heap memory.
 
-        // Index conf should be present if dictEnabledColumn is true. In case it doesn't, getConfig will throw an
-        // exception
         DictionaryIndexConfig dictConfig = config.getConfig(StandardIndexes.dictionary());
         if (!dictConfig.isEnabled()) {
-          throw new IllegalArgumentException("Dictionary index should be enabled");
+          LOGGER.info("Creating dictionary index in column {}.{} even when it is disabled in config",
+              segmentCreationSpec.getTableName(), columnName);
         }
         SegmentDictionaryCreator creator = new DictionaryIndexPlugin().getIndexType()
             .createIndexCreator(context, dictConfig);
