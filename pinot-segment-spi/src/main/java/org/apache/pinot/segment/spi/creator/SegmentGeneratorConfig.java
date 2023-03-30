@@ -246,8 +246,7 @@ public class SegmentGeneratorConfig implements Serializable {
         } else {
           builder = new FieldIndexConfigs.Builder(old);
         }
-        return builder.add(indexType, config)
-            .build();
+        return builder.add(indexType, config).build();
       });
     }
   }
