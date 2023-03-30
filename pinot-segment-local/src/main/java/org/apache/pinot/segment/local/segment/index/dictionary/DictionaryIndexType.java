@@ -263,7 +263,7 @@ public class DictionaryIndexType
     return getFileExtension();
   }
 
-  public static class ReaderFactory extends IndexReaderFactory.Default<DictionaryIndexConfig, Dictionary> {
+  private static class ReaderFactory extends IndexReaderFactory.Default<DictionaryIndexConfig, Dictionary> {
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 
     private ReaderFactory() {

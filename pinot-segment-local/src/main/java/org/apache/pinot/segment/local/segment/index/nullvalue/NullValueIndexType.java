@@ -97,7 +97,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
     return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
   }
 
-  public static class ReaderFactory implements IndexReaderFactory<NullValueVectorReader> {
+  private static class ReaderFactory implements IndexReaderFactory<NullValueVectorReader> {
 
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 

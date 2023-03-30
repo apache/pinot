@@ -139,7 +139,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
     return V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
   }
 
-  public static class ReaderFactory extends IndexReaderFactory.Default<FstIndexConfig, TextIndexReader> {
+  private static class ReaderFactory extends IndexReaderFactory.Default<FstIndexConfig, TextIndexReader> {
     public static final ReaderFactory INSTANCE = new ReaderFactory();
     @Override
     protected IndexType<FstIndexConfig, TextIndexReader, ?> getIndexType() {

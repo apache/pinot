@@ -112,7 +112,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
     return V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
   }
 
-  public static class ReaderFactory extends IndexReaderFactory.Default<H3IndexConfig, H3IndexReader> {
+  private static class ReaderFactory extends IndexReaderFactory.Default<H3IndexConfig, H3IndexReader> {
 
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 

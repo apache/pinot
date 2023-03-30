@@ -161,7 +161,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     return V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
   }
 
-  public static class ReaderFactory implements IndexReaderFactory<TextIndexReader> {
+  private static class ReaderFactory implements IndexReaderFactory<TextIndexReader> {
 
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 
