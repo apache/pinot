@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -44,7 +45,7 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
 
   @Override
   public String getId() {
-    return "bloom_filter";
+    return StandardIndexes.BLOOM_FILTER_ID;
   }
 
   @Override

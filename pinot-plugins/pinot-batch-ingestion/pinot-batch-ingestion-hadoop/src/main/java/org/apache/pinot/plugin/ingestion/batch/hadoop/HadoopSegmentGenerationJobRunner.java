@@ -257,7 +257,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       }
 
       _spec.setOutputDirURI(stagingSegmentTarUri.toUri().toString());
-      jobConf.set(SEGMENT_GENERATION_JOB_SPEC, new Yaml().dump(_spec));
+      jobConf.set(SEGMENT_GENERATION_JOB_SPEC, new Yaml().dumpAsMap(_spec));
       _spec.setOutputDirURI(outputDirURI.toString());
 
       job.setMapperClass(getMapperClass());

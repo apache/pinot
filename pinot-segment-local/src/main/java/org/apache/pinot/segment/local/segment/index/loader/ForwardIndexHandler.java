@@ -301,10 +301,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           continue;
         }
 
-        // Note that RAW columns cannot be sorted.
-        ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        Preconditions.checkState(!existingColMetadata.isSorted(), "Raw column=" + column + " cannot be sorted.");
-
         columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
       } else if (existingDictColumns.contains(column) && newNoDictColumns.contains(column)) {
         // Existing column has dictionary. New config for the column is RAW.
@@ -758,8 +754,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     String fwdIndexFileExtension;
     if (isSingleValue) {
-      // Raw columns cannot be sorted.
-      fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      if (existingColMetadata.isSorted()) {
+        fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      } else {
+        fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      }
     } else {
       fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     }

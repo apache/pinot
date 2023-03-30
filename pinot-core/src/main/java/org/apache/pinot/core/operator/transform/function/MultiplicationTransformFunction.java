@@ -57,10 +57,10 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
         DataType dataType = literalTransformFunction.getResultMetadata().getDataType();
         if (dataType == DataType.BIG_DECIMAL) {
           _literalBigDecimalProduct =
-              _literalBigDecimalProduct.multiply(new BigDecimal(literalTransformFunction.getLiteral()));
+              _literalBigDecimalProduct.multiply(literalTransformFunction.getBigDecimalLiteral());
           _resultDataType = DataType.BIG_DECIMAL;
         } else {
-          _literalDoubleProduct *= Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          _literalDoubleProduct *= ((LiteralTransformFunction) argument).getDoubleLiteral();
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {

@@ -66,14 +66,14 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     TransformFunction regexpFunction = arguments.get(1);
     Preconditions.checkState(regexpFunction instanceof LiteralTransformFunction,
         "`regexp` must be a literal regex expression.");
-    _regexp = Pattern.compile(((LiteralTransformFunction) regexpFunction).getLiteral());
+    _regexp = Pattern.compile(((LiteralTransformFunction) regexpFunction).getStringLiteral());
 
     if (arguments.size() >= 3) {
       TransformFunction groupFunction = arguments.get(2);
       Preconditions.checkState(groupFunction instanceof LiteralTransformFunction
-              && Integer.parseInt(((LiteralTransformFunction) groupFunction).getLiteral()) >= 0,
+              && ((LiteralTransformFunction) groupFunction).getIntLiteral() >= 0,
           "`group` must be a literal, non-negative integer.");
-      _group = Integer.parseInt(((LiteralTransformFunction) groupFunction).getLiteral());
+      _group = ((LiteralTransformFunction) groupFunction).getIntLiteral();
     } else {
       _group = 0;
     }
@@ -82,7 +82,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
       TransformFunction positionFunction = arguments.get(3);
       Preconditions.checkState(positionFunction instanceof LiteralTransformFunction,
           "`default_value` must be a literal expression.");
-      _defaultValue = ((LiteralTransformFunction) regexpFunction).getLiteral();
+      _defaultValue = ((LiteralTransformFunction) regexpFunction).getStringLiteral();
     } else {
       _defaultValue = "";
     }

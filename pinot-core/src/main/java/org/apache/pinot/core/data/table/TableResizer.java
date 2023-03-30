@@ -131,7 +131,7 @@ public class TableResizer {
    */
   private OrderByValueExtractor getOrderByValueExtractor(ExpressionContext expression) {
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
-      return new LiteralExtractor(expression.getLiteralString());
+      return new LiteralExtractor(expression.getLiteral().getStringValue());
     }
     Integer groupByExpressionIndex = _groupByExpressionIndexMap.get(expression);
     if (groupByExpressionIndex != null) {
