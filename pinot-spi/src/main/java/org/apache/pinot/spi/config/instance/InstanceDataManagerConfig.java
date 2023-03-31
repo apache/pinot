@@ -71,5 +71,5 @@ public interface InstanceDataManagerConfig {
 
   long getExternalViewDroppedMaxWaitMs();
 
-  long getExternalViewCheckIntervalMs();
+  long getExternalViewDroppedCheckIntervalMs();
 }

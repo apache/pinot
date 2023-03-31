@@ -131,14 +131,14 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Check if the external view is dropped for a table, and if so, wait for the external view to
   // be updated for a maximum of this time.
   private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
-  private static final String EXTERNAL_VIEW_CHECK_INTERVAL_MS = "external.view.check.interval.ms";
+  private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
   public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L;
-  public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L;
+  public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = 1_000L;
 
   private final PinotConfiguration _instanceDataManagerConfiguration;
 
@@ -297,9 +297,9 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public long getExternalViewCheckIntervalMs() {
-    return _instanceDataManagerConfiguration.getProperty(EXTERNAL_VIEW_CHECK_INTERVAL_MS,
-        DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+  public long getExternalViewDroppedCheckIntervalMs() {
+    return _instanceDataManagerConfiguration.getProperty(EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS,
+        DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS);
   }
 
   @Override

@@ -88,6 +88,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
   private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
+  private long _externalViewDroppedMaxWaitMs;
+  private long _externalViewDroppedCheckInternalMs;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -110,6 +112,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _serverMetrics = serverMetrics;
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
+
+    _externalViewDroppedMaxWaitMs = _instanceDataManagerConfig.getExternalViewDroppedMaxWaitMs();
+    _externalViewDroppedCheckInternalMs = _instanceDataManagerConfig.getExternalViewDroppedCheckIntervalMs();
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
@@ -202,7 +207,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteTable(String tableNameWithType)
       throws Exception {
     // Wait externalview to converge
-    long endTimeMs = System.currentTimeMillis() + _instanceDataManagerConfig.getExternalViewDroppedMaxWaitMs();
+    long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
     do {
       ExternalView externalView = _helixManager.getHelixDataAccessor()
           .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
@@ -219,7 +224,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         });
         return;
       }
-      Thread.sleep(_instanceDataManagerConfig.getExternalViewCheckIntervalMs());
+      Thread.sleep(_externalViewDroppedCheckInternalMs);
     } while (System.currentTimeMillis() < endTimeMs);
     throw new TimeoutException(
         "Timeout while waiting for ExternalView to converge for the table to delete: " + tableNameWithType);
