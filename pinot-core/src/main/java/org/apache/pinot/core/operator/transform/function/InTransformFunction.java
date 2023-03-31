@@ -139,11 +139,7 @@ public class InTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null || _intValuesSV.length < length) {
-      _intValuesSV = new int[length];
-    } else {
-      Arrays.fill(_intValuesSV, 0);
-    }
+    initZeroFillingIntValuesSV(length);
     TransformResultMetadata mainFunctionMetadata = _mainFunction.getResultMetadata();
     DataType storedType = mainFunctionMetadata.getDataType().getStoredType();
     if (_valueSet != null) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -124,6 +125,14 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected void initIntValuesSV(int length) {
     if (_intValuesSV == null || _intValuesSV.length < length) {
       _intValuesSV = new int[length];
+    }
+  }
+
+  protected void initZeroFillingIntValuesSV(int length) {
+    if (_intValuesSV == null || _intValuesSV.length < length) {
+      _intValuesSV = new int[length];
+    } else {
+      Arrays.fill(_intValuesSV, 0, length, 0);
     }
   }
 
