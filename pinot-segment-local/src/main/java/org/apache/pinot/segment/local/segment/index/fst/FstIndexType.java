@@ -19,65 +19,119 @@
 
 package org.apache.pinot.segment.local.segment.index.fst;
 
+import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.FSTIndexHandler;
+import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.FstIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
-import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class FstIndexType implements IndexType<IndexConfig, IndexReader, IndexCreator> {
-  public static final FstIndexType INSTANCE = new FstIndexType();
+public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>
+    implements ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
 
-  private FstIndexType() {
+  protected FstIndexType() {
+    super(StandardIndexes.FST_ID);
   }
 
   @Override
-  public String getId() {
-    return StandardIndexes.FST_ID;
+  public Class<FstIndexConfig> getIndexConfigClass() {
+    return FstIndexConfig.class;
   }
 
   @Override
-  public Class<IndexConfig> getIndexConfigClass() {
-    return IndexConfig.class;
+  public Map<String, FstIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+    Map<String, FstIndexConfig> result = new HashMap<>();
+    Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
+    for (String column : indexLoadingConfig.getAllKnownColumns()) {
+      if (fstIndexColumns.contains(column)) {
+        FstIndexConfig conf = new FstIndexConfig(indexLoadingConfig.getFSTIndexType());
+        result.put(column, conf);
+      } else {
+        result.put(column, FstIndexConfig.DISABLED);
+      }
+    }
+    return result;
   }
 
   @Override
-  public IndexConfig getDefaultConfig() {
-    return IndexConfig.DISABLED;
+  public FstIndexConfig getDefaultConfig() {
+    return FstIndexConfig.DISABLED;
   }
 
   @Override
-  public IndexConfig getConfig(TableConfig tableConfig, Schema schema) {
-    throw new UnsupportedOperationException();
+  public ColumnConfigDeserializer<FstIndexConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes("fst", getIndexConfigClass())
+        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
+            FieldConfig.IndexType.FST,
+            (tableConfig, fieldConfig) -> {
+              IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+              FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
+              return new FstIndexConfig(fstIndexType);
+            }));
   }
 
   @Override
-  public IndexCreator createIndexCreator(IndexCreationContext context, IndexConfig indexConfig)
-      throws Exception {
-    throw new UnsupportedOperationException();
+  public FSTIndexCreator createIndexCreator(IndexCreationContext context, FstIndexConfig indexConfig)
+      throws IOException {
+    Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
+        "FST index is currently only supported on single-value columns");
+    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
+        "FST index is currently only supported on STRING type columns");
+    Preconditions.checkState(context.hasDictionary(),
+        "FST index is currently only supported on dictionary-encoded columns");
+    if (indexConfig.getFstType() == FSTType.NATIVE) {
+      return new NativeFSTIndexCreator(context);
+    } else {
+      return new LuceneFSTIndexCreator(context);
+    }
   }
 
   @Override
-  public IndexReaderFactory<IndexReader> getReaderFactory() {
-    throw new UnsupportedOperationException();
+  protected IndexReaderFactory<TextIndexReader> createReaderFactory() {
+    return ReaderFactory.INSTANCE;
+  }
+
+  public static TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
+      throws IndexReaderConstraintException, IOException {
+    return ReaderFactory.INSTANCE.createIndexReader(dataBuffer, metadata);
   }
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    throw new UnsupportedOperationException();
+    return new FSTIndexHandler(segmentDirectory, configsByCol, tableConfig);
   }
 
   @Override
@@ -85,8 +139,32 @@ public class FstIndexType implements IndexType<IndexConfig, IndexReader, IndexCr
     return V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
   }
 
-  @Override
-  public String toString() {
-    return getId();
+  private static class ReaderFactory extends IndexReaderFactory.Default<FstIndexConfig, TextIndexReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+    @Override
+    protected IndexType<FstIndexConfig, TextIndexReader, ?> getIndexType() {
+      return StandardIndexes.fst();
+    }
+
+    protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
+        throws IndexReaderConstraintException, IOException {
+      if (!metadata.hasDictionary()) {
+        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.fst(),
+            "This index requires a dictionary");
+      }
+      int magicHeader = dataBuffer.getInt(0);
+      if (magicHeader == FSTHeader.FST_MAGIC) {
+        return new NativeFSTIndexReader(dataBuffer);
+      } else {
+        return new LuceneFSTIndexReader(dataBuffer);
+      }
+    }
+
+    @Override
+    protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        FstIndexConfig indexConfig)
+        throws IndexReaderConstraintException, IOException {
+      return createIndexReader(dataBuffer, metadata);
+    }
   }
 }

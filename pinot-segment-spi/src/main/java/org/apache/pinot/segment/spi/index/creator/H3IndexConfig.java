@@ -18,20 +18,38 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
-public class H3IndexConfig {
+public class H3IndexConfig extends IndexConfig {
+  public static final H3IndexConfig DISABLED = new H3IndexConfig(false, null);
   public static final String RESOLUTIONS_KEY = "resolutions";
 
   private final H3IndexResolution _resolution;
 
-  public H3IndexConfig(Map<String, String> properties) {
+  public H3IndexConfig(H3IndexResolution resolution) {
+    this(true, resolution);
+  }
+
+  @JsonCreator
+  public H3IndexConfig(@JsonProperty("enabled") @Nullable Boolean enabled,
+      @JsonProperty("resolution") H3IndexResolution resolution) {
+    super(enabled != null && enabled);
+    _resolution = resolution;
+  }
+
+  // Used to read from older configs
+  public H3IndexConfig(@Nullable Map<String, String> properties) {
+    super(true);
     Preconditions.checkArgument(properties != null && properties.containsKey(RESOLUTIONS_KEY),
         "Properties must contain H3 resolutions");
     List<Integer> resolutions = new ArrayList<>();

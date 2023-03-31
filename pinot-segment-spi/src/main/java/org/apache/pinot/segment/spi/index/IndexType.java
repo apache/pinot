@@ -59,23 +59,7 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   C getDefaultConfig();
 
-  C getConfig(TableConfig tableConfig, Schema schema);
-
-  /**
-   * Optional method that can be implemented to ignore the index creation.
-   *
-   * Sometimes it doesn't make sense to create an index, even when the user explicitly asked for it. For example, an
-   * inverted index shouldn't be created when the column is sorted.
-   *
-   * Apache Pinot will call this method once all index configurations have been parsed and it is included in the
-   * {@link FieldIndexConfigs} param.
-   *
-   * This method do not need to return false when the index type itself is not included in the {@link FieldIndexConfigs}
-   * param.
-   */
-  default boolean shouldBeCreated(IndexCreationContext context, FieldIndexConfigs configs) {
-    return true;
-  }
+  Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
 
   /**
    * Returns the {@link IndexCreator} that can should be used to create an index of this type with the given context
@@ -102,19 +86,10 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   @Nullable
   default IR getIndexReader(ColumnIndexContainer indexContainer) {
-    throw new UnsupportedOperationException();
+    return indexContainer.getIndex(this);
   }
 
   String getFileExtension(ColumnMetadata columnMetadata);
-
-  /**
-   * Returns whether the index is stored as a buffer or not.
-   *
-   * Most indexes are stored as a buffer, but for example TextIndexType is stored in a separate lucene file.
-   */
-  default boolean storedAsBuffer() {
-    return true;
-  }
 
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig);
