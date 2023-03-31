@@ -102,10 +102,36 @@ public class ForwardIndexTypeTest {
     public void oldConfEnableDict()
         throws IOException {
       addFieldIndexConfig(""
-                  + " {\n"
-                  + "    \"name\": \"dimInt\","
-                  + "    \"encodingType\": \"DICTIONARY\"\n"
-                  + " }"
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"DICTIONARY\"\n"
+          + " }"
+      );
+      assertEquals(ForwardIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void oldConfEnableDictWithSnappyCompression()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"DICTIONARY\",\n"
+          + "    \"compressionCodec\": \"SNAPPY\"\n"
+          + " }"
+      );
+      assertEquals(ForwardIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void oldConfEnableDictWithLZ4Compression()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"DICTIONARY\",\n"
+          + "    \"compressionCodec\": \"LZ4\"\n"
+          + " }"
       );
       assertEquals(ForwardIndexConfig.DEFAULT);
     }
