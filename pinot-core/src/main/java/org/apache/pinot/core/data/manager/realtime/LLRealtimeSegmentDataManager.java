@@ -527,7 +527,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
-    boolean noTransformedRows = true;
+    boolean hasTransformedRows = false;
 
     TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean prematureExit = false;
@@ -596,7 +596,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         }
         List<GenericRow> transformedRows = reusedResult.getTransformedRows();
         if (transformedRows.size() > 0) {
-          noTransformedRows = false;
+          hasTransformedRows = true;
         }
         for (GenericRow transformedRow : transformedRows) {
           try {
@@ -621,7 +621,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _numRowsConsumed++;
       streamMessageCount++;
     }
-    updateIngestionDelay(indexedMessageCount, noTransformedRows, msgMetadata);
+    updateIngestionDelay(indexedMessageCount, hasTransformedRows, msgMetadata);
     updateCurrentDocumentCountMetrics();
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
@@ -1581,14 +1581,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * Updates the ingestion delay if messages were processed using the time stamp for the last consumed event.
    *
    * @param indexedMessagesCount: greater than 0 if at least one row was transformed successfully.
-   * @param noTransformedRows: true if there were no transformed rows in the current message batch.
-   * @param rowMetadata: if noTransformedRows is true, this holds the metadata for the last row processed.
+   * @param hasTransformedRows: true if there were transformed rows in the current message batch.
+   * @param rowMetadata: if hasTransformedRows is false, this holds the metadata for the last row processed.
    */
-  private void updateIngestionDelay(int indexedMessageCount, boolean noTransformedRows, RowMetadata rowMetadata) {
+  private void updateIngestionDelay(int indexedMessageCount, boolean hasTransformedRows, RowMetadata rowMetadata) {
     if (indexedMessageCount > 0) {
       // Record Ingestion delay for this partition
       updateIngestionDelay(_lastRowMetadata);
-    } else if (noTransformedRows) {
+    } else if (!hasTransformedRows) {
       // If there was no transformed rows in a batch we still use the last metadata to record ingestion delay
       updateIngestionDelay(rowMetadata);
     }
