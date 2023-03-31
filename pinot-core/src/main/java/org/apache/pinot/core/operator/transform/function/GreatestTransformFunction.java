@@ -32,9 +32,7 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(numDocs);
     int[] values = _arguments.get(0).transformToIntValuesSV(valueBlock);
     System.arraycopy(values, 0, _intValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
@@ -49,9 +47,7 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[numDocs];
-    }
+    initLongValuesSV(numDocs);
     long[] values = _arguments.get(0).transformToLongValuesSV(valueBlock);
     System.arraycopy(values, 0, _longValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
@@ -66,9 +62,7 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[numDocs];
-    }
+    initFloatValuesSV(numDocs);
     float[] values = _arguments.get(0).transformToFloatValuesSV(valueBlock);
     System.arraycopy(values, 0, _floatValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
@@ -83,9 +77,7 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[numDocs];
-    }
+    initDoubleValuesSV(numDocs);
     double[] values = _arguments.get(0).transformToDoubleValuesSV(valueBlock);
     System.arraycopy(values, 0, _doubleValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
@@ -100,9 +92,7 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[numDocs];
-    }
+    initBigDecimalValuesSV(numDocs);
     BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(valueBlock);
     System.arraycopy(values, 0, _bigDecimalValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {
@@ -117,9 +107,7 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[numDocs];
-    }
+    initStringValuesSV(numDocs);
     String[] values = _arguments.get(0).transformToStringValuesSV(valueBlock);
     System.arraycopy(values, 0, _stringValuesSV, 0, numDocs);
     for (int i = 1; i < _arguments.size(); i++) {

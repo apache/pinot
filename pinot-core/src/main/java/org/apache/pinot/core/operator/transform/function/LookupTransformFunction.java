@@ -229,10 +229,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setIntSV);
     return _intValuesSV;
   }
@@ -242,10 +239,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[numDocs];
-    }
+    initLongValuesSV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setLongSV);
     return _longValuesSV;
   }
@@ -255,10 +249,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[numDocs];
-    }
+    initFloatValuesSV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setFloatSV);
     return _floatValuesSV;
   }
@@ -268,10 +259,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[numDocs];
-    }
+    initDoubleValuesSV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setDoubleSV);
     return _doubleValuesSV;
   }
@@ -281,10 +269,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[numDocs];
-    }
+    initStringValuesSV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setStringSV);
     return _stringValuesSV;
   }
@@ -294,10 +279,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
-      _bytesValuesSV = new byte[numDocs][];
-    }
+    initBytesValuesSV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setBytesSV);
     return _bytesValuesSV;
   }
@@ -307,10 +289,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[numDocs][];
-    }
+    initIntValuesMV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setIntMV);
     return _intValuesMV;
   }
@@ -320,10 +299,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_longValuesMV == null) {
-      _longValuesMV = new long[numDocs][];
-    }
+    initLongValuesMV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setLongMV);
     return _longValuesMV;
   }
@@ -333,10 +309,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesMV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_floatValuesMV == null) {
-      _floatValuesMV = new float[numDocs][];
-    }
+    initFloatValuesMV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setFloatMV);
     return _floatValuesMV;
   }
@@ -346,10 +319,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[numDocs][];
-    }
+    initDoubleValuesMV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setDoubleMV);
     return _doubleValuesMV;
   }
@@ -359,10 +329,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(valueBlock);
     }
-    int numDocs = valueBlock.getNumDocs();
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[numDocs][];
-    }
+    initStringValuesMV(valueBlock.getNumDocs());
     lookup(valueBlock, this::setStringMV);
     return _stringValuesMV;
   }

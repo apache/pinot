@@ -112,9 +112,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private int[] getIntTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     int[][] data = new int[width][length];
@@ -146,9 +144,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private long[] getLongTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     long[][] data = new long[width][length];
@@ -180,9 +176,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private float[] getFloatTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[length];
-    }
+    initFloatValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     float[][] data = new float[width][length];
@@ -214,9 +208,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private double[] getDoubleTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     double[][] data = new double[width][length];
@@ -248,9 +240,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private BigDecimal[] getBigDecimalTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+    initBigDecimalValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     BigDecimal[][] data = new BigDecimal[width][length];
@@ -282,9 +272,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private String[] getStringTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     String[][] data = new String[width][length];

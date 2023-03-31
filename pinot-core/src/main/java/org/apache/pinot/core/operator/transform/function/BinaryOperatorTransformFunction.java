@@ -112,9 +112,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultArray(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     switch (_leftStoredType) {
       case INT:
         fillResultInt(valueBlock, length);

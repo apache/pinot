@@ -70,9 +70,7 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       double sumRes = 0;

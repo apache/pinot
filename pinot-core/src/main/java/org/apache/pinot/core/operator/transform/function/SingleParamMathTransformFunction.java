@@ -72,9 +72,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _doubleValuesSV, length);
@@ -88,9 +86,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+    initBigDecimalValuesSV(length);
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _bigDecimalValuesSV, length);

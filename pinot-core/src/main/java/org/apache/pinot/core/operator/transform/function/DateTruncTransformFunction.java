@@ -129,9 +129,7 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     long[] input = _mainTransformFunction.transformToLongValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _longValuesSV[i] =

@@ -74,9 +74,7 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     DataType storedType = _transformFunction.getResultMetadata().getDataType().getStoredType();
     switch (storedType) {
       case INT:
