@@ -104,8 +104,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       }
       return DataType.INT;
     }
-    Preconditions.checkState(left == right, "Data type " + left + " is not compatible with ", right);
-    return left;
+    return DataType.STRING;
   }
 
   /**
