@@ -137,6 +137,11 @@ public class ForwardIndexType
           } else if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
             accum.put(fieldConfig.getName(), createConfigFromFieldConfig(fieldConfig));
           }
+          // On other case encoding is DICTIONARY. We create the default forward index by default. That means that if
+          // field config indicates for example a compression while using encoding dictionary, the compression is
+          // ignored.
+          // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
+          // the default `fromIndexes` deserializer.
         }
     );
     return IndexConfigDeserializer.fromIndexes("forward", getIndexConfigClass())
@@ -149,10 +154,6 @@ public class ForwardIndexType
   }
 
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
-    if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW) {
-      throw new IllegalArgumentException("Cannot build a forward index on a field whose encoding is "
-          + fieldConfig.getEncodingType());
-    }
     FieldConfig.CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
     if (compressionCodec != null) {
