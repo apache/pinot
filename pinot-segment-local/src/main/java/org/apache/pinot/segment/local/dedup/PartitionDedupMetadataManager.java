@@ -20,8 +20,6 @@ package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -46,7 +44,7 @@ import org.rocksdb.WriteOptions;
 
 public class PartitionDedupMetadataManager {
   @VisibleForTesting
-  static final String DEDUP_DATA_DIR = "/tmp/dudup-data";
+  public static final String DEDUP_DATA_DIR = "/tmp/dudup-data";
   @VisibleForTesting
   static final RocksDB ROCKS_DB = initRocksDB();
   private final String _tableNameWithType;
@@ -64,10 +62,8 @@ public class PartitionDedupMetadataManager {
       options.setCreateIfMissing(true);
       File dbDir = new File(DEDUP_DATA_DIR);
       try {
-        Files.createDirectories(dbDir.getParentFile().toPath());
-        Files.createDirectories(dbDir.getAbsoluteFile().toPath());
         return RocksDB.open(options, dbDir.getAbsolutePath());
-      } catch (IOException | RocksDBException ex) {
+      } catch (RocksDBException ex) {
         throw new RuntimeException(ex);
       }
   }
