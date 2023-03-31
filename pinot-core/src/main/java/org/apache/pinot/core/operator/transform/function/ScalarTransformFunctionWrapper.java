@@ -113,9 +113,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToIntValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -132,9 +130,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToLongValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -151,9 +147,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToFloatValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[length];
-    }
+    initFloatValuesSV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -170,9 +164,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToDoubleValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -189,9 +181,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToBigDecimalValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+    initBigDecimalValuesSV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -208,9 +198,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToStringValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -229,9 +217,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToBytesValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
-      _bytesValuesSV = new byte[length][];
-    }
+    initBytesValuesSV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -248,9 +234,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToIntValuesMV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[length][];
-    }
+    initIntValuesMV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -267,9 +251,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToLongValuesMV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_longValuesMV == null) {
-      _longValuesMV = new long[length][];
-    }
+    initLongValuesMV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -286,9 +268,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToFloatValuesMV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_floatValuesMV == null) {
-      _floatValuesMV = new float[length][];
-    }
+    initFloatValuesMV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -305,9 +285,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToDoubleValuesMV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[length][];
-    }
+    initDoubleValuesMV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -324,9 +302,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       return super.transformToStringValuesMV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[length][];
-    }
+    initStringValuesMV(length);
     getNonLiteralValues(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {

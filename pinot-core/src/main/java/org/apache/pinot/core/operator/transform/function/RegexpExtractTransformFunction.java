@@ -97,9 +97,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     String[] valuesSV = _valueFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       Matcher matcher = _regexp.matcher(valuesSV[i]);

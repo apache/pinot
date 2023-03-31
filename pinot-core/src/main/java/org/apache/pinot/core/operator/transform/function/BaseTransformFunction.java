@@ -78,7 +78,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.STRING, false, false);
   protected static final TransformResultMetadata JSON_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.JSON, false, false);
-  // TODO: Support MV BYTES
   protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, false, false);
 
@@ -122,12 +121,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     throw new UnsupportedOperationException();
   }
 
+  protected void initIntValuesSV(int length) {
+    if (_intValuesSV == null || _intValuesSV.length < length) {
+      _intValuesSV = new int[length];
+    }
+  }
+
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
@@ -168,11 +171,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _intValuesSV;
   }
 
+  @Override
   public Pair<int[], RoaringBitmap> transformToIntValuesSVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -219,12 +221,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_intValuesSV, bitmap);
   }
 
+  protected void initLongValuesSV(int length) {
+    if (_longValuesSV == null || _longValuesSV.length < length) {
+      _longValuesSV = new long[length];
+    }
+  }
+
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
@@ -268,9 +274,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<long[], RoaringBitmap> transformToLongValuesSVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -317,12 +321,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_longValuesSV, bitmap);
   }
 
+  protected void initFloatValuesSV(int length) {
+    if (_floatValuesSV == null || _floatValuesSV.length < length) {
+      _floatValuesSV = new float[length];
+    }
+  }
+
   @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[length];
-    }
+    initFloatValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
@@ -366,9 +374,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<float[], RoaringBitmap> transformToFloatValuesSVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[length];
-    }
+    initFloatValuesSV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -415,12 +421,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_floatValuesSV, bitmap);
   }
 
+  protected void initDoubleValuesSV(int length) {
+    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
+      _doubleValuesSV = new double[length];
+    }
+  }
+
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
@@ -464,9 +474,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<double[], RoaringBitmap> transformToDoubleValuesSVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -513,12 +521,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_doubleValuesSV, bitmap);
   }
 
+  protected void initBigDecimalValuesSV(int length) {
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
+      _bigDecimalValuesSV = new BigDecimal[length];
+    }
+  }
+
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+    initBigDecimalValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
@@ -563,11 +575,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _bigDecimalValuesSV;
   }
 
+  @Override
   public Pair<BigDecimal[], RoaringBitmap> transformToBigDecimalValuesSVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+    initBigDecimalValuesSV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -619,12 +630,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_bigDecimalValuesSV, bitmap);
   }
 
+  protected void initStringValuesSV(int length) {
+    if (_stringValuesSV == null || _stringValuesSV.length < length) {
+      _stringValuesSV = new String[length];
+    }
+  }
+
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
@@ -669,11 +684,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _stringValuesSV;
   }
 
+  @Override
   public Pair<String[], RoaringBitmap> transformToStringValuesSVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -725,12 +739,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_stringValuesSV, bitmap);
   }
 
+  protected void initBytesValuesSV(int length) {
+    if (_bytesValuesSV == null || _bytesValuesSV.length < length) {
+      _bytesValuesSV = new byte[length][];
+    }
+  }
+
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
-      _bytesValuesSV = new byte[length][];
-    }
+    initBytesValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
@@ -762,9 +780,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<byte[][], RoaringBitmap> transformToBytesValuesSVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
-      _bytesValuesSV = new byte[length][];
-    }
+    initBytesValuesSV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -796,12 +812,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_bytesValuesSV, bitmap);
   }
 
+  protected void initIntValuesMV(int length) {
+    if (_intValuesMV == null || _intValuesMV.length < length) {
+      _intValuesMV = new int[length][];
+    }
+  }
+
   @Override
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[length][];
-    }
+    initIntValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -847,9 +867,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<int[][], RoaringBitmap> transformToIntValuesMVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[length][];
-    }
+    initIntValuesMV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -891,12 +909,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_intValuesMV, bitmap);
   }
 
+  protected void initLongValuesMV(int length) {
+    if (_longValuesMV == null || _longValuesMV.length < length) {
+      _longValuesMV = new long[length][];
+    }
+  }
+
   @Override
   public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesMV == null) {
-      _longValuesMV = new long[length][];
-    }
+    initLongValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -942,9 +964,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<long[][], RoaringBitmap> transformToLongValuesMVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesMV == null) {
-      _longValuesMV = new long[length][];
-    }
+    initLongValuesMV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -982,12 +1002,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_longValuesMV, bitmap);
   }
 
+  protected void initFloatValuesMV(int length) {
+    if (_floatValuesMV == null || _floatValuesMV.length < length) {
+      _floatValuesMV = new float[length][];
+    }
+  }
+
   @Override
   public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_floatValuesMV == null) {
-      _floatValuesMV = new float[length][];
-    }
+    initFloatValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -1033,9 +1057,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<float[][], RoaringBitmap> transformToFloatValuesMVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_floatValuesMV == null) {
-      _floatValuesMV = new float[length][];
-    }
+    initFloatValuesMV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -1077,12 +1099,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_floatValuesMV, bitmap);
   }
 
+  protected void initDoubleValuesMV(int length) {
+    if (_doubleValuesMV == null || _doubleValuesMV.length < length) {
+      _doubleValuesMV = new double[length][];
+    }
+  }
+
   @Override
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[length][];
-    }
+    initDoubleValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -1125,11 +1151,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _doubleValuesMV;
   }
 
+  @Override
   public Pair<double[][], RoaringBitmap> transformToDoubleValuesMVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[length][];
-    }
+    initDoubleValuesMV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
@@ -1171,12 +1196,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_doubleValuesMV, bitmap);
   }
 
+  protected void initStringValuesMV(int length) {
+    if (_stringValuesMV == null || _stringValuesMV.length < length) {
+      _stringValuesMV = new String[length][];
+    }
+  }
+
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[length][];
-    }
+    initStringValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -1219,11 +1248,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _stringValuesMV;
   }
 
+  @Override
   public Pair<String[][], RoaringBitmap> transformToStringValuesMVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[length][];
-    }
+    initStringValuesMV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType) {
@@ -1265,12 +1293,16 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return ImmutablePair.of(_stringValuesMV, bitmap);
   }
 
+  protected void initBytesValuesMV(int length) {
+    if (_bytesValuesMV == null || _bytesValuesMV.length < length) {
+      _bytesValuesMV = new byte[length][][];
+    }
+  }
+
   @Override
   public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bytesValuesMV == null) {
-      _bytesValuesMV = new byte[length][][];
-    }
+    initBytesValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -1292,9 +1324,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public Pair<byte[][][], RoaringBitmap> transformToBytesValuesMVWithNull(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bytesValuesMV == null) {
-      _bytesValuesMV = new byte[length][][];
-    }
+    initBytesValuesMV(length);
     RoaringBitmap bitmap;
     DataType resultDataType = getResultMetadata().getDataType();
     switch (resultDataType) {

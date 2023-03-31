@@ -59,17 +59,12 @@ public class TrigonometricTransformFunctions {
     @Override
     public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
       int length = valueBlock.getNumDocs();
-
-      if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
-        _doubleValuesSV = new double[length];
-      }
-
+      initDoubleValuesSV(length);
       double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
       double[] rightValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.atan2(leftValues[i], rightValues[i]);
       }
-
       return _doubleValuesSV;
     }
   }

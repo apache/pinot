@@ -75,9 +75,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     if (_firstTransformFunction == null) {
       Arrays.fill(_doubleValuesSV, 0, length, _firstLiteral);
     } else {

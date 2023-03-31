@@ -118,9 +118,7 @@ public class CastTransformFunction extends BaseTransformFunction {
   // TODO: Add it to the interface
   private int[] transformToBooleanValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     switch (_sourceDataType.getStoredType()) {
       case INT:
         int[] intValues = _transformFunction.transformToIntValuesSV(valueBlock);
@@ -168,9 +166,7 @@ public class CastTransformFunction extends BaseTransformFunction {
   private long[] transformToTimestampValuesSV(ValueBlock valueBlock) {
     if (_sourceDataType.getStoredType() == DataType.STRING) {
       int length = valueBlock.getNumDocs();
-      if (_longValuesSV == null) {
-        _longValuesSV = new long[length];
-      }
+      initLongValuesSV(length);
       String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
       ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
       return _longValuesSV;
@@ -213,17 +209,13 @@ public class CastTransformFunction extends BaseTransformFunction {
       switch (_sourceDataType) {
         case BOOLEAN:
           int length = valueBlock.getNumDocs();
-          if (_stringValuesSV == null) {
-            _stringValuesSV = new String[length];
-          }
+          initStringValuesSV(length);
           int[] intValues = _transformFunction.transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copyFromBoolean(intValues, _stringValuesSV, length);
           return _stringValuesSV;
         case TIMESTAMP:
           length = valueBlock.getNumDocs();
-          if (_stringValuesSV == null) {
-            _stringValuesSV = new String[length];
-          }
+          initStringValuesSV(length);
           long[] longValues = _transformFunction.transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValues, _stringValuesSV, length);
           return _stringValuesSV;
@@ -232,9 +224,7 @@ public class CastTransformFunction extends BaseTransformFunction {
       }
     } else {
       int length = valueBlock.getNumDocs();
-      if (_stringValuesSV == null) {
-        _stringValuesSV = new String[length];
-      }
+      initStringValuesSV(length);
       switch (resultDataType) {
         case INT:
           int[] intValues = _transformFunction.transformToIntValuesSV(valueBlock);
@@ -290,9 +280,7 @@ public class CastTransformFunction extends BaseTransformFunction {
   // TODO: Add it to the interface
   private int[][] transformToBooleanValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[length][];
-    }
+    initIntValuesMV(length);
     switch (_sourceDataType.getStoredType()) {
       case INT:
         int[][] intValuesMV = _transformFunction.transformToIntValuesMV(valueBlock);
@@ -336,9 +324,7 @@ public class CastTransformFunction extends BaseTransformFunction {
   private long[][] transformToTimestampValuesMV(ValueBlock valueBlock) {
     if (_sourceDataType.getStoredType() == DataType.STRING) {
       int length = valueBlock.getNumDocs();
-      if (_longValuesMV == null) {
-        _longValuesMV = new long[length][];
-      }
+      initLongValuesMV(length);
       String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(valueBlock);
       ArrayCopyUtils.copyToTimestamp(stringValuesMV, _longValuesMV, length);
       return _longValuesMV;
@@ -372,17 +358,13 @@ public class CastTransformFunction extends BaseTransformFunction {
       switch (_sourceDataType) {
         case BOOLEAN:
           int length = valueBlock.getNumDocs();
-          if (_stringValuesMV == null) {
-            _stringValuesMV = new String[length][];
-          }
+          initStringValuesMV(length);
           int[][] intValuesMV = _transformFunction.transformToIntValuesMV(valueBlock);
           ArrayCopyUtils.copyFromBoolean(intValuesMV, _stringValuesMV, length);
           return _stringValuesMV;
         case TIMESTAMP:
           length = valueBlock.getNumDocs();
-          if (_stringValuesMV == null) {
-            _stringValuesMV = new String[length][];
-          }
+          initStringValuesMV(length);
           long[][] longValuesMV = _transformFunction.transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
           return _stringValuesMV;
@@ -391,9 +373,7 @@ public class CastTransformFunction extends BaseTransformFunction {
       }
     } else {
       int length = valueBlock.getNumDocs();
-      if (_stringValuesMV == null) {
-        _stringValuesMV = new String[length][];
-      }
+      initStringValuesMV(length);
       switch (resultDataType) {
         case INT:
           int[][] intValuesMV = _transformFunction.transformToIntValuesMV(valueBlock);

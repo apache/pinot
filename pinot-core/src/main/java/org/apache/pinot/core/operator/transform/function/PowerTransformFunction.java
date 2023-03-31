@@ -65,9 +65,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     if (_fixedExponent) {
       for (int i = 0; i < length; i++) {
