@@ -50,6 +50,10 @@ public class AggregationUtils {
     return new Key(keyElements);
   }
 
+  public static Key extractEmptyKey() {
+    return new Key(new Object[0]);
+  }
+
   private static Object mergeSum(Object left, Object right) {
     return ((Number) left).doubleValue() + ((Number) right).doubleValue();
   }
