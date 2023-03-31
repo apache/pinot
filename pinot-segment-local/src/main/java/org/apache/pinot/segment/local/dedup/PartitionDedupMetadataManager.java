@@ -40,6 +40,9 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.WriteBatch;
+import org.rocksdb.WriteOptions;
+
 
 public class PartitionDedupMetadataManager {
   @VisibleForTesting
@@ -87,19 +90,24 @@ public class PartitionDedupMetadataManager {
   public void addSegment(IndexSegment segment) {
     // Add all PKs to the rocksdb column family
     Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
-    // TODO use write batch
+    WriteBatch writeBatch = new WriteBatch();
+    byte[] serializedSegment = serializeSegment(segment);
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
+      byte[] serializedPrimaryKey = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _hashFunction));
       try {
-        ROCKS_DB.put(_columnFamilyHandle,
-            serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _hashFunction)),
-            serializeSegment(segment));
+        writeBatch.put(_columnFamilyHandle, serializedPrimaryKey, serializedSegment);
       } catch (RocksDBException e) {
         throw new RuntimeException(e);
       }
     }
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-          getKeyCount());
+    try {
+      ROCKS_DB.write(new WriteOptions(), writeBatch);
+    } catch (RocksDBException e) {
+      throw new RuntimeException(e);
+    }
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+        getKeyCount());
   }
 
   @VisibleForTesting
