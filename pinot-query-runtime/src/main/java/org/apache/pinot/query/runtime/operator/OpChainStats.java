@@ -26,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 
@@ -74,6 +76,14 @@ public class OpChainStats {
 
   public ConcurrentHashMap<String, OperatorStats> getOperatorStatsMap() {
     return _operatorStatsMap;
+  }
+
+  public OperatorStats getOperatorStats(OpChainExecutionContext context, String operatorId) {
+    return _operatorStatsMap.computeIfAbsent(operatorId, (id) -> {
+       OperatorStats operatorStats = new OperatorStats(context);
+       operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), operatorId);
+       return operatorStats;
+     });
   }
 
   private void startExecutionTimer() {

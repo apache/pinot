@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Joiner;
 import java.util.List;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -35,17 +34,12 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
   private final String _operatorId;
   private final OpChainExecutionContext _context;
-  // TODO: Move to OperatorContext class.
-  protected final OperatorStats _operatorStats;
   protected final OpChainStats _opChainStats;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
-    _operatorStats =
-        new OperatorStats(_context, toExplainString());
     _operatorId =
         Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
-    _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
     _opChainStats = _context.getStats();
   }
 
@@ -55,30 +49,13 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
-      _operatorStats.startTimer();
+      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+      operatorStats.startTimer();
       TransferableBlock nextBlock = getNextBlock();
-      _operatorStats.endTimer(nextBlock);
-
-      _operatorStats.recordRow(1, nextBlock.getNumRows());
-      _operatorStats.endTimer(nextBlock);
-      if (nextBlock.isSuccessfulEndOfStreamBlock()) {
-        populateOperatorStatsMap();
-      }
+      operatorStats.recordRow(1, nextBlock.getNumRows());
+      operatorStats.endTimer(nextBlock);
       return nextBlock;
     }
-  }
-
-  protected void populateOperatorStatsMap() {
-    if (!_operatorStats.getExecutionStats().isEmpty()) {
-      _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
-      if (_opChainStats != null) {
-        _opChainStats.getOperatorStatsMap().compute(_operatorId, (_key, _value) -> _operatorStats);
-      }
-    }
-  }
-
-  public OperatorStats getOperatorStats() {
-    return _operatorStats;
   }
 
   public String getOperatorId() {

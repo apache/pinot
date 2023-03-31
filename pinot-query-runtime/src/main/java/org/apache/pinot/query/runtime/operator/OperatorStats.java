@@ -38,24 +38,21 @@ public class OperatorStats {
 
   private final VirtualServerAddress _serverAddress;
 
-  private final String _operatorType;
-
   private int _numBlock = 0;
   private int _numRows = 0;
   private long _startTimeMs = -1;
   private final Map<String, String> _executionStats;
   private boolean _processingStarted = false;
 
-  public OperatorStats(OpChainExecutionContext context, String operatorType) {
-    this(context.getRequestId(), context.getStageId(), context.getServer(), operatorType);
+  public OperatorStats(OpChainExecutionContext context) {
+    this(context.getRequestId(), context.getStageId(), context.getServer());
   }
 
   //TODO: remove this constructor after the context constructor can be used in serialization and deserialization
-  public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress, String operatorType) {
+  public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress) {
     _stageId = stageId;
     _requestId = requestId;
     _serverAddress = serverAddress;
-    _operatorType = operatorType;
     _executionStats = new HashMap<>();
   }
 
@@ -114,10 +111,6 @@ public class OperatorStats {
 
   public VirtualServerAddress getServerAddress() {
     return _serverAddress;
-  }
-
-  public String getOperatorType() {
-    return _operatorType;
   }
 
   @Override

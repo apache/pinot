@@ -34,9 +34,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -163,23 +161,15 @@ public class MailboxSendOperatorTest {
             server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", DEFAULT_SENDER_STAGE_ID,
                 DEFAULT_RECEIVER_STAGE_ID), _exchangeFactory, DEFAULT_RECEIVER_STAGE_ID);
 
-    Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    Mockito.when(_input.nextBlock()).thenReturn(eosBlock);
 
     // When:
     TransferableBlock block = operator.nextBlock();
 
     // Then:
-    TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock(
-        OperatorUtils.getMetadataFromOperatorStats(context.getStats().getOperatorStatsMap()));
     Assert.assertTrue(block.isEndOfStreamBlock(), "expected EOS block to propagate");
-    Assert.assertFalse(block.getResultMetadata().isEmpty());
-    Assert.assertTrue(block.getResultMetadata().containsKey(operator.getOperatorId()));
-
-    OperatorStats stats = block.getResultMetadata().get(operator.getOperatorId());
-    Assert.assertEquals(stats.getRequestId(), 1);
-    Assert.assertEquals(stats.getStageId(), DEFAULT_SENDER_STAGE_ID);
-    Assert.assertEquals(JsonUtils.objectToString(block.getResultMetadata()),
-        JsonUtils.objectToString(eosBlock.getResultMetadata()));
+    Assert.assertEquals(block, eosBlock);
   }
 
   @Test
