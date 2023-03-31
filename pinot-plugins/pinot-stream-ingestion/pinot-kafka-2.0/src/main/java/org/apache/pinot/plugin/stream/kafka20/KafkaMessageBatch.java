@@ -38,7 +38,8 @@ public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
    * @param unfilteredMessageCount how many messages were received from the topic before being filtered
    * @param lastOffset the offset of the last message in the batch
    * @param batch the messages, which may be smaller than {@see unfilteredMessageCount}
-   * @param lastMessageMetadata metadata for last message in the batch, useful for estimating ingestion delay.
+   * @param lastMessageMetadata metadata for last filtered message in the batch, useful for estimating ingestion delay
+   *                            when a batch has all messages filtered.
    */
   public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<StreamMessage<byte[]>> batch,
       StreamMessageMetadata lastMessageMetadata) {
@@ -49,6 +50,9 @@ public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
   }
 
   @Override
+  /**
+   * Returns the metadata for the last filtered message if any, null otherwise.
+   */
   public StreamMessageMetadata getLastMessageMetadata() {
     return _lastMessageMetadata;
   }
