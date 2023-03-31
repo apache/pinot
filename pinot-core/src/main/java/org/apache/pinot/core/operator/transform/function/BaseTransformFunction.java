@@ -20,10 +20,12 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -99,8 +101,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   protected List<TransformFunction> _arguments;
 
-  // NOTE: this initArguments has to be called for default getNullBitmap() implementation to be effective.
-  public void initArguments(List<TransformFunction> arguments) {
+  // NOTE: this init has to be called for default getNullBitmap() implementation to be effective.
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     _arguments = arguments;
   }
 
