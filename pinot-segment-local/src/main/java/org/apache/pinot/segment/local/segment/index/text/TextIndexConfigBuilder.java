@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.text;
 
-import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
@@ -52,24 +51,6 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
       _stopWordsInclude = TextIndexUtils.extractStopWordsInclude(textIndexProperties);
       _stopWordsExclude = TextIndexUtils.extractStopWordsExclude(textIndexProperties);
     }
-    return this;
-  }
-
-  @Override
-  public TextIndexConfigBuilder withStopWordsInclude(List<String> stopWordsInclude) {
-    super.withStopWordsInclude(stopWordsInclude);
-    return this;
-  }
-
-  @Override
-  public TextIndexConfigBuilder withRawValueForTextIndex(@Nullable Object rawValueForTextIndex) {
-    super.withRawValueForTextIndex(rawValueForTextIndex);
-    return this;
-  }
-
-  @Override
-  public TextIndexConfigBuilder withStopWordsExclude(List<String> stopWordsExclude) {
-    super.withStopWordsExclude(stopWordsExclude);
     return this;
   }
 }
