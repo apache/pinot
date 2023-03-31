@@ -28,7 +28,6 @@ import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.impl.BatchMessageIdImpl;
 import org.apache.pulsar.client.impl.MessageIdImpl;
-import org.apache.pulsar.client.internal.DefaultImplementation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,7 +113,7 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
                 ((BatchMessageIdImpl) currentMessageId).getAcker());
       }
     } else {
-      nextMessageId = DefaultImplementation.newMessageId(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
+      nextMessageId = new MessageIdImpl(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
     }
     return new MessageIdStreamOffset(nextMessageId);
   }

@@ -76,7 +76,6 @@ const HomePage = () => {
   const { taskTypes, taskTypesTable } = useTaskTypesTable();
 
   const fetchData = async () => {
-    const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
     const instanceResponse = await PinotMethodUtils.getAllInstances();
     const taskTypes = await PinotMethodUtils.getAllTaskTypes();
     const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
@@ -84,7 +83,6 @@ const HomePage = () => {
     tablesResponse.records.map((record)=>{
       tablesList.push(...record);
     });
-    setTenantsData(tenantsDataResponse);
     setInstances(instanceResponse);
     setTables(tablesList);
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
@@ -96,6 +94,11 @@ const HomePage = () => {
   };
   useEffect(() => {
     fetchData();
+    async function fetchTenant () {
+      const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
+      setTenantsData(tenantsDataResponse);
+    }
+    fetchTenant();
   }, []);
   
   return fetching ? (

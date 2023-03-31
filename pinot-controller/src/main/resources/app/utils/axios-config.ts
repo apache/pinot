@@ -21,6 +21,7 @@ import axios from 'axios';
 import { AuthWorkflow } from 'Models';
 import app_state from '../app_state';
 import { AxiosError, AxiosRequestConfig } from "axios";
+import * as axiosCache from 'axios-cache-interceptor/dist/index.bundle';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -80,7 +81,7 @@ export const getAxiosResponseInterceptor = (): (<T>(
     return fulfilledResponseInterceptor;
 };
 
-export const baseApi = axios.create({ baseURL: '/' });
+export const baseApi = axiosCache.setupCache(axios.create({ baseURL: '/' }));
 baseApi.interceptors.request.use(getAxiosRequestInterceptor(), getAxiosErrorInterceptor());
 baseApi.interceptors.response.use(getAxiosResponseInterceptor(), getAxiosErrorInterceptor());
 
@@ -88,10 +89,11 @@ export const transformApi = axios.create({baseURL: '/', transformResponse: [data
 transformApi.interceptors.request.use(getAxiosRequestInterceptor(), getAxiosErrorInterceptor());
 transformApi.interceptors.response.use(getAxiosResponseInterceptor(), getAxiosErrorInterceptor());
 
+
 // baseApi axios instance does not throw an error when API fails hence the control will never go to catch block
 // changing the handleError method of baseApi will cause current UI to break (as UI might have not handle error properly)
 // creating a new axios instance baseApiWithErrors which can be used when adding new API's
 // NOTE: It is an add-on utility and can be used in case you want to handle/show UI when API fails.
-export const baseApiWithErrors = axios.create({ baseURL: '/' });
+export const baseApiWithErrors = axiosCache.setupCache(axios.create({ baseURL: '/' }));
 baseApiWithErrors.interceptors.request.use(getAxiosRequestInterceptor());
 baseApiWithErrors.interceptors.response.use(getAxiosResponseInterceptor());

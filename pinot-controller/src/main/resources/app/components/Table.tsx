@@ -71,7 +71,8 @@ type Props = {
     toggleName: string;
     toggleValue: boolean;
   },
-  tooltipData?: string[]
+  tooltipData?: string[],
+  onRowsRendered?: (rows: any[]) => void
 };
 
 // These sort functions are applied to any columns with these names. Otherwise, we just
@@ -279,7 +280,8 @@ export default function CustomizedTables({
   inAccordionFormat,
   regexReplace,
   accordionToggleObject,
-  tooltipData
+  tooltipData,
+  onRowsRendered
 }: Props) {
   // Separate the initial and final data into two separated state variables.
   // This way we can filter and sort the data without affecting the original data.
@@ -304,6 +306,14 @@ export default function CustomizedTables({
   const classes = useStyles();
   const [rowsPerPage, setRowsPerPage] = React.useState(defaultRowsPerPage || 10);
   const [page, setPage] = React.useState(0);
+  const currentlyRenderedRows = React.useMemo(() => {
+    return finalData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+  }, [finalData, page, rowsPerPage])
+  React.useEffect(() => {
+    if (typeof onRowsRendered === 'function' && page > 0) {
+      onRowsRendered(currentlyRenderedRows)
+    }
+  }, [page, rowsPerPage])
 
   const handleChangeRowsPerPage = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -526,8 +536,7 @@ export default function CustomizedTables({
                   </StyledTableCell>
                 </TableRow>
               ) : (
-                finalData
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                currentlyRenderedRows
                   .map((row, index) => (
                     <StyledTableRow key={index} hover>
                       {Object.values(row).map((cell: any, idx) =>{

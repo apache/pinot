@@ -17,17 +17,12 @@
  * under the License.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
 import { TableData } from 'Models';
-import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
-import CustomButton from '../components/CustomButton';
 import SimpleAccordion from '../components/SimpleAccordion';
-import AddSchemaOp from '../components/Homepage/Operations/AddSchemaOp';
-import AddOfflineTableOp from '../components/Homepage/Operations/AddOfflineTableOp';
-import AddRealtimeTableOp from '../components/Homepage/Operations/AddRealtimeTableOp';
 import Skeleton from '@material-ui/lab/Skeleton';
 
 const useStyles = makeStyles(() => ({
@@ -55,105 +50,64 @@ const TableTooltipData = [
 const TablesListingPage = () => {
   const classes = useStyles();
 
-  const [schemaDetails, setSchemaDetails] = useState<TableData>({
-    columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
-    records: [],
-    isLoading: true,
-  });
   const [tableData, setTableData] = useState<TableData>({
     columns: PinotMethodUtils.allTableDetailsColumnHeader,
     records: [],
     isLoading: true,
   });
-  const [showSchemaModal, setShowSchemaModal] = useState(false);
-  const [showAddOfflineTableModal, setShowAddOfflineTableModal] = useState(
-    false
-  );
-  const [showAddRealtimeTableModal, setShowAddRealtimeTableModal] = useState(
-    false
-  );
+
+  const [currentlySelectedTables, setCurrentlySelectedTables] = useState([])
 
   const loading = { customRenderer: <Skeleton animation={'wave'} /> };
 
-  const fetchData = async () => {
-    const schemaResponse = await PinotMethodUtils.getQuerySchemaList();
-    const schemaList = [];
-    const schemaData = [];
-    schemaResponse.records.map((record) => {
-      schemaList.push(...record);
-    });
-    schemaList.map((schema) => {
-      schemaData.push([schema].concat([...Array(PinotMethodUtils.allSchemaDetailsColumnHeader.length - 1)].map((e) => loading)));
-    });
-    const tablesResponse = await PinotMethodUtils.getQueryTablesList({
-      bothType: true,
-    });
-    const tablesList = [];
-    const tableData = [];
-    tablesResponse.records.map((record) => {
-      tablesList.push(...record);
-    });
-    tablesList.map((table) => {
-      tableData.push([table].concat([...Array(PinotMethodUtils.allTableDetailsColumnHeader.length - 1)].map((e) => loading)));
-    });
-    // Set the table data to "Loading..." at first as tableSize can take minutes to fetch
-    // for larger tables.
-    setTableData({
-      columns: PinotMethodUtils.allTableDetailsColumnHeader,
-      records: tableData,
-      isLoading: false,
-    });
-
-    // Set just the column headers so these do not have to load with the data
-    setSchemaDetails({
-      columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
-      records: schemaData,
-      isLoading: false,
-    });
-
-    // these implicitly set isLoading=false by leaving it undefined
-    const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
-    setTableData(tableDetails);
-    const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails(schemaList);
-    setSchemaDetails(schemaDetailsData);
-  };
+  useEffect(() => {
+    async function initTables () {
+      const tablesResponse = await PinotMethodUtils.getQueryTablesList({
+        bothType: true,
+      });
+      const tablesList = tablesResponse.records.flat();
+      const tableData = [];
+      tablesList.map((table) => {
+        tableData.push([table].concat([...Array(PinotMethodUtils.allTableDetailsColumnHeader.length - 1)].map((e) => loading)));
+      });
+      // Set the table data to "Loading..." at first as tableSize can take minutes to fetch
+      // for larger tables.
+      setTableData({
+        columns: PinotMethodUtils.allTableDetailsColumnHeader,
+        records: tableData,
+        isLoading: false,
+      });
+      // get first 10
+      const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList.slice(0, 10));
+      const records = tableDetails.records.concat(tableData)
+      setTableData({ columns: tableDetails.columns, records });
+    }
+    initTables();
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (currentlySelectedTables.length === 0) return
+    async function loadData () {
+      const tablesList = currentlySelectedTables.map(row => row['Table Name#$%0'])
+  
+      // these implicitly set isLoading=false by leaving it undefined
+      const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
+      setTableData({ columns: tableDetails.columns, records: tableData.records.map(record => {
+        const updatedTable = tableDetails.records.find(table => table[0] === record[0])
+        if (updatedTable) {
+          return updatedTable
+        }
+        return record
+      })});
+    }
+    loadData()
+  }, [currentlySelectedTables])
 
   return (
     <Grid item xs className={classes.gridContainer}>
       <div className={classes.operationDiv}>
         <SimpleAccordion headerTitle="Operations" showSearchBox={false}>
           <div>
-            <CustomButton
-              onClick={() => {
-                setShowSchemaModal(true);
-              }}
-              tooltipTitle="Define the dimensions, metrics and date time columns of your data"
-              enableTooltip={true}
-            >
-              Add Schema
-            </CustomButton>
-            <CustomButton
-              onClick={() => {
-                setShowAddOfflineTableModal(true);
-              }}
-              tooltipTitle="Create a Pinot table to ingest from batch data sources, such as S3"
-              enableTooltip={true}
-            >
-              Add Offline Table
-            </CustomButton>
-            <CustomButton
-              onClick={() => {
-                setShowAddRealtimeTableModal(true);
-              }}
-              tooltipTitle="Create a Pinot table to ingest from stream data sources, such as Kafka"
-              enableTooltip={true}
-            >
-              Add Realtime Table
-            </CustomButton>
           </div>
         </SimpleAccordion>
       </div>
@@ -165,41 +119,8 @@ const TablesListingPage = () => {
         showSearchBox={true}
         inAccordionFormat={true}
         tooltipData={TableTooltipData}
+        onRowsRendered={(rows) => setCurrentlySelectedTables(rows)}
       />
-      <CustomizedTables
-        title="Schemas"
-        data={schemaDetails}
-        showSearchBox={true}
-        inAccordionFormat={true}
-        addLinks
-        baseURL="/tenants/schema/"
-      />
-      {showSchemaModal && (
-        <AddSchemaOp
-          hideModal={() => {
-            setShowSchemaModal(false);
-          }}
-          fetchData={fetchData}
-        />
-      )}
-      {showAddOfflineTableModal && (
-        <AddOfflineTableOp
-          hideModal={() => {
-            setShowAddOfflineTableModal(false);
-          }}
-          fetchData={fetchData}
-          tableType={'OFFLINE'}
-        />
-      )}
-      {showAddRealtimeTableModal && (
-        <AddRealtimeTableOp
-          hideModal={() => {
-            setShowAddRealtimeTableModal(false);
-          }}
-          fetchData={fetchData}
-          tableType={'REALTIME'}
-        />
-      )}
     </Grid>
   );
 };

@@ -23,7 +23,7 @@ if [[ "$#" -gt 0 ]]
 then
   DOCKER_TAG=$1
 else
-  DOCKER_TAG="pinot:latest"
+  DOCKER_TAG="rlvt-pinot:latest"
   echo "Not specified a Docker Tag, using default tag: ${DOCKER_TAG}."
 fi
 
@@ -39,7 +39,7 @@ if [[ "$#" -gt 2 ]]
 then
   PINOT_GIT_URL=$3
 else
-  PINOT_GIT_URL="https://github.com/apache/pinot.git"
+  PINOT_GIT_URL="https://github.com/reelevant-tech/pinot.git"
 fi
 
 if [[ "$#" -gt 3 ]]

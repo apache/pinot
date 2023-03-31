@@ -404,60 +404,64 @@ const allTableDetailsColumnHeader = [
   'Status',
 ];
 
-const getAllTableDetails = (tablesList) => {
+const getAllTableDetails = async (tablesList) => {
   if (tablesList.length) {
-    const promiseArr = [];
+    const promiseArr: Promise<any>[] = [];
     tablesList.map((name) => {
       promiseArr.push(getTableSize(name));
       promiseArr.push(getIdealState(name));
       promiseArr.push(getExternalView(name));
     });
+    const results = []
+    // call one by one
+    for (const promise of promiseArr) {
+      const result = await promise
+      results.push(result)
+    }
 
-    return Promise.all(promiseArr).then((results) => {
-      const finalRecordsArr = [];
-      let singleTableData = [];
-      let idealStateObj = null;
-      let externalViewObj = null;
-      results.map((result, index) => {
-        // since we have 3 promises, we are using mod 3 below
-        if (index % 3 === 0) {
-          // response of getTableSize API
-          const {
-            tableName,
-            reportedSizeInBytes,
-            estimatedSizeInBytes,
-          } = result.data;
-          singleTableData.push(
-            tableName,
-            Utils.formatBytes(reportedSizeInBytes),
-            Utils.formatBytes(estimatedSizeInBytes)
-          );
-        } else if (index % 3 === 1) {
-          // response of getIdealState API
-          idealStateObj = result.data.OFFLINE || result.data.REALTIME || {};
-        } else if (index % 3 === 2) {
-          // response of getExternalView API
-          externalViewObj = result.data.OFFLINE || result.data.REALTIME || {};
-          const externalSegmentCount = Object.keys(externalViewObj).length;
-          const idealSegmentCount = Object.keys(idealStateObj).length;
-          // Generating data for the record
-          singleTableData.push(
-            `${externalSegmentCount} / ${idealSegmentCount}`,
-            Utils.getSegmentStatus(idealStateObj, externalViewObj)
-          );
-          // saving into records array
-          finalRecordsArr.push(singleTableData);
-          // resetting the required variables
-          singleTableData = [];
-          idealStateObj = null;
-          externalViewObj = null;
-        }
-      });
-      return {
-        columns: allTableDetailsColumnHeader,
-        records: finalRecordsArr,
-      };
+    const finalRecordsArr = [];
+    let singleTableData = [];
+    let idealStateObj = null;
+    let externalViewObj = null;
+    results.map((result, index) => {
+      // since we have 3 promises, we are using mod 3 below
+      if (index % 3 === 0) {
+        // response of getTableSize API
+        const {
+          tableName,
+          reportedSizeInBytes,
+          estimatedSizeInBytes,
+        } = result.data;
+        singleTableData.push(
+          tableName,
+          Utils.formatBytes(reportedSizeInBytes),
+          Utils.formatBytes(estimatedSizeInBytes)
+        );
+      } else if (index % 3 === 1) {
+        // response of getIdealState API
+        idealStateObj = result.data.OFFLINE || result.data.REALTIME || {};
+      } else if (index % 3 === 2) {
+        // response of getExternalView API
+        externalViewObj = result.data.OFFLINE || result.data.REALTIME || {};
+        const externalSegmentCount = Object.keys(externalViewObj).length;
+        const idealSegmentCount = Object.keys(idealStateObj).length;
+        // Generating data for the record
+        singleTableData.push(
+          `${externalSegmentCount} / ${idealSegmentCount}`,
+          Utils.getSegmentStatus(idealStateObj, externalViewObj)
+        );
+        // saving into records array
+        finalRecordsArr.push(singleTableData);
+        // resetting the required variables
+        singleTableData = [];
+        idealStateObj = null;
+        externalViewObj = null;
+      }
     });
+    return {
+      columns: allTableDetailsColumnHeader,
+      records: finalRecordsArr,
+    };
   }
   return {
     columns: allTableDetailsColumnHeader,
