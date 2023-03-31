@@ -41,7 +41,7 @@ public class StartReplaceSegmentsRequest {
     _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
     _segmentsTo = (segmentsTo == null) ? Collections.emptyList() : segmentsTo;
     Preconditions.checkArgument(!_segmentsFrom.isEmpty() || !_segmentsTo.isEmpty(),
-        "Both segmentsFrom and segmentsTo cannot be empty");
+        "'segmentsFrom' and 'segmentsTo' cannot both be empty");
   }
 
   public List<String> getSegmentsFrom() {
