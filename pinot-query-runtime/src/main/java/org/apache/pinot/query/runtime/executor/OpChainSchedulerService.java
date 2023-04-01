@@ -111,7 +111,6 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                 LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
                     result.getDataBlock().getExceptions());
               } else {
-                operatorChain.getStats().setOperatorStatsMap(result.getResultMetadata());
                 LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
               }
             }
