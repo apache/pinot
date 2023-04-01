@@ -621,7 +621,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _numRowsConsumed++;
       streamMessageCount++;
     }
-    updateIngestionDelay(indexedMessageCount, hasTransformedRows, msgMetadata);
+
+    if (indexedMessageCount > 0) {
+      // Record Ingestion delay for this partition with metadata for last message we processed
+      updateIngestionDelay(_lastRowMetadata);
+    } else if (!hasTransformedRows && (msgMetadata != null)) {
+      // If all messages were filtered by transformation, we still attempt to update ingestion delay using
+      // the metadata for the last message we processed if any.
+      updateIngestionDelay(msgMetadata);
+    }
+
     updateCurrentDocumentCountMetrics();
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
@@ -1575,23 +1584,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
     _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
-  }
-
-  /*
-   * Updates the ingestion delay if messages were processed using the time stamp for the last consumed event.
-   *
-   * @param indexedMessagesCount: greater than 0 if at least one row was transformed successfully.
-   * @param hasTransformedRows: true if there were transformed rows in the current message batch.
-   * @param rowMetadata: if hasTransformedRows is false, this holds the metadata for the last row processed.
-   */
-  private void updateIngestionDelay(int indexedMessageCount, boolean hasTransformedRows, RowMetadata rowMetadata) {
-    if (indexedMessageCount > 0) {
-      // Record Ingestion delay for this partition
-      updateIngestionDelay(_lastRowMetadata);
-    } else if (!hasTransformedRows) {
-      // If there was no transformed rows in a batch we still use the last metadata to record ingestion delay
-      updateIngestionDelay(rowMetadata);
-    }
   }
 
   private void updateIngestionDelay(RowMetadata metadata) {
