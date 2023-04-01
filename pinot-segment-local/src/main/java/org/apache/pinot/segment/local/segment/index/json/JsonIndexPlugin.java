@@ -25,8 +25,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class JsonIndexPlugin implements IndexPlugin<JsonIndexType> {
+  public static final JsonIndexType INSTANCE = new JsonIndexType();
+
   @Override
   public JsonIndexType getIndexType() {
-    return JsonIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

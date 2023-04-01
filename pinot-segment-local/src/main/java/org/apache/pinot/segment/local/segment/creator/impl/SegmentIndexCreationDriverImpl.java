@@ -36,6 +36,7 @@ import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
@@ -425,20 +426,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Uses config and column properties like storedType and length of elements to determine if
    * varLengthDictionary should be used for a column
+   * @deprecated Use
+   * {@link DictionaryIndexType#shouldUseVarLengthDictionary(String, Set, DataType, ColumnStatistics)} instead.
    */
+  @Deprecated
   public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
       DataType columnStoredType, ColumnStatistics columnProfile) {
-    if (varLengthDictColumns.contains(columnName)) {
-      return true;
-    }
-
-    if (columnStoredType == DataType.BYTES || columnStoredType == DataType.BIG_DECIMAL) {
-      if (!columnProfile.isFixedLength()) {
-        return true;
-      }
-    }
-
-    return false;
+    return DictionaryIndexType.shouldUseVarLengthDictionary(
+        columnName, varLengthDictColumns, columnStoredType, columnProfile);
   }
 
   /**

@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -245,5 +246,17 @@ public class LiteralTransformFunction implements TransformFunction {
   @Override
   public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    // Treat all unknown type values as null regardless of the value.
+    if (_dataType != DataType.UNKNOWN) {
+      return null;
+    }
+    int length = valueBlock.getNumDocs();
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, length);
+    return bitmap;
   }
 }

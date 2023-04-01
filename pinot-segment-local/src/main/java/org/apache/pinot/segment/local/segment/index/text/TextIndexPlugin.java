@@ -25,8 +25,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class TextIndexPlugin implements IndexPlugin<TextIndexType> {
+
+  public static final TextIndexType INSTANCE = new TextIndexType();
   @Override
   public TextIndexType getIndexType() {
-    return TextIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

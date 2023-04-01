@@ -21,10 +21,11 @@ package org.apache.pinot.segment.local.segment.store;
 import java.io.IOException;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.mockito.Mockito;
 import org.testng.Assert;
 
@@ -36,16 +37,16 @@ public class ColumnIndexDirectoryTestHelper {
   private ColumnIndexDirectoryTestHelper() {
   }
 
-  private static final ColumnIndexType[] INDEX_TYPES = {
-      ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX,
-      ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR
+  private static final IndexType[] INDEX_TYPES = {
+     StandardIndexes.dictionary(), StandardIndexes.forward(), StandardIndexes.inverted(),
+      StandardIndexes.bloomFilter(), StandardIndexes.nullValueVector()
   };
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {
     String columnName = column + "." + index;
     // skip star tree. It's managed differently
-    ColumnIndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
+    IndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
     PinotDataBuffer buf = columnDirectory.newBuffer(columnName, indexType, size);
     return buf;
   }
@@ -54,7 +55,7 @@ public class ColumnIndexDirectoryTestHelper {
       throws IOException {
     String columnName = column + "." + index;
     // skip star tree
-    ColumnIndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
+    IndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
     PinotDataBuffer buf = columnDirectory.getBuffer(columnName, indexType);
     return buf;
   }

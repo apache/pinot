@@ -19,33 +19,47 @@
 
 package org.apache.pinot.segment.local.segment.index.inverted;
 
+import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
-import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class InvertedIndexType implements IndexType<IndexConfig, IndexReader, IndexCreator> {
-  public static final InvertedIndexType INSTANCE = new InvertedIndexType();
+public class InvertedIndexType
+    extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>
+    implements ConfigurableFromIndexLoadingConfig<IndexConfig> {
 
-  private InvertedIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.INVERTED_ID;
+  protected InvertedIndexType() {
+    super(StandardIndexes.INVERTED_ID);
   }
 
   @Override
@@ -54,30 +68,57 @@ public class InvertedIndexType implements IndexType<IndexConfig, IndexReader, In
   }
 
   @Override
+  public Map<String, IndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+    return indexLoadingConfig.getInvertedIndexColumns().stream()
+        .collect(Collectors.toMap(Function.identity(), v -> IndexConfig.ENABLED));
+  }
+
+  @Override
   public IndexConfig getDefaultConfig() {
     return IndexConfig.DISABLED;
   }
 
   @Override
-  public IndexConfig getConfig(TableConfig tableConfig, Schema schema) {
-    throw new UnsupportedOperationException();
+  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
+    ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
+        tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
+        (acum, column) -> acum.put(column, IndexConfig.ENABLED));
+    return IndexConfigDeserializer.fromIndexes("inverted", getIndexConfigClass())
+        .withExclusiveAlternative(IndexConfigDeserializer.ifIndexingConfig(fromInvertedCols));
+  }
+
+  public DictionaryBasedInvertedIndexCreator createIndexCreator(IndexCreationContext context)
+      throws IOException {
+    if (context.isOnHeap()) {
+      return new OnHeapBitmapInvertedIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+          context.getCardinality());
+    } else {
+      return new OffHeapBitmapInvertedIndexCreator(context.getIndexDir(), context.getFieldSpec(),
+          context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
+    }
   }
 
   @Override
-  public IndexCreator createIndexCreator(IndexCreationContext context, IndexConfig indexConfig)
-      throws Exception {
-    throw new UnsupportedOperationException();
+  public DictionaryBasedInvertedIndexCreator createIndexCreator(IndexCreationContext context,
+      IndexConfig indexConfig)
+      throws IOException {
+    return createIndexCreator(context);
   }
 
   @Override
-  public IndexReaderFactory<IndexReader> getReaderFactory() {
-    throw new UnsupportedOperationException();
+  protected IndexReaderFactory<InvertedIndexReader> createReaderFactory() {
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
-  public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    throw new UnsupportedOperationException();
+  @Nullable
+  public InvertedIndexReader getIndexReader(ColumnIndexContainer indexContainer) {
+    InvertedIndexReader reader = super.getIndexReader(indexContainer);
+    if (reader != null) {
+      return reader;
+    }
+    ForwardIndexReader fwdReader = indexContainer.getIndex(StandardIndexes.forward());
+    return fwdReader instanceof SortedIndexReader ? (SortedIndexReader) fwdReader : null;
   }
 
   @Override
@@ -86,7 +127,59 @@ public class InvertedIndexType implements IndexType<IndexConfig, IndexReader, In
   }
 
   @Override
-  public String toString() {
-    return getId();
+  public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
+      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+    return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig);
+  }
+
+  public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+
+    /**
+     * Creates a {@link InvertedIndexReader}.
+     *
+     * Unless {@link #createSkippingForward(SegmentDirectory.Reader, ColumnMetadata)}, this method first try to use the
+     * forward index reader in case it is also an inverted index. That is the case, for example, when the column is
+     * sorted and single value.
+     */
+    @Override
+    public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+        throws IOException, IndexReaderConstraintException {
+      if (fieldIndexConfigs == null || !fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
+        return null;
+      }
+      if (!metadata.hasDictionary()) {
+        throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "
+            + "index if it has no dictionary");
+      }
+      if (metadata.isSorted() && metadata.isSingleValue()) {
+        ForwardIndexReader fwdReader = StandardIndexes.forward().getReaderFactory()
+            .createIndexReader(segmentReader, fieldIndexConfigs, metadata);
+        Preconditions.checkState(fwdReader instanceof SortedIndexReader);
+        return (SortedIndexReader) fwdReader;
+      } else {
+        return createSkippingForward(segmentReader, metadata);
+      }
+    }
+
+    /**
+     * Directly creates a {@link InvertedIndexReader}.
+     *
+     * Unless {@link #createIndexReader}, this method always tries to create the actual inverted index reader instead of
+     * try to use the forward index when the column is sorted and single value.
+     */
+    public InvertedIndexReader createSkippingForward(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata)
+        throws IOException {
+      if (!metadata.hasDictionary()) {
+        throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "
+            + "index if it has no dictionary");
+      }
+      PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
+      return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
+    }
   }
 }

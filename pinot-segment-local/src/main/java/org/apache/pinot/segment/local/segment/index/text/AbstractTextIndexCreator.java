@@ -16,22 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.creator;
 
-import java.io.IOException;
+package org.apache.pinot.segment.local.segment.index.text;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 
 
-public interface TextIndexCreatorProvider {
+public abstract class AbstractTextIndexCreator implements TextIndexCreator {
 
-  /**
-   * Creates a {@see TextIndexCreator} from information about index creation.
-   * This allows a plugin to pattern match index creation information to select
-   * an appropriate implementation.
-   * @param context context about the index creation.
-   * @return a {@see ForwardIndexCreator}
-   * @throws IOException whenever something goes wrong matching or constructing the creator
-   */
-  TextIndexCreator newTextIndexCreator(IndexCreationContext.Text context)
-      throws IOException;
+  @Override
+  public void add(@Nonnull Object value, int dictId) {
+    add((String) value);
+  }
+
+  @Override
+  public void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+    int length = values.length;
+    if (values instanceof String[]) {
+      add((String[]) values, length);
+    } else {
+      String[] strings = new String[length];
+      for (int i = 0; i < length; i++) {
+        strings[i] = (String) values[i];
+      }
+      add(strings, length);
+    }
+  }
 }

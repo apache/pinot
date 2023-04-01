@@ -37,6 +37,7 @@ public class BloomFilterConfig extends IndexConfig {
   public BloomFilterConfig(double fpp, int maxSizeInBytes, boolean loadOnHeap) {
     this(true, fpp, maxSizeInBytes, loadOnHeap);
   }
+
   @JsonCreator
   public BloomFilterConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty(value = "fpp") double fpp,
       @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,

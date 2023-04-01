@@ -2166,6 +2166,24 @@
         "expectedException": "Error explain query plan for.*"
       },
       {
+        "description": "unsupported custom frames - ORDER BY with two columns and RANGE",
+        "notes": "Apache Calcite throws error: RANGE clause cannot be used with compound ORDER BY clause, even though not specifying the frame results in RANGE itself",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "unsupported custom frames - PARTITION BY and ORDER BY with two columns and RANGE",
+        "notes": "Apache Calcite throws error: RANGE clause cannot be used with compound ORDER BY clause, even though not specifying the frame results in RANGE itself",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3, a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "unsupported custom frames - ORDER BY with two columns and ROWS",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
         "description": "Multiple window groups",
         "notes": "not yet supported",
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
@@ -2187,6 +2205,12 @@
         "description": "Multiple window groups",
         "notes": "not yet supported",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2), MIN(a.col3) OVER(PARTITION BY a.col2) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Multiple window groups",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2, a.col1), MIN(a.col3) OVER(ORDER BY a.col1, a.col2) FROM a",
         "expectedException": "Error explain query plan for.*"
       },
       {

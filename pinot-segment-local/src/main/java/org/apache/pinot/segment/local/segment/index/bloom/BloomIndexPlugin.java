@@ -24,8 +24,9 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class BloomIndexPlugin implements IndexPlugin<BloomIndexType> {
+  private static final BloomIndexType INSTANCE = new BloomIndexType();
   @Override
   public BloomIndexType getIndexType() {
-    return BloomIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

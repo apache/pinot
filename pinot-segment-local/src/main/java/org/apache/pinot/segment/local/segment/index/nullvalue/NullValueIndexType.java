@@ -19,34 +19,34 @@
 
 package org.apache.pinot.segment.local.segment.index.nullvalue;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
-import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class NullValueIndexType implements IndexType<IndexConfig, IndexReader, IndexCreator> {
+public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
 
-  public static final NullValueIndexType INSTANCE = new NullValueIndexType();
-
-  private NullValueIndexType() {
-  }
-
-  @Override
-  public String getId() {
-    return StandardIndexes.NULL_VALUE_VECTOR_ID;
+  protected NullValueIndexType() {
+    super(StandardIndexes.NULL_VALUE_VECTOR_ID);
   }
 
   @Override
@@ -55,30 +55,41 @@ public class NullValueIndexType implements IndexType<IndexConfig, IndexReader, I
   }
 
   @Override
+  public NullValueVectorCreator createIndexCreator(IndexCreationContext context, IndexConfig indexConfig)
+      throws Exception {
+    return new NullValueVectorCreator(context.getIndexDir(), context.getFieldSpec().getName());
+  }
+
+  @Override
   public IndexConfig getDefaultConfig() {
     return IndexConfig.DISABLED;
   }
 
   @Override
-  public IndexConfig getConfig(TableConfig tableConfig, Schema schema) {
-    throw new UnsupportedOperationException();
+  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes("null", getIndexConfigClass())
+        .withFallbackAlternative(
+            IndexConfigDeserializer.ifIndexingConfig(
+                IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->
+                  tableConfig.getIndexingConfig().isNullHandlingEnabled()
+                      ? IndexConfig.ENABLED
+                      : IndexConfig.DISABLED))
+        );
+  }
+
+  public NullValueVectorCreator createIndexCreator(File indexDir, String columnName) {
+    return new NullValueVectorCreator(indexDir, columnName);
   }
 
   @Override
-  public IndexCreator createIndexCreator(IndexCreationContext context, IndexConfig indexConfig)
-      throws Exception {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public IndexReaderFactory<IndexReader> getReaderFactory() {
-    throw new UnsupportedOperationException();
+  protected IndexReaderFactory<NullValueVectorReader> createReaderFactory() {
+    return ReaderFactory.INSTANCE;
   }
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    throw new UnsupportedOperationException();
+    return IndexHandler.NoOp.INSTANCE;
   }
 
   @Override
@@ -86,8 +97,26 @@ public class NullValueIndexType implements IndexType<IndexConfig, IndexReader, I
     return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
   }
 
-  @Override
-  public String toString() {
-    return getId();
+  private static class ReaderFactory implements IndexReaderFactory<NullValueVectorReader> {
+
+    public static final ReaderFactory INSTANCE = new ReaderFactory();
+
+    private ReaderFactory() {
+    }
+
+    @Nullable
+    @Override
+    public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+          throws IOException {
+      // TODO: Change this behavior and make it closer to other indexes.
+      //  For historical and test reasons, NullValueIndexType doesn't really care about its config
+      //  if there is a buffer for this index, it is read even if the config explicitly ask to disable it.
+      if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector())) {
+        return null;
+      }
+      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector());
+      return new NullValueVectorReaderImpl(buffer);
+    }
   }
 }

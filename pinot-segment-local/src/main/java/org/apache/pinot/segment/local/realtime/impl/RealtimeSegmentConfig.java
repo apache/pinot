@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl;
 
+import com.google.common.collect.Sets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -88,7 +89,7 @@ public class RealtimeSegmentConfig {
     _timeColumnName = timeColumnName;
     _capacity = capacity;
     _avgNumMultiValues = avgNumMultiValues;
-    _noDictionaryColumns = noDictionaryColumns;
+    _noDictionaryColumns = Sets.newHashSet(noDictionaryColumns);
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _invertedIndexColumns = invertedIndexColumns;
     _textIndexColumns = textIndexColumns;

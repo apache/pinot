@@ -16,23 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader.provider;
+package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
-import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
-public interface InvertedIndexReaderProvider {
+public interface FSTIndexCreator extends IndexCreator {
+
+  @Override
+  default void add(@Nonnull Object value, int dictId)
+      throws IOException {
+    // FST indexes should do nothing when called for each row
+  }
+
+  @Override
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+      throws IOException {
+    // FST indexes should do nothing when called for each row
+  }
 
   /**
-   * Creates a {@see InvertedIndexReader}
-   * @param dataBuffer the buffer, the caller is responsible for closing it
-   * @param metadata the column metadata, may be used to select a reader if the buffer does not start with a magic byte.
-   * @return an inverted index reader
-   * @throws IOException if reading from the buffer fails.
+   * Adds the next document.
    */
-  InvertedIndexReader<?> newInvertedIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-      throws IOException;
+  void add(String document);
+
+  /**
+   * Adds a set of documents to the index
+   */
+  void add(String[] document, int length);
 }

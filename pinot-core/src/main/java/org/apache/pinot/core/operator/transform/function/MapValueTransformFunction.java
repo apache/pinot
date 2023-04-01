@@ -97,7 +97,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToDictIdsSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_dictIds == null) {
+    if (_dictIds == null || _dictIds.length < length) {
       _dictIds = new int[length];
     }
     int[][] keyDictIdsMV = _keyColumnFunction.transformToDictIdsMV(valueBlock);

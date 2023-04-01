@@ -32,5 +32,9 @@
     <Root level="error">
       <AppenderRef ref="console"/>
     </Root>
+    <Logger name="org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig" additivity="false"
+            level="error">
+      <AppenderRef ref="console"/>
+    </Logger>
   </Loggers>
 </Configuration>

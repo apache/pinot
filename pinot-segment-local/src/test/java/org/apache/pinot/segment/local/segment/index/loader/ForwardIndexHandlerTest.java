@@ -35,6 +35,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -42,15 +44,15 @@ import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.index.IndexingOverrides;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -374,7 +376,7 @@ public class ForwardIndexHandlerTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setInvertedIndexCreationColumns(_invertedIndexColumns);
+    config.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
     config.setForwardIndexDisabledColumns(_forwardIndexDisabledColumns);
     config.setRangeIndexCreationColumns(
         Collections.singletonList(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX));
@@ -1106,11 +1108,10 @@ public class ForwardIndexHandlerTest {
         tableConfig.setFieldConfigList(fieldConfigs);
 
         IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
-        IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
         ForwardIndexHandler fwdIndexHandler =
             new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
         boolean val = fwdIndexHandler.needUpdateIndices(writer);
-        fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+        fwdIndexHandler.updateIndices(writer);
         fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
         // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1118,7 +1119,7 @@ public class ForwardIndexHandlerTest {
 
         // Validation
         ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(columnName);
-        testIndexExists(columnName, ColumnIndexType.FORWARD_INDEX);
+        testIndexExists(columnName, StandardIndexes.forward());
         validateIndexMap(columnName, false, false);
         validateForwardIndex(columnName, newCompressionType, metadata.isSorted());
 
@@ -1186,16 +1187,15 @@ public class ForwardIndexHandlerTest {
     tableConfig.setFieldConfigList(fieldConfigs);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, null);
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
     segmentLocalFSDirectory.close();
 
     ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    testIndexExists(column1, ColumnIndexType.FORWARD_INDEX);
+    testIndexExists(column1, StandardIndexes.forward());
     validateIndexMap(column1, false, false);
     validateForwardIndex(column1, newCompressionType, metadata.isSorted());
     // Validate metadata properties. Nothing should change when a forwardIndex is rewritten for compressionType
@@ -1207,7 +1207,7 @@ public class ForwardIndexHandlerTest {
         false);
 
     metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    testIndexExists(column2, ColumnIndexType.FORWARD_INDEX);
+    testIndexExists(column2, StandardIndexes.forward());
     validateIndexMap(column2, false, false);
     validateForwardIndex(column2, newCompressionType, metadata.isSorted());
     validateMetadataProperties(column2, metadata.hasDictionary(), metadata.getColumnMaxLength(),
@@ -1239,8 +1239,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.removeNoDictionaryColumns(col2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1248,8 +1247,8 @@ public class ForwardIndexHandlerTest {
 
     // Col1 validation.
     ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(col1);
-    testIndexExists(col1, ColumnIndexType.FORWARD_INDEX);
-    testIndexExists(col1, ColumnIndexType.DICTIONARY);
+    testIndexExists(col1, StandardIndexes.forward());
+    testIndexExists(col1, StandardIndexes.dictionary());
     validateIndexMap(col1, true, false);
     validateForwardIndex(col1, null, metadata.isSorted());
     // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
@@ -1268,8 +1267,8 @@ public class ForwardIndexHandlerTest {
 
     // Col2 validation.
     metadata = existingSegmentMetadata.getColumnMetadataFor(col2);
-    testIndexExists(col2, ColumnIndexType.FORWARD_INDEX);
-    testIndexExists(col2, ColumnIndexType.DICTIONARY);
+    testIndexExists(col2, StandardIndexes.forward());
+    testIndexExists(col2, StandardIndexes.dictionary());
     validateIndexMap(col2, true, false);
     validateForwardIndex(col2, null, metadata.isSorted());
     // In column metadata, nothing other than hasDictionary and dictionaryElementSize should change.
@@ -1301,16 +1300,15 @@ public class ForwardIndexHandlerTest {
       indexLoadingConfig.removeNoDictionaryColumns(column);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
       segmentLocalFSDirectory.close();
 
       ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-      testIndexExists(column, ColumnIndexType.FORWARD_INDEX);
-      testIndexExists(column, ColumnIndexType.DICTIONARY);
+      testIndexExists(column, StandardIndexes.forward());
+      testIndexExists(column, StandardIndexes.dictionary());
       validateIndexMap(column, true, false);
       validateForwardIndex(column, null, metadata.isSorted());
 
@@ -1349,16 +1347,15 @@ public class ForwardIndexHandlerTest {
       indexLoadingConfig.removeNoDictionaryColumns(column);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
       segmentLocalFSDirectory.close();
 
       ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-      testIndexExists(column, ColumnIndexType.FORWARD_INDEX);
-      testIndexExists(column, ColumnIndexType.DICTIONARY);
+      testIndexExists(column, StandardIndexes.forward());
+      testIndexExists(column, StandardIndexes.dictionary());
       validateIndexMap(column, true, false);
       validateForwardIndex(column, null, metadata.isSorted());
 
@@ -1400,8 +1397,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.addInvertedIndexColumns(col2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1453,8 +1449,7 @@ public class ForwardIndexHandlerTest {
       indexLoadingConfig.setInvertedIndexColumns(invertedIndexColumns);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1489,14 +1484,13 @@ public class ForwardIndexHandlerTest {
 
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       segmentLocalFSDirectory.close();
 
       ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column);
-      testIndexExists(column, ColumnIndexType.FORWARD_INDEX);
+      testIndexExists(column, StandardIndexes.forward());
       validateIndexMap(column, false, false);
       // All the columns are dimensions. So default compression type is LZ4.
       validateForwardIndex(column, FieldConfig.CompressionCodec.LZ4, metadata.isSorted());
@@ -1530,15 +1524,14 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.addNoDictionaryColumns(column2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     segmentLocalFSDirectory.close();
 
     // Column1 validation.
     ColumnMetadata metadata = existingSegmentMetadata.getColumnMetadataFor(column1);
-    testIndexExists(column1, ColumnIndexType.FORWARD_INDEX);
+    testIndexExists(column1, StandardIndexes.forward());
     validateIndexMap(column1, false, false);
     // All the columns are dimensions. So default compression type is LZ4.
     validateForwardIndex(column1, FieldConfig.CompressionCodec.LZ4, metadata.isSorted());
@@ -1551,7 +1544,7 @@ public class ForwardIndexHandlerTest {
 
     // Column2 validation.
     metadata = existingSegmentMetadata.getColumnMetadataFor(column2);
-    testIndexExists(column2, ColumnIndexType.FORWARD_INDEX);
+    testIndexExists(column2, StandardIndexes.forward());
     validateIndexMap(column2, false, false);
     // All the columns are dimensions. So default compression type is LZ4.
     validateForwardIndex(column2, FieldConfig.CompressionCodec.LZ4, metadata.isSorted());
@@ -1584,8 +1577,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.addInvertedIndexColumns(col2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1659,8 +1651,7 @@ public class ForwardIndexHandlerTest {
       indexLoadingConfig.setInvertedIndexColumns(invertedIndexColumns);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1716,8 +1707,7 @@ public class ForwardIndexHandlerTest {
       indexLoadingConfig.setInvertedIndexColumns(invertedIndexColumns);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1770,8 +1760,7 @@ public class ForwardIndexHandlerTest {
       indexLoadingConfig.setInvertedIndexColumns(invertedIndexColumns);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1814,8 +1803,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.removeForwardIndexDisabledColumns(col2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1858,8 +1846,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.removeForwardIndexDisabledColumns(column);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1901,8 +1888,7 @@ public class ForwardIndexHandlerTest {
       indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1941,8 +1927,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.addNoDictionaryColumns(col2);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -1987,8 +1972,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.addNoDictionaryColumns(column);
 
     ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -2017,7 +2001,6 @@ public class ForwardIndexHandlerTest {
     forwardIndexDisabledColumns.add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
     List<String> allForwardIndexDisabledColumns = new ArrayList<>(SV_FORWARD_INDEX_DISABLED_COLUMNS);
     allForwardIndexDisabledColumns.addAll(MV_FORWARD_INDEX_DISABLED_COLUMNS);
-    List<String> columnList = new ArrayList<>();
     for (String column : allForwardIndexDisabledColumns) {
       SegmentMetadataImpl existingSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
       SegmentDirectory segmentLocalFSDirectory =
@@ -2032,12 +2015,10 @@ public class ForwardIndexHandlerTest {
       invertedIndexColumns.remove(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
       invertedIndexColumns.remove(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX);
       indexLoadingConfig.setInvertedIndexColumns(invertedIndexColumns);
-      columnList.add(column);
-      indexLoadingConfig.addNoDictionaryColumns(columnList);
+      indexLoadingConfig.addNoDictionaryColumns(column);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-      fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+      fwdIndexHandler.updateIndices(writer);
       fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
       // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -2085,8 +2066,7 @@ public class ForwardIndexHandlerTest {
 
     ForwardIndexHandler fwdIndexHandler =
         new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -2138,8 +2118,7 @@ public class ForwardIndexHandlerTest {
 
     ForwardIndexHandler fwdIndexHandler =
         new ForwardIndexHandler(segmentLocalFSDirectory, indexLoadingConfig, _schema);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
+    fwdIndexHandler.updateIndices(writer);
     fwdIndexHandler.postUpdateIndicesCleanup(writer);
 
     // Tear down before validation. Because columns.psf and index map cleanup happens at segmentDirectory.close()
@@ -2188,8 +2167,7 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.addRangeIndexColumns(column);
 
     RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentLocalFSDirectory, indexLoadingConfig);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-    rangeIndexHandler.updateIndices(writer, indexCreatorProvider);
+    rangeIndexHandler.updateIndices(writer);
 
     // Validate forward index exists before calling post cleanup
     validateIndexMap(column, true, false);
@@ -2226,7 +2204,7 @@ public class ForwardIndexHandlerTest {
 
   @Test
   public void testAddOtherIndexWhenForwardIndexDisabledAndInvertedIndexOrDictionaryDisabled()
-      throws IOException {
+      throws Exception {
     SegmentMetadataImpl existingSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
     SegmentDirectory segmentLocalFSDirectory =
         new SegmentLocalFSDirectory(_segmentDirectory, existingSegmentMetadata, ReadMode.mmap);
@@ -2236,9 +2214,8 @@ public class ForwardIndexHandlerTest {
     // Add a forward index and inverted index disabled column to the range index list
     indexLoadingConfig.addRangeIndexColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
     RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentLocalFSDirectory, indexLoadingConfig);
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
     try {
-      rangeIndexHandler.updateIndices(writer, indexCreatorProvider);
+      rangeIndexHandler.updateIndices(writer);
       Assert.fail("Creating the range index on forward index and inverted index disabled column should fail");
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Forward index disabled column "
@@ -2251,9 +2228,8 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig.removeRangeIndexColumns(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITHOUT_INV_IDX);
     indexLoadingConfig.addRangeIndexColumns(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER);
     rangeIndexHandler = new RangeIndexHandler(segmentLocalFSDirectory, indexLoadingConfig);
-    indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
     try {
-      rangeIndexHandler.updateIndices(writer, indexCreatorProvider);
+      rangeIndexHandler.updateIndices(writer);
       Assert.fail("Creating the range index on forward index and inverted index disabled column should fail");
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Forward index disabled column "
@@ -2273,17 +2249,16 @@ public class ForwardIndexHandlerTest {
     ColumnMetadata columnMetadata = existingSegmentMetadata.getColumnMetadataFor(columnName);
 
     if (columnMetadata.hasDictionary()) {
-      assertTrue(writer.hasIndexFor(columnName, ColumnIndexType.DICTIONARY));
-      Dictionary dictionary = LoaderUtils.getDictionary(writer, columnMetadata);
+      assertTrue(writer.hasIndexFor(columnName, StandardIndexes.dictionary()));
+      Dictionary dictionary = DictionaryIndexType.read(writer, columnMetadata);
       assertEquals(columnMetadata.getCardinality(), dictionary.length());
     } else {
-      assertFalse(writer.hasIndexFor(columnName, ColumnIndexType.DICTIONARY));
+      assertFalse(writer.hasIndexFor(columnName, StandardIndexes.dictionary()));
     }
-
     if (columnMetadata.isSorted()) {
-      assertTrue(writer.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX));
+      assertTrue(writer.hasIndexFor(columnName, StandardIndexes.forward()));
     } else {
-      assertFalse(writer.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX));
+      assertFalse(writer.hasIndexFor(columnName, StandardIndexes.forward()));
     }
   }
 
@@ -2299,23 +2274,23 @@ public class ForwardIndexHandlerTest {
     boolean isSingleValue = columnMetadata.isSingleValue();
 
     if (expectedCompressionType == null) {
-      assertTrue(writer.hasIndexFor(columnName, ColumnIndexType.DICTIONARY));
+      assertTrue(writer.hasIndexFor(columnName, StandardIndexes.dictionary()));
     } else {
-      assertFalse(writer.hasIndexFor(columnName, ColumnIndexType.DICTIONARY));
+      assertFalse(writer.hasIndexFor(columnName, StandardIndexes.dictionary()));
     }
-    assertTrue(writer.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX));
+    assertTrue(writer.hasIndexFor(columnName, StandardIndexes.forward()));
 
     // Check Compression type in header
-    ForwardIndexReader fwdIndexReader = LoaderUtils.getForwardIndexReader(writer, columnMetadata);
+    ForwardIndexReader fwdIndexReader = ForwardIndexType.read(writer, columnMetadata);
     ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
     if (expectedCompressionType != null) {
       assertEquals(fwdIndexCompressionType.name(), expectedCompressionType.name());
     }
 
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(writer, columnMetadata)) {
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(writer, columnMetadata)) {
       Dictionary dictionary = null;
       if (columnMetadata.hasDictionary()) {
-        dictionary = LoaderUtils.getDictionary(writer, columnMetadata);
+        dictionary = DictionaryIndexType.read(writer, columnMetadata);
       }
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndexReader, dictionary, null,
           columnMetadata.getMaxNumberOfMultiValues());
@@ -2459,7 +2434,7 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  private void testIndexExists(String columnName, ColumnIndexType indexType) throws Exception {
+  private void testIndexExists(String columnName, IndexType<?, ?, ?> indexType) throws Exception {
     SegmentMetadataImpl existingSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
     SegmentDirectory segmentLocalFSDirectory =
         new SegmentLocalFSDirectory(_segmentDirectory, existingSegmentMetadata, ReadMode.mmap);
