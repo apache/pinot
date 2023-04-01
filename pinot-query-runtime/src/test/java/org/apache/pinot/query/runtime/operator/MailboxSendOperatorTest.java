@@ -169,7 +169,7 @@ public class MailboxSendOperatorTest {
 
     // Then:
     Assert.assertTrue(block.isEndOfStreamBlock(), "expected EOS block to propagate");
-    Mockito.verify(_exchange).send(eosBlock);
+    Assert.assertEquals(block, eosBlock);
   }
 
   @Test

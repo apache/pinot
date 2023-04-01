@@ -214,12 +214,20 @@ public class IngestionDelayTracker {
       // Do not update the ingestion delay metrics during server startup period
       return;
     }
+    if ((ingestionTimeMs < 0) && (firstStreamIngestionTimeMs < 0)) {
+      // If stream does not return a valid ingestion timestamps don't publish a metric
+      return;
+    }
     IngestionTimestamps previousMeasure = _partitionToIngestionTimestampsMap.put(partitionGroupId,
         new IngestionTimestamps(ingestionTimeMs, firstStreamIngestionTimeMs));
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
-          ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionGroupId));
+      // Only publish the metric if supported by the underlying stream. If not supported the stream
+      // returns Long.MIN_VALUE
+      if (ingestionTimeMs >= 0) {
+        _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+            () -> getPartitionIngestionDelayMs(partitionGroupId));
+      }
       if (firstStreamIngestionTimeMs >= 0) {
         // Only publish this metric when creation time is supported by the underlying stream
         // When this timestamp is not supported it always returns the value Long.MIN_VALUE
