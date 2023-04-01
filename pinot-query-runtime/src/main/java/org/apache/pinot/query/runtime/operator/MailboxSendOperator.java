@@ -159,11 +159,10 @@ public class MailboxSendOperator extends MultiStageOperator {
             TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
                 OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
             _exchange.send(eosBlockWithStats);
-            return transferableBlock;
           } else {
             _exchange.send(transferableBlock);
-            return transferableBlock;
           }
+          return transferableBlock;
         }
         _exchange.send(transferableBlock);
         transferableBlock = _dataTableBlockBaseOperator.nextBlock();
