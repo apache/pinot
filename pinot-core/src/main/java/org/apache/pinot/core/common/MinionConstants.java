@@ -134,27 +134,8 @@ public class MinionConstants {
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
 
-  public static class UpsertCompactionTask {
+  public static class UpsertCompactionTask extends MergeTask{
     public static final String TASK_TYPE = "UpsertCompactionTask";
-
-    /**
-     * The time window size for the task.
-     * e.g. if set to "1d", then generated segments will include data for a 1 day window
-     */
-    public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
-
-    /**
-     * The time period to wait before picking segments for this task
-     * e.g. if set to "2d", then a newly completed segment will not be compacted until 2 days since completion
-     */
-    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
-
-    /**
-     * The maximum amount of records allowed for a generated segment.
-     * e.g. if set to "5000000", then a generated segment will have at most 5000000 records
-     */
-    public static final String MAX_NUM_RECORDS_PER_SEGMENT = "maxNumRecordsPerSegment";
-
     /**
      * The maximum amount of old records allowed for an existing segment.
      * e.g. if set to "2500000", then an existing segment will be compacted

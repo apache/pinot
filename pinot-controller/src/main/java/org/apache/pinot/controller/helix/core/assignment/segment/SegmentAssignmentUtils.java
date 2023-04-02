@@ -465,10 +465,9 @@ public class SegmentAssignmentUtils {
    * Returns a partition id for realtime table
    */
   public static int getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
-      HelixManager helixManager, @Nullable String partitionColumn,
-      @Nullable SegmentZKMetadata segmentZKMetadata) {
+      HelixManager helixManager, @Nullable String partitionColumn) {
     Integer segmentPartitionId =
-        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn, segmentZKMetadata);
+        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn);
     if (segmentPartitionId == null) {
       // This case is for the uploaded segments for which there's no partition information.
       // A random, but consistent, partition id is calculated based on the hash code of the segment name.
@@ -488,7 +487,7 @@ public class SegmentAssignmentUtils {
     Map<Integer, List<String>> instancePartitionIdToSegmentsMap = new HashMap<>();
     for (String segmentName : segments) {
       int instancePartitionId =
-          getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn, null)
+          getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn)
               % numInstancePartitions;
       instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
     }

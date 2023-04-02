@@ -84,7 +84,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
             .getOfflineSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
       } else {
         partitionId = SegmentAssignmentUtils
-            .getRealtimeSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn, null) % numPartitions;
+            .getRealtimeSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
       }
     }
     return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);

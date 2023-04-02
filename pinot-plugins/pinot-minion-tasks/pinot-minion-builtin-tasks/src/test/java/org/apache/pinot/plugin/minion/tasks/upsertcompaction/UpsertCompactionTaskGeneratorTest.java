@@ -59,54 +59,45 @@ public class UpsertCompactionTaskGeneratorTest {
         .setTableName(RAW_TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN_NAME)
         .build();
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfig,
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfig));
 
     TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(RAW_TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN_NAME);
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
     tableConfigBuilder = tableConfigBuilder
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
     Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
     tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
     Map<String, String> compactionConfigs = new HashMap<>();
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
     compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
     compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT, "5000000");
+    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
     tableConfigBuilder.setSegmentPartitionConfig(new SegmentPartitionConfig(
         Collections.singletonMap("memberId",
             new ColumnPartitionConfig("murmur", 1))));
-    assertTrue(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build(),
-        UpsertCompactionTask.TASK_TYPE));
+    assertTrue(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
   }
 
   @Test
@@ -134,7 +125,7 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, String> compactionConfigs = new HashMap<>();
     compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
     compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT, "5000000");
+    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(RAW_TABLE_NAME)
@@ -162,7 +153,7 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, String> compactionConfigs = new HashMap<>();
     compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
     compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT, "5000000");
+    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(RAW_TABLE_NAME)
@@ -192,7 +183,7 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, String> compactionConfigs = new HashMap<>();
     compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
     compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT, "5000000");
+    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(RAW_TABLE_NAME)
@@ -230,7 +221,7 @@ public class UpsertCompactionTaskGeneratorTest {
     String bufferPeriod = "7d";
     compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, bufferPeriod);
     String maxRecordsPerSegment = "5000000";
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT, maxRecordsPerSegment);
+    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxRecordsPerSegment);
     String invalidRecordsThreshold = "2500000";
     compactionConfigs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, invalidRecordsThreshold);
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
@@ -263,7 +254,7 @@ public class UpsertCompactionTaskGeneratorTest {
     SegmentPartitionMetadata partitionMetadata = new SegmentPartitionMetadata(
         Collections.singletonMap("memberId",
             new ColumnPartitionMetadata("murmur"))
-    )
+    );
     when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(completedSegment0, completedSegment1));
     taskGenerator.init(mockClusterInfoAccessor);
@@ -278,7 +269,7 @@ public class UpsertCompactionTaskGeneratorTest {
     assertEquals(segmentNames[0], completedSegment0.getSegmentName());
     assertEquals(segmentNames[1], completedSegment1.getSegmentName());
     assertEquals(configs.get(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY), bucketPeriod);
-    assertEquals(configs.get(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT), maxRecordsPerSegment);
+    assertEquals(configs.get(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY), maxRecordsPerSegment);
     assertEquals(configs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD), invalidRecordsThreshold);
   }
 
@@ -292,7 +283,7 @@ public class UpsertCompactionTaskGeneratorTest {
     String bufferPeriod = "7d";
     compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, bufferPeriod);
     String maxRecordsPerSegment = "5000000";
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT, maxRecordsPerSegment);
+    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxRecordsPerSegment);
     String invalidRecordsThreshold = "2500000";
     compactionConfigs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, invalidRecordsThreshold);
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
@@ -347,7 +338,7 @@ public class UpsertCompactionTaskGeneratorTest {
         foundTaskConfig1 = true;
       }
       assertEquals(configs.get(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY), bucketPeriod);
-      assertEquals(configs.get(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT), maxRecordsPerSegment);
+      assertEquals(configs.get(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY), maxRecordsPerSegment);
       assertEquals(configs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD), invalidRecordsThreshold);
     }
     assertTrue(foundTaskConfig0 && foundTaskConfig1);
