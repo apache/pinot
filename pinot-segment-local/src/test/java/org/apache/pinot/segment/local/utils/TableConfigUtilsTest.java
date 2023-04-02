@@ -1701,7 +1701,7 @@ public class TableConfigUtilsTest {
         ImmutableMap.of("schedule", "0 */10 * ? * * *",
             "bucketTimePeriod", "6h",
             "bufferTimePeriod", "5d",
-            "maxNumRecordsPerSegment","5000000");
+            "maxNumRecordsPerSegment", "5000000");
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
