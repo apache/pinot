@@ -90,6 +90,10 @@ public class HttpClient implements AutoCloseable {
     this(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, null);
   }
 
+  public HttpClient(@Nullable SSLContext sslContext) {
+    this(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, sslContext);
+  }
+
   public HttpClient(HttpClientConfig httpClientConfig, @Nullable SSLContext sslContext) {
     SSLContext context = sslContext != null ? sslContext : TlsUtils.getSslContext();
     // Set NoopHostnameVerifier to skip validating hostname when uploading/downloading segments.
