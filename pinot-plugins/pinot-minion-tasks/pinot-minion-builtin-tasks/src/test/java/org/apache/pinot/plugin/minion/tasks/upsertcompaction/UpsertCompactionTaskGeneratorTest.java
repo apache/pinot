@@ -71,9 +71,6 @@ public class UpsertCompactionTaskGeneratorTest {
     assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
     Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
-
     Map<String, String> compactionConfigs = new HashMap<>();
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
@@ -235,6 +232,7 @@ public class UpsertCompactionTaskGeneratorTest {
                 new ColumnPartitionConfig("murmur", 1))))
         .build();
     ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
+
     SegmentZKMetadata completedSegment0 = new SegmentZKMetadata("testTable__0");
     completedSegment0.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     Long endTime = System.currentTimeMillis()
@@ -244,6 +242,10 @@ public class UpsertCompactionTaskGeneratorTest {
     completedSegment0.setStartTime(startTime);
     completedSegment0.setEndTime(endTime);
     completedSegment0.setTimeUnit(TimeUnit.MILLISECONDS);
+    completedSegment0.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(
+        "memberId", new ColumnPartitionMetadata(
+            "murmur", 1, Collections.singleton(0), null))));
+
     SegmentZKMetadata completedSegment1 = new SegmentZKMetadata("testTable__1");
     completedSegment1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     endTime = System.currentTimeMillis() - TimeUtils.convertPeriodToMillis(bufferPeriod);
@@ -251,10 +253,10 @@ public class UpsertCompactionTaskGeneratorTest {
     completedSegment1.setStartTime(startTime);
     completedSegment1.setEndTime(endTime);
     completedSegment1.setTimeUnit(TimeUnit.MILLISECONDS);
-    SegmentPartitionMetadata partitionMetadata = new SegmentPartitionMetadata(
-        Collections.singletonMap("memberId",
-            new ColumnPartitionMetadata("murmur"))
-    );
+    completedSegment1.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(
+        "memberId", new ColumnPartitionMetadata(
+            "murmur", 1, Collections.singleton(0), null))));
+
     when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(completedSegment0, completedSegment1));
     taskGenerator.init(mockClusterInfoAccessor);

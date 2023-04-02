@@ -51,7 +51,8 @@ public class SegmentUtils {
 
   @Nullable
   private static Integer getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
-      @Nullable HelixManager helixManager,  @Nullable String partitionColumn, @Nullable SegmentZKMetadata segmentZKMetadata) {
+      @Nullable HelixManager helixManager, @Nullable String partitionColumn,
+      @Nullable SegmentZKMetadata segmentZKMetadata) {
     // A fast path if the segmentName is an LLC segment name: get the partition id from the name directly
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {

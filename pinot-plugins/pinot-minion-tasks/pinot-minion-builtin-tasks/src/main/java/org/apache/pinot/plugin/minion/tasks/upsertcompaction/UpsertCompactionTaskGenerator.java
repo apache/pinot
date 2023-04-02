@@ -112,6 +112,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
     configs.put(MinionConstants.SEGMENT_NAME_KEY,
         StringUtils.join(completedSegmentNames, MinionConstants.SEGMENT_NAME_SEPARATOR));
+    // TODO: use default values if the keys below aren't supplied
     configs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY,
         compactionConfigs.get(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY));
     configs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
