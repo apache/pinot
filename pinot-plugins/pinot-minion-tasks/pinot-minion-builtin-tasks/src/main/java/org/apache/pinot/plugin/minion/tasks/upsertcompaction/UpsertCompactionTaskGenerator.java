@@ -166,7 +166,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       LOGGER.warn(message, taskType, tableNameWithType);
       return false;
     }
-    Map<String, String> compactionConfigs = tableTaskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE);
+    Map<String, String> compactionConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
     if (!compactionConfigs.containsKey(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY)) {
       LOGGER.warn("Skip generation task: {} for table: {}, unable to find {} key in compaction task config",
           taskType, tableNameWithType, UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY);
