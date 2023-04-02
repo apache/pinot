@@ -46,15 +46,16 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   @Override
-  public String getTaskType() { return MinionConstants.UpsertCompactionTask.TASK_TYPE; }
+  public String getTaskType() {
+    return MinionConstants.UpsertCompactionTask.TASK_TYPE;
+  }
 
   @Override
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
     for (TableConfig tableConfig: tableConfigs) {
-      if (!validate(tableConfig))
-      {
+      if (!validate(tableConfig)) {
         continue;
       }
 
@@ -83,14 +84,14 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       // map each completedSegment to its partition
       Map<Integer, List<String>> partitionToSegmentNames = new HashMap<>();
       for (SegmentZKMetadata completedSegment : completedSegments) {
-        Integer partitionId =
-            SegmentUtils.getRealtimeSegmentPartitionId(completedSegment.getSegmentName(), tableNameWithType, completedSegment);
+        String segmentName = completedSegment.getSegmentName();
+        Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(
+            segmentName, tableNameWithType, completedSegment);
 
         Preconditions.checkState(partitionId != null,
             "Unable to find partitionId for completedSegment");
 
-        partitionToSegmentNames.computeIfAbsent(partitionId, k -> new ArrayList<>())
-            .add(completedSegment.getSegmentName());
+        partitionToSegmentNames.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
       }
       int numTaskConfigsForTable = 0;
       for (Map.Entry<Integer, List<String>> entry : partitionToSegmentNames.entrySet()) {
@@ -150,41 +151,39 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
     String tableNameWithType = tableConfig.getTableName();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      LOGGER.warn("Skip generation task: {} for table: {}, offline table is not supported", taskType, tableNameWithType);
+      String message = "Skip generation task: {} for table: {}, offline table is not supported";
+      LOGGER.warn(message, taskType, tableNameWithType);
       return false;
     }
     if (!tableConfig.isUpsertEnabled()) {
-      LOGGER.warn("Skip generation task: {} for table: {}, table without upsert enabled is not supported", taskType, tableNameWithType);
+      String message = "Skip generation task: {} for table: {}, table without upsert enabled is not supported";
+      LOGGER.warn(message, taskType, tableNameWithType);
       return false;
     }
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
     if (tableTaskConfig == null) {
-      LOGGER.warn("Skip generation task: {} for table: {}, unable to find task config",
-          taskType, tableNameWithType);
+      String message = "Skip generation task: {} for table: {}, unable to find task config";
+      LOGGER.warn(message, taskType, tableNameWithType);
       return false;
     }
     Map<String, String> compactionConfigs = tableTaskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE);
-    if (!compactionConfigs.containsKey(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY))
-    {
+    if (!compactionConfigs.containsKey(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY)) {
       LOGGER.warn("Skip generation task: {} for table: {}, unable to find {} key in compaction task config",
           taskType, tableNameWithType, UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY);
       return false;
     }
-    if (!compactionConfigs.containsKey(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY))
-    {
+    if (!compactionConfigs.containsKey(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY)) {
       LOGGER.warn("Skip generation task: {} for table: {}, unable to find {} key in compaction task config",
           taskType, tableNameWithType, UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY);
       return false;
     }
-    if (!compactionConfigs.containsKey(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY))
-    {
+    if (!compactionConfigs.containsKey(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY)) {
       LOGGER.warn("Skip generation task: {} for table: {}, unable to find {} key in compaction task config",
           taskType, tableNameWithType, UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
       return false;
     }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    if(indexingConfig == null || indexingConfig.getSegmentPartitionConfig() == null)
-    {
+    if (indexingConfig == null || indexingConfig.getSegmentPartitionConfig() == null) {
       LOGGER.warn("Skip generation task: {} for table: {}, unable to find segment partition config",
           taskType, tableNameWithType);
       return false;
