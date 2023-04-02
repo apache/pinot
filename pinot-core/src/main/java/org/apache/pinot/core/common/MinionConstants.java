@@ -134,7 +134,7 @@ public class MinionConstants {
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
 
-  public static class UpsertCompactionTask extends MergeTask{
+  public static class UpsertCompactionTask extends MergeTask {
     public static final String TASK_TYPE = "UpsertCompactionTask";
     /**
      * The maximum amount of old records allowed for an existing segment.
