@@ -100,6 +100,20 @@ public class OpChainTest {
         Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) <= 2000);
   }
 
+  @Test
+  public void testStatsCollectionTracingDisabled() {
+    OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracingDisabled();
+    DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
+
+    OpChain opChain = new OpChain(context, dummyMultiStageOperator, new ArrayList<>());
+    opChain.getStats().executing();
+    opChain.getRoot().nextBlock();
+    opChain.getStats().queued();
+
+    Assert.assertTrue(opChain.getStats().getExecutionTime() >= 1000);
+    Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
+  }
+
   static class DummyMultiStageOperator extends MultiStageOperator {
     public DummyMultiStageOperator(OpChainExecutionContext context) {
       super(context);
