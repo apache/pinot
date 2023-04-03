@@ -349,7 +349,6 @@ public class QueryGenerator {
     while (predicates.size() < predicateCount) {
       String columnName = pickRandom(_columnNames);
       if (!_columnToValueList.get(columnName).isEmpty()) {
-        predicates.add(pickRandom(getSingleValuePredicateGenerators()).generatePredicate(columnName));
         if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
           // Single-value column.
           predicates.add(pickRandom(getSingleValuePredicateGenerators()).generatePredicate(columnName));
