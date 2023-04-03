@@ -215,16 +215,18 @@ public class SegmentGeneratorConfig implements Serializable {
     _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
 
     if (indexingConfig != null) {
-      // NOTE: There are 2 ways to configure creating inverted index during segment generation:
+      // NOTE: By default inverted indexes are not created during segment creation
+      // There are 2 ways to configure creating inverted index during segment generation:
       //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
       //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
       // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
       // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
       if (indexingConfig.getInvertedIndexColumns() != null) {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP)))
-            || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
-          setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, indexingConfig.getInvertedIndexColumns());
+        boolean shouldSkipInvertedIndex = !indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()
+            && (customConfigs == null || Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP)));
+        if (shouldSkipInvertedIndex) {
+          setIndexOn(StandardIndexes.inverted(), IndexConfig.DISABLED, indexingConfig.getInvertedIndexColumns());
         }
       }
     }
