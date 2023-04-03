@@ -224,7 +224,7 @@ public class SegmentGeneratorConfig implements Serializable {
       if (indexingConfig.getInvertedIndexColumns() != null) {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
         boolean shouldSkipInvertedIndex = !indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()
-            && (customConfigs == null || Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP)));
+            && (customConfigs == null || !Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP)));
         if (shouldSkipInvertedIndex) {
           setIndexOn(StandardIndexes.inverted(), IndexConfig.DISABLED, indexingConfig.getInvertedIndexColumns());
         }
