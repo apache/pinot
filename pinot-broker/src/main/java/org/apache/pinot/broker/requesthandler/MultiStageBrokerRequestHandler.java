@@ -176,8 +176,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
-    for (Integer stageId: queryPlan.getStageMetadataMap().keySet()) {
-      stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
+    if (traceEnabled) {
+      for (Integer stageId : queryPlan.getStageMetadataMap().keySet()) {
+        stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
+      }
+    } else {
+      // Aggregate only at root stage, ignore other stages
+      stageIdStatsMap.put(0, new ExecutionStatsAggregator(traceEnabled));
     }
 
     try {

@@ -223,12 +223,14 @@ public class QueryDispatcher {
             OperatorStats operatorStats = entry.getValue();
             ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
             ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
-            if (queryPlan != null) {
-              StageMetadata operatorStageMetadata = queryPlan.getStageMetadataMap().get(operatorStats.getStageId());
-              OperatorUtils.recordTableName(operatorStats, operatorStageMetadata);
-            }
             rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
-            stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+            if (stageStatsAggregator != null) {
+              if (queryPlan != null) {
+                StageMetadata operatorStageMetadata = queryPlan.getStageMetadataMap().get(operatorStats.getStageId());
+                OperatorUtils.recordTableName(operatorStats, operatorStageMetadata);
+              }
+              stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+            }
           }
         }
         return resultDataBlocks;

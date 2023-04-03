@@ -79,11 +79,15 @@ public class OpChainStats {
   }
 
   public OperatorStats getOperatorStats(OpChainExecutionContext context, String operatorId) {
-    return _operatorStatsMap.computeIfAbsent(operatorId, (id) -> {
-       OperatorStats operatorStats = new OperatorStats(context);
-       operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), operatorId);
-       return operatorStats;
-     });
+    //TODO: remove this check once we have a better way to track the leaf operators
+    if (context.isTraceEnabled() || operatorId.contains("LEAF")) {
+      return _operatorStatsMap.computeIfAbsent(operatorId, (id) -> {
+        OperatorStats operatorStats = new OperatorStats(context);
+        operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), operatorId);
+        return operatorStats;
+      });
+    }
+    return null;
   }
 
   private void startExecutionTimer() {

@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -363,19 +362,18 @@ public class ExecutionStatsAggregator {
 
   public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
       @Nullable BrokerMetrics brokerMetrics) {
-    setStats(rawTableName, brokerResponseStats, brokerMetrics);
-
-    brokerResponseStats.setNumBlocks(_numBlocks);
-    brokerResponseStats.setNumRows(_numRows);
-    brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
-    brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
-    brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
     if (_enableTrace) {
+      setStats(rawTableName, brokerResponseStats, brokerMetrics);
+      brokerResponseStats.setNumBlocks(_numBlocks);
+      brokerResponseStats.setNumRows(_numRows);
+
+      brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
+      brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
+      brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
+
       brokerResponseStats.setOperatorStats(_operatorStats);
-    } else {
-      brokerResponseStats.setOperatorStats(Collections.emptyMap());
+      brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
     }
-    brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
   }
 
   private void withNotNullLongMetadata(Map<String, String> metadata, DataTable.MetadataKey key, LongConsumer consumer) {
