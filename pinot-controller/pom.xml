@@ -277,4 +277,13 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>bin-dist</id>
+      <properties>
+        <npm.script>build</npm.script>
+      </properties>
+    </profile>
+  </profiles>
 </project>
