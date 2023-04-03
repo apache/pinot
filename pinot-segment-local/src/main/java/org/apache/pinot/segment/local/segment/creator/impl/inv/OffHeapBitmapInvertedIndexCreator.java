@@ -84,6 +84,12 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
   private PinotDataBuffer _invertedIndexValueBuffer;
   private PinotDataBuffer _invertedIndexLengthBuffer;
 
+  /**
+   * Like calling {@link #OffHeapBitmapInvertedIndexCreator(File, FieldSpec, int, int, int, String)} with the default
+   * {@link V1Constants.Indexes#BITMAP_INVERTED_INDEX_FILE_EXTENSION}.
+   *
+   * @see #OffHeapBitmapInvertedIndexCreator(File, FieldSpec, int, int, int, String)
+   */
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
       int numValues)
       throws IOException {
@@ -91,12 +97,29 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
         V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
   }
 
+  /**
+   * Like calling {@link #OffHeapBitmapInvertedIndexCreator(File, String, boolean, int, int, int, String)} with
+   * the column name and single value specified by the given {@link FieldSpec}.
+   *
+   * @see #OffHeapBitmapInvertedIndexCreator(File, String, boolean, int, int, int, String)
+   */
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
       int numValues, String extension)
       throws IOException {
     this(indexDir, fieldSpec.getName(), fieldSpec.isSingleValueField(), cardinality, numDocs, numValues, extension);
   }
 
+  /**
+   * @param indexDir The directory where the index will be created.
+   * @param columnName The name of the column being indexed.
+   * @param singleValue True iff the column is single value.
+   * @param cardinality How many different values the column has.
+   * @param numDocs How many documents are expected.
+   * @param numValues How many values the index will have. This should be equal to numDocs in single value columns, but
+   *                  may be higher in multivalued columns.
+   * @param extension The suffix added to the file. Although is called extension, it behaves like
+   * {@link java.nio.file.Files#createTempFile(String, String, FileAttribute[])} suffix parameter.
+   */
   public OffHeapBitmapInvertedIndexCreator(File indexDir, String columnName, boolean singleValue, int cardinality,
       int numDocs, int numValues, String extension)
       throws IOException {
