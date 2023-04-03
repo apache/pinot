@@ -223,9 +223,10 @@ public class SegmentGeneratorConfig implements Serializable {
       // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
       if (indexingConfig.getInvertedIndexColumns() != null) {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-        boolean shouldSkipInvertedIndex = !indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()
-            && (customConfigs == null || !Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP)));
-        if (shouldSkipInvertedIndex) {
+        boolean customConfigEnabled =
+            customConfigs != null && Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP));
+        boolean indexingConfigEnable = indexingConfig.isCreateInvertedIndexDuringSegmentGeneration();
+        if (!customConfigEnabled && !indexingConfigEnable) {
           setIndexOn(StandardIndexes.inverted(), IndexConfig.DISABLED, indexingConfig.getInvertedIndexColumns());
         }
       }
