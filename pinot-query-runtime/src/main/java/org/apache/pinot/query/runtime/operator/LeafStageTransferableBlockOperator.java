@@ -114,6 +114,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     }
   }
 
+  @Override
+  protected boolean shouldCollectStats() {
+    return true;
+  }
+
   /**
    * this is data transfer block compose method is here to ensure that V1 results match what the expected projection
    * schema in the calcite logical operator.

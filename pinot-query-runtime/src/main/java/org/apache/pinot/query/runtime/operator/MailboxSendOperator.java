@@ -179,6 +179,11 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
+  protected boolean shouldCollectStats() {
+    return true;
+  }
+
+  @Override
   public void close() {
     super.close();
     _exchange.close();

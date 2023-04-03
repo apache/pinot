@@ -94,10 +94,13 @@ public class OperatorStats {
     _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName(),
         String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
     // wall time are recorded slightly longer than actual execution but it is OK.
-    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName(),
-        String.valueOf(_startTimeMs));
-    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName(),
-        String.valueOf(System.currentTimeMillis()));
+
+    if (_startTimeMs != -1) {
+      _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName(),
+          String.valueOf(_startTimeMs));
+      _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName(),
+          String.valueOf(System.currentTimeMillis()));
+    }
     return _executionStats;
   }
 

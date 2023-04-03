@@ -368,11 +368,13 @@ public class ExecutionStatsAggregator {
       brokerResponseStats.setNumRows(_numRows);
 
       brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
-      brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
       brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
 
       brokerResponseStats.setOperatorStats(_operatorStats);
       brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
+    }
+    if (_stageExecStartTimeMs >= 0 && _stageExecEndTimeMs >= 0) {
+      brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
     }
   }
 
