@@ -23,9 +23,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.PeekableIntIterator;
 
@@ -39,15 +39,16 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NULL operator function");
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NULL");
     TransformFunction transformFunction = arguments.get(0);
-    if (!(transformFunction instanceof IdentifierTransformFunction)) {
-      throw new IllegalArgumentException(
-          "Only column names are supported in IS_NULL. Support for functions is planned for future release");
-    }
+    Preconditions.checkArgument(transformFunction instanceof IdentifierTransformFunction,
+        "Only column names are supported in IS_NULL. Support for functions is planned for future release");
     String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    NullValueVectorReader nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
+    ColumnContext columnContext = columnContextMap.get(columnName);
+    Preconditions.checkArgument(columnContext.getDataSource() != null,
+        "Column must be projected from the original table in IS_NULL");
+    NullValueVectorReader nullValueVectorReader = columnContext.getDataSource().getNullValueVector();
     if (nullValueVectorReader != null) {
       _nullValueVectorIterator = nullValueVectorReader.getNullBitmap().getIntIterator();
     } else {
@@ -61,13 +62,11 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
-    Arrays.fill(_intValuesSV, 0);
-    int[] docIds = projectionBlock.getDocIds();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initZeroFillingIntValuesSV(length);
+    int[] docIds = valueBlock.getDocIds();
+    assert docIds != null;
     if (_nullValueVectorIterator != null) {
       int currentDocIdIndex = 0;
       while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {

@@ -40,6 +40,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
@@ -49,8 +52,6 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.routing.VirtualServer;
-import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -60,6 +61,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.h2.jdbc.JdbcArray;
 import org.testng.Assert;
 
 
@@ -84,20 +86,15 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     Map<String, String> requestMetadataMap =
-        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()),
+        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId),
             QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
             String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
-    MailboxReceiveOperator mailboxReceiveOperator = null;
+    int reducerStageId = -1;
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
-        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
-            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)), reduceNode.getSenderStageId(),
-            reduceNode.getStageId(), reduceNode.getDataSchema(),
-            new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
-            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
+        reducerStageId = stageId;
       } else {
         for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedStagePlan distributedStagePlan =
@@ -106,14 +103,14 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
       }
       if (executionStatsAggregatorMap != null) {
-        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(false));
+        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
-    Preconditions.checkNotNull(mailboxReceiveOperator);
-    return QueryDispatcher.toResultTable(
-        QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS,
-            executionStatsAggregatorMap, null),
-        queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
+    Preconditions.checkState(reducerStageId != -1);
+    ResultTable resultTable = QueryDispatcher.runReducer(requestId, queryPlan, reducerStageId,
+        Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
+        executionStatsAggregatorMap);
+    return resultTable.getRows();
   }
 
   protected List<Object[]> queryH2(String sql)
@@ -139,6 +136,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows) {
+    compareRowEquals(resultRows, expectedRows, false);
+  }
+
+  protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows,
+      boolean keepOutputRowsInOrder) {
     Assert.assertEquals(resultRows.size(), expectedRows.size(),
         String.format("Mismatched number of results. expected: %s, actual: %s",
             expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
@@ -157,15 +159,27 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       } else if (l instanceof Long) {
         return Long.compare((Long) l, ((Number) r).longValue());
       } else if (l instanceof Float) {
-        if (DoubleMath.fuzzyEquals((Float) l, ((Number) r).floatValue(), DOUBLE_CMP_EPSILON)) {
+        float lf = (Float) l;
+        float rf = ((Number) r).floatValue();
+        if (DoubleMath.fuzzyEquals(lf, rf, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Float.compare((Float) l, ((Number) r).floatValue());
+        float maxf = Math.max(Math.abs(lf), Math.abs(rf));
+        if (DoubleMath.fuzzyEquals(lf / maxf, rf / maxf, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Float.compare(lf, rf);
       } else if (l instanceof Double) {
-        if (DoubleMath.fuzzyEquals((Double) l, ((Number) r).doubleValue(), DOUBLE_CMP_EPSILON)) {
+        double ld = (Double) l;
+        double rd = ((Number) r).doubleValue();
+        if (DoubleMath.fuzzyEquals(ld, rd, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Double.compare((Double) l, ((Number) r).doubleValue());
+        double maxd = Math.max(Math.abs(ld), Math.abs(rd));
+        if (DoubleMath.fuzzyEquals(ld / maxd, rd / maxd, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Double.compare(ld, rd);
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {
@@ -176,10 +190,49 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         } else {
           return ((BigDecimal) l).compareTo(new BigDecimal((String) r));
         }
+      } else if (l instanceof byte[]) {
+        if (r instanceof byte[]) {
+          return ByteArray.compare((byte[]) l, (byte[]) r);
+        } else {
+          return ByteArray.compare((byte[]) l, ((ByteArray) r).getBytes());
+        }
       } else if (l instanceof ByteArray) {
-        return ((ByteArray) l).compareTo(new ByteArray((byte[]) r));
+        if (r instanceof ByteArray) {
+          return ((ByteArray) l).compareTo((ByteArray) r);
+        } else {
+          return ByteArray.compare(((ByteArray) l).getBytes(), (byte[]) r);
+        }
       } else if (l instanceof Timestamp) {
         return ((Timestamp) l).compareTo((Timestamp) r);
+      } else if (l instanceof int[]) {
+        int[] larray = (int[]) l;
+        Object[] rarray;
+        try {
+          rarray = (Object[]) ((JdbcArray) r).getArray();
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+        for (int idx = 0; idx < larray.length; idx++) {
+          Number relement = (Number) rarray[idx];
+          if (larray[idx] != relement.intValue()) {
+            return -1;
+          }
+        }
+        return 0;
+      } else if (l instanceof String[]) {
+        String[] larray = (String[]) l;
+        Object[] rarray;
+        try {
+          rarray = (Object[]) ((JdbcArray) r).getArray();
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+        for (int idx = 0; idx < larray.length; idx++) {
+          if (!larray[idx].equals(rarray[idx])) {
+            return -1;
+          }
+        }
+        return 0;
       } else {
         throw new RuntimeException("non supported type " + l.getClass());
       }
@@ -194,8 +247,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
       return 0;
     };
-    resultRows.sort(rowComp);
-    expectedRows.sort(rowComp);
+    if (!keepOutputRowsInOrder) {
+      resultRows.sort(rowComp);
+      expectedRows.sort(rowComp);
+    }
     for (int i = 0; i < resultRows.size(); i++) {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
@@ -216,7 +271,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected Schema constructSchema(String schemaName, List<QueryTestCase.ColumnAndType> columnAndTypes) {
     Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
     for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
-      builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      if (columnAndType._isSingleValue) {
+        builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      } else {
+        builder.addMultiValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      }
     }
     // TODO: ts is built-in, but we should allow user overwrite
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
@@ -268,7 +327,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void addDataToH2(String tableName, Schema schema, List<GenericRow> rows)
-      throws SQLException {
+      throws SQLException, DecoderException {
     if (rows != null && rows.size() > 0) {
       // prepare the statement for ingestion
       List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
@@ -277,14 +336,27 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         params.append(",?");
       }
       PreparedStatement h2Statement =
-          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
+          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
 
       // insert data into table
       for (GenericRow row : rows) {
         int h2Index = 1;
         for (String fieldName : schema.getColumnNames()) {
           Object value = row.getValue(fieldName);
-          h2Statement.setObject(h2Index++, value);
+          if (value instanceof List) {
+            h2Statement.setArray(h2Index++,
+                _h2Connection.createArrayOf(getH2FieldType(schema.getFieldSpecFor(fieldName).getDataType()),
+                    ((List) value).toArray()));
+          } else {
+            switch (schema.getFieldSpecFor(fieldName).getDataType()) {
+              case BYTES:
+                h2Statement.setBytes(h2Index++, Hex.decodeHex((String) value));
+                break;
+              default:
+                h2Statement.setObject(h2Index++, value);
+                break;
+            }
+          }
         }
         h2Statement.execute();
       }
@@ -295,39 +367,37 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     List<String> fieldNamesAndTypes = new ArrayList<>(pinotSchema.size());
     for (String fieldName : pinotSchema.getColumnNames()) {
       FieldSpec.DataType dataType = pinotSchema.getFieldSpecFor(fieldName).getDataType();
-      String fieldType;
-      switch (dataType) {
-        case INT:
-        case LONG:
-          fieldType = "bigint";
-          break;
-        case STRING:
-          fieldType = "varchar(128)";
-          break;
-        case FLOAT:
-          fieldType = "real";
-          break;
-        case DOUBLE:
-          fieldType = "double";
-          break;
-        case BOOLEAN:
-          fieldType = "BOOLEAN";
-          break;
-        case BIG_DECIMAL:
-          fieldType = "NUMERIC";
-          break;
-        case BYTES:
-          fieldType = "BYTEA";
-          break;
-        case TIMESTAMP:
-          fieldType = "TIMESTAMP";
-          break;
-        default:
-          throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
+      String fieldType = getH2FieldType(dataType);
+      if (!pinotSchema.getFieldSpecFor(fieldName).isSingleValueField()) {
+        fieldType += " ARRAY";
       }
       fieldNamesAndTypes.add(fieldName + " " + fieldType);
     }
     return fieldNamesAndTypes;
+  }
+
+  private static String getH2FieldType(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT:
+      case LONG:
+        return "bigint";
+      case STRING:
+        return "varchar(128)";
+      case FLOAT:
+        return "real";
+      case DOUBLE:
+        return "double";
+      case BOOLEAN:
+        return "BOOLEAN";
+      case BIG_DECIMAL:
+        return "NUMERIC(1200, 600)";
+      case BYTES:
+        return "BYTEA";
+      case TIMESTAMP:
+        return "TIMESTAMP";
+      default:
+        throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
+    }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -361,12 +431,16 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _ignored;
       @JsonProperty("sql")
       public String _sql;
+      @JsonProperty("h2Sql")
+      public String _h2Sql;
       @JsonProperty("description")
       public String _description;
       @JsonProperty("outputs")
       public List<List<Object>> _outputs = null;
       @JsonProperty("expectedException")
       public String _expectedException;
+      @JsonProperty("keepOutputRowOrder")
+      public boolean _keepOutputRowOrder;
     }
 
     public static class ColumnAndType {
@@ -374,6 +448,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       String _name;
       @JsonProperty("type")
       String _type;
+      @JsonProperty("isSingleValue")
+      boolean _isSingleValue = true;
     }
   }
 }

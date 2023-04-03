@@ -27,9 +27,9 @@ import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.JsonPathCache;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
@@ -61,7 +61,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are exactly 2 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException(
@@ -75,7 +75,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
   }
 
   @Override
@@ -84,12 +84,10 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[length][];
-    }
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initStringValuesMV(length);
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       List<String> values = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
       _stringValuesMV[i] = values.toArray(new String[0]);

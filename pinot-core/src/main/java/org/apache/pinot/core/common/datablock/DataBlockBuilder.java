@@ -217,6 +217,9 @@ public class DataBlockBuilder {
             ArrayCopyUtils.copy(timestamps, longs, length);
             setColumn(rowBuilder, byteBuffer, longs);
             break;
+          case UNKNOWN:
+            setColumn(rowBuilder, byteBuffer, (Object) null);
+            break;
           default:
             throw new IllegalStateException(
                 String.format("Unsupported data type: %s for column: %s", rowBuilder._columnDataTypes[colId],
@@ -460,6 +463,11 @@ public class DataBlockBuilder {
               value = nullPlaceholders[colId];
             }
             setColumn(columnarBuilder, byteBuffer, (String[]) value);
+          }
+          break;
+        case UNKNOWN:
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            setColumn(columnarBuilder, byteBuffer, (Object) null);
           }
           break;
         default:

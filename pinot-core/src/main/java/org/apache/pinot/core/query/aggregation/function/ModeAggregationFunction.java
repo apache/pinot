@@ -68,7 +68,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments <= 2, "Mode expects at most 2 arguments, got: %s", numArguments);
     if (numArguments > 1) {
-      _multiModeReducerType = MultiModeReducerType.valueOf(arguments.get(1).getLiteralString());
+      _multiModeReducerType = MultiModeReducerType.valueOf(arguments.get(1).getLiteral().getStringValue());
     } else {
       _multiModeReducerType = MultiModeReducerType.MIN;
     }

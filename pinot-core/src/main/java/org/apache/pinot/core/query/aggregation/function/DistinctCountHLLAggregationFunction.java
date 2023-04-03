@@ -48,7 +48,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     Preconditions.checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s",
         numExpressions);
     if (arguments.size() == 2) {
-      _log2m = Integer.parseInt(arguments.get(1).getLiteralString());
+      _log2m = arguments.get(1).getLiteral().getIntValue();
     } else {
       _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
     }

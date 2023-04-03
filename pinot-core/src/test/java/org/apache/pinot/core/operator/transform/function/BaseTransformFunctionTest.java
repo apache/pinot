@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -56,6 +57,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -71,6 +73,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final int MAX_NUM_MULTI_VALUES = 5;
   protected static final int MAX_MULTI_VALUE = 10;
   protected static final String INT_SV_COLUMN = "intSV";
+  // INT_SV_NULL_COLUMN's even row equals to INT_SV_COLUMN. odd row is null.
+  protected static final String INT_SV_NULL_COLUMN = "intSVNull";
   protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String FLOAT_SV_COLUMN = "floatSV";
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
@@ -154,6 +158,11 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
       map.put(INT_SV_COLUMN, _intSVValues[i]);
+      if (i % 2 == 0) {
+        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
+      } else {
+        map.put(INT_SV_NULL_COLUMN, null);
+      }
       map.put(LONG_SV_COLUMN, _longSVValues[i]);
       map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
@@ -178,6 +187,7 @@ public abstract class BaseTransformFunctionTest {
     }
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_SV_COLUMN, FieldSpec.DataType.INT)
+        .addSingleValueDimension(INT_SV_NULL_COLUMN, FieldSpec.DataType.INT)
         .addSingleValueDimension(LONG_SV_COLUMN, FieldSpec.DataType.LONG)
         .addSingleValueDimension(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT)
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
@@ -197,7 +207,8 @@ public abstract class BaseTransformFunctionTest {
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
+            .setNullHandlingEnabled(true).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR_PATH);
@@ -292,6 +303,41 @@ public abstract class BaseTransformFunctionTest {
       }
       assertEquals(stringValues[i], Double.toString(expectedValues[i]));
     }
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, double[] expectedValues,
+      RoaringBitmap expectedNull) {
+    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
+    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
+    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues = null;
+    try {
+      // 1- Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
+      // 2- NumberFormatException is thrown when converting double.NaN, Double.POSITIVE_INFINITY,
+      // or Double.NEGATIVE_INFINITY.
+      bigDecimalValues = transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
+    } catch (UnsupportedOperationException | NumberFormatException ignored) {
+    }
+    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(intValues.getLeft()[i], (int) expectedValues[i]);
+      assertEquals(longValues.getLeft()[i], (long) expectedValues[i]);
+      assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
+      assertEquals(doubleValues.getLeft()[i], expectedValues[i]);
+      if (bigDecimalValues != null) {
+        assertEquals(bigDecimalValues.getLeft()[i].doubleValue(), expectedValues[i]);
+      }
+      assertEquals(stringValues.getLeft()[i], Double.toString(expectedValues[i]));
+    }
+    assertEquals(intValues.getRight(), expectedNull);
+    assertEquals(longValues.getRight(), expectedNull);
+    assertEquals(floatValues.getRight(), expectedNull);
+    assertEquals(doubleValues.getRight(), expectedNull);
+    if (bigDecimalValues != null) {
+      assertEquals(bigDecimalValues.getRight(), expectedNull);
+    }
+    assertEquals(stringValues.getRight(), expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, BigDecimal[] expectedValues) {

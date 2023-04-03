@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.local.startree.OffHeapStarTree;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -38,7 +39,6 @@ import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -62,7 +62,7 @@ public class StarTreeLoaderUtils {
       SegmentDirectory.Reader indexReader = segmentReader.getStarTreeIndexReader(i);
       // Load star-tree index
       StarTree starTree =
-          new OffHeapStarTree(indexReader.getIndexFor(String.valueOf(i), ColumnIndexType.INVERTED_INDEX));
+          new OffHeapStarTree(indexReader.getIndexFor(String.valueOf(i), StandardIndexes.inverted()));
 
       StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(i);
       int numDocs = starTreeMetadata.getNumDocs();
@@ -70,18 +70,18 @@ public class StarTreeLoaderUtils {
 
       // Load dimension forward indexes
       for (String dimension : starTreeMetadata.getDimensionsSplitOrder()) {
-        PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(dimension, ColumnIndexType.FORWARD_INDEX);
+        PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(dimension, StandardIndexes.forward());
         ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(dimension);
         FixedBitSVForwardIndexReaderV2 forwardIndex =
             new FixedBitSVForwardIndexReaderV2(forwardIndexDataBuffer, numDocs, columnMetadata.getBitsPerElement());
         dataSourceMap.put(dimension, new StarTreeDataSource(columnMetadata.getFieldSpec(), numDocs, forwardIndex,
-            indexContainerMap.get(dimension).getDictionary()));
+            indexContainerMap.get(dimension).getIndex(StandardIndexes.dictionary())));
       }
 
       // Load metric (function-column pair) forward indexes
       for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
         String metric = functionColumnPair.toColumnName();
-        PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(metric, ColumnIndexType.FORWARD_INDEX);
+        PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(metric, StandardIndexes.forward());
         DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());
         FieldSpec fieldSpec = new MetricFieldSpec(metric, dataType);
         BaseChunkForwardIndexReader forwardIndex;

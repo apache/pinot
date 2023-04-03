@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
@@ -164,9 +165,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService =
-        new GrpcMailboxService(_reducerHostname, _reducerGrpcPort, new PinotConfiguration(reducerConfig), ignored -> {
-        });
+    _mailboxService = new GrpcMailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+        new PinotConfiguration(reducerConfig), ignored -> {
+    });
     _mailboxService.start();
 
     Map<String, List<String>> tableToSegmentMap1 = factory1.buildTableSegmentNameMap();
@@ -208,12 +209,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, String sql, String expect)
+  public void testQueryTestCasesWithH2(String testCaseName, String sql, String h2Sql, String expect,
+      boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
     runQuery(sql, expect, null).ifPresent(rows -> {
       try {
-        compareRowEquals(rows, queryH2(sql));
+        compareRowEquals(rows, queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -221,13 +223,15 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows, String expect)
+  public void testQueryTestCasesWithOutput(String testCaseName, String sql, String h2Sql, List<Object[]> expectedRows,
+      String expect, boolean keepOutputRowOrder)
       throws Exception {
-    runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows));
+    runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
-  public void testQueryTestCasesWithMetadata(String testCaseName, String sql, String expect, int numSegments)
+  public void testQueryTestCasesWithMetadata(String testCaseName, String sql, String h2Sql, String expect,
+      int numSegments)
       throws Exception {
     Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
     runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(rows -> {
@@ -248,11 +252,30 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       for (Integer stageId : stageIdStats.keySet()) {
         // check stats only for leaf stage
         BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
-        if (!brokerResponseStats.getTableNames().isEmpty()) {
-          Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-          String tableName = brokerResponseStats.getTableNames().get(0);
-          Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-          Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
+
+        if (brokerResponseStats.getTableNames().isEmpty()) {
+          continue;
+        }
+
+        String tableName = brokerResponseStats.getTableNames().get(0);
+        Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
+
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+        if (tableType == null) {
+          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        }
+
+        Assert.assertNotNull(_tableToSegmentMap.get(tableName));
+        Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
+
+        Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
+        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
+        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
+          if (entry.getKey().contains("LEAF_STAGE")) {
+            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
+          } else {
+            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));
+          }
         }
       }
     });
@@ -302,13 +325,17 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         if (queryCase._outputs != null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
           List<List<Object>> orgRows = queryCase._outputs;
           List<Object[]> expectedRows = new ArrayList<>(orgRows.size());
           for (List<Object> objs : orgRows) {
             expectedRows.add(objs.toArray());
           }
-
-          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows, queryCase._expectedException};
+          Object[] testEntry = new Object[]{
+              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException,
+              queryCase._keepOutputRowOrder
+          };
           providerContent.add(testEntry);
         }
       }
@@ -344,6 +371,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
 
           int segmentCount = 0;
           for (String tableName : testCaseEntry.getValue()._tables.keySet()) {
@@ -351,7 +380,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
                 _tableToSegmentMap.getOrDefault(testCaseName + "_" + tableName + "_OFFLINE", new HashSet<>()).size();
           }
 
-          Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException, segmentCount};
+          Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
           providerContent.add(testEntry);
         }
       }
@@ -377,7 +406,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
-          Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException};
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
+          Object[] testEntry =
+              new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder};
           providerContent.add(testEntry);
         }
       }

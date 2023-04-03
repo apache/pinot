@@ -19,15 +19,10 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Joiner;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -37,25 +32,15 @@ import org.slf4j.LoggerFactory;
 public abstract class MultiStageOperator implements Operator<TransferableBlock>, AutoCloseable {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
-  // TODO: Move to OperatorContext class.
-  protected final long _requestId;
-  protected final int _stageId;
-  protected final VirtualServerAddress _serverAddress;
-  protected final OperatorStats _operatorStats;
-  protected final Map<String, OperatorStats> _operatorStatsMap;
   private final String _operatorId;
+  private final OpChainExecutionContext _context;
+  protected final OpChainStats _opChainStats;
 
-  public MultiStageOperator(long requestId, int stageId, VirtualServerAddress serverAddress) {
-    _requestId = requestId;
-    _stageId = stageId;
-    _operatorStats = new OperatorStats(requestId, stageId, serverAddress, toExplainString());
-    _serverAddress = serverAddress;
-    _operatorStatsMap = new HashMap<>();
-    _operatorId = Joiner.on("_").join(toExplainString(), _requestId, _stageId, _serverAddress);
-  }
-
-  public Map<String, OperatorStats> getOperatorStatsMap() {
-    return _operatorStatsMap;
+  public MultiStageOperator(OpChainExecutionContext context) {
+    _context = context;
+    _operatorId =
+        Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
+    _opChainStats = _context.getStats();
   }
 
   @Override
@@ -64,26 +49,17 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
-      _operatorStats.startTimer();
+      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+      operatorStats.startTimer();
       TransferableBlock nextBlock = getNextBlock();
-      _operatorStats.recordRow(1, nextBlock.getNumRows());
-      _operatorStats.endTimer();
-      if (nextBlock.isEndOfStreamBlock()) {
-        if (nextBlock.isSuccessfulEndOfStreamBlock()) {
-          for (MultiStageOperator op : getChildOperators()) {
-            _operatorStatsMap.putAll(op.getOperatorStatsMap());
-          }
-
-          if (!_operatorStats.getExecutionStats().isEmpty()) {
-            _operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), _operatorId);
-            _operatorStatsMap.put(_operatorId, _operatorStats);
-          }
-          return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-              OperatorUtils.getMetadataFromOperatorStats(_operatorStatsMap));
-        }
-      }
+      operatorStats.recordRow(1, nextBlock.getNumRows());
+      operatorStats.endTimer(nextBlock);
       return nextBlock;
     }
+  }
+
+  public String getOperatorId() {
+    return _operatorId;
   }
 
   // Make it protected because we should always call nextBlock()

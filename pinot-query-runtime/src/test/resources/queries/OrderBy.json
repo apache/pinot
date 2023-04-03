@@ -18,28 +18,94 @@
       }
     },
     "queries": [
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col0 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 0"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col2, col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1, col2 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 100"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 OFFSET 100"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 DESC"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 DESC LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 ASC"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 ASC LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} ORDER BY power(col1, 2)"},
-      {"sql": "SELECT * FROM {basic} WHERE col1 > 3 ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} WHERE col0 > 3 ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {basic} WHERE col1 > 3 AND col1 < 5 ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT col1 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT col1, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT col1, col0, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col0 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 0",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col2, col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1, col2 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 100",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 OFFSET 100",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 DESC",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 DESC LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 ASC",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY col1 ASC LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} ORDER BY power(col1, 2)",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} WHERE col1 > 3 ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} WHERE col0 > 3 ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {basic} WHERE col1 > 3 AND col1 < 5 ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT col1 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT col1, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT col1, col0, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
       {
         "ignored": true,
         "comment": "we don't support ALL statement",
@@ -69,19 +135,37 @@
       }
     },
     "queries": [
-      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY sum"},
-      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY sum LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g HAVING SUM(val) > 3 ORDER BY sum LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY g"},
-      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY SUM(val)"},
-      {"sql": "SELECT SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY g"}
+      {
+        "sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY sum",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY sum LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g HAVING SUM(val) > 3 ORDER BY sum LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY g",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY SUM(val)",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY g",
+        "keepOutputRowOrder": true
+      }
     ]
   },
   "order_by_join": {
     "tables": {
       "l": {
         "schema": [
-          {"name": "key", "type": "STRING"},
+          {"name": "lkey", "type": "STRING"},
           {"name": "lval", "type": "INT"}
         ],
         "inputs": [
@@ -95,7 +179,7 @@
       },
       "r": {
         "schema": [
-          {"name": "key", "type": "STRING"},
+          {"name": "rkey", "type": "STRING"},
           {"name": "rval", "type": "INT"}
         ],
         "inputs": [
@@ -109,11 +193,28 @@
       }
     },
     "queries": [
-      {"sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY lval, rval LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT lval FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY lval, rval LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY {l}.key"},
-      {"sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY {r}.key"},
-      {"sql": "SELECT {l}.key, SUM(lval), SUM(rval) FROM {l} JOIN {r} ON {l}.key = {r}.key GROUP BY {l}.key ORDER BY {l}.key"}
+      {
+        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY lval, rval LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT lval FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY lval, rval LIMIT 2 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY {l}.lkey",
+        "keepOutputRowOrder": false,
+        "comments": "TODO: Setting 'keepOutputRowOrder' fails in this test, look into why. Most likely due to multiple rows for each ORDER BY {l}.lkey"
+      },
+      {
+        "sql": "SELECT * FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey ORDER BY {r}.rkey",
+        "keepOutputRowOrder": false,
+        "comments": "TODO: Setting 'keepOutputRowOrder' fails in this test, look into why. Most likely due to multiple rows for each ORDER BY {r}.rkey"
+      },
+      {
+        "sql": "SELECT {l}.lkey, SUM(lval), SUM(rval) FROM {l} JOIN {r} ON {l}.lkey = {r}.rkey GROUP BY {l}.lkey ORDER BY {l}.lkey",
+        "keepOutputRowOrder": true
+      }
     ]
   },
   "order_by_subqueries": {
@@ -135,16 +236,47 @@
       }
     },
     "queries": [
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col0)"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2)"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1)"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1) ORDER BY col1 LIMIT 3"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1) ORDER BY col2 LIMIT 3 OFFSET 1"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 5 OFFSET 1) ORDER BY col1 LIMIT 3 OFFSET 1"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 5 OFFSET 1) ORDER BY col1 OFFSET 1"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2) LIMIT 1"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1) ORDER BY col0"},
-      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1) ORDER BY col0 LIMIT 1"}
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col0)",
+        "keepOutputRowOrder": false,
+        "comments": "TODO: Setting 'keepOutputRowOrder' fails in this test, look into why. Perhaps this is due to no global ordering"
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2)",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1)",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1) ORDER BY col1 LIMIT 3",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1) ORDER BY col2 LIMIT 3 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 5 OFFSET 1) ORDER BY col1 LIMIT 3 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 5 OFFSET 1) ORDER BY col1 OFFSET 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2) LIMIT 1",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1) ORDER BY col0",
+        "keepOutputRowOrder": true
+      },
+      {
+        "sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1) ORDER BY col0 LIMIT 1",
+        "keepOutputRowOrder": true
+      }
     ]
   },
   "order_by_float": {
@@ -167,11 +299,13 @@
     "queries": [
       {
         "sql": "SELECT col1 FROM {floats} ORDER BY col1 LIMIT 2 OFFSET 1",
-        "description": "Basic test for ordering by a float column with a limit and offset"
+        "description": "Basic test for ordering by a float column with a limit and offset",
+        "keepOutputRowOrder": true
       },
       {
         "sql": "SELECT col0 FROM {floats} ORDER BY col0 * 2 LIMIT 2 OFFSET 1",
-        "description": "Testing order by with an expression involving floats"
+        "description": "Testing order by with an expression involving floats",
+        "keepOutputRowOrder": true
       }
     ]
   },
@@ -195,11 +329,13 @@
     "queries": [
       {
         "sql": "SELECT col1 FROM {doubles} ORDER BY col1 LIMIT 2 OFFSET 1",
-        "description": "Basic test for ordering by a double column with a limit and offset"
+        "description": "Basic test for ordering by a double column with a limit and offset",
+        "keepOutputRowOrder": true
       },
       {
         "sql": "SELECT col0 FROM {doubles} ORDER BY col0 * 2 LIMIT 2 OFFSET 1",
-        "description": "Testing order by with an expression involving doubles"
+        "description": "Testing order by with an expression involving doubles",
+        "keepOutputRowOrder": true
       }
     ]
   },
@@ -225,7 +361,8 @@
     "queries": [
       {
         "sql": "SELECT col1 FROM {bools} ORDER BY col0, col1 LIMIT 2 OFFSET 1",
-        "description": "Basic test for ordering by a boolean column with a limit and offset"
+        "description": "Basic test for ordering by a boolean column with a limit and offset",
+        "keepOutputRowOrder": true
       }
     ]
   }

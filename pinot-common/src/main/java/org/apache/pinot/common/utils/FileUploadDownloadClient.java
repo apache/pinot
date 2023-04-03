@@ -57,6 +57,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -129,8 +130,16 @@ public class FileUploadDownloadClient implements AutoCloseable {
     _httpClient = new HttpClient();
   }
 
+  public FileUploadDownloadClient(HttpClientConfig httpClientConfig) {
+    _httpClient = new HttpClient(httpClientConfig, null);
+  }
+
   public FileUploadDownloadClient(SSLContext sslContext) {
-    _httpClient = new HttpClient(sslContext);
+    _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, sslContext);
+  }
+
+  public FileUploadDownloadClient(HttpClientConfig httpClientConfig, SSLContext sslContext) {
+    _httpClient = new HttpClient(httpClientConfig, sslContext);
   }
 
   public HttpClient getHttpClient() {

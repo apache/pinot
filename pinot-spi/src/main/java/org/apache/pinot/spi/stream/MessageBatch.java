@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -115,5 +116,18 @@ public interface MessageBatch<T> {
    */
   default boolean isEndOfPartitionGroup() {
     return false;
+  }
+
+  /**
+   * This is useful while determining ingestion delay for a message batch. Retaining metadata for last filtered message
+   * in a batch can enable us to estimate the ingestion delay for the batch.
+   * Note that a batch can be fully filtered, and we can still retain the metadata for the last filtered message to
+   * facilitate computing ingestion delay in the face of a fully filtered batch.
+   *
+   * @return null by default.
+   */
+  @Nullable
+  default public StreamMessageMetadata getLastMessageMetadata() {
+    return null;
   }
 }

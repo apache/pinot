@@ -527,9 +527,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
+    boolean hasTransformedRows = false;
 
     TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean prematureExit = false;
+    RowMetadata msgMetadata = null;
+
     for (int index = 0; index < messageCount; index++) {
       prematureExit = _shouldStop || endCriteriaReached();
       if (prematureExit) {
@@ -562,7 +565,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       // Decode message
       StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
-      RowMetadata msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
+      msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
       if (decodedRow.getException() != null) {
         // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
         // decode error
@@ -591,7 +594,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
                   reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
         }
-        for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
+        List<GenericRow> transformedRows = reusedResult.getTransformedRows();
+        if (transformedRows.size() > 0) {
+          hasTransformedRows = true;
+        }
+        for (GenericRow transformedRow : transformedRows) {
           try {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
@@ -614,18 +621,31 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _numRowsConsumed++;
       streamMessageCount++;
     }
-    updateIngestionDelay(indexedMessageCount);
+
+    if (indexedMessageCount > 0) {
+      // Record Ingestion delay for this partition with metadata for last message we processed
+      updateIngestionDelay(_lastRowMetadata);
+    } else if (!hasTransformedRows && (msgMetadata != null)) {
+      // If all messages were filtered by transformation, we still attempt to update ingestion delay using
+      // the metadata for the last message we processed if any.
+      updateIngestionDelay(msgMetadata);
+    }
+
     updateCurrentDocumentCountMetrics();
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
+      if (messageCount == 0) {
+        // If we received events from the stream but all were filtered, we attempt to estimate the ingestion
+        // delay from the metadata of the last filtered message received.
+        updateIngestionDelay(messagesAndOffsets.getLastMessageMetadata());
+      }
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
             indexedMessageCount, streamMessageCount, _currentOffset);
       }
     } else if (!prematureExit) {
       // Record Pinot ingestion delay as zero since we are up-to-date and no new events
-      long currentTimeMs = System.currentTimeMillis();
-      _realtimeTableDataManager.updateIngestionDelay(currentTimeMs, currentTimeMs, _partitionGroupId);
+      setIngestionDelayToZero();
       if (_segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
@@ -1238,7 +1258,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  public void destroy() {
+  protected void doDestroy() {
     try {
       stop();
     } catch (InterruptedException e) {
@@ -1347,12 +1367,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     // Inverted index columns
-    Set<String> invertedIndexColumns = indexLoadingConfig.getInvertedIndexColumns();
     // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
     // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
     // are sorted on the sorted column.
     if (sortedColumn != null) {
-      invertedIndexColumns.add(sortedColumn);
+      indexLoadingConfig.addInvertedIndexColumns(sortedColumn);
     }
 
     // Read the max number of rows
@@ -1368,7 +1387,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
     _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
-        new ArrayList<>(invertedIndexColumns),
+        new ArrayList<>(indexLoadingConfig.getInvertedIndexColumns()),
         new ArrayList<>(indexLoadingConfig.getTextIndexColumns()),
         new ArrayList<>(indexLoadingConfig.getFSTIndexColumns()),
         new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
@@ -1382,7 +1401,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
+            .setInvertedIndexColumns(indexLoadingConfig.getInvertedIndexColumns())
+            .setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
             .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns())
             .setJsonIndexConfigs(indexLoadingConfig.getJsonIndexConfigs())
             .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
@@ -1394,7 +1414,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
-            .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn())
+            .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
@@ -1419,7 +1439,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
-      _resourceTmpDir = new File(resourceDataDir, "_tmp");
+      _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
       if (!_resourceTmpDir.exists()) {
         _resourceTmpDir.mkdirs();
       }
@@ -1566,18 +1586,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 
-  /*
-   * Updates the ingestion delay if messages were processed using the time stamp for the last consumed event.
-   *
-   * @param indexedMessagesCount
-   */
-  private void updateIngestionDelay(int indexedMessageCount) {
-    if ((indexedMessageCount > 0) && (_lastRowMetadata != null)) {
-      // Record Ingestion delay for this partition
-      _realtimeTableDataManager.updateIngestionDelay(_lastRowMetadata.getRecordIngestionTimeMs(),
-          _lastRowMetadata.getFirstStreamRecordIngestionTimeMs(),
-          _partitionGroupId);
+  private void updateIngestionDelay(RowMetadata metadata) {
+    if (metadata != null) {
+      _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(),
+          metadata.getFirstStreamRecordIngestionTimeMs(), _partitionGroupId);
     }
+  }
+
+  /*
+   * Sets ingestion delay to zero in situations where we are caught up processing events.
+   */
+  private void setIngestionDelayToZero() {
+    long currentTimeMs = System.currentTimeMillis();
+    _realtimeTableDataManager.updateIngestionDelay(currentTimeMs, currentTimeMs, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

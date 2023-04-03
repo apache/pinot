@@ -93,6 +93,11 @@
       <type>test-jar</type>
     </dependency>
     <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>

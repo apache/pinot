@@ -19,24 +19,27 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.creator.InvertedIndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,9 +50,10 @@ public class InvertedIndexHandler extends BaseIndexHandler {
 
   private final Set<String> _columnsToAddIdx;
 
-  public InvertedIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentDirectory, indexLoadingConfig);
-    _columnsToAddIdx = indexLoadingConfig.getInvertedIndexColumns();
+  public InvertedIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
+      @Nullable TableConfig tableConfig) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+    _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.inverted(), _fieldIndexConfigs);
   }
 
   @Override
@@ -57,7 +61,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns =
-        segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
+        segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.inverted());
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
@@ -77,24 +81,24 @@ public class InvertedIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
-      throws IOException {
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
+      throws Exception {
     // Remove indices not set in table config any more.
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns =
-        segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
+        segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.inverted());
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing inverted index from segment: {}, column: {}", segmentName, column);
-        segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
+        segmentWriter.removeIndex(column, StandardIndexes.inverted());
         LOGGER.info("Removed existing inverted index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateInvertedIndex(columnMetadata)) {
-        createInvertedIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+        createInvertedIndexForColumn(segmentWriter, columnMetadata);
       }
     }
   }
@@ -109,9 +113,8 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     return columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary();
   }
 
-  private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      InvertedIndexCreatorProvider indexCreatorProvider)
-      throws IOException {
+  private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
@@ -132,10 +135,15 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     // Create new inverted index for the column.
     LOGGER.info("Creating new inverted index for segment: {}, column: {}", segmentName, columnName);
     int numDocs = columnMetadata.getTotalDocs();
-    try (DictionaryBasedInvertedIndexCreator creator = indexCreatorProvider.newInvertedIndexCreator(
-        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
-            .forInvertedIndex())) {
-      try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+
+    IndexCreationContext.Common context = IndexCreationContext.builder()
+        .withIndexDir(indexDir)
+        .withColumnMetadata(columnMetadata)
+        .build();
+
+    try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()
+        .createIndexCreator(context, IndexConfig.ENABLED)) {
+      try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.
@@ -156,7 +164,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
 
     // For v3, write the generated inverted index file into the single file and remove it.
     if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, invertedIndexFile, ColumnIndexType.INVERTED_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, invertedIndexFile, StandardIndexes.inverted());
     }
 
     // Delete the marker file.

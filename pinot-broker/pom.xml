@@ -153,5 +153,10 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.mercateo</groupId>
+      <artifactId>test-clock</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

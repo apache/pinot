@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.combine.merger;
 
-import java.util.Collection;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -56,10 +55,6 @@ public class SelectionOnlyResultsBlockMerger implements ResultsBlockMerger<Selec
           QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
       return;
     }
-
-    Collection<Object[]> mergedRows = mergedBlock.getRows();
-    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
-    assert mergedRows != null && rowsToMerge != null;
-    SelectionOperatorUtils.mergeWithoutOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
+    SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
   }
 }

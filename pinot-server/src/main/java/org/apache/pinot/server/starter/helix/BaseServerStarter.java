@@ -54,6 +54,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
+import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
@@ -502,6 +503,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
+    LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
 
     // install default SSL context if necessary (even if not force-enabled everywhere)

@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi.datasource;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -39,6 +41,8 @@ public interface DataSource {
    * Returns the metadata for the column.
    */
   DataSourceMetadata getDataSourceMetadata();
+
+  <R extends IndexReader> R getIndex(IndexType<?, R, ?> type);
 
   /**
    * Returns the forward index for the column. The forward index can be either dictionary-encoded or raw.

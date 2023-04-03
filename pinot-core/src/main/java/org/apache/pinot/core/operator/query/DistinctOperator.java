@@ -20,12 +20,11 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
@@ -41,26 +40,26 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
 
   private final IndexSegment _indexSegment;
   private final DistinctAggregationFunction _distinctAggregationFunction;
-  private final TransformOperator _transformOperator;
+  private final BaseProjectOperator<?> _projectOperator;
   private final DistinctExecutor _distinctExecutor;
 
   private int _numDocsScanned = 0;
 
   public DistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
-      TransformOperator transformOperator, QueryContext queryContext) {
+      BaseProjectOperator<?> projectOperator, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _distinctAggregationFunction = distinctAggregationFunction;
-    _transformOperator = transformOperator;
-    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(distinctAggregationFunction, transformOperator,
+    _projectOperator = projectOperator;
+    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(distinctAggregationFunction, projectOperator,
         queryContext.isNullHandlingEnabled());
   }
 
   @Override
   protected DistinctResultsBlock getNextBlock() {
-    TransformBlock transformBlock;
-    while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      _numDocsScanned += transformBlock.getNumDocs();
-      if (_distinctExecutor.process(transformBlock)) {
+    ValueBlock valueBlock;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      _numDocsScanned += valueBlock.getNumDocs();
+      if (_distinctExecutor.process(valueBlock)) {
         break;
       }
     }
@@ -68,8 +67,8 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+  public List<BaseProjectOperator<?>> getChildOperators() {
+    return Collections.singletonList(_projectOperator);
   }
 
   @Override
@@ -79,8 +78,8 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _projectOperator.getNumColumnsProjected();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);

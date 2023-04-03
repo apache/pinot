@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -28,6 +29,9 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.AssertJUnit.assertTrue;
 
 
 /**
@@ -201,5 +205,101 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     h2Query = "SELECT COUNT(1) FROM " + getTableName();
     testQuery(pinotQuery, h2Query);
     DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+  }
+
+  @Test
+  public void testNullLiteralSelectionOnlyBroker()
+      throws Exception {
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    // Null literal only
+    String sqlQuery = "SELECT null FROM mytable OPTION(enableNullHandling=true)";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "null");
+
+    // Null related functions
+    sqlQuery = "SELECT isNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), true);
+
+    sqlQuery = "SELECT isNotNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), false);
+
+
+    sqlQuery = "SELECT coalesce(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asInt(), 1);
+
+    sqlQuery = "SELECT coalesce(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "null");
+
+    sqlQuery = "SELECT isDistinctFrom(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), false);
+
+    sqlQuery = "SELECT isNotDistinctFrom(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), true);
+
+
+    sqlQuery = "SELECT isDistinctFrom(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), true);
+
+    sqlQuery = "SELECT isNotDistinctFrom(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asBoolean(), false);
+
+    sqlQuery = "SELECT case when true then null end FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "null");
+
+
+    sqlQuery = "SELECT case when false then 1 end FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "null");
+
+
+    // Null intolerant functions
+    sqlQuery = "SELECT add(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "null");
   }
 }

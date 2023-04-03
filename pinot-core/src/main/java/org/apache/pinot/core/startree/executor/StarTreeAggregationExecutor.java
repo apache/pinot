@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.executor;
 
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -48,12 +48,12 @@ public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
   }
 
   @Override
-  public void aggregate(TransformBlock transformBlock) {
+  public void aggregate(ValueBlock valueBlock) {
     int numAggregationFunctions = _aggregationFunctions.length;
-    int length = transformBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < numAggregationFunctions; i++) {
       _aggregationFunctions[i].aggregate(length, _aggregationResultHolders[i],
-          AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[i], transformBlock));
+          AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[i], valueBlock));
     }
   }
 }

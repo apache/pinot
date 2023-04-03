@@ -39,8 +39,7 @@ import org.testng.annotations.Test;
 
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String SCHEMA_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
+  private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
 
   @Override
   protected String getSchemaFileName() {
@@ -104,6 +103,18 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
     String h2Query = "SELECT * FROM mytable limit 1";
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
+        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+  }
+
+  @Test
+  public void testMultiValueColumnSelectionQuery()
+      throws Exception {
+    String pinotQuery =
+        "SELECT DivAirportIDs, DivAirports FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
+            + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    String h2Query =
+        "SELECT DivAirportIDs__MV0, DivAirports__MV0 FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
     ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
         h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }

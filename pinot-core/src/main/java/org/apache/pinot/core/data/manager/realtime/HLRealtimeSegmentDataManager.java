@@ -143,13 +143,13 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     // Inverted index columns
-    Set<String> invertedIndexColumns = indexLoadingConfig.getInvertedIndexColumns();
     // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
     // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
     // are sorted on the sorted column.
     if (_sortedColumn != null) {
-      invertedIndexColumns.add(_sortedColumn);
+      indexLoadingConfig.addInvertedIndexColumns(_sortedColumn);
     }
+    Set<String> invertedIndexColumns = indexLoadingConfig.getInvertedIndexColumns();
     _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
     _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig));
 
@@ -159,7 +159,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         invertedIndexColumns);
 
     _segmentEndTimeThreshold = _start + _streamConfig.getFlushThresholdTimeMillis();
-    _resourceTmpDir = new File(resourceDataDir, "_tmp");
+    _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
     if (!_resourceTmpDir.exists()) {
       _resourceTmpDir.mkdirs();
     }
@@ -469,7 +469,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public void destroy() {
+  protected void doDestroy() {
     LOGGER.info("Trying to shutdown RealtimeSegmentDataManager : {}!", _segmentName);
     _isShuttingDown = true;
     try {

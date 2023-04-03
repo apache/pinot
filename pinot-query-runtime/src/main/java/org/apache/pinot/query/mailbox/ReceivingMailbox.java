@@ -18,42 +18,58 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+
+
 /**
- * Mailbox is used to send and receive data.
+ * Mailbox that's used to receive data. Ownership of the ReceivingMailbox is with the MailboxService, which is unlike
+ * the {@link SendingMailbox} whose ownership lies with the {@link MailboxSendOperator}. This is because the
+ * ReceivingMailbox can be initialized even before the corresponding OpChain is registered on the receiver, whereas
+ * the SendingMailbox is initialized when the MailboxSendOperator is running. Also see {@link #isInitialized()}.
  *
- * Mailbox should be instantiated on both side of MailboxServer.
- *
- * @param <T> type of data carried over the mailbox.
+ * @param <T> the unit of data that each {@link #receive()} call returns.
  */
 public interface ReceivingMailbox<T> {
 
   /**
    * Get the unique identifier for the mailbox.
-   *
-   * @return Mailbox ID.
    */
   String getMailboxId();
 
   /**
-   * Receive a data packet from the mailbox. Depending on the implementation, this may return null. The caller should
-   * use {@link ReceivingMailbox#isClosed()} to determine if the sender is done sending and the channel is closed.
-   * @return data packet.
-   * @throws Exception
+   * Returns a unit of data. Implementations are allowed to return null, in which case {@link MailboxReceiveOperator}
+   * will assume that this mailbox doesn't have any data to return and it will instead poll the other mailbox (if any).
    */
-  T receive()
-      throws Exception;
+  @Nullable
+  T receive() throws Exception;
 
   /**
-   * Check if receiving mailbox is initialized.
-   * @return
+   * A ReceivingMailbox is considered initialized when it has a reference to the underlying channel used for receiving
+   * the data. The underlying channel may be a gRPC stream, in-memory queue, etc. Once a receiving mailbox is
+   * initialized, it has the ability to close the underlying channel via the {@link #cancel()} method.
    */
   boolean isInitialized();
 
   /**
-   * Check if mailbox is closed.
-   * @return
+   * A ReceivingMailbox is considered closed if it has sent all the data to the receiver and doesn't have any more data
+   * to send.
    */
   boolean isClosed();
 
-  void cancel(Throwable e);
+  /**
+   * A ReceivingMailbox may hold a reference to the underlying channel. Usually the channel would be automatically
+   * closed once all the data has been received by the receiver, and in such cases {@link #isClosed()} returns true.
+   * However in failure scenarios the underlying channel may not be released, and the receiver can use this method to
+   * ensure the same.
+   *
+   * This API should ensure that the underlying channel is "released" if it hasn't been already. If the channel has
+   * already been released, the API shouldn't throw and instead return gracefully.
+   *
+   * <p>
+   *   This method may be called multiple times, so implementations should ensure this is idempotent.
+   * </p>
+   */
+  void cancel();
 }

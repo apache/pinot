@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -224,12 +223,11 @@ public class SelectionCombineOperatorTest {
     SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    PriorityQueue<Object[]> selectionResult = combineResult.getRowsAsPriorityQueue();
-    assertNotNull(selectionResult);
-    assertEquals(selectionResult.size(), 10);
-    int expectedValue = 9;
-    while (!selectionResult.isEmpty()) {
-      assertEquals((int) selectionResult.poll()[0], expectedValue--);
+    List<Object[]> rows = combineResult.getRows();
+    assertNotNull(rows);
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      assertEquals((int) rows.get(i)[0], i);
     }
     // Should early-terminate after processing the result of the first segment. Each thread should process at most 1
     // segment.
@@ -248,12 +246,12 @@ public class SelectionCombineOperatorTest {
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    selectionResult = combineResult.getRowsAsPriorityQueue();
-    assertNotNull(selectionResult);
-    assertEquals(selectionResult.size(), 10);
-    expectedValue = NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT / 2 + 40;
-    while (!selectionResult.isEmpty()) {
-      assertEquals((int) selectionResult.poll()[0], expectedValue++);
+    rows = combineResult.getRows();
+    assertNotNull(rows);
+    assertEquals(rows.size(), 10);
+    int expectedValue = NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT / 2 + 49;
+    for (int i = 0; i < 10; i++) {
+      assertEquals((int) rows.get(i)[0], expectedValue - i);
     }
     // Should early-terminate after processing the result of the first segment. Each thread should process at most 1
     // segment.
@@ -272,9 +270,9 @@ public class SelectionCombineOperatorTest {
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 10000");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    selectionResult = combineResult.getRowsAsPriorityQueue();
-    assertNotNull(selectionResult);
-    assertEquals(selectionResult.size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+    rows = combineResult.getRows();
+    assertNotNull(rows);
+    assertEquals(rows.size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
     // Should not early-terminate
     numDocsScanned = combineResult.getNumDocsScanned();
     assertEquals(numDocsScanned, NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);

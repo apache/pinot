@@ -31,10 +31,10 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -167,8 +167,8 @@ public class SegmentPurgerTest {
         .load(purgedIndexDir.toURI(), new SegmentDirectoryLoaderContext.Builder().setTableConfig(_tableConfig)
             .setSegmentName(purgedSegmentMetadata.getName()).setSegmentDirectoryConfigs(new PinotConfiguration(props))
             .build()); SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      assertTrue(reader.hasIndexFor(D1, ColumnIndexType.INVERTED_INDEX));
-      assertFalse(reader.hasIndexFor(D2, ColumnIndexType.INVERTED_INDEX));
+      assertTrue(reader.hasIndexFor(D1, StandardIndexes.inverted()));
+      assertFalse(reader.hasIndexFor(D2, StandardIndexes.inverted()));
     }
   }
 

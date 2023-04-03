@@ -21,6 +21,10 @@ package org.apache.pinot.segment.local.segment.index.datasource;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -34,33 +38,11 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 public abstract class BaseDataSource implements DataSource {
   private final DataSourceMetadata _dataSourceMetadata;
-  private final ForwardIndexReader<?> _forwardIndex;
-  private final Dictionary _dictionary;
-  private final InvertedIndexReader<?> _invertedIndex;
-  private final RangeIndexReader<?> _rangeIndex;
-  private final TextIndexReader _textIndex;
-  private final TextIndexReader _fstIndex;
-  private final JsonIndexReader _jsonIndex;
-  private final H3IndexReader _h3Index;
-  private final BloomFilterReader _bloomFilter;
-  private final NullValueVectorReader _nullValueVector;
+  private final ColumnIndexContainer _indexContainer;
 
-  public BaseDataSource(DataSourceMetadata dataSourceMetadata, @Nullable ForwardIndexReader<?> forwardIndex,
-      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
-      @Nullable RangeIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
-      @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex, @Nullable H3IndexReader h3Index,
-      @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
+  public BaseDataSource(DataSourceMetadata dataSourceMetadata, ColumnIndexContainer indexContainer) {
     _dataSourceMetadata = dataSourceMetadata;
-    _forwardIndex = forwardIndex;
-    _dictionary = dictionary;
-    _invertedIndex = invertedIndex;
-    _rangeIndex = rangeIndex;
-    _textIndex = textIndex;
-    _fstIndex = fstIndex;
-    _jsonIndex = jsonIndex;
-    _h3Index = h3Index;
-    _bloomFilter = bloomFilter;
-    _nullValueVector = nullValueVector;
+    _indexContainer = indexContainer;
   }
 
   @Override
@@ -69,61 +51,66 @@ public abstract class BaseDataSource implements DataSource {
   }
 
   @Override
+  public <R extends IndexReader> R getIndex(IndexType<?, R, ?> type) {
+    return type.getIndexReader(_indexContainer);
+  }
+
+  @Override
   public ForwardIndexReader<?> getForwardIndex() {
-    return _forwardIndex;
+    return getIndex(StandardIndexes.forward());
   }
 
   @Nullable
   @Override
   public Dictionary getDictionary() {
-    return _dictionary;
+    return getIndex(StandardIndexes.dictionary());
   }
 
   @Nullable
   @Override
   public InvertedIndexReader<?> getInvertedIndex() {
-    return _invertedIndex;
+    return getIndex(StandardIndexes.inverted());
   }
 
   @Nullable
   @Override
   public RangeIndexReader<?> getRangeIndex() {
-    return _rangeIndex;
+    return getIndex(StandardIndexes.range());
   }
 
   @Nullable
   @Override
   public TextIndexReader getTextIndex() {
-    return _textIndex;
+    return getIndex(StandardIndexes.text());
   }
 
   @Nullable
   @Override
   public TextIndexReader getFSTIndex() {
-    return _fstIndex;
+    return getIndex(StandardIndexes.fst());
   }
 
   @Nullable
   @Override
   public JsonIndexReader getJsonIndex() {
-    return _jsonIndex;
+    return getIndex(StandardIndexes.json());
   }
 
   @Nullable
   @Override
   public H3IndexReader getH3Index() {
-    return _h3Index;
+    return getIndex(StandardIndexes.h3());
   }
 
   @Nullable
   @Override
   public BloomFilterReader getBloomFilter() {
-    return _bloomFilter;
+    return getIndex(StandardIndexes.bloomFilter());
   }
 
   @Nullable
   @Override
   public NullValueVectorReader getNullValueVector() {
-    return _nullValueVector;
+    return getIndex(StandardIndexes.nullValueVector());
   }
 }

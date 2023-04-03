@@ -35,7 +35,8 @@ class SingletonExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox<TransferableBlock>> mailbox, TransferableBlock block) {
+  protected void route(List<SendingMailbox<TransferableBlock>> mailbox, TransferableBlock block)
+      throws Exception {
     for (SendingMailbox sendingMailbox : mailbox) {
       sendBlock(sendingMailbox, block);
     }

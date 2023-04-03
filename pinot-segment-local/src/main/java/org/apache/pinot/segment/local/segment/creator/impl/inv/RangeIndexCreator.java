@@ -94,8 +94,8 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
   private final int _numValues;
   private int _nextDocId;
   private int _nextValueId;
-  private int _numValuesPerRange;
-  private DataType _valueType;
+  private final int _numValuesPerRange;
+  private final DataType _valueType;
 
   /**
    *
@@ -158,6 +158,11 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
       destroyBuffer(_tempValueBuffer, _tempDocIdBufferFile);
       throw e;
     }
+  }
+
+  @Override
+  public DataType getDataType() {
+    return _valueType;
   }
 
   @Override

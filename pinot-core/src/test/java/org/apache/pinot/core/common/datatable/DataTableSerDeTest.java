@@ -680,6 +680,9 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
+          case UNKNOWN:
+            dataTableBuilder.setColumn(colId, (Object) null);
+            break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
         }
@@ -772,6 +775,10 @@ public class DataTableSerDeTest {
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
+            break;
+          case UNKNOWN:
+            Object nulValue = newDataTable.getCustomObject(rowId, colId);
+            Assert.assertNull(nulValue, ERROR_MESSAGE);
             break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
