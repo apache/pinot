@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.Map;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
@@ -58,8 +59,9 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
 
   private void computeWorkerAssignment(StageNode node, DispatchablePlanContext context) {
     int stageId = node.getStageId();
-    context.getWorkerManager().assignWorkerToStage(stageId, context.getQueryPlan().getStageMetadataMap().get(stageId),
-        context.getRequestId(), context.getPlannerContext().getOptions());
+    Map<Integer, StageMetadata> stageMetadataMap = context.getQueryPlan().getStageMetadataMap();
+    context.getWorkerManager().assignWorkerToStage(stageId, stageMetadataMap, context.getRequestId(),
+        context.getPlannerContext().getOptions());
   }
 
   @Override
@@ -99,7 +101,8 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, DispatchablePlanContext context) {
     node.getSender().visit(this, context);
-    getStageMetadata(node, context);
+    StageMetadata stageMetadata = getStageMetadata(node, context);
+    stageMetadata.addInboundStage(node.getSender().getStageId());
     return null;
   }
 

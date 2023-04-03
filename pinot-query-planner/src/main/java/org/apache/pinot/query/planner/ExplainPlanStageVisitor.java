@@ -92,9 +92,9 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     int stage = node.getStageId();
     context._builder
         .append(context._prefix)
-        .append('[')
+        .append('{')
         .append(stage)
-        .append("]@")
+        .append("}@")
         .append(context._host.getHostname())
         .append(':')
         .append(context._host.getPort())
@@ -138,7 +138,8 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     MailboxSendNode sender = (MailboxSendNode) node.getSender();
     int senderStageId = node.getSenderStageId();
     StageMetadata metadata = _queryPlan.getStageMetadataMap().get(senderStageId);
-    Map<ServerInstance, Map<String, List<String>>> segments = metadata.getServerInstanceToSegmentsMap();
+    Map<ServerInstance, Map<String, Map<Integer, List<String>>>> segments =
+        metadata.getServerAndPartitionToSegmentMap();
 
     Iterator<VirtualServer> iterator = metadata.getServerInstances().iterator();
     while (iterator.hasNext()) {
@@ -175,7 +176,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     context._builder.append("->");
     String receivers = servers.stream()
         .map(VirtualServer::toString)
-        .map(s -> "[" + receiverStageId + "]@" + s)
+        .map(s -> "{" + receiverStageId + "}@" + s)
         .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
   }
@@ -196,7 +197,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
         .append(' ')
         .append(_queryPlan.getStageMetadataMap()
             .get(node.getStageId())
-            .getServerInstanceToSegmentsMap()
+            .getServerAndPartitionToSegmentMap()
             .get(context._host.getServer()))
         .append('\n');
   }

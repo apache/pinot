@@ -145,7 +145,7 @@ public class QueryServerTest extends QueryTestSet {
 
   private static boolean isMetadataMapsEqual(StageMetadata left, StageMetadata right) {
     return left.getServerInstances().equals(right.getServerInstances())
-        && left.getServerInstanceToSegmentsMap().equals(right.getServerInstanceToSegmentsMap())
+        && left.getServerAndPartitionToSegmentMap().equals(right.getServerAndPartitionToSegmentMap())
         && left.getScannedTables().equals(right.getScannedTables());
   }
 

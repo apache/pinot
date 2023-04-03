@@ -244,10 +244,15 @@ public class QueryRunner {
     Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
         "Server request for V2 engine should only have 1 scan table per request.");
     String rawTableName = stageMetadata.getScannedTables().get(0);
-    Map<String, List<String>> tableToSegmentListMap =
-        stageMetadata.getServerInstanceToSegmentsMap().get(distributedStagePlan.getServer().getServer());
+    Map<String, Map<Integer, List<String>>> tableToPartitionedSegmentsMap =
+        stageMetadata.getServerAndPartitionToSegmentMap().get(distributedStagePlan.getServer().getServer());
     List<ServerPlanRequestContext> requests = new ArrayList<>();
-    for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
+    for (Map.Entry<String, Map<Integer, List<String>>> tableEntry : tableToPartitionedSegmentsMap.entrySet()) {
+      // TODO: submit partitioned server instance request. now we combine all partitioned segment list into just 1.
+      List<String> allSegments = new ArrayList<>();
+      for (List<String> segmentList : tableEntry.getValue().values()) {
+        allSegments.addAll(segmentList);
+      }
       String tableType = tableEntry.getKey();
       // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
       // network traffic. but there's chance to improve this:
@@ -259,7 +264,7 @@ public class QueryRunner {
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
         requests.add(
             ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap, tableConfig,
-                schema, stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue(), deadlineMs));
+                schema, stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, allSegments, deadlineMs));
       } else if (TableType.REALTIME.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
@@ -267,7 +272,7 @@ public class QueryRunner {
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
         requests.add(
             ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap, tableConfig,
-                schema, stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue(), deadlineMs));
+                schema, stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, allSegments, deadlineMs));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
       }
@@ -291,7 +296,8 @@ public class QueryRunner {
     int stageId = distributedStagePlan.getStageId();
     VirtualServer serverInstance = distributedStagePlan.getServer();
     StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(stageId);
-    Map<String, List<String>> segments = stageMetadata.getServerInstanceToSegmentsMap().get(serverInstance.getServer());
-    return segments != null && segments.size() > 0;
+    Map<String, Map<Integer, List<String>>> partitionedSegments =
+        stageMetadata.getServerAndPartitionToSegmentMap().get(serverInstance.getServer());
+    return partitionedSegments != null && partitionedSegments.size() > 0;
   }
 }

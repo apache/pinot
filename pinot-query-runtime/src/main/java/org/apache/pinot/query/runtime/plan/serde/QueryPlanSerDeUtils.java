@@ -109,15 +109,20 @@ public class QueryPlanSerDeUtils {
     for (String serverInstanceString : workerStageMetadata.getInstancesList()) {
       stageMetadata.getServerInstances().add(stringToInstance(serverInstanceString));
     }
-    for (Map.Entry<String, Worker.SegmentMap> instanceEntry
+    for (Map.Entry<String, Worker.SegmentPartitionMap> instanceEntry
         : workerStageMetadata.getInstanceToSegmentMapMap().entrySet()) {
-      Map<String, List<String>> tableToSegmentMap = new HashMap<>();
-      for (Map.Entry<String, Worker.SegmentList> tableEntry
-          : instanceEntry.getValue().getTableTypeToSegmentListMap().entrySet()) {
-        tableToSegmentMap.put(tableEntry.getKey(), tableEntry.getValue().getSegmentsList());
+      Map<String, Map<Integer, List<String>>> tableToPartitionedSegmentsMap = new HashMap<>();
+      for (Map.Entry<String, Worker.PartitionMap> tableEntry
+          : instanceEntry.getValue().getTableTypeToPartitionSegmentsMap().entrySet()) {
+        Map<Integer, List<String>> partitionToSegmentsMap = new HashMap<>();
+        for (Map.Entry<Integer, Worker.SegmentList> partitionEntry
+            : tableEntry.getValue().getPartitionToSegmentsMap().entrySet()) {
+          partitionToSegmentsMap.put(partitionEntry.getKey(), partitionEntry.getValue().getSegmentsList());
+        }
+        tableToPartitionedSegmentsMap.put(tableEntry.getKey(), partitionToSegmentsMap);
       }
-      stageMetadata.getServerInstanceToSegmentsMap()
-          .put(stringToInstance(instanceEntry.getKey()).getServer(), tableToSegmentMap);
+      stageMetadata.getServerAndPartitionToSegmentMap()
+          .put(stringToInstance(instanceEntry.getKey()).getServer(), tableToPartitionedSegmentsMap);
     }
     // time boundary info
     if (!workerStageMetadata.getTimeColumn().isEmpty()) {
@@ -143,16 +148,22 @@ public class QueryPlanSerDeUtils {
     for (VirtualServer serverInstance : stageMetadata.getServerInstances()) {
       builder.addInstances(instanceToString(serverInstance));
     }
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> instanceEntry
-        : stageMetadata.getServerInstanceToSegmentsMap().entrySet()) {
-      Map<String, Worker.SegmentList> tableToSegmentMap = new HashMap<>();
-      for (Map.Entry<String, List<String>> tableEntry : instanceEntry.getValue().entrySet()) {
-        tableToSegmentMap.put(tableEntry.getKey(),
-            Worker.SegmentList.newBuilder().addAllSegments(tableEntry.getValue()).build());
+    for (Map.Entry<ServerInstance, Map<String, Map<Integer, List<String>>>> instanceEntry
+        : stageMetadata.getServerAndPartitionToSegmentMap().entrySet()) {
+      Map<String, Worker.PartitionMap> tableToSegmentPartitionMap = new HashMap<>();
+      for (Map.Entry<String, Map<Integer, List<String>>> tableEntry : instanceEntry.getValue().entrySet()) {
+        Map<Integer, Worker.SegmentList> partitionToSegmentMap = new HashMap<>();
+        for (Map.Entry<Integer, List<String>> partitionEntry : tableEntry.getValue().entrySet()) {
+          partitionToSegmentMap.put(partitionEntry.getKey(),
+              Worker.SegmentList.newBuilder().addAllSegments(partitionEntry.getValue()).build());
+        }
+        tableToSegmentPartitionMap.put(tableEntry.getKey(),
+            Worker.PartitionMap.newBuilder().putAllPartitionToSegments(partitionToSegmentMap).build());
       }
       builder.putInstanceToSegmentMap(
           instanceToString(new VirtualServer(instanceEntry.getKey(), Collections.singletonList(0))),
-          Worker.SegmentMap.newBuilder().putAllTableTypeToSegmentList(tableToSegmentMap).build());
+          Worker.SegmentPartitionMap.newBuilder().putAllTableTypeToPartitionSegments(tableToSegmentPartitionMap)
+              .build());
     }
     // time boundary info
     if (stageMetadata.getTimeBoundaryInfo() != null) {

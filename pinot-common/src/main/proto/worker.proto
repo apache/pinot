@@ -78,13 +78,17 @@ message StagePlan {
 message StageMetadata {
   repeated string instances = 1;
   repeated string dataSources = 2;
-  map<string, SegmentMap> instanceToSegmentMap = 3;
+  map<string, SegmentPartitionMap> instanceToSegmentMap = 3;
   string timeColumn = 4;
   string timeValue = 5;
 }
 
-message SegmentMap {
-  map<string, SegmentList> tableTypeToSegmentList = 1;
+message SegmentPartitionMap {
+  map<string, PartitionMap> tableTypeToPartitionSegments = 1;
+}
+
+message PartitionMap {
+  map<int32, SegmentList> partitionToSegments = 1;
 }
 
 message SegmentList {

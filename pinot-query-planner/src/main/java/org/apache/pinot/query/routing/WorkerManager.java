@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -63,70 +64,40 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
-  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata, long requestId,
+  public void assignWorkerToStage(int stageId, Map<Integer, StageMetadata> stageMetadataMap, long requestId,
       Map<String, String> options) {
-    List<String> scannedTables = stageMetadata.getScannedTables();
+    StageMetadata currentStageMetadata = stageMetadataMap.get(stageId);
+    List<String> scannedTables = currentStageMetadata.getScannedTables();
     if (scannedTables.size() == 1) {
       // --- LEAF STAGE ---
-      // table scan stage, need to attach server as well as segment info for each physical table type.
-      String logicalTableName = scannedTables.get(0);
-      Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName, requestId);
-      if (routingTableMap.size() == 0) {
-        throw new IllegalArgumentException("Unable to find routing entries for table: " + logicalTableName);
-      }
-      // acquire time boundary info if it is a hybrid table.
-      if (routingTableMap.size() > 1) {
-        TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(TableNameBuilder
-            .forType(TableType.OFFLINE).tableNameWithType(TableNameBuilder.extractRawTableName(logicalTableName)));
-        if (timeBoundaryInfo != null) {
-          stageMetadata.setTimeBoundaryInfo(timeBoundaryInfo);
-        } else {
-          // remove offline table routing if no time boundary info is acquired.
-          routingTableMap.remove(TableType.OFFLINE.name());
-        }
-      }
-
-      // extract all the instances associated to each table type
-      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
-      for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
-        String tableType = routingEntry.getKey();
-        RoutingTable routingTable = routingEntry.getValue();
-        // for each server instance, attach all table types and their associated segment list.
-        for (Map.Entry<ServerInstance, List<String>> serverEntry
-            : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
-          serverInstanceToSegmentsMap.putIfAbsent(serverEntry.getKey(), new HashMap<>());
-          Map<String, List<String>> tableTypeToSegmentListMap = serverInstanceToSegmentsMap.get(serverEntry.getKey());
-          Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue()) == null,
-              "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
-        }
-      }
-      // TODO: see the leaf stage doesn't allow control of partition yet. see: {@link ServerRequestPlanVisitor#build}
-      stageMetadata.setServerInstances(new ArrayList<>(
-          serverInstanceToSegmentsMap.keySet()
-              .stream()
-              .map(server -> new VirtualServer(server, Collections.singletonList(0)))
-              .collect(Collectors.toList())));
-      stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);
+      assignWorkerToLeafStage(requestId, currentStageMetadata, scannedTables);
     } else if (PlannerUtils.isRootStage(stageId)) {
       // --- ROOT STAGE / BROKER REDUCE STAGE ---
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
-      stageMetadata.setServerInstances(Lists.newArrayList(
+      currentStageMetadata.setServerInstances(Lists.newArrayList(
           new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), Collections.singletonList(0))));
     } else {
       // --- INTERMEDIATE STAGES ---
       // TODO: actually make assignment strategy decisions for intermediate stages
-      stageMetadata.setServerInstances(assignServers(_routingManager.getEnabledServerInstanceMap().values(),
-          stageMetadata.isRequiresSingletonInstance(), options));
+      assignWorkerToIntermediateStage(requestId, currentStageMetadata, stageMetadataMap, options);
     }
   }
 
-  private static List<VirtualServer> assignServers(Collection<ServerInstance> servers,
-      boolean requiresSingletonInstance, Map<String, String> options) {
+  private void assignWorkerToIntermediateStage(long requestId, StageMetadata currentStageMetadata,
+      Map<Integer, StageMetadata> stageMetadataMap, Map<String, String> options) {
+    HashSet<ServerInstance> servers = new HashSet<>();
+    for (int inboundStageId : currentStageMetadata.getInboundStageSet()) {
+      for (VirtualServer virtualServer : stageMetadataMap.get(inboundStageId).getServerInstances()) {
+        servers.add(virtualServer.getServer());
+      }
+    }
+    // only retain the available server instances from this routing manager.
+    servers.retainAll(_routingManager.getEnabledServerInstanceMap().values());
     // TODO: support partition-aware routing and worker assignment.
     int stageParallelism = Integer.parseInt(
         options.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.STAGE_PARALLELISM, "1"));
-
+    boolean requiresSingletonInstance = currentStageMetadata.isRequiresSingletonInstance();
     List<VirtualServer> serverInstances = new ArrayList<>();
     int idx = 0;
     int matchingIdx = -1;
@@ -144,6 +115,7 @@ public class WorkerManager {
           if (matchingIdx == -1) {
             serverInstances.add(new VirtualServer(server, Util.range(partitionCount,
                 partitionCount + stageParallelism)));
+            partitionCount += stageParallelism;
           } else {
             // for singleton exchange, add 0 as the default parallelism as the requirement of singleton
             serverInstances.add(new VirtualServer(server, Collections.singletonList(0)));
@@ -152,7 +124,53 @@ public class WorkerManager {
       }
       idx++;
     }
-    return serverInstances;
+    currentStageMetadata.setServerInstances(serverInstances);
+  }
+
+  private void assignWorkerToLeafStage(long requestId, StageMetadata currentStageMetadata, List<String> scannedTables) {
+    // table scan stage, need to attach server as well as segment info for each physical table type.
+    String logicalTableName = scannedTables.get(0);
+    Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName, requestId);
+    if (routingTableMap.size() == 0) {
+      throw new IllegalArgumentException("Unable to find routing entries for table: " + logicalTableName);
+    }
+    // acquire time boundary info if it is a hybrid table.
+    if (routingTableMap.size() > 1) {
+      TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(TableNameBuilder
+          .forType(TableType.OFFLINE).tableNameWithType(TableNameBuilder.extractRawTableName(logicalTableName)));
+      if (timeBoundaryInfo != null) {
+        currentStageMetadata.setTimeBoundaryInfo(timeBoundaryInfo);
+      } else {
+        // remove offline table routing if no time boundary info is acquired.
+        routingTableMap.remove(TableType.OFFLINE.name());
+      }
+    }
+
+    // extract all the instances associated to each table type
+    Map<ServerInstance, Map<String, Map<Integer, List<String>>>> serverAndPartitionToSegmentMap = new HashMap<>();
+    for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
+      String tableType = routingEntry.getKey();
+      RoutingTable routingTable = routingEntry.getValue();
+      // for each server instance, attach all table types and their associated segment list.
+      for (Map.Entry<ServerInstance, List<String>> serverEntry
+          : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
+        serverAndPartitionToSegmentMap.putIfAbsent(serverEntry.getKey(), new HashMap<>());
+        Map<String, Map<Integer, List<String>>> tableTypeToPartitionedSegmentListMap =
+            serverAndPartitionToSegmentMap.get(serverEntry.getKey());
+        // TODO: support partitioned segment list routing.
+        Map<Integer, List<String>> existingRouting =
+            tableTypeToPartitionedSegmentListMap.put(tableType, Collections.singletonMap(0, serverEntry.getValue()));
+        Preconditions.checkState(existingRouting == null, "Entry for server {} and table type: {} already exist!",
+            serverEntry.getKey(), tableType);
+      }
+    }
+    // TODO: see the leaf stage doesn't allow control of partition yet. see: {@link ServerRequestPlanVisitor#build}
+    currentStageMetadata.setServerInstances(new ArrayList<>(
+        serverAndPartitionToSegmentMap.keySet()
+            .stream()
+            .map(server -> new VirtualServer(server, Collections.singletonList(0)))
+            .collect(Collectors.toList())));
+    currentStageMetadata.setServerAndPartitionToSegmentMap(serverAndPartitionToSegmentMap);
   }
 
   /**
