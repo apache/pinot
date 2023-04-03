@@ -89,7 +89,7 @@ public class QueryGenerator {
   private final List<String> _columnNames = new ArrayList<>();
   private final List<String> _singleValueColumnNames = new ArrayList<>();
   private final List<String> _singleValueNumericalColumnNames = new ArrayList<>();
-  //private final Map<String, Integer> _multiValueColumnMaxNumElements = new HashMap<>();
+  private final Map<String, Integer> _multiValueColumnMaxNumElements = new HashMap<>();
 
   private final List<QueryGenerationStrategy> _queryGenerationStrategies =
       Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
@@ -134,23 +134,19 @@ public class QueryGenerator {
             _columnNames.add(fieldName);
             _columnToValueSet.put(fieldName, new HashSet<>());
             Schema.Type type = fieldSchema.getTypes().get(0).getType();
-            /*if (type == Schema.Type.ARRAY) {
+            if (type == Schema.Type.ARRAY) {
               _multiValueColumnMaxNumElements.put(fieldName, 0);
-            } else {*/
+            } else {
               _singleValueColumnNames.add(fieldName);
               if (type != Schema.Type.STRING && type != Schema.Type.BOOLEAN) {
                 _singleValueNumericalColumnNames.add(fieldName);
               }
-            //}
+            }
             break;
           case ARRAY:
             _columnNames.add(fieldName);
             _columnToValueSet.put(fieldName, new HashSet<>());
-            _singleValueColumnNames.add(fieldName);
-            if (fieldSchema.getElementType().getType() != Schema.Type.STRING && fieldSchema.getElementType().getType() != Schema.Type.BOOLEAN) {
-              _singleValueNumericalColumnNames.add(fieldName);
-            }
-              //_multiValueColumnMaxNumElements.put(fieldName, 0);
+            _multiValueColumnMaxNumElements.put(fieldName, 0);
             break;
           case INT:
           case LONG:
@@ -255,7 +251,7 @@ public class QueryGenerator {
           // Turn the Avro value into a valid SQL String token.
           Object avroValue = genericRecord.get(columnName);
           if (avroValue != null) {
-           /* Integer storedMaxNumElements = _multiValueColumnMaxNumElements.get(columnName);
+            Integer storedMaxNumElements = _multiValueColumnMaxNumElements.get(columnName);
             if (storedMaxNumElements != null) {
               // Multi-value column
               GenericData.Array array = (GenericData.Array) avroValue;
@@ -266,10 +262,10 @@ public class QueryGenerator {
               for (Object element : array) {
                 storeAvroValueIntoValueSet(values, element);
               }
-            } else {*/
+            } else {
               // Single-value column
               storeAvroValueIntoValueSet(values, avroValue);
-            //}
+            }
           }
         }
       }
@@ -289,14 +285,14 @@ public class QueryGenerator {
       String columnName = columnNameIterator.next();
 
       // Remove multi-value columns with more than MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE elements.
-/*      Integer maxNumElements = _multiValueColumnMaxNumElements.get(columnName);
+      Integer maxNumElements = _multiValueColumnMaxNumElements.get(columnName);
       if (maxNumElements != null
           && maxNumElements > ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE) {
         columnNameIterator.remove();
         _multiValueColumnMaxNumElements.remove(columnName);
-      } else {*/
+      } else {
         _columnToValueList.put(columnName, new ArrayList<>(_columnToValueSet.get(columnName)));
-      //}
+      }
     }
 
     // Free the other copy of the data.
@@ -354,13 +350,13 @@ public class QueryGenerator {
       String columnName = pickRandom(_columnNames);
       if (!_columnToValueList.get(columnName).isEmpty()) {
         predicates.add(pickRandom(getSingleValuePredicateGenerators()).generatePredicate(columnName));
-       /* if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
+        if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
           // Single-value column.
           predicates.add(pickRandom(getSingleValuePredicateGenerators()).generatePredicate(columnName));
         } else if (!_skipMultiValuePredicates) {
           // Multi-value column.
           predicates.add(pickRandom(_multiValuePredicateGenerators).generatePredicate(columnName));
-        }*/
+        }
       }
     }
 
@@ -453,15 +449,15 @@ public class QueryGenerator {
     public String generateH2Query() {
       List<String> h2ProjectionColumns = new ArrayList<>();
       for (String projectionColumn : _projectionColumns) {
-       /* if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
+        if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
           // Multi-value column.
-          for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
+          for (int i = 1; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
             h2ProjectionColumns.add(String.format("`%s[%d]`", projectionColumn, i));
           }
         } else {
           // Single-value column.
           h2ProjectionColumns.add(String.format("`%s`", projectionColumn));
-        }*/
+        }
         h2ProjectionColumns.add(String.format("`%s`", projectionColumn));
       }
       return joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
