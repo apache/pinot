@@ -272,11 +272,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
             + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
     h2Query =
-        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
-            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
-            + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
-            + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
-            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
+        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND ARRAY_CONTAINS(DivAirportSeqIDs, 1078102) "
+            + " OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
     testQuery(query, h2Query);
 
     // Non-Standard SQL syntax:
