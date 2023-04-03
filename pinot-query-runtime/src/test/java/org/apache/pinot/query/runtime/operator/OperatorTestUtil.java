@@ -77,6 +77,6 @@ public class OperatorTestUtil {
   public static OpChainExecutionContext getContext(long requestId, int stageId,
       VirtualServerAddress virtualServerAddress) {
     return new OpChainExecutionContext(null, requestId, stageId, virtualServerAddress, Long.MAX_VALUE, Long.MAX_VALUE,
-        new HashMap<>(), false);
+        new HashMap<>(), true);
   }
 }

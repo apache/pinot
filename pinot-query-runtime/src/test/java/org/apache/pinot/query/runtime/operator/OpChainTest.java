@@ -188,6 +188,7 @@ public class OpChainTest {
     Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
   }
 
+<<<<<<< HEAD
   @Test
   public void testStatsCollectionTracingEnabledMultipleOperators() {
     long dummyOperatorWaitTime = 1000L;
@@ -325,6 +326,8 @@ public class OpChainTest {
   }
 
 
+=======
+>>>>>>> f768fc5503 (Fix tests)
   static class DummyMultiStageOperator extends MultiStageOperator {
 
     public DummyMultiStageOperator(OpChainExecutionContext context) {
