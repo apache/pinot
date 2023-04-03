@@ -285,7 +285,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         dataTable.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
             "Query cancelled on: " + _instanceName + e));
       } else {
-        dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+        dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
+            "Query execution error on: " + _instanceName + e));
       }
       byte[] serializedDataTable = dataTable.toBytes();
       sendResponse(ctx, tableNameWithType, queryArrivalTimeMs, serializedDataTable);

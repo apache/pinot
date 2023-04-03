@@ -273,7 +273,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
             "Query cancelled on: " + _instanceDataManager.getInstanceId() + e));
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
+            "Query execution error on: " + _instanceDataManager.getInstanceId() + e));
       }
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
