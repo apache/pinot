@@ -108,7 +108,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
       }
       if (executionStatsAggregatorMap != null) {
-        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
+        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(false));
       }
     }
     Preconditions.checkState(reducerStageId != -1);

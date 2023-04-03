@@ -375,6 +375,9 @@ public class ExecutionStatsAggregator {
     if (_stageExecStartTimeMs >= 0 && _stageExecEndTimeMs >= 0) {
       brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
     }
+    if (_stageExecStartTimeMs >= 0 && _stageExecEndTimeMs >= 0) {
+      brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
+    }
   }
 
   private void withNotNullLongMetadata(Map<String, String> metadata, DataTable.MetadataKey key, LongConsumer consumer) {
