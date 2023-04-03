@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.nio.file.attribute.FileAttribute;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
@@ -101,10 +102,10 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
       throws IOException {
     String ext = extension.equals(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION) ? "" : "." + extension;
     _invertedIndexFile = getDefaultFile(indexDir, columnName, extension);
-    _forwardIndexValueBufferFile = new File(indexDir, columnName + ext + FORWARD_INDEX_VALUE_BUFFER_SUFFIX);
-    _forwardIndexLengthBufferFile = new File(indexDir, columnName + ext + FORWARD_INDEX_LENGTH_BUFFER_SUFFIX);
-    _invertedIndexValueBufferFile = new File(indexDir, columnName + ext + INVERTED_INDEX_VALUE_BUFFER_SUFFIX);
-    _invertedIndexLengthBufferFile = new File(indexDir, columnName + ext + INVERTED_INDEX_LENGTH_BUFFER_SUFFIX);
+    _forwardIndexValueBufferFile = getDefaultFile(indexDir, columnName, ext + FORWARD_INDEX_VALUE_BUFFER_SUFFIX);
+    _forwardIndexLengthBufferFile = getDefaultFile(indexDir, columnName, ext + FORWARD_INDEX_LENGTH_BUFFER_SUFFIX);
+    _invertedIndexValueBufferFile = getDefaultFile(indexDir, columnName, ext + INVERTED_INDEX_VALUE_BUFFER_SUFFIX);
+    _invertedIndexLengthBufferFile = getDefaultFile(indexDir, columnName, ext + INVERTED_INDEX_LENGTH_BUFFER_SUFFIX);
     _singleValue = singleValue;
     _cardinality = cardinality;
     _numDocs = numDocs;
