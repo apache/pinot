@@ -45,6 +45,12 @@ public class NotEqualsTransformFunctionTest extends BinaryOperatorTransformFunct
     Assert.assertTrue(transformFunction instanceof NotEqualsTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not_equals");
     int[] expectedValues = new int[NUM_ROWS];
+<<<<<<< HEAD
+=======
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 0;
+    }
+>>>>>>> 39f12684e1 (test)
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -61,8 +67,14 @@ public class NotEqualsTransformFunctionTest extends BinaryOperatorTransformFunct
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % 2 == 0) {
+<<<<<<< HEAD
         expectedValues[i] = 0;
       } else {
+=======
+        expectedValues[i] =  0;
+      } else {
+        expectedValues[i] =  1;
+>>>>>>> 39f12684e1 (test)
         roaringBitmap.add(i);
       }
     }

@@ -94,11 +94,22 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
 
   @Test
   public void testNotNullLiteral() {
+<<<<<<< HEAD
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("Not(null)", INT_SV_NULL_COLUMN));
+=======
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("Not(null)", INT_SV_NULL_COLUMN));
+>>>>>>> 39f12684e1 (test)
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not");
     int[] expectedValues = new int[NUM_ROWS];
+<<<<<<< HEAD
+=======
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 1;
+    }
+>>>>>>> 39f12684e1 (test)
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -106,7 +117,12 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
 
   @Test
   public void testNotNullColumn() {
+<<<<<<< HEAD
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("Not(%s)", INT_SV_NULL_COLUMN));
+=======
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("Not(%s)", INT_SV_NULL_COLUMN));
+>>>>>>> 39f12684e1 (test)
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not");
@@ -116,6 +132,10 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
       if (i % 2 == 0) {
         expectedValues[i] = _intSVValues[i] == 0 ? 1 : 0;
       } else {
+<<<<<<< HEAD
+=======
+        expectedValues[i] =  0;
+>>>>>>> 39f12684e1 (test)
         roaringBitmap.add(i);
       }
     }
