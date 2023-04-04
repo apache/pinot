@@ -85,6 +85,8 @@ public final class StageNodeSerDeUtils {
         return new ValueNode(stageId);
       case "WindowNode":
         return new WindowNode(stageId);
+      case "SetOpNode":
+        return new SetOpNode(stageId);
       default:
         throw new IllegalArgumentException("Unknown node name: " + nodeName);
     }

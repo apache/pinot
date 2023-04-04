@@ -32,6 +32,7 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
@@ -77,6 +78,13 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   @Override
   public Set<Integer> visitWindow(WindowNode node, Void context) {
     throw new UnsupportedOperationException("Window not yet supported!");
+  }
+
+  @Override
+  public Set<Integer> visitSetOp(SetOpNode setOpNode, Void context) {
+    Set<Integer> newPartitionKeys = new HashSet<>();
+    setOpNode.getInputs().forEach(input -> newPartitionKeys.addAll(input.visit(this, context)));
+    return newPartitionKeys;
   }
 
   @Override

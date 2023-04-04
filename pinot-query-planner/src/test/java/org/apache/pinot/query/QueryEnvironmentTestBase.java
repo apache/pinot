@@ -73,6 +73,11 @@ public class QueryEnvironmentTestBase {
   @DataProvider(name = "testQueryDataProvider")
   protected Object[][] provideQueries() {
     return new Object[][] {
+        new Object[]{"SELECT * FROM a UNION SELECT * FROM b"},
+        new Object[]{"SELECT * FROM a UNION ALL SELECT * FROM b"},
+        new Object[]{"SELECT * FROM a INTERSECT SELECT * FROM b"},
+        new Object[]{"SELECT * FROM a EXCEPT SELECT * FROM b"},
+        new Object[]{"SELECT * FROM a MINUS SELECT * FROM b"},
         new Object[]{"SELECT * FROM a ORDER BY col1 LIMIT 10"},
         new Object[]{"SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 10"},
         new Object[]{"SELECT * FROM d"},

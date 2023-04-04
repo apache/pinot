@@ -56,4 +56,6 @@ public interface StageNodeVisitor<T, C> {
   T visitValue(ValueNode node, C context);
 
   T visitWindow(WindowNode node, C context);
+
+  T visitSetOp(SetOpNode setOpNode, C context);
 }
