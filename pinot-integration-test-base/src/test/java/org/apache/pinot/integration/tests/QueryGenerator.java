@@ -448,7 +448,7 @@ public class QueryGenerator {
     public String generateH2Query() {
       List<String> h2ProjectionColumns = new ArrayList<>();
       for (String projectionColumn : _projectionColumns) {
-        if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
+        /*if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
           // Multi-value column.
           for (int i = 1; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
             h2ProjectionColumns.add(String.format("`%s[%d]`", projectionColumn, i));
@@ -456,7 +456,7 @@ public class QueryGenerator {
         } else {
           // Single-value column.
           h2ProjectionColumns.add(String.format("`%s`", projectionColumn));
-        }
+        }*/
         h2ProjectionColumns.add(String.format("`%s`", projectionColumn));
       }
       return joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
