@@ -31,5 +31,11 @@ spec:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.controller.service.name }}
       port: {{ .Values.controller.service.port }}
+    {{- if .Values.controller.service.extraPorts }}
+    {{- range .Values.controller.service.extraPorts }}
+    - name: {{ .name }}
+      port: {{ .containerPort }} 
+    {{- end }}
+    {{- end }}
   selector:
     {{- include "pinot.controllerMatchLabels" . | nindent 4 }}

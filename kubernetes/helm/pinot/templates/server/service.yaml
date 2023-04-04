@@ -36,5 +36,9 @@ spec:
       port: {{ .Values.server.service.adminExposePort }}
       targetPort: {{ .Values.server.service.adminPort }}
       protocol: {{ .Values.server.service.protocol }}
+    {{- range .Values.server.service.extraPorts }}
+    - name: {{ .name }}
+      port: {{ .containerPort }} 
+    {{- end }}
   selector:
     {{- include "pinot.serverMatchLabels" . | nindent 4 }}
