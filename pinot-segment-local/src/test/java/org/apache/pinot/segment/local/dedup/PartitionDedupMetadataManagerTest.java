@@ -46,7 +46,7 @@ public class PartitionDedupMetadataManagerTest {
 
   @BeforeTest
   public void setup() throws Exception {
-    FileUtils.deleteDirectory(new File(PartitionDedupMetadataManager.DEDUP_DATA_DIR));
+    FileUtils.deleteDirectory(new File(LocalKeyValueStore.DEDUP_DATA_DIR));
   }
 
   @Test
@@ -72,8 +72,8 @@ public class PartitionDedupMetadataManagerTest {
 
     metadataManager._primaryKeyIterator = pkList1.iterator();
     metadataManager.removeSegment(segment1);
-    metadataManager.ROCKS_DB.compactRange(metadataManager._columnFamilyHandle);
-    Assert.assertEquals(metadataManager.getKeyCount(), 0);
+    metadataManager._keyValueStore.compact();
+    Assert.assertEquals(metadataManager._keyValueStore.getKeyCount(), 0);
   }
 
   @Test
@@ -98,8 +98,8 @@ public class PartitionDedupMetadataManagerTest {
     metadataManager._primaryKeyIterator = pkList1.iterator();
     ImmutableSegmentImpl segment2 = mockSegment(2);
     metadataManager.removeSegment(segment2);
-    metadataManager.ROCKS_DB.compactRange(metadataManager._columnFamilyHandle);
-    Assert.assertEquals(metadataManager.getKeyCount(), 3);
+    metadataManager._keyValueStore.compact();
+    Assert.assertEquals(metadataManager._keyValueStore.getKeyCount(), 3);
 
     // Keys should still exist
     checkRecordLocation(metadataManager, 0, segment1, hashFunction);
@@ -161,7 +161,7 @@ public class PartitionDedupMetadataManagerTest {
       IndexSegment segment, HashFunction hashFunction) throws Exception {
     Object pk = HashUtils.hashPrimaryKey(getPrimaryKey(keyValue), hashFunction);
     byte[] pkBytes = PartitionDedupMetadataManager.serializePrimaryKey(pk);
-    byte[] indexSegmentBytes = metadataManager.ROCKS_DB.get(metadataManager._columnFamilyHandle, pkBytes);
+    byte[] indexSegmentBytes = metadataManager._keyValueStore.get(pkBytes);
     Assert.assertNotNull(indexSegmentBytes);
     byte[] segmentBytes = PartitionDedupMetadataManager.serializeSegment(segment);
     Assert.assertEquals(indexSegmentBytes, segmentBytes);

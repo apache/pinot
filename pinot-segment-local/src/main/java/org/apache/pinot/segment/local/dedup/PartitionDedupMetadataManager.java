@@ -19,12 +19,13 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -33,40 +34,15 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
-import org.rocksdb.WriteOptions;
 
 
 public class PartitionDedupMetadataManager {
-  @VisibleForTesting
-  public static final String DEDUP_DATA_DIR = "/tmp/dudup-data";
-  @VisibleForTesting
-  static final RocksDB ROCKS_DB = initRocksDB();
   private final String _tableNameWithType;
   private final List<String> _primaryKeyColumns;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final HashFunction _hashFunction;
-
-  @VisibleForTesting
-  final ColumnFamilyHandle _columnFamilyHandle;
-
-  private static RocksDB initRocksDB() {
-      RocksDB.loadLibrary();
-      final Options options = new Options();
-      options.setCreateIfMissing(true);
-      File dbDir = new File(DEDUP_DATA_DIR);
-      try {
-        return RocksDB.open(options, dbDir.getAbsolutePath());
-      } catch (RocksDBException ex) {
-        throw new RuntimeException(ex);
-      }
-  }
+  @VisibleForTesting final LocalKeyValueStore _keyValueStore;
 
   public PartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,
       ServerMetrics serverMetrics, HashFunction hashFunction) {
@@ -75,44 +51,21 @@ public class PartitionDedupMetadataManager {
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _hashFunction = hashFunction;
-    try {
-      _columnFamilyHandle = ROCKS_DB.createColumnFamily(
-          new ColumnFamilyDescriptor((tableNameWithType + "@" + partitionId).getBytes()));
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
-    }
+    _keyValueStore = new LocalKeyValueStore((tableNameWithType + "@" + partitionId).getBytes());
   }
 
   public void addSegment(IndexSegment segment) {
-    // Add all PKs to the rocksdb column family
     Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
-    WriteBatch writeBatch = new WriteBatch();
     byte[] serializedSegment = serializeSegment(segment);
+    List<Pair<byte[], byte[]>> keyValues = new ArrayList<>();
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
       byte[] serializedPrimaryKey = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _hashFunction));
-      try {
-        writeBatch.put(_columnFamilyHandle, serializedPrimaryKey, serializedSegment);
-      } catch (RocksDBException e) {
-        throw new RuntimeException(e);
-      }
+      keyValues.add(Pair.of(serializedPrimaryKey, serializedSegment));
     }
-    try {
-      ROCKS_DB.write(new WriteOptions(), writeBatch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
-    }
+    _keyValueStore.putBatch(keyValues);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        getKeyCount());
-  }
-
-  @VisibleForTesting
-  long getKeyCount() {
-    try {
-    return ROCKS_DB.getLongProperty(_columnFamilyHandle, "rocksdb.estimate-num-keys");
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
-    }
+        _keyValueStore.getKeyCount());
   }
 
   @VisibleForTesting
@@ -138,16 +91,12 @@ public class PartitionDedupMetadataManager {
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
       byte[] pkBytes = serializePrimaryKey(pk);
-      try {
-        if (Objects.deepEquals(ROCKS_DB.get(_columnFamilyHandle, pkBytes), segmentBytes)) {
-          ROCKS_DB.delete(_columnFamilyHandle, pkBytes);
-        }
-      } catch (RocksDBException e) {
-        throw new RuntimeException(e);
+      if (Objects.deepEquals(_keyValueStore.get(pkBytes), segmentBytes)) {
+        _keyValueStore.delete(pkBytes);
       }
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        getKeyCount());
+        _keyValueStore.getKeyCount());
   }
 
   @VisibleForTesting
@@ -184,15 +133,11 @@ public class PartitionDedupMetadataManager {
 
   public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
     byte[] keyBytes = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _hashFunction));
-    try {
-      if (Objects.isNull(ROCKS_DB.get(_columnFamilyHandle, keyBytes))) {
-          ROCKS_DB.put(_columnFamilyHandle, keyBytes, serializeSegment(indexSegment));
-        _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-            getKeyCount());
-        return false;
-      }
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
+    if (Objects.isNull(_keyValueStore.get(keyBytes))) {
+        _keyValueStore.put(keyBytes, serializeSegment(indexSegment));
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+          _keyValueStore.getKeyCount());
+      return false;
     }
     return true;
   }

@@ -24,6 +24,7 @@ import java.net.URL;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.dedup.LocalKeyValueStore;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -50,7 +51,7 @@ public class MutableSegmentDedupeTest {
 
   @BeforeTest
   public void beforeTest() throws Exception {
-    FileUtils.deleteDirectory(new File(PartitionDedupMetadataManager.DEDUP_DATA_DIR));
+    FileUtils.deleteDirectory(new File(LocalKeyValueStore.DEDUP_DATA_DIR));
   }
 
   private void setup(boolean dedupEnabled)
