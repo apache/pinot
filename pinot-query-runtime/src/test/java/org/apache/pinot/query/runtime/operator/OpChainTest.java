@@ -83,7 +83,6 @@ public class OpChainTest {
   @Mock
   private ReceivingMailbox<TransferableBlock> _mailbox2;
 
-
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
@@ -188,7 +187,6 @@ public class OpChainTest {
     Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
   }
 
-<<<<<<< HEAD
   @Test
   public void testStatsCollectionTracingEnabledMultipleOperators() {
     long dummyOperatorWaitTime = 1000L;
@@ -325,9 +323,6 @@ public class OpChainTest {
     return operators;
   }
 
-
-=======
->>>>>>> f768fc5503 (Fix tests)
   static class DummyMultiStageOperator extends MultiStageOperator {
 
     public DummyMultiStageOperator(OpChainExecutionContext context) {
