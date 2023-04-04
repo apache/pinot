@@ -224,11 +224,13 @@ jobs:
       matrix:
         # We only test LTS Java versions
         # TODO: add JDK 17 once ready. see: https://github.com/apache/pinot/issues/8529
-        java: [ 11, 15, 17, 20 ]
+        java: [ 11, 17, 20 ]
         distribution: [ "temurin" ]
         include:
           - java: 8
-            distribution: [ "adopt" ]
+            distribution: "adopt"
+          - java: 15
+            distribution: "adopt"
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v3
