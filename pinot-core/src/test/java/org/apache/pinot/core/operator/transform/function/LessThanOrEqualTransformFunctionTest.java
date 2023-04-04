@@ -54,8 +54,8 @@ public class LessThanOrEqualTransformFunctionTest extends BinaryOperatorTransfor
 
   @Test
   public void testLessThanOrEqualsNullColumn() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("less_than_or_equal(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("less_than_or_equal(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof LessThanOrEqualTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "less_than_or_equal");
@@ -63,9 +63,9 @@ public class LessThanOrEqualTransformFunctionTest extends BinaryOperatorTransfor
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % 2 == 0) {
-        expectedValues[i] =  1;
+        expectedValues[i] = 1;
       } else {
-        expectedValues[i] =  1;
+        expectedValues[i] = 1;
         roaringBitmap.add(i);
       }
     }

@@ -55,8 +55,8 @@ public class GreaterThanOrEqualTransformFunctionTest extends BinaryOperatorTrans
 
   @Test
   public void testEqualsNullColumn() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("greater_than_or_equal(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("greater_than_or_equal(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof GreaterThanOrEqualTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "greater_than_or_equal");
@@ -64,9 +64,9 @@ public class GreaterThanOrEqualTransformFunctionTest extends BinaryOperatorTrans
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % 2 == 0) {
-        expectedValues[i] =  1;
+        expectedValues[i] = 1;
       } else {
-        expectedValues[i] =  0;
+        expectedValues[i] = 0;
         roaringBitmap.add(i);
       }
     }

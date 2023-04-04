@@ -59,7 +59,7 @@ public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFu
         RequestContextUtils.getExpression(String.format("and(%s,%s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AndOperatorTransformFunction);
-    Assert.assertEquals(transformFunction.getName(),  TransformFunctionType.AND.getName());
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.AND.getName());
     int[] expectedValues = new int[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {

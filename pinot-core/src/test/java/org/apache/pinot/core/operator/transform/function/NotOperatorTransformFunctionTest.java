@@ -94,8 +94,7 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
 
   @Test
   public void testNotNullLiteral() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("Not(null)", INT_SV_NULL_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("Not(null)", INT_SV_NULL_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not");
@@ -110,8 +109,7 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
 
   @Test
   public void testNotNullColumn() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("Not(%s)", INT_SV_NULL_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("Not(%s)", INT_SV_NULL_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not");
@@ -121,7 +119,7 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
       if (i % 2 == 0) {
         expectedValues[i] = _intSVValues[i] == 0 ? 1 : 0;
       } else {
-        expectedValues[i] =  0;
+        expectedValues[i] = 0;
         roaringBitmap.add(i);
       }
     }

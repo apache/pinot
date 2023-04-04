@@ -166,15 +166,15 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     Assert.assertTrue(clazz.isInstance(transformFunction));
     Assert.assertEquals(transformFunction.getName(), sqlFunction);
     expectedValues = new double[NUM_ROWS];
+    RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if(i % 2 == 0){
+      if (i % 2 == 0) {
         expectedValues[i] = op.applyAsDouble(_intSVValues[i]);
       } else {
-        expectedValues[i] = 0;
+        expectedValues[i] = op.applyAsDouble(Integer.MIN_VALUE);
+        bitmap.add(i);
       }
     }
-    RoaringBitmap bitmap = new RoaringBitmap();
-    bitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 }

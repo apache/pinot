@@ -53,8 +53,8 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument1 is required for not transform function");
     TransformResultMetadata argumentMetadata = arguments.get(0).getResultMetadata();
     Preconditions.checkState(
-        argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric() ||
-        argumentMetadata.getDataType().getStoredType().isUnknown(),
+        argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric()
+            || argumentMetadata.getDataType().getStoredType().isUnknown(),
         "Unsupported argument type. Expecting single-valued boolean/number");
     _argument = arguments.get(0);
   }

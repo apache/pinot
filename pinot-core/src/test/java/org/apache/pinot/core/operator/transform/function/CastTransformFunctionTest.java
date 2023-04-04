@@ -35,7 +35,6 @@ import static org.testng.Assert.assertTrue;
 
 
 public class CastTransformFunctionTest extends BaseTransformFunctionTest {
-
   @Test
   public void testCastTransformFunction() {
     ExpressionContext expression =
@@ -284,10 +283,10 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % 2 == 0) {
-        expectedValues[i] =  _intSVValues[i];
+        expectedValues[i] = _intSVValues[i];
       } else {
         //
-        expectedValues[i] =  Integer.MIN_VALUE;
+        expectedValues[i] = Integer.MIN_VALUE;
         roaringBitmap.add(i);
       }
     }

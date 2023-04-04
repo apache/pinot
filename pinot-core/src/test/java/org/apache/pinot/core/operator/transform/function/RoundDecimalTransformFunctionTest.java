@@ -70,7 +70,8 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
 
   @Test
   public void testRoundDecimalNullLiteral() {
-    ExpressionContext expression = RequestContextUtils.getExpression(String.format("round_decimal(null)", INT_SV_COLUMN));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("round_decimal(null)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
@@ -89,7 +90,7 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
         RequestContextUtils.getExpression(String.format("round_decimal(%s)", INT_SV_NULL_COLUMN, 0));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
-    Assert.assertEquals(transformFunction.getName(),  TransformFunctionType.ROUND_DECIMAL.getName());
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
     double[] expectedValues = new double[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
