@@ -67,6 +67,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -132,6 +133,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
 
+    if (_brokerConf.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT) == 0) {
+      _brokerConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
+    }
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
     _hostname = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);

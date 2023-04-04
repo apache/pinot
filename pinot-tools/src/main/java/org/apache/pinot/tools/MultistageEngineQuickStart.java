@@ -94,7 +94,6 @@ public class MultistageEngineQuickStart extends Quickstart {
   @Override
   public Map<String, Object> getConfigOverrides() {
     Map<String, Object> overrides = new HashMap<>(super.getConfigOverrides());
-    overrides.put("pinot.multistage.engine.enabled", "true");
     overrides.put("pinot.server.instance.currentDataTableVersion", 4);
     return overrides;
   }

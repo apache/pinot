@@ -194,7 +194,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
-    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = false;
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = true;
   }
 
   public static class Broker {
