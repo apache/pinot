@@ -174,7 +174,8 @@ public class PinotQueryResource {
     SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
     List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
     if (tableNames.size() == 0) {
-      return QueryException.SQL_PARSING_ERROR.toString();
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR,
+          new Exception("Unable to find table name from SQL thus cannot dispatch to broker.")).toString();
     }
 
     String brokerTenant = getCommonBrokerTenant(tableNames);
