@@ -24,9 +24,7 @@ import java.nio.ByteOrder;
 import org.apache.pinot.segment.spi.memory.ByteBufferUtil;
 import org.apache.pinot.segment.spi.memory.NonNativePinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-//CHECKSTYLE:OFF
 import sun.misc.Unsafe;
-//CHECKSTYLE:ON
 
 
 /**
