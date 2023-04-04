@@ -61,7 +61,7 @@ public class LessThanTransformFunctionTest extends BinaryOperatorTransformFuncti
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % 2 == 0) {
-        expectedValues[i] = 0;
+        expectedValues[i] =  0;
       } else {
         roaringBitmap.add(i);
       }
