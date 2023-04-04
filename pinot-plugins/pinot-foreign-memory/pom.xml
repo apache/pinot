@@ -71,7 +71,7 @@
         <executions>
           <execution>
             <id>default-compile</id>
-            <phase>none</phase>
+            <phase>none</phase> <!-- By default code in this project is not compiled -->
             <goals>
               <goal>compile</goal>
             </goals>
@@ -86,6 +86,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <!-- At least in JDK 20 we need to enable preview in order to run the tests -->
           <argLine>--enable-preview</argLine>
         </configuration>
       </plugin>
@@ -94,6 +95,7 @@
 
   <profiles>
     <profile>
+      <!-- Only if JDK is at least 20, we compile the code -->
       <id>java20</id>
       <activation>
         <jdk>[20,)</jdk>
