@@ -753,35 +753,25 @@ public class ClusterIntegrationTestUtils {
         }
 
         // Handle multi-value columns
-        /*int length = columnName.length();
-        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName.substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH,
-            length - 1).equals("__MV")) {
+        int columnType = h2MetaData.getColumnType(columnIndex);
+        if (columnType == Types.ARRAY) {
           // Multi-value column
-          String multiValueColumnName = columnName.substring(0, length - H2_MULTI_VALUE_SUFFIX_LENGTH);
-          List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
-          if (multiValue == null) {
-            multiValue = new ArrayList<>();
-            reusableMultiValuesMap.put(multiValueColumnName, multiValue);
-            reusableColumnOrder.add(multiValueColumnName);
-          }
-          multiValue.add(columnValue);
+          //Object columnValue = h2ResultSet.getArray(columnIndex).getArray();
+          reusableColumnOrder.add(columnName);
+          reusableExpectedValueMap.put(columnName, columnValue);
         } else {
           // Single-value column
+
           String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
           columnValue = removeTrailingZeroForNumber(columnValue, columnDataType);
           reusableExpectedValueMap.put(columnName, columnValue);
           reusableColumnOrder.add(columnName);
-        }*/
-
-        String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
-        columnValue = removeTrailingZeroForNumber(columnValue, columnDataType);
-        reusableExpectedValueMap.put(columnName, columnValue);
-        reusableColumnOrder.add(columnName);
+        }
       }
 
       // Add multi-value column results to the expected values
       // The reason for this step is that Pinot does not maintain order of elements in multi-value columns
-      /*for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
+/*      for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
         List<String> multiValue = entry.getValue();
         Collections.sort(multiValue);
         reusableExpectedValueMap.put(entry.getKey(), multiValue.toString());
