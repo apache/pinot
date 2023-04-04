@@ -29,7 +29,8 @@ public class PinotDefaultByteBufferTest extends PinotDataBufferTest {
 
   @Override
   protected boolean prioritizeByteBuffer() {
-    return true;
+    // TODO (more-buffers): Change to false once we test the code
+    return false;
   }
 
   @BeforeClass
