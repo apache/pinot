@@ -114,7 +114,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         "SELECT DivAirportIDs, DivAirports FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
             + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
     String h2Query =
-        "SELECT DivAirportIDs, DivAirports FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+        "SELECT DivAirportIDs[1], DivAirports[1] FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
     ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
         h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }

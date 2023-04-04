@@ -751,7 +751,6 @@ public class ClusterIntegrationTestUtils {
       for (int columnIndex = 1; columnIndex <= numColumns; columnIndex++) { // h2 result set is 1-based
         String columnName = h2MetaData.getColumnName(columnIndex);
 
-
         // Handle null result and convert boolean value to lower case
         String columnValue = h2ResultSet.getString(columnIndex);
         if (columnValue == null) {
