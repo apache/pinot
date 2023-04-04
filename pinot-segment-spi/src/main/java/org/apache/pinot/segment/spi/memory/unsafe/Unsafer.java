@@ -19,8 +19,9 @@
 package org.apache.pinot.segment.spi.memory.unsafe;
 
 import java.lang.reflect.Field;
+//CHECKSTYLE:OFF
 import sun.misc.Unsafe;
-
+//CHECKSTYLE:ON
 
 public class Unsafer {
 
