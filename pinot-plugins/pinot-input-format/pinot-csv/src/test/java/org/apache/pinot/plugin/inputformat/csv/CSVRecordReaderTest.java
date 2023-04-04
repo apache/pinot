@@ -136,6 +136,8 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     //read all fields
     //execute and assert
     csvRecordReader.init(_dataFile, null, csvRecordReaderConfig);
+    Assert.assertEquals(10, csvRecordReader.getCSVHeaderMap().size());
+    Assert.assertTrue(csvRecordReader.getCSVHeaderMap().containsKey("col1"));
     Assert.assertTrue(csvRecordReader.hasNext());
   }
 
