@@ -114,24 +114,15 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
         RequestContextUtils.getExpression(String.format("power(%s,%s)", INT_SV_NULL_COLUMN, 0));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
-<<<<<<< HEAD
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.POWER.getName());
-=======
     Assert.assertEquals(transformFunction.getName(),  TransformFunctionType.POWER.getName());
->>>>>>> 39f12684e1 (test)
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.POWER.getName());
     double[] expectedValues = new double[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % 2 == 0) {
-<<<<<<< HEAD
         expectedValues[i] = 1;
       } else {
-=======
-        expectedValues[i] =  1;
-      } else {
-        // null int is set to int min in field spec.
-        expectedValues[i] = 1;
->>>>>>> 39f12684e1 (test)
         roaringBitmap.add(i);
       }
     }

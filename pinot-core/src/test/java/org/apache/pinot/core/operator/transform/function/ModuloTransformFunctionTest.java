@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -115,12 +114,6 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "mod");
     double[] expectedValues = new double[NUM_ROWS];
-<<<<<<< HEAD
-=======
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
->>>>>>> 39f12684e1 (test)
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -136,21 +129,11 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-<<<<<<< HEAD
       if (i % 2 == 0) {
         expectedValues[i] = (double) _intSVValues[i] % (double) _longSVValues[i];
       } else {
         roaringBitmap.add(i);
       }
-=======
-      if(i % 2 == 0) {
-        expectedValues[i] = (double) _intSVValues[i] % (double) _longSVValues[i];
-      } else {
-        expectedValues[i] = (double) Integer.MIN_VALUE % (double) _longSVValues[i];
-        roaringBitmap.add(i);
-      }
-
->>>>>>> 39f12684e1 (test)
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
