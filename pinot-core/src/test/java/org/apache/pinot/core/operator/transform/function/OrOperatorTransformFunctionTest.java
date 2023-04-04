@@ -59,11 +59,7 @@ public class OrOperatorTransformFunctionTest extends LogicalOperatorTransformFun
         RequestContextUtils.getExpression(String.format("or(%s,%s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof OrOperatorTransformFunction);
-<<<<<<< HEAD
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.OR.getName());
-=======
-    Assert.assertEquals(transformFunction.getName(),  TransformFunctionType.OR.getName());
->>>>>>> 39f12684e1 (test)
     int[] expectedValues = new int[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
