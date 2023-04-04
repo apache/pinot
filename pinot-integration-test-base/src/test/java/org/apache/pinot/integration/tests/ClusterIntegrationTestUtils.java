@@ -138,10 +138,8 @@ public class ClusterIntegrationTestUtils {
           case ARRAY:
             Schema.Type type = field.schema().getElementType().getType();
             Assert.assertTrue(isSingleValueAvroFieldType(type));
-            // Split multi-value field into MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE single-value fields
-            //for (int i = 0; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
+            // create Array data type based column.
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true, true));
-            //}
             break;
           default:
             if (isSingleValueAvroFieldType(fieldType)) {
@@ -222,7 +220,16 @@ public class ClusterIntegrationTestUtils {
     return buildH2FieldNameAndType(fieldName, avroFieldType, nullable, false);
   }
 
-  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable, boolean ArrayType) {
+  /**
+   * Helper method to build H2 field name and type.
+   *
+   * @param fieldName Field name
+   * @param avroFieldType Avro field type
+   * @param nullable Whether the column is nullable
+   * @param arrayType Whether the column is array data type or not
+   * @return H2 field name and type
+   */
+  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable, boolean arrayType) {
     String avroFieldTypeName = avroFieldType.getName();
     String h2FieldType;
     switch (avroFieldTypeName) {
@@ -236,7 +243,8 @@ public class ClusterIntegrationTestUtils {
         h2FieldType = avroFieldTypeName;
         break;
     }
-    if (ArrayType) {
+    // if column is array data type, add Array with size.
+    if (arrayType) {
       h2FieldType = h2FieldType + " ARRAY[" + MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE + "]";
     }
     if (nullable) {
@@ -756,26 +764,16 @@ public class ClusterIntegrationTestUtils {
         int columnType = h2MetaData.getColumnType(columnIndex);
         if (columnType == Types.ARRAY) {
           // Multi-value column
-          //Object columnValue = h2ResultSet.getArray(columnIndex).getArray();
           reusableColumnOrder.add(columnName);
           reusableExpectedValueMap.put(columnName, columnValue);
         } else {
           // Single-value column
-
           String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
           columnValue = removeTrailingZeroForNumber(columnValue, columnDataType);
           reusableExpectedValueMap.put(columnName, columnValue);
           reusableColumnOrder.add(columnName);
         }
       }
-
-      // Add multi-value column results to the expected values
-      // The reason for this step is that Pinot does not maintain order of elements in multi-value columns
-/*      for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
-        List<String> multiValue = entry.getValue();
-        Collections.sort(multiValue);
-        reusableExpectedValueMap.put(entry.getKey(), multiValue.toString());
-      }*/
 
       // Build expected value String
       StringBuilder expectedValue = new StringBuilder();
