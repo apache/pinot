@@ -21,14 +21,13 @@ package org.apache.pinot.query.routing;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import org.antlr.v4.runtime.misc.OrderedHashSet;
 import org.apache.calcite.util.Util;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -50,6 +49,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
  *
  * TODO: Currently it is implemented by wrapping routing manager from Pinot Broker. however we can abstract out
  * the worker manager later when we split out the query-spi layer.
+ * TODO: clean up singleton instance assignment using Pinot-specific RelDistributionTrait
  */
 public class WorkerManager {
   private static final Random RANDOM = new Random();
@@ -86,45 +86,44 @@ public class WorkerManager {
 
   private void assignWorkerToIntermediateStage(long requestId, StageMetadata currentStageMetadata,
       Map<Integer, StageMetadata> stageMetadataMap, Map<String, String> options) {
-    HashSet<ServerInstance> servers = new HashSet<>();
-    for (int inboundStageId : currentStageMetadata.getInboundStageSet()) {
+    // step 1: compute all server instances used by previous stages.
+    //   - we also only retain the available server instances from this routing manager.
+    OrderedHashSet<ServerInstance> servers = new OrderedHashSet<>();
+    for (int inboundStageId : currentStageMetadata.getInboundStageMap()) {
       for (VirtualServer virtualServer : stageMetadataMap.get(inboundStageId).getServerInstances()) {
         servers.add(virtualServer.getServer());
       }
     }
-    // only retain the available server instances from this routing manager.
     servers.retainAll(_routingManager.getEnabledServerInstanceMap().values());
-    // TODO: support partition-aware routing and worker assignment.
+    // step 2: determine the stage parallelism based on query options or previous stage partition count.
+    // TODO: right now it is hint-based only, but we should compute based on previous stages as well.
     int stageParallelism = Integer.parseInt(
         options.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.STAGE_PARALLELISM, "1"));
-    boolean requiresSingletonInstance = currentStageMetadata.isRequiresSingletonInstance();
+
+    // step 3: assign instances and partitions to this stage.
     List<VirtualServer> serverInstances = new ArrayList<>();
-    int idx = 0;
-    int matchingIdx = -1;
-    if (requiresSingletonInstance) {
-      matchingIdx = RANDOM.nextInt(servers.size());
-    }
-    int partitionCount = 0;
-    for (ServerInstance server : servers) {
-      if (matchingIdx == -1 || idx == matchingIdx) {
+    if (currentStageMetadata.isRequiresSingletonInstance()) {
+      // Current stage require singleton instance
+      ServerInstance randomInstance = servers.get(RANDOM.nextInt(servers.size()));
+      serverInstances.add(new VirtualServer(randomInstance, Collections.singletonList(0)));
+    } else {
+      // Current stage is partitioned-based.
+      int partitionCount = 0;
+      for (ServerInstance server : servers) {
         String hostname = server.getHostname();
         if (server.getQueryServicePort() > 0 && server.getQueryMailboxPort() > 0
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
-          if (matchingIdx == -1) {
-            serverInstances.add(new VirtualServer(server, Util.range(partitionCount,
-                partitionCount + stageParallelism)));
-            partitionCount += stageParallelism;
-          } else {
-            // for singleton exchange, add 0 as the default parallelism as the requirement of singleton
-            serverInstances.add(new VirtualServer(server, Collections.singletonList(0)));
-          }
+          serverInstances.add(new VirtualServer(server, Util.range(partitionCount, partitionCount + stageParallelism)));
+          partitionCount += stageParallelism;
         }
       }
-      idx++;
     }
     currentStageMetadata.setServerInstances(serverInstances);
+
+    // step 4: update previous stage to current stage mapping.
+
   }
 
   private void assignWorkerToLeafStage(long requestId, StageMetadata currentStageMetadata, List<String> scannedTables) {

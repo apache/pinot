@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.routing.VirtualServer;
@@ -91,15 +92,20 @@ public class StageMetadata implements Serializable {
    *   - for partitioned exchanges, the inner map contains multiple entries with a singleton list.
    *   - for non-partitioned exchanges, the inner map contains 1 entry with a list of all receiving server instances.
    */
-  private Map<Integer, Map<Integer, List<ServerInstance>>> _receivingServerInstanceMap;
+  private Map<Integer, List<VirtualServer>> _receivingServerInstanceMap;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
 
+  // --------------------------------------------------------------------------
+  // Transient objects that are only used during DispatchablePlanVisitor
+  // --------------------------------------------------------------------------
+
   // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
   private transient boolean _requiresSingletonInstance;
 
-  private transient Set<Integer> _inboundStageSet;
+  // what are the inbound stage towards the current stage.
+  private transient Map<Integer, RelDistribution.Type> _inboundStageMap;
 
   public StageMetadata() {
     _scannedTables = new ArrayList<>();
@@ -107,7 +113,7 @@ public class StageMetadata implements Serializable {
     _serverAndPartitionToSegmentMap = new HashMap<>();
     _timeBoundaryInfo = null;
     _requiresSingletonInstance = false;
-    _inboundStageSet = new HashSet<>();
+    _inboundStageMap = new HashMap<>();
   }
 
   public List<String> getScannedTables() {
@@ -164,12 +170,12 @@ public class StageMetadata implements Serializable {
     _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
   }
 
-  public Set<Integer> getInboundStageSet() {
-    return _inboundStageSet;
+  public Set<Integer> getInboundStageMap() {
+    return _inboundStageMap;
   }
 
   public void addInboundStage(int inboundStageId) {
-    _inboundStageSet.add(inboundStageId);
+    _inboundStageMap.add(inboundStageId);
   }
 
   @Override
