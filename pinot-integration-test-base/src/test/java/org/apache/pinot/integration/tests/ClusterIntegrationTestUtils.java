@@ -176,9 +176,9 @@ public class ClusterIntegrationTestUtils {
               Object[] arrayValue = new Object[MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE];
               for (int i = 0; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
                 if (i < array.size()) {
-                  value = array.get(i);
-                  if (value instanceof Utf8) {
-                    arrayValue[i] = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
+                  arrayValue[i] = array.get(i);
+                  if (arrayValue[i] instanceof Utf8) {
+                    arrayValue[i] = StringUtil.sanitizeStringValue(arrayValue[i].toString(), FieldSpec.DEFAULT_MAX_LENGTH);
                   }
                 } else {
                   arrayValue[i] = null;
