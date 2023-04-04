@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Stack;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -38,6 +39,8 @@ public class OpChainTest {
   private AutoCloseable _mocks;
   @Mock
   private MultiStageOperator _upstreamOperator;
+
+  private static int _numOperatorsInitialized = 0;
 
   @BeforeMethod
   public void setUp() {
@@ -79,7 +82,7 @@ public class OpChainTest {
   }
 
   @Test
-  public void testStatsCollection() {
+  public void testStatsCollectionTracingEnabled() {
     OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
@@ -114,7 +117,57 @@ public class OpChainTest {
     Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
   }
 
+
+  @Test
+  public void testStatsCollectionTracingEnabledMultipleOperators() {
+    OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
+    DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
+
+    int numOperatorsInChain = 5;
+    Stack<MultiStageOperator> operators = new Stack<>();
+    operators.push(dummyMultiStageOperator);
+    for (int i = 0; i < numOperatorsInChain; i++) {
+      MultiStageOperator nextOperator = new DummyMultiStageCallableOperator(context, operators.peek());
+      operators.push(nextOperator);
+    }
+
+    OpChain opChain = new OpChain(context, operators.peek(), new ArrayList<>());
+    opChain.getStats().executing();
+    opChain.getRoot().nextBlock();
+    opChain.getStats().queued();
+
+    Assert.assertTrue(opChain.getStats().getExecutionTime() >= numOperatorsInChain * 1000L);
+    Map<String, OperatorStats> operatorStatsMap = opChain.getStats().getOperatorStatsMap();
+    Assert.assertEquals(operatorStatsMap.size(), numOperatorsInChain + 1);
+    while (!operators.isEmpty()) {
+      MultiStageOperator operator = operators.pop();
+      Assert.assertTrue(operatorStatsMap.containsKey(operator.getOperatorId()));
+    }
+  }
+
+  @Test
+  public void testStatsCollectionTracingDisabledMultipleOperators() {
+    OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracingDisabled();
+    DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
+
+    int numOperatorsInChain = 5;
+    Stack<MultiStageOperator> operators = new Stack<>();
+    operators.push(dummyMultiStageOperator);
+    for (int i = 0; i < numOperatorsInChain; i++) {
+      MultiStageOperator nextOperator = new DummyMultiStageCallableOperator(context, operators.peek());
+      operators.push(nextOperator);
+    }
+    OpChain opChain = new OpChain(context, operators.peek(), new ArrayList<>());
+    opChain.getStats().executing();
+    opChain.getRoot().nextBlock();
+    opChain.getStats().queued();
+
+    Assert.assertTrue(opChain.getStats().getExecutionTime() >= numOperatorsInChain * 1000L);
+    Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
+  }
+
   static class DummyMultiStageOperator extends MultiStageOperator {
+
     public DummyMultiStageOperator(OpChainExecutionContext context) {
       super(context);
     }
@@ -133,6 +186,32 @@ public class OpChainTest {
     @Override
     public String toExplainString() {
       return "DUMMY";
+    }
+  }
+
+  static class DummyMultiStageCallableOperator extends MultiStageOperator {
+    private final MultiStageOperator _upstream;
+
+    public DummyMultiStageCallableOperator(OpChainExecutionContext context, MultiStageOperator upstream) {
+      super(context);
+      _upstream = upstream;
+    }
+
+    @Override
+    protected TransferableBlock getNextBlock() {
+      try {
+        Thread.sleep(1000);
+        _upstream.nextBlock();
+      } catch (InterruptedException e) {
+        // IGNORE
+      }
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    }
+
+    @Nullable
+    @Override
+    public String toExplainString() {
+      return "DUMMY_" + _numOperatorsInitialized++;
     }
   }
 }

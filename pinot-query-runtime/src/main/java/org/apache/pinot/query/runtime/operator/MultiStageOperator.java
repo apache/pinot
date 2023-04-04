@@ -57,7 +57,6 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
         operatorStats.recordRow(1, nextBlock.getNumRows());
         operatorStats.endTimer(nextBlock);
       } else {
-
         nextBlock = getNextBlock();
       }
       return nextBlock;

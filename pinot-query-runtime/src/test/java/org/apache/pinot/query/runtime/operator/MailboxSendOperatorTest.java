@@ -194,6 +194,11 @@ public class MailboxSendOperatorTest {
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
     Mockito.verify(_exchange).send(captor.capture());
     Assert.assertSame(captor.getValue().getType(), DataBlock.Type.ROW, "expected data block to propagate");
+
+    // EOS block should contain statistics
+    Assert.assertFalse(context.getStats().getOperatorStatsMap().isEmpty());
+    Assert.assertEquals(context.getStats().getOperatorStatsMap().size(), 1);
+    Assert.assertTrue(context.getStats().getOperatorStatsMap().containsKey(operator.getOperatorId()));
   }
 
   private static TransferableBlock block(DataSchema schema, Object[]... rows) {
