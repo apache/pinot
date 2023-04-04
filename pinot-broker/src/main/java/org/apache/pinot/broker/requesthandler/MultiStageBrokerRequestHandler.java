@@ -149,7 +149,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long compilationStartTimeNs;
     long queryTimeoutMs;
-    QueryPlan queryPlan;
+    QueryEnvironment.QueryPlannerResult queryPlanResult;
     try {
       // Parse the request
       sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
@@ -159,9 +159,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       compilationStartTimeNs = System.nanoTime();
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          String plan = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
-          boolean hasAccess = hasTableAccess(requesterIdentity, _queryEnvironment.getRelRoot().rel);
-          if (!hasAccess) {
+          queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
+          String plan = queryPlanResult.getExplainPlan();
+          RelNode explainRelRoot = queryPlanResult.getRelRoot();
+
+          if (!hasTableAccess(requesterIdentity, explainRelRoot)) {
             _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
             LOGGER.info("Access denied for requestId {}", requestId);
             requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
@@ -171,7 +173,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
+          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions,
+              requestId);
+          RelNode queryRelRoot = queryPlanResult.getRelRoot();
+
+          if (!hasTableAccess(requesterIdentity, queryRelRoot)) {
+            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+            LOGGER.info("Access denied for requestId {}", requestId);
+            requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+            return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+          }
+
           break;
       }
     } catch (Exception e) {
@@ -181,14 +193,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
 
-    // Perform table level access validation.
-    boolean hasAccess = hasTableAccess(requesterIdentity, _queryEnvironment.getRelRoot().rel);
-    if (!hasAccess) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.info("Access denied for requestId {}", requestId);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
-    }
+    QueryPlan queryPlan = queryPlanResult.getQueryPlan();
 
     boolean traceEnabled = Boolean.parseBoolean(
         request.has(CommonConstants.Broker.Request.TRACE) ? request.get(CommonConstants.Broker.Request.TRACE).asText()

@@ -53,7 +53,7 @@ public interface AccessControl {
    * Fine-grained access control on pinot tables.
    *
    * @param requesterIdentity requester identity
-   * @param tables List of pinot tables used in the query
+   * @param tables Set of pinot tables used in the query. Table name can be with or without tableType.
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */

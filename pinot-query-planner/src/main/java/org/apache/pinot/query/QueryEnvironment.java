@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
@@ -82,8 +83,6 @@ public class QueryEnvironment {
   private final WorkerManager _workerManager;
   private final TableCache _tableCache;
 
-  private RelRoot _relRoot;
-
   public QueryEnvironment(TypeFactory typeFactory, CalciteSchema rootSchema, WorkerManager workerManager,
       TableCache tableCache) {
     _typeFactory = typeFactory;
@@ -135,13 +134,6 @@ public class QueryEnvironment {
   }
 
   /**
-   * Returns the RelRoot generated after compiling the query.
-   */
-  public RelRoot getRelRoot() {
-    return _relRoot;
-  }
-
-  /**
    * Plan a SQL query.
    *
    * This function is thread safe since we construct a new PlannerContext every time.
@@ -151,13 +143,13 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @return a dispatchable query plan
+   * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
-  public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
+  public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      _relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return toDispatchablePlan(_relRoot, plannerContext, requestId);
+      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId), null, relRoot.rel);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -175,17 +167,17 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @return the explained query plan.
+   * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
-  public String explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      _relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      return PlannerUtils.explainPlan(_relRoot.rel, format, level);
+      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), relRoot.rel);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -193,12 +185,39 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public QueryPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0);
+    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0).getQueryPlan();
   }
 
   @VisibleForTesting
   public String explainQuery(String sqlQuery) {
-    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery)).getExplainPlan();
+  }
+
+  /**
+   * Results of planning a query
+   */
+  public static class QueryPlannerResult {
+    private QueryPlan _queryPlan;
+    private String _explainPlan;
+    private RelNode _relRoot;
+
+    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, RelNode relRoot) {
+      _queryPlan = queryPlan;
+      _explainPlan = explainPlan;
+      _relRoot = relRoot;
+    }
+
+    public String getExplainPlan() {
+      return _explainPlan;
+    }
+
+    public QueryPlan getQueryPlan() {
+      return _queryPlan;
+    }
+
+    public RelNode getRelRoot() {
+      return _relRoot;
+    }
   }
 
   // --------------------------------------------------------------------------
