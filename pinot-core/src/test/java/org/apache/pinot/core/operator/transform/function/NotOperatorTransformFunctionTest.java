@@ -24,6 +24,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -88,5 +90,41 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
     assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(exprNumArg, _dataSourceMap);
     });
+  }
+
+  @Test
+  public void testNotNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("Not(null)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "not");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 1;
+    }
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testNotNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("Not(%s)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "not");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (i % 2 == 0) {
+        expectedValues[i] = _intSVValues[i] == 0 ? 1 : 0;
+      } else {
+        expectedValues[i] =  0;
+        roaringBitmap.add(i);
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

@@ -21,7 +21,9 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -82,6 +84,43 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
           ((double) _floatSVValues[i] * (double) _longSVValues[i]) * 0.34 * (double) _intSVValues[i])
           * _doubleSVValues[i]);
     }
+  }
+
+  @Test
+  public void testMultiplicationNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("mult(null, 0)"));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "mult");
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 0;
+    }
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testModuloNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("mult(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "mult");
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if(i % 2 == 0) {
+        expectedValues[i] = (double)_intSVValues[i] * (double)_intSVValues[i];
+      } else {
+        expectedValues[i] = (double) Integer.MIN_VALUE * (double) Integer.MIN_VALUE;
+        roaringBitmap.add(i);
+      }
+
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})

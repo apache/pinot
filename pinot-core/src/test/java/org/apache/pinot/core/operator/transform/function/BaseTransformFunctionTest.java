@@ -245,6 +245,31 @@ public abstract class BaseTransformFunctionTest {
     }
   }
 
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
+      RoaringBitmap expectedNull) {
+    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
+    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
+    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues =
+        transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
+    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(intValues.getLeft()[i], expectedValues[i]);
+      assertEquals(longValues.getLeft()[i], expectedValues[i]);
+      assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
+      assertEquals(doubleValues.getLeft()[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues.getLeft()[i].intValue(), expectedValues[i]);
+      assertEquals(stringValues.getLeft()[i], Integer.toString(expectedValues[i]));
+    }
+    assertEquals(intValues.getRight(), expectedNull);
+    assertEquals(longValues.getRight(), expectedNull);
+    assertEquals(floatValues.getRight(), expectedNull);
+    assertEquals(doubleValues.getRight(), expectedNull);
+    assertEquals(bigDecimalValues.getRight(), expectedNull);
+    assertEquals(stringValues.getRight(), expectedNull);
+  }
+
   protected void testTransformFunction(TransformFunction transformFunction, long[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);

@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -89,5 +91,41 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
       expectedValues[i] = Math.pow((double) _intSVValues[i], exponent);
     }
     testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testPowerNullLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("power(%s,null)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.POWER.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 1;
+    }
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testPowerNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("power(%s,%s)", INT_SV_NULL_COLUMN, 0));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
+    Assert.assertEquals(transformFunction.getName(),  TransformFunctionType.POWER.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (i % 2 == 0) {
+        expectedValues[i] =  1;
+      } else {
+        // null int is set to int min in field spec.
+        expectedValues[i] = 1;
+        roaringBitmap.add(i);
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

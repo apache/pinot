@@ -463,6 +463,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
+     * Returns {@code true} if the data type is unknown, {@code false} otherwise.
+     */
+    public boolean isUnknown(){
+      return _storedType == UNKNOWN;
+    }
+
+    /**
      * Converts the given string value to the data type. Returns byte[] for BYTES.
      */
     public Object convert(String value) {

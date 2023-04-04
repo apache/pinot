@@ -25,6 +25,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.cast;
@@ -254,5 +256,41 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
       expectedArraySums[i] = Arrays.stream(afterCast[i]).sum();
     }
     testTransformFunction(transformFunction, expectedArraySums);
+  }
+
+  @Test
+  public void testCastNullLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression("cast(null AS INT)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 0;
+    }
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testCastNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("cast(%s AS INT)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (i % 2 == 0) {
+        expectedValues[i] =  _intSVValues[i];
+      } else {
+        //
+        expectedValues[i] =  Integer.MIN_VALUE;
+        roaringBitmap.add(i);
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

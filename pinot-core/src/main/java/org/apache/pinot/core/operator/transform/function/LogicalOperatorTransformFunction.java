@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -35,6 +36,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     _arguments = arguments;
     int numArguments = arguments.size();
     if (numArguments <= 1) {
@@ -44,7 +46,8 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
     }
     for (int i = 0; i < numArguments; i++) {
       TransformResultMetadata argumentMetadata = arguments.get(i).getResultMetadata();
-      if (!(argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric())) {
+      FieldSpec.DataType storedType = argumentMetadata.getDataType().getStoredType();
+      if (!(argumentMetadata.isSingleValue() && storedType.isNumeric()) && !storedType.isUnknown()) {
         throw new IllegalArgumentException(
             "Unsupported argument of index: " + i + ", expecting single-valued boolean/number");
       }
