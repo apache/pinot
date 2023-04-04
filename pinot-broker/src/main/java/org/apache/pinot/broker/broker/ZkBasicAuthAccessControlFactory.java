@@ -108,7 +108,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
                 // no matching token? reject
                 return false;
             }
-            if (tables == null || tables.size() == 0) {
+            if (tables == null || tables.isEmpty()) {
                 return true;
             }
 

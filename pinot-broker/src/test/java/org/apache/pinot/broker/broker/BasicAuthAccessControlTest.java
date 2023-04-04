@@ -20,11 +20,8 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.broker.api.AccessControl;
@@ -117,11 +114,11 @@ public class BasicAuthAccessControlTest {
 
     Set<String> tableNames = new HashSet<>();
     tableNames.add("veryImportantStuff");
-    Assert.assertFalse(_accessControl.hasAccess(identity,tableNames));
+    Assert.assertFalse(_accessControl.hasAccess(identity, tableNames));
     tableNames.add("lessImportantStuff");
-    Assert.assertFalse(_accessControl.hasAccess(identity,tableNames));
+    Assert.assertFalse(_accessControl.hasAccess(identity, tableNames));
     tableNames.add("lesserImportantStuff");
-    Assert.assertFalse(_accessControl.hasAccess(identity,tableNames));
+    Assert.assertFalse(_accessControl.hasAccess(identity, tableNames));
   }
 
   @Test
@@ -145,7 +142,7 @@ public class BasicAuthAccessControlTest {
     tableNames.add("veryImportantStuff");
     tableNames.add("lesserImportantStuff");
 
-    Assert.assertTrue(_accessControl.hasAccess(identity,tableNames));
+    Assert.assertTrue(_accessControl.hasAccess(identity, tableNames));
   }
 
   @Test

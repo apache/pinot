@@ -109,7 +109,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         return false;
       }
 
-      if (tables == null || tables.size() == 0) {
+      if (tables == null || tables.isEmpty()) {
         return true;
       }
 
