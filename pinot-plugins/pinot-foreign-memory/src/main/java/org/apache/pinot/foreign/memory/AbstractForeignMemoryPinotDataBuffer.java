@@ -19,15 +19,11 @@
 package org.apache.pinot.foreign.memory;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
