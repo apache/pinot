@@ -25,7 +25,10 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
+<<<<<<< HEAD
 import org.glassfish.jersey.internal.guava.Preconditions;
+=======
+>>>>>>> 39f12684e1 (test)
 
 
 /**
@@ -48,9 +51,16 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
     for (int i = 0; i < numArguments; i++) {
       TransformResultMetadata argumentMetadata = arguments.get(i).getResultMetadata();
       FieldSpec.DataType storedType = argumentMetadata.getDataType().getStoredType();
+<<<<<<< HEAD
       Preconditions.checkState(
           argumentMetadata.isSingleValue() && storedType.isNumeric() || storedType.isUnknown(),
           "Unsupported argument type. Expecting single-valued boolean/number");
+=======
+      if (!(argumentMetadata.isSingleValue() && storedType.isNumeric()) && !storedType.isUnknown()) {
+        throw new IllegalArgumentException(
+            "Unsupported argument of index: " + i + ", expecting single-valued boolean/number");
+      }
+>>>>>>> 39f12684e1 (test)
     }
   }
 

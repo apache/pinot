@@ -55,7 +55,12 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
     TransformResultMetadata argumentMetadata = arguments.get(0).getResultMetadata();
     FieldSpec.DataType storedType = argumentMetadata.getDataType().getStoredType();
     Preconditions.checkState(
+<<<<<<< HEAD
         argumentMetadata.isSingleValue() && storedType.isNumeric() || storedType.isUnknown(),
+=======
+        argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric() ||
+        argumentMetadata.getDataType().getStoredType().isUnknown(),
+>>>>>>> 39f12684e1 (test)
         "Unsupported argument type. Expecting single-valued boolean/number");
     _argument = arguments.get(0);
   }
