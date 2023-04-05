@@ -41,6 +41,7 @@ public class OperatorStats {
   private int _numBlock = 0;
   private int _numRows = 0;
   private long _startTimeMs = -1;
+  private long _endTimeMs = -1;
   private final Map<String, String> _executionStats;
   private boolean _processingStarted = false;
 
@@ -66,9 +67,11 @@ public class OperatorStats {
   public void endTimer(TransferableBlock block) {
     if (_executeStopwatch.isRunning()) {
       _executeStopwatch.stop();
+      _endTimeMs = System.currentTimeMillis();
     }
     if (!_processingStarted && block.isNoOpBlock()) {
       _startTimeMs = -1;
+      _endTimeMs = -1;
       _executeStopwatch.reset();
     } else {
       _processingStarted = true;
@@ -99,7 +102,7 @@ public class OperatorStats {
       _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName(),
           String.valueOf(_startTimeMs));
       _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName(),
-          String.valueOf(System.currentTimeMillis()));
+          String.valueOf(_endTimeMs));
     }
     return _executionStats;
   }
