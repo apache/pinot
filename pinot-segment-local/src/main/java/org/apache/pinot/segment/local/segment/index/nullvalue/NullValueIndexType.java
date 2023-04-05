@@ -66,8 +66,8 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
-  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("null", getIndexConfigClass())
+  public ColumnConfigDeserializer<IndexConfig> createDeserializer(@Nullable String tier) {
+    return IndexConfigDeserializer.fromIndexes("null", tier, getIndexConfigClass())
         .withFallbackAlternative(
             IndexConfigDeserializer.ifIndexingConfig(
                 IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->

@@ -101,6 +101,7 @@ public class TableConfigBuilder {
   private boolean _nullHandlingEnabled;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
+  private Map<String, List<StarTreeIndexConfig>> _starTreeIndexConfigsTierOverwrites;
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
   private boolean _optimizeDictionaryForMetrics;
@@ -306,6 +307,12 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setStarTreeIndexConfigsTierOverwrites(
+      Map<String, List<StarTreeIndexConfig>> starTreeIndexConfigsTierOverwrites) {
+    _starTreeIndexConfigsTierOverwrites = starTreeIndexConfigsTierOverwrites;
+    return this;
+  }
+
   public TableConfigBuilder setJsonIndexColumns(List<String> jsonIndexColumns) {
     _jsonIndexColumns = jsonIndexColumns;
     return this;
@@ -456,6 +463,7 @@ public class TableConfigBuilder {
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
+    indexingConfig.setStarTreeIndexConfigsTierOverwrites(_starTreeIndexConfigsTierOverwrites);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);

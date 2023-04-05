@@ -79,11 +79,11 @@ public class InvertedIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
+  public ColumnConfigDeserializer<IndexConfig> createDeserializer(@Nullable String tier) {
     ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
         tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
         (acum, column) -> acum.put(column, IndexConfig.ENABLED));
-    return IndexConfigDeserializer.fromIndexes("inverted", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("inverted", tier, getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.ifIndexingConfig(fromInvertedCols));
   }
 

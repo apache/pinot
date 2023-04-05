@@ -23,6 +23,33 @@
           "MONTH"
         ]
       }
+    },
+    {
+      "name": "ArrTimeBlk",
+      "encodingType": "DICTIONARY",
+      "indexes": {
+        "inverted": {
+          "enabled": "true"
+        }
+      },
+      "tierOverwrites": {
+        "hotTier": {
+          "encodingType": "DICTIONARY",
+          "indexes": {
+            "bloom": {
+              "enabled": "true"
+            }
+          }
+        },
+        "coldTier": {
+          "encodingType": "RAW",
+          "indexes": {
+            "text": {
+              "enabled": "true"
+            }
+          }
+        }
+      }
     }
   ],
   "tableIndexConfig": {
@@ -39,22 +66,27 @@
           "MAX__ArrDelay"
         ],
         "maxLeafRecords": 10
-      },
-      {
-        "dimensionsSplitOrder": [
-          "Carrier",
-          "CancellationCode",
-          "Origin",
-          "Dest"
-        ],
-        "skipStarNodeCreationForDimensions": [],
-        "functionColumnPairs": [
-          "MAX__CarrierDelay",
-          "AVG__CarrierDelay"
-        ],
-        "maxLeafRecords": 10
       }
     ],
+    "starTreeIndexConfigsTierOverwrites": {
+      "hotTier": [
+        {
+          "dimensionsSplitOrder": [
+            "Carrier",
+            "CancellationCode",
+            "Origin",
+            "Dest"
+          ],
+          "skipStarNodeCreationForDimensions": [],
+          "functionColumnPairs": [
+            "MAX__CarrierDelay",
+            "AVG__CarrierDelay"
+          ],
+          "maxLeafRecords": 10
+        }
+      ],
+      "coldTier": []
+    },
     "enableDynamicStarTreeCreation": true,
     "loadMode": "MMAP"
   },

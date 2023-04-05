@@ -93,6 +93,7 @@ public class IndexLoadingConfig {
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
+  private Map<String, List<StarTreeIndexConfig>> _starTreeIndexConfigsTierOverwrites;
   private Map<String, ChunkCompressionType> _compressionConfigs = new HashMap<>();
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
 
@@ -234,6 +235,7 @@ public class IndexLoadingConfig {
 
     _enableDynamicStarTreeCreation = indexingConfig.isEnableDynamicStarTreeCreation();
     _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+    _starTreeIndexConfigsTierOverwrites = indexingConfig.getStarTreeIndexConfigsTierOverwrites();
     _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
 
     String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
@@ -282,23 +284,25 @@ public class IndexLoadingConfig {
 
   private <C extends IndexConfig> ColumnConfigDeserializer<C> getDeserializer(IndexType<C, ?, ?> indexType) {
     ColumnConfigDeserializer<C> deserializer;
-
-    ColumnConfigDeserializer<C> stdDeserializer = indexType::getConfig;
+    ColumnConfigDeserializer<C> stdDeserializer =
+        (tableConfig, schema) -> indexType.getConfig(tableConfig, schema, _segmentTier);
     if (indexType instanceof ConfigurableFromIndexLoadingConfig) {
       @SuppressWarnings("unchecked")
       Map<String, C> fromIndexLoadingConfig =
           ((ConfigurableFromIndexLoadingConfig<C>) indexType).fromIndexLoadingConfig(this);
 
       if (_schema == null || _tableConfig == null) {
-        LOGGER.warn("Ignoring default deserializers given that there is no schema or table config.");
+        LOGGER.debug(
+            "Ignoring default deserializers given that there is no schema or table config. Using indexLoadingConfig");
         deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig);
       } else {
-        deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig)
-            .withFallbackAlternative(stdDeserializer);
+        deserializer = stdDeserializer
+            .withFallbackAlternative(IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig));
       }
     } else {
       if (_schema == null || _tableConfig == null) {
-        LOGGER.warn("Ignoring default deserializers given that there is no schema or table config.");
+        LOGGER.debug(
+            "Ignoring default deserializers given that there is no schema or table config. Using default configs");
         deserializer = (tableConfig, schema) -> getAllKnownColumns().stream()
             .collect(Collectors.toMap(Function.identity(), col -> indexType.getDefaultConfig()));
       } else {
@@ -759,7 +763,10 @@ public class IndexLoadingConfig {
 
   @Nullable
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
-    return unmodifiable(_starTreeIndexConfigs);
+    if (_segmentTier == null || _starTreeIndexConfigsTierOverwrites == null) {
+      return unmodifiable(_starTreeIndexConfigs);
+    }
+    return _starTreeIndexConfigsTierOverwrites.getOrDefault(_segmentTier, _starTreeIndexConfigs);
   }
 
   public boolean isEnableDefaultStarTree() {

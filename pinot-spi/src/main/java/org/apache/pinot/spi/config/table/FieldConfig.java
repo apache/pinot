@@ -22,12 +22,15 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class FieldConfig extends BaseJsonConfig {
@@ -60,6 +63,7 @@ public class FieldConfig extends BaseJsonConfig {
   private final EncodingType _encodingType;
   private final List<IndexType> _indexTypes;
   private final JsonNode _indexes;
+  private final JsonNode _tierOverwrites;
   private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
   private final TimestampConfig _timestampConfig;
@@ -67,19 +71,19 @@ public class FieldConfig extends BaseJsonConfig {
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, IndexType indexType, CompressionCodec compressionCodec,
       Map<String, String> properties) {
-    this(name, encodingType, indexType, null, compressionCodec, null, null, properties);
+    this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
   }
 
   public FieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
       CompressionCodec compressionCodec, Map<String, String> properties) {
-    this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties);
+    this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
   }
 
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
       @Nullable TimestampConfig timestampConfig, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, indexTypes, compressionCodec, timestampConfig, null, properties);
+    this(name, encodingType, indexType, indexTypes, compressionCodec, timestampConfig, null, properties, null);
   }
 
   @JsonCreator
@@ -90,7 +94,8 @@ public class FieldConfig extends BaseJsonConfig {
       @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty(value = "timestampConfig") @Nullable TimestampConfig timestampConfig,
       @JsonProperty(value = "indexes") @Nullable JsonNode indexes,
-      @JsonProperty(value = "properties") @Nullable Map<String, String> properties) {
+      @JsonProperty(value = "properties") @Nullable Map<String, String> properties,
+      @JsonProperty(value = "tierOverwrites") @Nullable JsonNode tierOverwrites) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
     _encodingType = encodingType;
@@ -100,6 +105,7 @@ public class FieldConfig extends BaseJsonConfig {
     _timestampConfig = timestampConfig;
     _properties = properties;
     _indexes = indexes == null ? NullNode.getInstance() : indexes;
+    _tierOverwrites = tierOverwrites == null ? NullNode.getInstance() : tierOverwrites;
   }
 
   // If null, we will create dictionary encoded forward index by default
@@ -136,6 +142,27 @@ public class FieldConfig extends BaseJsonConfig {
 
   public JsonNode getIndexes() {
     return _indexes;
+  }
+
+  public JsonNode getTierOverwrites() {
+    return _tierOverwrites;
+  }
+
+  /**
+   * @return the primary field config is no tier overwrites are found.
+   */
+  public FieldConfig withTierOverwrites(String tier) {
+    if (tier == null || !_tierOverwrites.has(tier)) {
+      return this;
+    }
+    try {
+      JsonNode tierCfgJsonNode = _tierOverwrites.get(tier);
+      // Add column name, which may be absent in JsonNode but required to deserialize JsonNode to FieldConfig.
+      ((ObjectNode) tierCfgJsonNode).put("name", _name);
+      return JsonUtils.jsonNodeToObject(tierCfgJsonNode, FieldConfig.class);
+    } catch (IOException e) {
+      return this;
+    }
   }
 
   @Nullable
