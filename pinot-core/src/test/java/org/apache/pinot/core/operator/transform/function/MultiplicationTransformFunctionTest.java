@@ -92,9 +92,6 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "mult");
     double[] expectedValues = new double[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -113,7 +110,6 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
       if (i % 2 == 0) {
         expectedValues[i] = (double) _intSVValues[i] * (double) _intSVValues[i];
       } else {
-        expectedValues[i] = (double) Integer.MIN_VALUE * (double) Integer.MIN_VALUE;
         roaringBitmap.add(i);
       }
     }

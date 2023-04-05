@@ -99,8 +99,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.abs(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.abs(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -167,8 +165,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.ceil(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.ceil(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -236,8 +232,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.exp(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.exp(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -306,8 +300,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.floor(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.floor(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -375,8 +367,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.log(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.log(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -444,8 +434,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.sqrt(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.sqrt(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -481,8 +469,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.sqrt(_intSVValues[i]) + Math.ceil(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.sqrt(expectedValues[i]) + Math.ceil(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -540,8 +526,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.log10(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.log10(expectedValues[i]);
         bitmap.add(i);
       }
     }
@@ -599,8 +583,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.log(_intSVValues[i]) / Math.log(2);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.log(expectedValues[i]) / Math.log(2);
         bitmap.add(i);
       }
     }
@@ -657,8 +639,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = Math.signum(_intSVValues[i]);
       } else {
-        expectedValues[i] = Integer.MIN_VALUE;
-        expectedValues[i] = Math.signum(expectedValues[i]);
         bitmap.add(i);
       }
     }

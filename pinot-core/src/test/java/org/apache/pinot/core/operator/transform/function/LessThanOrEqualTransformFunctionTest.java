@@ -44,9 +44,6 @@ public class LessThanOrEqualTransformFunctionTest extends BinaryOperatorTransfor
     Assert.assertTrue(transformFunction instanceof LessThanOrEqualTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "less_than_or_equal");
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -65,7 +62,6 @@ public class LessThanOrEqualTransformFunctionTest extends BinaryOperatorTransfor
       if (i % 2 == 0) {
         expectedValues[i] = 1;
       } else {
-        expectedValues[i] = 1;
         roaringBitmap.add(i);
       }
     }

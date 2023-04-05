@@ -45,9 +45,6 @@ public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFu
     Assert.assertTrue(transformFunction instanceof AndOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.AND.getName());
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -66,8 +63,6 @@ public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFu
       if (i % 2 == 0) {
         expectedValues[i] = (_intSVValues[i] == 0) ? 0 : 1;
       } else {
-        // null int is set to int min in field spec.
-        expectedValues[i] = 1;
         roaringBitmap.add(i);
       }
     }

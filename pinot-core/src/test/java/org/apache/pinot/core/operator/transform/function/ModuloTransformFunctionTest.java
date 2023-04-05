@@ -114,9 +114,6 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "mod");
     double[] expectedValues = new double[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -135,7 +132,6 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
       if (i % 2 == 0) {
         expectedValues[i] = (double) _intSVValues[i] % (double) _longSVValues[i];
       } else {
-        expectedValues[i] = (double) Integer.MIN_VALUE % (double) _longSVValues[i];
         roaringBitmap.add(i);
       }
     }

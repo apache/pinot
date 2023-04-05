@@ -44,9 +44,6 @@ public class EqualsTransformFunctionTest extends BinaryOperatorTransformFunction
     Assert.assertTrue(transformFunction instanceof EqualsTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "equals");
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -65,7 +62,6 @@ public class EqualsTransformFunctionTest extends BinaryOperatorTransformFunction
       if (i % 2 == 0) {
         expectedValues[i] = 1;
       } else {
-        expectedValues[i] = 0;
         roaringBitmap.add(i);
       }
     }

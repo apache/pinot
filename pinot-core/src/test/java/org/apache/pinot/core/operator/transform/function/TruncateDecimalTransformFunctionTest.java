@@ -75,9 +75,6 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.TRUNCATE.getName());
     double[] expectedValues = new double[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -96,8 +93,6 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
       if (i % 2 == 0) {
         expectedValues[i] = _intSVValues[i];
       } else {
-        // null int is set to int min in field spec.
-        expectedValues[i] = Integer.MIN_VALUE;
         roaringBitmap.add(i);
       }
     }

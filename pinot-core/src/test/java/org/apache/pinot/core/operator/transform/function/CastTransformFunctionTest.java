@@ -264,9 +264,6 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -285,8 +282,6 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
       if (i % 2 == 0) {
         expectedValues[i] = _intSVValues[i];
       } else {
-        //
-        expectedValues[i] = Integer.MIN_VALUE;
         roaringBitmap.add(i);
       }
     }

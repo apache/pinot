@@ -45,9 +45,6 @@ public class GreaterThanOrEqualTransformFunctionTest extends BinaryOperatorTrans
     Assert.assertTrue(transformFunction instanceof GreaterThanOrEqualTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "greater_than_or_equal");
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -66,7 +63,6 @@ public class GreaterThanOrEqualTransformFunctionTest extends BinaryOperatorTrans
       if (i % 2 == 0) {
         expectedValues[i] = 1;
       } else {
-        expectedValues[i] = 0;
         roaringBitmap.add(i);
       }
     }

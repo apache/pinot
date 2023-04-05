@@ -49,8 +49,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
       TransformResultMetadata argumentMetadata = arguments.get(i).getResultMetadata();
       FieldSpec.DataType storedType = argumentMetadata.getDataType().getStoredType();
       Preconditions.checkState(
-          argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric()
-              || argumentMetadata.getDataType().getStoredType().isUnknown(),
+          argumentMetadata.isSingleValue() && storedType.isNumeric() || storedType.isUnknown(),
           "Unsupported argument type. Expecting single-valued boolean/number");
     }
   }
