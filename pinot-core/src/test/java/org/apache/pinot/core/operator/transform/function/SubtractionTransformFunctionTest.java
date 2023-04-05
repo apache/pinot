@@ -126,12 +126,9 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.SUB.getName());
     double[] expectedValues = new double[NUM_ROWS];
-<<<<<<< HEAD
-=======
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = -1;
     }
->>>>>>> 39f12684e1 (test)
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -150,11 +147,6 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
       if (i % 2 == 0) {
         expectedValues[i] = _intSVValues[i];
       } else {
-<<<<<<< HEAD
-=======
-        // null int is set to int min in field spec.
-        expectedValues[i] = Integer.MIN_VALUE;
->>>>>>> 39f12684e1 (test)
         roaringBitmap.add(i);
       }
     }

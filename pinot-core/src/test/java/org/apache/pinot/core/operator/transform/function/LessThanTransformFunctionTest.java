@@ -45,9 +45,6 @@ public class LessThanTransformFunctionTest extends BinaryOperatorTransformFuncti
     Assert.assertTrue(transformFunction instanceof LessThanTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "less_than");
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

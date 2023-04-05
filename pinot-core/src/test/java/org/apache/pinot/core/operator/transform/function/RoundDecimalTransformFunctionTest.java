@@ -75,9 +75,6 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
     double[] expectedValues = new double[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

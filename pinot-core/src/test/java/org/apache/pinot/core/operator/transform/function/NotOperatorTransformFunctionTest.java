@@ -100,9 +100,6 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
     Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not");
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 1;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
