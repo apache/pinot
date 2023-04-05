@@ -39,6 +39,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -163,7 +164,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           String plan = queryPlanResult.getExplainPlan();
           RelNode explainRelRoot = queryPlanResult.getRelRoot();
 
-          if (!hasTableAccess(requesterIdentity, explainRelRoot)) {
+          if (!hasTableAccess(requesterIdentity, getTableNamesFromRelRoot(explainRelRoot))) {
             _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
             LOGGER.info("Access denied for requestId {}", requestId);
             requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
@@ -175,15 +176,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         default:
           queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions,
               requestId);
-          RelNode queryRelRoot = queryPlanResult.getRelRoot();
-
-          if (!hasTableAccess(requesterIdentity, queryRelRoot)) {
-            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-            LOGGER.info("Access denied for requestId {}", requestId);
-            requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-            return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
-          }
-
           break;
       }
     } catch (Exception e) {
@@ -194,6 +186,34 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     QueryPlan queryPlan = queryPlanResult.getQueryPlan();
+    Set<String> tableNames = getTableNamesFromRelRoot(queryPlanResult.getRelRoot());
+
+    // Compilation Time. This includes the time taken for parsing, compiling, create stage plans and assigning workers.
+    long compilationEndTimeNs = System.nanoTime();
+    long compilationTime = (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs();
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTime);
+
+    // Validate table access.
+    if (!hasTableAccess(requesterIdentity, tableNames)) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.info("Access denied for requestId {}", requestId);
+      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+    }
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
+
+    // Validate QPS quota
+    for (String tableName : tableNames) {
+      if (!_queryQuotaManager.acquire(tableName)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
+        LOGGER.info(errorMessage);
+        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
+        return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      }
+    }
 
     boolean traceEnabled = Boolean.parseBoolean(
         request.has(CommonConstants.Broker.Request.TRACE) ? request.get(CommonConstants.Broker.Request.TRACE).asText()
@@ -205,6 +225,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
     }
 
+    long executionStartTime = System.nanoTime();
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
           sqlNodeAndOptions.getOptions(), stageIdStatsMap);
@@ -215,6 +236,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     long executionEndTimeNs = System.nanoTime();
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTime);
 
     // Set total query processing time
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
@@ -230,11 +252,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
 
       BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
-      List<String> tableNames = queryPlan.getStageMetadataMap().get(entry.getKey()).getScannedTables();
-      if (tableNames.size() > 0) {
+      if (!tableNames.isEmpty()) {
         //TODO: Only using first table to assign broker metrics
         // find a way to split metrics in case of multiple table
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNames.get(0));
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
         entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
       } else {
         entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
@@ -247,10 +268,22 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return brokerResponse;
   }
 
-  private boolean hasTableAccess(RequesterIdentity requesterIdentity, RelNode relRoot) {
-    Set<String> tableNames = new HashSet<>(RelOptUtil.findAllTableQualifiedNames(relRoot));
+  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames) {
     return _accessControlFactory.create().hasAccess(requesterIdentity, tableNames);
   }
+
+  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
+    return new HashSet<>(RelOptUtil.findAllTableQualifiedNames(relRoot));
+  }
+
+  private void updatePhaseTimingForTables(Set<String> tableNames,
+      BrokerQueryPhase phase, long time) {
+    for (String tableName : tableNames) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
+    }
+  }
+
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
