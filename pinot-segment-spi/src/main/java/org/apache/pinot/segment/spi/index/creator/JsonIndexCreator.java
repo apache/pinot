@@ -18,15 +18,27 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import java.io.Closeable;
 import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
 /**
  * Index creator for json index.
  */
-public interface JsonIndexCreator extends Closeable {
+public interface JsonIndexCreator extends IndexCreator {
   char KEY_VALUE_SEPARATOR = '\0';
+
+  @Override
+  default void add(@Nonnull Object value, int dictId)
+      throws IOException {
+    add((String) value);
+  }
+
+  @Override
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  }
 
   /**
    * Adds the next json value.

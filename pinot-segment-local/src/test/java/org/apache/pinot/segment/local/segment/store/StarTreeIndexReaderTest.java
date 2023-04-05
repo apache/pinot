@@ -30,12 +30,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
@@ -126,44 +126,44 @@ public class StarTreeIndexReaderTest {
 
     try (StarTreeIndexReader reader = new StarTreeIndexReader(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       // Check the bytes of the 1st ST index
-      assertTrue(reader.hasIndexFor(0, "0", ColumnIndexType.INVERTED_INDEX));
-      PinotDataBuffer buf = reader.getBuffer(0, "0", ColumnIndexType.INVERTED_INDEX);
+      assertTrue(reader.hasIndexFor(0, "0", StandardIndexes.inverted()));
+      PinotDataBuffer buf = reader.getBuffer(0, "0", StandardIndexes.inverted());
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 0);
 
-      assertTrue(reader.hasIndexFor(0, "dim0", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer(0, "dim0", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(0, "dim0", StandardIndexes.forward()));
+      buf = reader.getBuffer(0, "dim0", StandardIndexes.forward());
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 1);
 
-      assertTrue(reader.hasIndexFor(0, "dim1", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer(0, "dim1", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(0, "dim1", StandardIndexes.forward()));
+      buf = reader.getBuffer(0, "dim1", StandardIndexes.forward());
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 2);
 
-      assertTrue(reader.hasIndexFor(0, "count__*", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer(0, "count__*", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(0, "count__*", StandardIndexes.forward()));
+      buf = reader.getBuffer(0, "count__*", StandardIndexes.forward());
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 3);
 
       // Check the bytes of the 2nd ST index
-      assertTrue(reader.hasIndexFor(1, "1", ColumnIndexType.INVERTED_INDEX));
-      buf = reader.getBuffer(1, "1", ColumnIndexType.INVERTED_INDEX);
+      assertTrue(reader.hasIndexFor(1, "1", StandardIndexes.inverted()));
+      buf = reader.getBuffer(1, "1", StandardIndexes.inverted());
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 12);
 
-      assertTrue(reader.hasIndexFor(1, "dimX", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer(1, "dimX", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(1, "dimX", StandardIndexes.forward()));
+      buf = reader.getBuffer(1, "dimX", StandardIndexes.forward());
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 15);
 
-      assertTrue(reader.hasIndexFor(1, "dimY", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer(1, "dimY", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(1, "dimY", StandardIndexes.forward()));
+      buf = reader.getBuffer(1, "dimY", StandardIndexes.forward());
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 18);
 
-      assertTrue(reader.hasIndexFor(1, "sum__dimX", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer(1, "sum__dimX", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(1, "sum__dimX", StandardIndexes.forward()));
+      buf = reader.getBuffer(1, "sum__dimX", StandardIndexes.forward());
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 21);
     }

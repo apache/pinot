@@ -29,12 +29,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,14 +107,14 @@ public class StarTreeIndexReader implements Closeable {
         _indexColumnEntries.computeIfAbsent(starTreeId, k -> new HashMap<>());
     // Load star-tree index. The index tree doesn't have corresponding column name or column index type to create an
     // IndexKey. As it's a kind of inverted index, we uniquely identify it with index id and inverted index type.
-    columnEntries.computeIfAbsent(new IndexKey(String.valueOf(starTreeId), ColumnIndexType.INVERTED_INDEX),
+    columnEntries.computeIfAbsent(new IndexKey(String.valueOf(starTreeId), StandardIndexes.inverted()),
         k -> new StarTreeIndexEntry(indexMap.get(StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY), _dataBuffer,
             ByteOrder.LITTLE_ENDIAN));
     List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
     StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(starTreeId);
     // Load dimension forward indexes
     for (String dimension : starTreeMetadata.getDimensionsSplitOrder()) {
-      IndexKey indexKey = new IndexKey(dimension, ColumnIndexType.FORWARD_INDEX);
+      IndexKey indexKey = new IndexKey(dimension, StandardIndexes.forward());
       columnEntries.computeIfAbsent(indexKey, k -> new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, dimension)),
           _dataBuffer, ByteOrder.BIG_ENDIAN));
@@ -121,14 +122,14 @@ public class StarTreeIndexReader implements Closeable {
     // Load metric (function-column pair) forward indexes
     for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
       String metric = functionColumnPair.toColumnName();
-      IndexKey indexKey = new IndexKey(metric, ColumnIndexType.FORWARD_INDEX);
+      IndexKey indexKey = new IndexKey(metric, StandardIndexes.forward());
       columnEntries.computeIfAbsent(indexKey, k -> new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, metric)),
           _dataBuffer, ByteOrder.BIG_ENDIAN));
     }
   }
 
-  public PinotDataBuffer getBuffer(int starTreeId, String column, ColumnIndexType type)
+  public PinotDataBuffer getBuffer(int starTreeId, String column, IndexType<?, ?, ?> type)
       throws IOException {
     Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(starTreeId);
     if (columnEntries == null) {
@@ -144,7 +145,7 @@ public class StarTreeIndexReader implements Closeable {
             type, starTreeId, _segmentDirectory.toString()));
   }
 
-  public boolean hasIndexFor(int starTreeId, String column, ColumnIndexType type) {
+  public boolean hasIndexFor(int starTreeId, String column, IndexType<?, ?, ?> type) {
     Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(starTreeId);
     if (columnEntries == null) {
       return false;

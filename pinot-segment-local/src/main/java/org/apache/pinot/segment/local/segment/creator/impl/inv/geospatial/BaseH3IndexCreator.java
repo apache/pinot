@@ -30,6 +30,7 @@ import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
@@ -99,6 +100,11 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     _bitmapValueStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_bitmapValueFile)));
     _resolution = resolution;
     _lowestResolution = resolution.getLowestResolution();
+  }
+
+  @Override
+  public Geometry deserialize(byte[] bytes) {
+    return GeometrySerializer.deserialize(bytes);
   }
 
   @Override

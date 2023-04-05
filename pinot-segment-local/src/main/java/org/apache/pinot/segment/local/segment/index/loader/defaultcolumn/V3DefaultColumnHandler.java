@@ -23,8 +23,8 @@ import java.io.File;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -79,17 +79,17 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       }
     }
     if (forwardIndexFile != null) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, StandardIndexes.forward());
     }
     if (invertedIndexFile != null) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, ColumnIndexType.INVERTED_INDEX);
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, StandardIndexes.inverted());
     }
     File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
-    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
 
     File nullValueVectorFile = new File(_indexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
     if (nullValueVectorFile.exists()) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, nullValueVectorFile, ColumnIndexType.NULLVALUE_VECTOR);
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, nullValueVectorFile, StandardIndexes.nullValueVector());
     }
     return true;
   }

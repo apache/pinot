@@ -68,20 +68,24 @@ public class SegmentConversionUtils {
   /**
    * Gets segment names for the given table
    * @param tableNameWithType a table name with type
+   * @param startTimestamp start timestamp in ms (inclusive)
+   * @param endTimestamp end timestamp in ms (exclusive)
+   * @param excludeOverlapping whether to exclude the segments overlapping with the timestamps, false by default
    * @param controllerBaseURI the controller base URI
    * @param authProvider a {@link AuthProvider}
    * @return a set of segment names
    * @throws Exception when there are exceptions getting segment names for the given table
    */
-  public static Set<String> getSegmentNamesForTable(String tableNameWithType, URI controllerBaseURI,
-      @Nullable AuthProvider authProvider)
+  public static Set<String> getSegmentNamesForTable(String tableNameWithType, long startTimestamp, long endTimestamp,
+      boolean excludeOverlapping, URI controllerBaseURI, @Nullable AuthProvider authProvider)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       Map<String, List<String>> tableTypeToSegmentNames =
-          fileUploadDownloadClient.getSegments(controllerBaseURI, rawTableName, tableType, true, authProvider);
+          fileUploadDownloadClient.getSegments(controllerBaseURI, rawTableName, tableType, true, startTimestamp,
+              endTimestamp, excludeOverlapping, authProvider);
       if (tableTypeToSegmentNames != null && !tableTypeToSegmentNames.isEmpty()) {
         List<String> allSegmentNameList = tableTypeToSegmentNames.get(tableType.toString());
         if (!CollectionUtils.isEmpty(allSegmentNameList)) {
@@ -90,6 +94,21 @@ public class SegmentConversionUtils {
       }
       return Collections.emptySet();
     }
+  }
+
+  /**
+   * Gets segment names for the given table
+   * @param tableNameWithType a table name with type
+   * @param controllerBaseURI the controller base URI
+   * @param authProvider a {@link AuthProvider}
+   * @return a set of segment names
+   * @throws Exception when there are exceptions getting segment names for the given table
+   */
+  public static Set<String> getSegmentNamesForTable(String tableNameWithType, URI controllerBaseURI,
+      @Nullable AuthProvider authProvider)
+      throws Exception {
+    return getSegmentNamesForTable(tableNameWithType, Long.MIN_VALUE, Long.MAX_VALUE, false, controllerBaseURI,
+        authProvider);
   }
 
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,

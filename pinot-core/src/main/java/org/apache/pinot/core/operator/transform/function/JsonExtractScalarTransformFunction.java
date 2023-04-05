@@ -127,10 +127,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToIntValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _intValuesSV);
@@ -170,10 +167,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[numDocs];
-    }
+    initLongValuesSV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToLongValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _longValuesSV);
@@ -213,10 +207,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[numDocs];
-    }
+    initFloatValuesSV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToFloatValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _floatValuesSV);
@@ -255,10 +246,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[numDocs];
-    }
+    initDoubleValuesSV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToDoubleValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _doubleValuesSV);
@@ -297,10 +285,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[numDocs];
-    }
+    initBigDecimalValuesSV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToBigDecimalValuesSV(
           (ProjectionBlock) valueBlock, _jsonPathEvaluator, _bigDecimalValuesSV);
@@ -339,10 +324,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[numDocs];
-    }
+    initStringValuesSV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToStringValuesSV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _stringValuesSV);
@@ -381,10 +363,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[numDocs][];
-    }
+    initIntValuesMV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToIntValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _intValuesMV);
@@ -420,10 +399,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_longValuesMV == null) {
-      _longValuesMV = new long[numDocs][];
-    }
+    initLongValuesMV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToLongValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _longValuesMV);
@@ -459,10 +435,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_floatValuesMV == null) {
-      _floatValuesMV = new float[numDocs][];
-    }
+    initFloatValuesMV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToFloatValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _floatValuesMV);
@@ -498,10 +471,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[numDocs][];
-    }
+    initDoubleValuesMV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToDoubleValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _doubleValuesMV);
@@ -537,10 +507,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    if (_stringValuesMV == null || _stringValuesMV.length < numDocs) {
-      _stringValuesMV = new String[numDocs][];
-    }
+    initStringValuesMV(valueBlock.getNumDocs());
     if (_jsonFieldTransformFunction instanceof PushDownTransformFunction && valueBlock instanceof ProjectionBlock) {
       ((PushDownTransformFunction) _jsonFieldTransformFunction).transformToStringValuesMV((ProjectionBlock) valueBlock,
           _jsonPathEvaluator, _stringValuesMV);

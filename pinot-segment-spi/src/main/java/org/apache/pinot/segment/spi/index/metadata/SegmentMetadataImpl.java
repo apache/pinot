@@ -49,9 +49,10 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
@@ -244,8 +245,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           try {
             String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
             if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
-              ColumnIndexType columnIndexType = ColumnIndexType.getValue(parsedKeys[1]);
-              _columnMetadataMap.get(parsedKeys[0]).getIndexSizeMap().put(columnIndexType, mapConfig.getLong(key));
+              IndexType<?, ?, ?> indexType = IndexService.getInstance().get(parsedKeys[1]);
+              _columnMetadataMap.get(parsedKeys[0]).getIndexSizeMap().put(indexType, mapConfig.getLong(key));
             }
           } catch (Exception e) {
             LOGGER.debug("Unable to load index metadata in {} for {}!", indexMapFile, key, e);

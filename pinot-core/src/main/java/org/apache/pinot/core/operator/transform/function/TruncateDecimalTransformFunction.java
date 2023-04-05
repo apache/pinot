@@ -83,20 +83,17 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(_scale, RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.DOWN).doubleValue();
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] =
+            BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
       }
     } else {
       for (int i = 0; i < length; i++) {

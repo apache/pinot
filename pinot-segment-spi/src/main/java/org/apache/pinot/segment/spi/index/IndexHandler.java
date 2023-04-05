@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.index;
 
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 
 
@@ -30,7 +29,7 @@ public interface IndexHandler {
   /**
    * Adds new indices and removes obsolete indices.
    */
-  void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
+  void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception;
 
   /**
@@ -46,4 +45,24 @@ public interface IndexHandler {
    */
   void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
     throws Exception;
+
+  public static class NoOp implements IndexHandler {
+    public static final NoOp INSTANCE = new NoOp();
+
+    private NoOp() {
+    }
+
+    @Override
+    public void updateIndices(SegmentDirectory.Writer segmentWriter) {
+    }
+
+    @Override
+    public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+      return false;
+    }
+
+    @Override
+    public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter) {
+    }
+  }
 }

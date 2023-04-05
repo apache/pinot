@@ -59,9 +59,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(numDocs);
     System.arraycopy(_arguments.get(0).transformToIntValuesSV(valueBlock), 0, _intValuesSV, 0, numDocs);
     int numArguments = _arguments.size();
     for (int i = 1; i < numArguments; i++) {

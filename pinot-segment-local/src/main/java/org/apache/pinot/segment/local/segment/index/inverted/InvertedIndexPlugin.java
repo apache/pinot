@@ -25,8 +25,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 @AutoService(IndexPlugin.class)
 public class InvertedIndexPlugin implements IndexPlugin<InvertedIndexType> {
+  private static final InvertedIndexType INSTANCE = new InvertedIndexType();
+
   @Override
   public InvertedIndexType getIndexType() {
-    return InvertedIndexType.INSTANCE;
+    return INSTANCE;
   }
 }

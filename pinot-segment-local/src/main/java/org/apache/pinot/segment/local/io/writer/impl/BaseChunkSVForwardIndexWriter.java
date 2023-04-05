@@ -28,6 +28,7 @@ import java.nio.channels.FileChannel;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
   // TODO: Remove this before release 0.5.0
-  public static final int DEFAULT_VERSION = 2;
+  public static final int DEFAULT_VERSION = ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION;
   public static final int CURRENT_VERSION = 3;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexWriter.class);

@@ -23,6 +23,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.operator.OpChainStats;
 
 
 /**
@@ -38,6 +40,8 @@ public class OpChainExecutionContext {
   private final long _timeoutMs;
   private final long _deadlineMs;
   private final Map<Integer, StageMetadata> _metadataMap;
+  private final OpChainId _id;
+  private final OpChainStats _stats;
 
   public OpChainExecutionContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long timeoutMs, long deadlineMs, Map<Integer, StageMetadata> metadataMap) {
@@ -48,6 +52,8 @@ public class OpChainExecutionContext {
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
     _metadataMap = metadataMap;
+    _id = new OpChainId(requestId, server.virtualId(), stageId);
+    _stats = new OpChainStats(_id.toString());
   }
 
   public OpChainExecutionContext(PlanRequestContext planRequestContext) {
@@ -82,5 +88,13 @@ public class OpChainExecutionContext {
 
   public Map<Integer, StageMetadata> getMetadataMap() {
     return _metadataMap;
+  }
+
+  public OpChainId getId() {
+    return _id;
+  }
+
+  public OpChainStats getStats() {
+    return _stats;
   }
 }

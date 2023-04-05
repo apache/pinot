@@ -49,7 +49,25 @@ public interface IndexReaderFactory<R extends IndexReader> {
     public R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
         ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
-      throw new UnsupportedOperationException("To be implemented in a future PR");
+      IndexType<C, R, ?> indexType = getIndexType();
+      C indexConf;
+      if (fieldIndexConfigs == null) {
+        indexConf = getIndexType().getDefaultConfig();
+      } else {
+        indexConf = fieldIndexConfigs.getConfig(indexType);
+      }
+
+      if (indexConf == null || !indexConf.isEnabled()) { //it is either not enabled or the default value is null
+        return null;
+      }
+
+      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), indexType);
+      try {
+        return createIndexReader(buffer, metadata, indexConf);
+      } catch (RuntimeException ex) {
+        throw new RuntimeException(
+            "Cannot read index " + indexType + " for column " + metadata.getColumnName(), ex);
+      }
     }
   }
 }
