@@ -70,9 +70,13 @@ public class FilterOperatorUtils {
     public BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
         int numDocs, boolean nullHandlingEnabled) {
       if (predicateEvaluator.isAlwaysFalse()) {
-        return EmptyFilterOperator.getInstance();
+        if (!nullHandlingEnabled) {
+          return EmptyFilterOperator.getInstance();
+        }
       } else if (predicateEvaluator.isAlwaysTrue()) {
-        return new MatchAllFilterOperator(numDocs);
+        if (!nullHandlingEnabled) {
+          return new MatchAllFilterOperator(numDocs);
+        }
       }
 
       // Currently sorted index based filtering is supported only for
@@ -83,29 +87,29 @@ public class FilterOperatorUtils {
       // operator is used only if the column is sorted and has dictionary.
       Predicate.Type predicateType = predicateEvaluator.getPredicateType();
       if (predicateType == Predicate.Type.RANGE) {
-        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
+        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null && !nullHandlingEnabled) {
           return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
-        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
+        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource) && !nullHandlingEnabled) {
           return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
-        if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()) {
+        if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted() && !nullHandlingEnabled) {
           return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
-        if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
+        if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null && !nullHandlingEnabled) {
           return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
       } else {
-        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
+        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null && !nullHandlingEnabled) {
           return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
-        if (dataSource.getInvertedIndex() != null) {
+        if (dataSource.getInvertedIndex() != null && !nullHandlingEnabled) {
           return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
-        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
+        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource) && !nullHandlingEnabled) {
           return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);

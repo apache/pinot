@@ -148,6 +148,33 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     testQueries(columnDataType, indexDir);
   }
 
+  @Test
+  public void testQueriesWithDictTimestampColumn()
+          throws Exception {
+    ColumnDataType columnDataType = ColumnDataType.TIMESTAMP;
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+            .setTableName(RAW_TABLE_NAME)
+            .build();
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithDictLongColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
+  }
+
+  @Test(priority = 1)
+  public void testQueriesWithNoDictTimestampColumn()
+          throws Exception {
+    ColumnDataType columnDataType = ColumnDataType.TIMESTAMP;
+    List<String> noDictionaryColumns = new ArrayList<String>();
+    noDictionaryColumns.add(COLUMN_NAME);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+            .setTableName(RAW_TABLE_NAME)
+            .setNoDictionaryColumns(noDictionaryColumns)
+            .build();
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithNoDictLongColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
+  }
+
   @Test(priority = 2)
   public void testQueriesWithDictFloatColumn()
       throws Exception {
@@ -289,6 +316,35 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     DataType dataType = columnDataType.toDataType();
+    {
+      long lowerLimit = 0;
+      String query = String.format(
+              "SELECT %s FROM testTable WHERE %s >= '%s' LIMIT 10",
+              COLUMN_NAME,
+              COLUMN_NAME,
+              columnDataType == ColumnDataType.STRING ? "" : lowerLimit);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
+      List<Object[]> rows = resultTable.getRows();
+      // Null comparison always returns false.
+      assertEquals(rows.size(), 0);
+    }
+    {
+      long lowerLimit = 0;
+      String query = String.format(
+              "SELECT %s FROM testTable WHERE %s = '%s' LIMIT 10",
+              COLUMN_NAME,
+              COLUMN_NAME,
+              columnDataType == ColumnDataType.STRING ? "" : lowerLimit);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 0);
+    }
     {
       String query = String.format("SELECT %s FROM testTable WHERE %s is null limit 5000", COLUMN_NAME, COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
