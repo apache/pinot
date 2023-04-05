@@ -496,8 +496,22 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers)
       throws Exception {
+    return postQueryToController(query, controllerBaseApiUrl, headers, null);
+  }
+
+  /**
+   * Queries the controller's sql query endpoint (/sql)
+   */
+  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers,
+      Map<String, String> extraJsonProperties)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
+    if (MapUtils.isNotEmpty(extraJsonProperties)) {
+      for (Map.Entry<String, String> extraProperty :extraJsonProperties.entrySet()) {
+        payload.put(extraProperty.getKey(), extraProperty.getValue());
+      }
+    }
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
   }

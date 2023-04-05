@@ -544,55 +544,71 @@ public class ClusterIntegrationTestUtils {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection)
       throws Exception {
-    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, null);
   }
 
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
-    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null);
   }
 
   /**
    * Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
    * query.
    */
-  static void testQueryWithMatchingRowCount(String pinotQuery, String brokerUrl,
+  static void testQueryWithMatchingRowCount(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
       throws Exception {
     try {
-      testQueryInternal(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, extraJsonProperties,
-          true);
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, true, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
     }
   }
 
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
       @Nullable Map<String, String> extraJsonProperties) {
     try {
-      testQueryInternal(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, extraJsonProperties,
-          false);
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, false, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
     }
   }
 
-  private static void testQueryInternal(String pinotQuery, String brokerUrl,
+  static void testQueryViaController(String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties) {
+    try {
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, false, true);
+    } catch (Exception e) {
+      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+    }
+  }
+
+  private static void testQueryInternal(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
-      boolean matchingRowCount)
+      boolean matchingRowCount, boolean viaController)
       throws Exception {
     // broker response
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers, extraJsonProperties);
+    JsonNode pinotResponse;
+    if (viaController) {
+      pinotResponse = ClusterTest.postQueryToController(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+    } else {
+      pinotResponse = ClusterTest.postQuery(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+    }
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
@@ -649,7 +665,7 @@ public class ClusterIntegrationTestUtils {
           if (h2Value == null) {
             if (pinotNumRecordsSelected != 0) {
               throw new RuntimeException("No record selected in H2 but " + pinotNumRecordsSelected
-                  + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, brokerUrl, headers,
+                  + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, queryResourceUrl, headers,
                   extraJsonProperties));
             }
 
@@ -672,7 +688,7 @@ public class ClusterIntegrationTestUtils {
             throw new RuntimeException(
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                     + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                    brokerUrl, headers, extraJsonProperties));
+                    queryResourceUrl, headers, extraJsonProperties));
           }
         }
       } else {
@@ -696,7 +712,7 @@ public class ClusterIntegrationTestUtils {
                   throw new RuntimeException(
                       "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                           + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                          brokerUrl, headers, extraJsonProperties));
+                          queryResourceUrl, headers, extraJsonProperties));
                 }
               }
               if (!h2ResultSet.next()) {
