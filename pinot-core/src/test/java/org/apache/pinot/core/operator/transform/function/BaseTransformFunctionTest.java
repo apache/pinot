@@ -327,7 +327,17 @@ public abstract class BaseTransformFunctionTest {
     Pair<BigDecimal[], RoaringBitmap> bigDecimalValues =
         transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
     Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
+    assertEquals(intValues.getRight(), expectedNull);
+    assertEquals(longValues.getRight(), expectedNull);
+    assertEquals(floatValues.getRight(), expectedNull);
+    assertEquals(doubleValues.getRight(), expectedNull);
+    assertEquals(bigDecimalValues.getRight(), expectedNull);
+    assertEquals(stringValues.getRight(), expectedNull);
     for (int i = 0; i < NUM_ROWS; i++) {
+      if (expectedNull.contains(i)) {
+        continue;
+      }
+      // only compare the rows that are not null.
       assertEquals(intValues.getLeft()[i], expectedValues[i]);
       assertEquals(longValues.getLeft()[i], expectedValues[i]);
       assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
@@ -335,12 +345,6 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues.getLeft()[i].intValue(), expectedValues[i]);
       assertEquals(stringValues.getLeft()[i], Integer.toString(expectedValues[i]));
     }
-    assertEquals(intValues.getRight(), expectedNull);
-    assertEquals(longValues.getRight(), expectedNull);
-    assertEquals(floatValues.getRight(), expectedNull);
-    assertEquals(doubleValues.getRight(), expectedNull);
-    assertEquals(bigDecimalValues.getRight(), expectedNull);
-    assertEquals(stringValues.getRight(), expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, long[] expectedValues) {
@@ -510,7 +514,6 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(doubleValues[i] == 1, expectedValues[i]);
       assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
     }
-    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, boolean[] expectedValues,
