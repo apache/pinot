@@ -395,8 +395,18 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+
+    ZNRecord znRecord = instanceConfig.getRecord();
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
     if (_tlsPort > 0) {
       HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
+    // Update multi-stage query engine ports
+    if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
+          Integer.parseInt(_brokerConf.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT)));
+    } else {
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, -1);
     }
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     boolean shouldUpdateBrokerResource = false;
@@ -464,6 +474,25 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       LOGGER.error("Caught exception while getting default broker Id", e);
       return "";
     }
+  }
+
+  private boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
+    String existingPortStr = instanceConfigSimpleFields.get(key);
+    if (port > 0) {
+      String portStr = Integer.toString(port);
+      if (!portStr.equals(existingPortStr)) {
+        LOGGER.info("Updating '{}' for instance: {} to: {}", key, _instanceId, port);
+        instanceConfigSimpleFields.put(key, portStr);
+        return true;
+      }
+    } else {
+      if (existingPortStr != null) {
+        LOGGER.info("Removing '{}' from instance: {}", key, _instanceId);
+        instanceConfigSimpleFields.remove(key);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

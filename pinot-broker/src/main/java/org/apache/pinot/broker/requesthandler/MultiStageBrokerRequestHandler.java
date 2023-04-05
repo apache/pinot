@@ -93,7 +93,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       reducerHostname = brokerId;
     }
     _reducerHostname = reducerHostname;
-    _reducerPort = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
+    // This config has to be set to a valid port number.
+    _reducerPort = Integer.parseInt(config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT));
     _defaultBrokerTimeoutMs = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
         CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
