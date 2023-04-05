@@ -508,25 +508,26 @@ public class QueryGenerator {
       List<String> h2AggregateColumnAndFunctions = new ArrayList<>();
       for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
         String h2AggregateColumnAndFunction;
-        if (!aggregateColumnAndFunction.equals("COUNT(*)")) {
-          aggregateColumnAndFunction = aggregateColumnAndFunction.replace("(", "(`").replace(")", "`)");
+        String pinotAggregateFunction = aggregateColumnAndFunction;
+        if (!pinotAggregateFunction.equals("COUNT(*)")) {
+          pinotAggregateFunction = pinotAggregateFunction.replace("(", "(`").replace(")", "`)");
         }
-        if (!aggregateColumnAndFunction.contains("(")) {
-          aggregateColumnAndFunction = String.format("`%s`", aggregateColumnAndFunction);
+        if (!pinotAggregateFunction.contains("(")) {
+          pinotAggregateFunction = String.format("`%s`", pinotAggregateFunction);
         }
         // Make 'AVG' and
-        if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
+        if (pinotAggregateFunction.startsWith("DISTINCTCOUNT(")) {
           // make 'DISTINCTCOUNT(..)' compatible with H2 SQL query using 'COUNT(DISTINCT(..)'
-          h2AggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
-        } else if (AGGREGATION_FUNCTIONS.contains(aggregateColumnAndFunction.substring(0, 3))) {
+          h2AggregateColumnAndFunction = pinotAggregateFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+        } else if (AGGREGATION_FUNCTIONS.contains(pinotAggregateFunction.substring(0, 3))) {
           // make AGG functions (SUM, MIN, MAX, AVG) compatible with H2 SQL query.
           // this is because Pinot queries casts all to double before doing aggregation
-          String aggFunctionName = aggregateColumnAndFunction.substring(0, 3);
-          h2AggregateColumnAndFunction = aggregateColumnAndFunction
+          String aggFunctionName = pinotAggregateFunction.substring(0, 3);
+          h2AggregateColumnAndFunction = pinotAggregateFunction
               .replace(aggFunctionName + "(", aggFunctionName + "(CAST(")
               .replace(")", " AS DOUBLE))");
         } else {
-          h2AggregateColumnAndFunction = aggregateColumnAndFunction;
+          h2AggregateColumnAndFunction = pinotAggregateFunction;
         }
         h2AggregateColumnAndFunctions.add(h2AggregateColumnAndFunction);
       }
