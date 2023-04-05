@@ -210,7 +210,12 @@ public class ControllerTest {
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
+    overrideControllerConf(properties);
     return properties;
+  }
+
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    // do nothing, to be overridden by tests if they need something specific
   }
 
   public void startController()

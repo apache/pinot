@@ -151,11 +151,16 @@ public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngin
   }
 
   @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
+  }
+
+  @Override
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils
-        .testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query, getH2Connection(), null,
-            ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+        .testQueryViaController(pinotQuery, _controllerBaseApiUrl, getPinotConnection(), h2Query, getH2Connection(),
+            null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
 
   @AfterClass
