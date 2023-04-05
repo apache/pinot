@@ -171,10 +171,6 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
       if (i % 2 == 0) {
         expectedValues[i] = op.applyAsDouble(_intSVValues[i]);
       } else {
-<<<<<<< HEAD
-=======
-        expectedValues[i] = op.applyAsDouble(Integer.MIN_VALUE);
->>>>>>> 6cb974abcd (null support for default null transform funcs)
         bitmap.add(i);
       }
     }

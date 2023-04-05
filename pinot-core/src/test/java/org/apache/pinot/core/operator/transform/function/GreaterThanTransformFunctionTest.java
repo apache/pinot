@@ -60,10 +60,6 @@ public class GreaterThanTransformFunctionTest extends BinaryOperatorTransformFun
     int[] expectedValues = new int[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-<<<<<<< HEAD
-=======
-      expectedValues[i] = 0;
->>>>>>> 6cb974abcd (null support for default null transform funcs)
       if (i % 2 != 0) {
         roaringBitmap.add(i);
       } else {
