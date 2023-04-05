@@ -309,8 +309,16 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           LOGGER.warn("Cannot enable dictionary for column={} as schema or tableConfig is null.", column);
           continue;
         }
-
-        columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+        ColumnMetadata existingColumnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (DictionaryIndexType.ignoreDictionaryOverride(
+            _tableConfig.getIndexingConfig().isOptimizeDictionary(),
+            _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
+            _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
+            existingColumnMetadata.getFieldSpec(), _fieldIndexConfigs.get(column),
+            existingColumnMetadata.getCardinality(),
+            existingColumnMetadata.getTotalNumberOfEntries())) {
+          columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+        }
       } else if (existingDictColumns.contains(column) && !newIsDict) {
         // Existing column has dictionary. New config for the column is RAW.
         if (shouldDisableDictionary(column, _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column))) {
