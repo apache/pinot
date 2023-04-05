@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -33,7 +31,6 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -43,11 +40,6 @@ import static org.mockito.Mockito.when;
 public class PartitionDedupMetadataManagerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
-
-  @BeforeTest
-  public void setup() throws Exception {
-    FileUtils.deleteDirectory(new File(LocalKeyValueStore.DEDUP_DATA_DIR));
-  }
 
   @Test
   public void verifyAddRemoveSegment() throws Exception {

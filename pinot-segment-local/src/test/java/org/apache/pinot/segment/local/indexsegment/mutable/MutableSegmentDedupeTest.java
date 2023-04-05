@@ -22,9 +22,7 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 import java.io.File;
 import java.net.URL;
 import java.util.Collections;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.dedup.LocalKeyValueStore;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -40,7 +38,6 @@ import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
@@ -48,11 +45,6 @@ public class MutableSegmentDedupeTest {
   private static final String SCHEMA_FILE_PATH = "data/test_dedup_schema.json";
   private static final String DATA_FILE_PATH = "data/test_dedup_data.json";
   private MutableSegmentImpl _mutableSegmentImpl;
-
-  @BeforeTest
-  public void beforeTest() throws Exception {
-    FileUtils.deleteDirectory(new File(LocalKeyValueStore.DEDUP_DATA_DIR));
-  }
 
   private void setup(boolean dedupEnabled)
       throws Exception {

@@ -2,6 +2,8 @@ package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -14,8 +16,6 @@ import org.rocksdb.WriteOptions;
 
 public class LocalKeyValueStore {
   @VisibleForTesting
-  public static final String DEDUP_DATA_DIR = "/tmp/dedup-data";
-  @VisibleForTesting
   static final RocksDB ROCKS_DB = initRocksDB();
 
   @VisibleForTesting
@@ -25,8 +25,13 @@ public class LocalKeyValueStore {
       RocksDB.loadLibrary();
       final Options options = new Options();
       options.setCreateIfMissing(true);
-      File dbDir = new File(DEDUP_DATA_DIR);
-      try {
+      File dbDir;
+    try {
+      dbDir = Files.createTempDirectory("dedup-data").toFile();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    try {
         return RocksDB.open(options, dbDir.getAbsolutePath());
       } catch (RocksDBException ex) {
         throw new RuntimeException(ex);
