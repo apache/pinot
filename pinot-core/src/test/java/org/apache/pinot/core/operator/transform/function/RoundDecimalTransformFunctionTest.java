@@ -69,27 +69,15 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
 
   @Test
   public void testRoundDecimalNullLiteral() {
-<<<<<<< HEAD
-<<<<<<< HEAD
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("round_decimal(null)", INT_SV_COLUMN));
-=======
-    ExpressionContext expression = RequestContextUtils.getExpression(String.format("round_decimal(null)", INT_SV_COLUMN));
->>>>>>> 39f12684e1 (test)
-=======
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("round_decimal(null)", INT_SV_COLUMN));
->>>>>>> 6cb974abcd (null support for default null transform funcs)
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
     double[] expectedValues = new double[NUM_ROWS];
-<<<<<<< HEAD
-=======
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = 0;
     }
->>>>>>> 39f12684e1 (test)
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
@@ -101,26 +89,13 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
         RequestContextUtils.getExpression(String.format("round_decimal(%s)", INT_SV_NULL_COLUMN, 0));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
-<<<<<<< HEAD
-<<<<<<< HEAD
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
-=======
-    Assert.assertEquals(transformFunction.getName(),  TransformFunctionType.ROUND_DECIMAL.getName());
->>>>>>> 39f12684e1 (test)
-=======
-    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
->>>>>>> 6cb974abcd (null support for default null transform funcs)
     double[] expectedValues = new double[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % 2 == 0) {
         expectedValues[i] = _intSVValues[i];
       } else {
-<<<<<<< HEAD
-=======
-        // null int is set to int min in field spec.
-        expectedValues[i] = Integer.MIN_VALUE;
->>>>>>> 39f12684e1 (test)
         roaringBitmap.add(i);
       }
     }
