@@ -162,6 +162,10 @@ public class CalciteSqlParser {
         tableNames.addAll(((SqlIdentifier) fromNode).names);
         tableNames.addAll(extractTableNamesFromNode(((SqlSelect) sqlNode).getWhere()));
       }
+    } else if (sqlNode instanceof SqlOrderBy) {
+      for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
+        tableNames.addAll(extractTableNamesFromNode(node));
+      }
     } else if (sqlNode instanceof SqlBasicCall) {
       if (((SqlBasicCall) sqlNode).getOperator() instanceof SqlAsOperator) {
         SqlNode firstOperand = ((SqlBasicCall) sqlNode).getOperandList().get(0);
