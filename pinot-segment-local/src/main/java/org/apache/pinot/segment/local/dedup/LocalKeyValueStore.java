@@ -46,34 +46,34 @@ public class LocalKeyValueStore {
     }
   }
 
-  byte[] get(byte[] keyBytes) {
+  byte[] get(byte[] key) {
     try {
-      return ROCKS_DB.get(_columnFamilyHandle, keyBytes);
+      return ROCKS_DB.get(_columnFamilyHandle, key);
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
   }
 
-  void delete(byte[] keyBytes) {
+  void delete(byte[] key) {
     try {
-      ROCKS_DB.delete(_columnFamilyHandle, keyBytes);
+      ROCKS_DB.delete(_columnFamilyHandle, key);
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
   }
 
-  void put(byte[] keyBytes, byte[] valueBytes) {
+  void put(byte[] key, byte[] value) {
     try {
-      ROCKS_DB.put(_columnFamilyHandle, keyBytes, valueBytes);
+      ROCKS_DB.put(_columnFamilyHandle, key, value);
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
   }
 
-  void putBatch(List<Pair<byte[], byte[]>> keyValue) {
+  void putBatch(List<Pair<byte[], byte[]>> keyValues) {
     WriteBatch writeBatch = new WriteBatch();
     try {
-      for (Pair<byte[], byte[]> pair : keyValue) {
+      for (Pair<byte[], byte[]> pair : keyValues) {
         writeBatch.put(_columnFamilyHandle, pair.getKey(), pair.getValue());
       }
       LocalKeyValueStore.ROCKS_DB.write(new WriteOptions(), writeBatch);
