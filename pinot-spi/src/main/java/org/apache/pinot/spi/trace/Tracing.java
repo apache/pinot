@@ -58,8 +58,8 @@ public class Tracing {
 
   private static final class Holder {
     static final Tracer TRACER = TRACER_REGISTRATION.get() == null ? createDefaultTracer() : TRACER_REGISTRATION.get();
-    static final ThreadResourceUsageAccountant ACCOUNTANT = ACCOUNTANT_REGISTRATION.get() == null
-        ? createDefaultThreadAccountant() : ACCOUNTANT_REGISTRATION.get();
+    static final ThreadResourceUsageAccountant ACCOUNTANT =
+        ACCOUNTANT_REGISTRATION.get() == null ? createDefaultThreadAccountant() : ACCOUNTANT_REGISTRATION.get();
   }
 
   /**
@@ -86,7 +86,7 @@ public class Tracing {
    * visible for testing only
    */
   public static boolean isAccountantRegistered() {
-   return ACCOUNTANT_REGISTRATION.get() != null;
+    return ACCOUNTANT_REGISTRATION.get() != null;
   }
 
   /**
@@ -116,8 +116,7 @@ public class Tracing {
     String defaultImplementationClassName = "org.apache.pinot.core.util.trace.BuiltInTracer";
     try {
       Class<?> clazz = Class.forName(defaultImplementationClassName, false, Tracing.class.getClassLoader());
-      return (Tracer) MethodHandles.publicLookup()
-          .findConstructor(clazz, MethodType.methodType(void.class)).invoke();
+      return (Tracer) MethodHandles.publicLookup().findConstructor(clazz, MethodType.methodType(void.class)).invoke();
     } catch (Throwable missing) {
       return FallbackTracer.INSTANCE;
     }
@@ -196,8 +195,7 @@ public class Tracing {
     }
 
     @Override
-    public final void createExecutionContext(String queryId, int taskId,
-        ThreadExecutionContext parentContext) {
+    public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext parentContext) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
       createExecutionContextInner(queryId, taskId, parentContext);
     }
@@ -242,8 +240,7 @@ public class Tracing {
 
     public static void setupRunner(String queryId) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
-      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID,
-          null);
+      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, null);
     }
 
     public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
@@ -262,18 +259,22 @@ public class Tracing {
 
     public static void initializeThreadAccountant(PinotConfiguration config) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
-      LOGGER.info("Config-specified accountant factory name {}", factoryName);
-      try {
-        ThreadAccountantFactory threadAccountantFactory =
-            (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
-        boolean registered = Tracing.register(threadAccountantFactory.init(config));
-        LOGGER.info("Using accountant provided by {}", factoryName);
-        if (!registered) {
-          LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);
+      if (factoryName == null) {
+        LOGGER.warn("No thread accountant factory provided, using default implementation");
+      } else {
+        LOGGER.info("Config-specified accountant factory name {}", factoryName);
+        try {
+          ThreadAccountantFactory threadAccountantFactory =
+              (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
+          boolean registered = Tracing.register(threadAccountantFactory.init(config));
+          LOGGER.info("Using accountant provided by {}", factoryName);
+          if (!registered) {
+            LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);
+          }
+        } catch (Exception exception) {
+          LOGGER.warn("Using default implementation of thread accountant, "
+              + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
         }
-      } catch (Exception exception) {
-        LOGGER.warn("Using default implementation of thread accountant, "
-            + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
       }
       Tracing.getThreadAccountant().startWatcherTask();
     }
