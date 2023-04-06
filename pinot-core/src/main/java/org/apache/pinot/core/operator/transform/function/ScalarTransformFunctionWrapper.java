@@ -614,7 +614,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock){
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     RoaringBitmap bitmap = new RoaringBitmap();
     getNonLiteralValuesWithNull(valueBlock);
@@ -626,6 +626,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       if (result == null) {
         bitmap.add(i);
       }
+    }
+    if (bitmap != null && bitmap.isEmpty()) {
+      return null;
     }
     return bitmap;
   }
