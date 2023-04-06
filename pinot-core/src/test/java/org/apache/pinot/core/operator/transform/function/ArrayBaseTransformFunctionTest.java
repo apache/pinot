@@ -34,7 +34,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
   @Test
   public void testArrayTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_NULL_COLUMN));
+        RequestContextUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getClass().getName(), getArrayFunctionClass().getName());
     Assert.assertEquals(transformFunction.getName(), getFunctionName());
