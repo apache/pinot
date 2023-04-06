@@ -32,8 +32,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
@@ -100,9 +98,6 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       // H2
       ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
     }
-
-    // Setting data table version to 4
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @Test(dataProvider = "QueryDataProvider")

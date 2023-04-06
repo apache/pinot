@@ -21,7 +21,6 @@ package org.apache.pinot.tools;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -89,13 +88,6 @@ public class MultistageEngineQuickStart extends Quickstart {
   @Override
   public String[] getDefaultBatchTableDirectories() {
     return MULTI_STAGE_TABLE_DIRECTORIES;
-  }
-
-  @Override
-  public Map<String, Object> getConfigOverrides() {
-    Map<String, Object> overrides = new HashMap<>(super.getConfigOverrides());
-    overrides.put("pinot.server.instance.currentDataTableVersion", 4);
-    return overrides;
   }
 
   @Override

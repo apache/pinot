@@ -25,8 +25,6 @@ import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
@@ -75,9 +73,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-
-    // Setting data table version to 4
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @Test
