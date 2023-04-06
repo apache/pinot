@@ -37,7 +37,6 @@ import org.testng.annotations.Test;
 
 
 public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionTest {
-
   @Test
   public void testAbsTransformFunction() {
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("abs(%s)", INT_SV_COLUMN));

@@ -88,7 +88,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertEquals(transformFunction.getName(), PowerTransformFunction.FUNCTION_NAME);
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.pow((double) _intSVValues[i], exponent);
+      expectedValues[i] = Math.pow(_intSVValues[i], exponent);
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -121,8 +121,6 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
       if (i % 2 == 0) {
         expectedValues[i] = 1;
       } else {
-        // null int is set to int min in field spec.
-        expectedValues[i] = 1;
         roaringBitmap.add(i);
       }
     }

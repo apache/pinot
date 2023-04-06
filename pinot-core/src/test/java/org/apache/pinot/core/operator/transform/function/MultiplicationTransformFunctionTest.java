@@ -29,7 +29,6 @@ import org.testng.annotations.Test;
 
 
 public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTest {
-
   @Test
   public void testMultiplicationTransformFunction() {
     ExpressionContext expression = RequestContextUtils.getExpression(

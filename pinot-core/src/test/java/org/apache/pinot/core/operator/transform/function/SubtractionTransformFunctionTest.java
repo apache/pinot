@@ -30,7 +30,6 @@ import org.testng.annotations.Test;
 
 
 public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest {
-
   @Test
   public void testSubtractionTransformFunction() {
     ExpressionContext expression =

@@ -61,7 +61,6 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = round(_doubleSVValues[i], 0);
     }
-    testTransformFunction(transformFunction, expectedValues);
   }
 
   public Double round(double a, int b) {

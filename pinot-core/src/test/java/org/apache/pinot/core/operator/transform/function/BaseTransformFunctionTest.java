@@ -228,6 +228,11 @@ public abstract class BaseTransformFunctionTest {
         new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
   }
 
+  private void testNullBitmap(TransformFunction transformFunction, RoaringBitmap expectedNull) {
+    RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
+    assertEquals(nullBitmap, expectedNull);
+  }
+
   protected void testTransformFunction(TransformFunction transformFunction, int[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
@@ -243,6 +248,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
       assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
@@ -272,6 +278,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues.getLeft()[i].intValue(), expectedValues[i]);
       assertEquals(stringValues.getLeft()[i], Integer.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, long[] expectedValues) {
@@ -289,6 +296,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
       assertEquals(stringValues[i], Long.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, float[] expectedValues) {
@@ -306,6 +314,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i].floatValue(), expectedValues[i]);
       assertEquals(stringValues[i], Float.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, double[] expectedValues) {
@@ -332,6 +341,7 @@ public abstract class BaseTransformFunctionTest {
       }
       assertEquals(stringValues[i], Double.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, double[] expectedValues,
@@ -371,6 +381,7 @@ public abstract class BaseTransformFunctionTest {
       }
       assertEquals(stringValues.getLeft()[i], Double.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, BigDecimal[] expectedValues) {
@@ -390,6 +401,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals((new BigDecimal(stringValues[i])).compareTo(expectedValues[i]), 0);
       assertEquals(BigDecimalUtils.deserialize(bytesValues[i]).compareTo(expectedValues[i]), 0);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, boolean[] expectedValues) {
@@ -406,6 +418,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(doubleValues[i] == 1, expectedValues[i]);
       assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, boolean[] expectedValues,
@@ -432,6 +445,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(doubleValues.getLeft()[i] == 1, expectedValues[i]);
       assertEquals(bigDecimalValues.getLeft()[i].intValue() == 1, expectedValues[i]);
     }
+    testNullBitmap(transformFunction, expectedNulls);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, Timestamp[] expectedValues) {
@@ -450,6 +464,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i], BigDecimal.valueOf(expectedValues[i].getTime()));
 //      assertEquals(stringValues[i], expectedValues[i].toString());
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, String[] expectedValues) {
@@ -457,6 +472,7 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(stringValues[i], expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
@@ -466,6 +482,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bytesValues[i], BytesUtils.toBytes(stringValues[i]));
       assertEquals(bytesValues[i], expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, int[][] expectedValues) {
@@ -490,6 +507,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Integer.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, long[][] expectedValues) {
@@ -514,6 +532,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Long.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, float[][] expectedValues) {
@@ -538,6 +557,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Float.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, double[][] expectedValues) {
@@ -562,6 +582,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Double.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
@@ -569,6 +590,7 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(stringValuesMV[i], expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   @AfterClass
