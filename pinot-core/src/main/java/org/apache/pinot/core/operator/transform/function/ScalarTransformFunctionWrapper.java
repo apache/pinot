@@ -96,13 +96,15 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       TransformFunction transformFunction = arguments.get(i);
       if (transformFunction instanceof LiteralTransformFunction) {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) transformFunction;
-        switch (literalTransformFunction.getResultMetadata().getDataType()) {
-          case UNKNOWN:
-            _scalarArguments[i] = null;
-            break;
+        DataType dataType = literalTransformFunction.getResultMetadata().getDataType();
+        switch (dataType) {
           case BOOLEAN:
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getBooleanLiteral(), PinotDataType.BOOLEAN);
+            break;
+          case LONG:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.LONG);
             break;
           case DOUBLE:
             _scalarArguments[i] =
@@ -112,10 +114,19 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getBigDecimalLiteral(), PinotDataType.BIG_DECIMAL);
             break;
-          default:
+          case TIMESTAMP:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.TIMESTAMP);
+            break;
+          case STRING:
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getStringLiteral(), PinotDataType.STRING);
             break;
+          case UNKNOWN:
+            _scalarArguments[i] = null;
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type:" + dataType);
         }
       } else {
         _nonLiteralIndices[_numNonLiteralArguments] = i;
@@ -235,7 +246,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = valueBlock.getNumDocs();
     RoaringBitmap bitmap = new RoaringBitmap();
-    initLongValuesSV(length);
+    initFloatValuesSV(length);
     getNonLiteralValuesWithNull(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -275,7 +286,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = valueBlock.getNumDocs();
     RoaringBitmap bitmap = new RoaringBitmap();
-    initLongValuesSV(length);
+    initDoubleValuesSV(length);
     getNonLiteralValuesWithNull(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -315,7 +326,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = valueBlock.getNumDocs();
     RoaringBitmap bitmap = new RoaringBitmap();
-    initLongValuesSV(length);
+    initBigDecimalValuesSV(length);
     getNonLiteralValuesWithNull(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -432,7 +443,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
   @Override
   public Pair<int[][], RoaringBitmap> transformToIntValuesMVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMVWithNull(valueBlock);
     }
     int length = valueBlock.getNumDocs();
@@ -597,7 +608,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = valueBlock.getNumDocs();
     RoaringBitmap bitmap = new RoaringBitmap();
-    initDoubleValuesMV(length);
+    initStringValuesMV(length);
     getNonLiteralValuesWithNull(valueBlock);
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
@@ -735,10 +746,10 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           bitmap = doubleResult.getRight();
           break;
         case BIG_DECIMAL:
-          Pair<BigDecimal[], RoaringBitmap> bigdecimalResult =
+          Pair<BigDecimal[], RoaringBitmap> bigDecimalResult =
               transformFunction.transformToBigDecimalValuesSVWithNull(valueBlock);
-          _nonLiteralValues[i] = bigdecimalResult.getLeft();
-          bitmap = bigdecimalResult.getRight();
+          _nonLiteralValues[i] = bigDecimalResult.getLeft();
+          bitmap = bigDecimalResult.getRight();
           break;
         case BOOLEAN: {
           Pair<int[], RoaringBitmap> boolResult = transformFunction.transformToIntValuesSVWithNull(valueBlock);
