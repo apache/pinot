@@ -286,6 +286,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
     testNullBitmap(transformFunction, null);
+<<<<<<< HEAD
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
@@ -316,6 +317,8 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValues.getLeft()[i], Integer.toString(expectedValues[i]));
     }
     testNullBitmap(transformFunction, expectedNull);
+=======
+>>>>>>> 28051f2dda (add nullbitmap test)
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
@@ -345,6 +348,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues.getLeft()[i].intValue(), expectedValues[i]);
       assertEquals(stringValues.getLeft()[i], Integer.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, long[] expectedValues) {
@@ -514,6 +518,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(doubleValues[i] == 1, expectedValues[i]);
       assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, boolean[] expectedValues,
