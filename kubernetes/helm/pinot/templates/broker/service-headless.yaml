@@ -29,7 +29,7 @@ spec:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.broker.service.name }}
       port: {{ .Values.broker.service.port }}
-    {{- range .Values.controller.service.extraPorts }}
+    {{- range .Values.broker.service.extraPorts }}
     - name: {{ .name }}
       port: {{ .containerPort }} 
     {{- end }}
