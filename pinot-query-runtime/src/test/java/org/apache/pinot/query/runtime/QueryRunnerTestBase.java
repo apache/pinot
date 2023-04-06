@@ -59,6 +59,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.h2.jdbc.JdbcArray;
@@ -181,6 +182,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
         return Double.compare(ld, rd);
       } else if (l instanceof String) {
+        if (r instanceof byte[]) {
+          return ((String) l).compareTo(BytesUtils.toHexString((byte[]) r));
+        }
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {
         return ((Boolean) l).compareTo((Boolean) r);
