@@ -83,6 +83,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
   protected static final String INT_MV_COLUMN = "intMV";
+  protected static final String INT_MV_NULL_COLUMN = "intMVNull";
+
   protected static final String LONG_MV_COLUMN = "longMV";
   protected static final String FLOAT_MV_COLUMN = "floatMV";
   protected static final String DOUBLE_MV_COLUMN = "doubleMV";
@@ -171,6 +173,11 @@ public abstract class BaseTransformFunctionTest {
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
+      if (i % 2 == 0) {
+        map.put(INT_MV_NULL_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
+      } else {
+        map.put(INT_MV_NULL_COLUMN, null);
+      }
       map.put(LONG_MV_COLUMN, ArrayUtils.toObject(_longMVValues[i]));
       map.put(FLOAT_MV_COLUMN, ArrayUtils.toObject(_floatMVValues[i]));
       map.put(DOUBLE_MV_COLUMN, ArrayUtils.toObject(_doubleMVValues[i]));
@@ -198,6 +205,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
+        .addMultiValueDimension(INT_MV_NULL_COLUMN, FieldSpec.DataType.INT)
         .addMultiValueDimension(LONG_MV_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(FLOAT_MV_COLUMN, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(DOUBLE_MV_COLUMN, FieldSpec.DataType.DOUBLE)
