@@ -55,6 +55,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   @Override
   public void complete() throws Exception {
+    _gotMailCallback.accept(_mailboxId);
     _transferStream.complete();
   }
 

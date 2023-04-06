@@ -148,6 +148,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   @Override
   public void onCompleted() {
     _isCompleted.set(true);
+    _gotMailCallback.accept(_mailboxId);
     _responseObserver.onCompleted();
   }
 
