@@ -36,8 +36,16 @@ public class SortUtils {
     private final int[] _multipliers;
     private final boolean[] _useDoubleComparison;
 
+    /**
+     * Sort comparator for use with priority queues
+     * @param collationKeys collation keys to sort on
+     * @param collationDirections collation direction for each collation key to sort on
+     * @param dataSchema data schema to use
+     * @param isNullHandlingEnabled 'true' if null handling is enabled. Not supported yet
+     * @param switchDirections 'true' if the opposite sort direction should be used as what is specified
+     */
     public SortComparator(List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
-        DataSchema dataSchema, boolean isNullHandlingEnabled) {
+        DataSchema dataSchema, boolean isNullHandlingEnabled, boolean switchDirections) {
       DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
       _size = collationKeys.size();
       _valueIndices = new int[_size];
@@ -45,7 +53,8 @@ public class SortUtils {
       _useDoubleComparison = new boolean[_size];
       for (int i = 0; i < _size; i++) {
         _valueIndices[i] = ((RexExpression.InputRef) collationKeys.get(i)).getIndex();
-        _multipliers[i] = collationDirections.get(i).isDescending() ? 1 : -1;
+        _multipliers[i] = switchDirections ? (collationDirections.get(i).isDescending() ? 1 : -1)
+            : (collationDirections.get(i).isDescending() ? -1 : 1);
         _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
       }
     }

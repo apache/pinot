@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -83,8 +83,9 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     _dataSchema = dataSchema;
     Preconditions.checkState(!CollectionUtils.isEmpty(collationKeys) && isSortOnReceiver,
         "Collation keys should exist and sorting must be enabled otherwise use non-sorted MailboxReceiveOperator");
+    // No need to switch the direction since all rows will be stored in the priority queue without applying limits
     _priorityQueue = new PriorityQueue<>(new SortUtils.SortComparator(collationKeys, collationDirections,
-        dataSchema, false));
+        dataSchema, false, false));
     _isSortedBlockConstructed = false;
   }
 
@@ -97,7 +98,6 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     if (_upstreamErrorBlock != null) {
-      cleanUpResourcesOnError();
       return _upstreamErrorBlock;
     } else if (System.nanoTime() >= _deadlineTimestampNano) {
       return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
@@ -132,7 +132,6 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
             if (block != null) {
               foundNonNullTransferableBlock = true;
               if (block.isErrorBlock()) {
-                cleanUpResourcesOnError();
                 _upstreamErrorBlock =
                     TransferableBlockUtils.getErrorTransferableBlock(block.getDataBlock().getExceptions());
                 return _upstreamErrorBlock;
@@ -158,13 +157,13 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
       }
     } while (foundNonNullTransferableBlock && ((openMailboxCount > 0) && (openMailboxCount > eosMailboxCount)));
 
-    if (((openMailboxCount == 0) || (openMailboxCount <= eosMailboxCount))
+    if (((openMailboxCount == 0) || (openMailboxCount == eosMailboxCount))
         && (!CollectionUtils.isEmpty(_priorityQueue)) && !_isSortedBlockConstructed) {
       // Some data is present in the PriorityQueue, these need to be sent upstream
-      LinkedList<Object[]> rows = new LinkedList<>();
+      List<Object[]> rows = new ArrayList<>();
       while (_priorityQueue.size() > 0) {
         Object[] row = _priorityQueue.poll();
-        rows.addFirst(row);
+        rows.add(row);
       }
       _isSortedBlockConstructed = true;
       return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
@@ -181,9 +180,23 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     return block;
   }
 
-  private void cleanUpResourcesOnError() {
+  private void cleanUpResources() {
     if (_priorityQueue != null) {
       _priorityQueue.clear();
+    }
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    cleanUpResources();
+  }
+
+  @Override
+  public void cancel(Throwable t) {
+    super.cancel(t);
+    if (_upstreamErrorBlock != null) {
+      cleanUpResources();
     }
   }
 }
