@@ -37,9 +37,6 @@
     <antlr-runtime.version>4.8</antlr-runtime.version>
     <scalatest.version>3.1.1</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
-
-    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
-    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
 
   <profiles>

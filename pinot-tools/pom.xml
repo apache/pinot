@@ -252,6 +252,18 @@
           <groupId>io.grpc</groupId>
           <artifactId>grpc-context</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>jakarta.activation</groupId>
+          <artifactId>jakarta.activation-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.typesafe.netty</groupId>
+          <artifactId>netty-reactive-streams</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.beust</groupId>
+          <artifactId>jcommander</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
