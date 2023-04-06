@@ -613,6 +613,23 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return ImmutablePair.of(_stringValuesMV, bitmap);
   }
 
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock){
+    int length = valueBlock.getNumDocs();
+    RoaringBitmap bitmap = new RoaringBitmap();
+    getNonLiteralValuesWithNull(valueBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object result = _functionInvoker.invoke(_scalarArguments);
+      if (result == null) {
+        bitmap.add(i);
+      }
+    }
+    return bitmap;
+  }
+
   /**
    * Helper method to fetch values for the non-literal transform functions based on the parameter types.
    */

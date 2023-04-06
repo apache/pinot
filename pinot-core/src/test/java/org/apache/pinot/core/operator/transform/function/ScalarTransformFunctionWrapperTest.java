@@ -1025,6 +1025,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     RoaringBitmap bitmap = new RoaringBitmap();
     bitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+    testNullBitmap(transformFunction, bitmap);
   }
 
   @Test
@@ -1044,5 +1045,6 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+    testNullBitmap(transformFunction, bitmap);
   }
 }
