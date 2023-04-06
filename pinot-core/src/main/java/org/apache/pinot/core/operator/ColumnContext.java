@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -69,5 +70,50 @@ public class ColumnContext {
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
     return new ColumnContext(resultMetadata.getDataType(), resultMetadata.isSingleValue(),
         transformFunction.getDictionary(), null);
+  }
+
+  public static ColumnContext fromColumnDataType(ColumnDataType columnDataType) {
+    switch (columnDataType) {
+      case INT:
+        return new ColumnContext(DataType.INT, true, null, null);
+      case LONG:
+        return new ColumnContext(DataType.LONG, true, null, null);
+      case FLOAT:
+        return new ColumnContext(DataType.FLOAT, true, null, null);
+      case DOUBLE:
+        return new ColumnContext(DataType.DOUBLE, true, null, null);
+      case BIG_DECIMAL:
+        return new ColumnContext(DataType.BIG_DECIMAL, true, null, null);
+      case BOOLEAN:
+        return new ColumnContext(DataType.BOOLEAN, true, null, null);
+      case TIMESTAMP:
+        return new ColumnContext(DataType.TIMESTAMP, true, null, null);
+      case STRING:
+        return new ColumnContext(DataType.STRING, true, null, null);
+      case JSON:
+        return new ColumnContext(DataType.JSON, true, null, null);
+      case BYTES:
+        return new ColumnContext(DataType.BYTES, true, null, null);
+      case INT_ARRAY:
+        return new ColumnContext(DataType.INT, false, null, null);
+      case LONG_ARRAY:
+        return new ColumnContext(DataType.LONG, false, null, null);
+      case FLOAT_ARRAY:
+        return new ColumnContext(DataType.FLOAT, false, null, null);
+      case DOUBLE_ARRAY:
+        return new ColumnContext(DataType.DOUBLE, false, null, null);
+      case BOOLEAN_ARRAY:
+        return new ColumnContext(DataType.BOOLEAN, false, null, null);
+      case TIMESTAMP_ARRAY:
+        return new ColumnContext(DataType.TIMESTAMP, false, null, null);
+      case STRING_ARRAY:
+        return new ColumnContext(DataType.STRING, false, null, null);
+      case BYTES_ARRAY:
+        return new ColumnContext(DataType.BYTES, false, null, null);
+      case UNKNOWN:
+        return new ColumnContext(DataType.UNKNOWN, true, null, null);
+      default:
+        throw new IllegalStateException("Unsupported column data type: " + columnDataType);
+    }
   }
 }

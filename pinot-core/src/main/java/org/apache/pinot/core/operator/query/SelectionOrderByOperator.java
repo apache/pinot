@@ -125,7 +125,8 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
-    if (_expressions.size() == _orderByExpressions.size()) {
+    if (_expressions.size() == _orderByExpressions.size() || _queryContext.hasJoin()) {
+      // DO NOT use optimized operator for JOIN queries because document order is not preserved
       return computeAllOrdered();
     } else {
       return computePartiallyOrdered();
@@ -176,10 +177,18 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     // Create the data schema
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    int numOrderByExpressions = _orderByExpressions.size();
     for (int i = 0; i < numExpressions; i++) {
-      columnNames[i] = _expressions.get(i).toString();
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
-          _orderByColumnContexts[i].isSingleValue());
+      ExpressionContext expression = _expressions.get(i);
+      columnNames[i] = expression.toString();
+      if (i < numOrderByExpressions) {
+        columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
+            _orderByColumnContexts[i].isSingleValue());
+      } else {
+        ColumnContext columnContext = _projectOperator.getResultColumnContext(expression);
+        columnDataTypes[i] =
+            DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
+      }
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 

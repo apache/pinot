@@ -71,9 +71,17 @@ public class SelectionPlanNode implements PlanNode {
           new ProjectPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall).run();
       return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
+
+    // Selection order-by
+
+    // DO NOT use optimized operator for JOIN queries because column might be from the right table
+    if (_queryContext.hasJoin()) {
+      BaseProjectOperator<?> projectOperator =
+          new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+      return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
+    }
+
     int numOrderByExpressions = orderByExpressions.size();
-    // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
-    // expression the operator will return a block whose selection result is a priority queue.
     int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
     OrderByAlgorithm orderByAlgorithm = OrderByAlgorithm.fromQueryContext(_queryContext);
     if (sortedColumnsPrefixSize > 0 && orderByAlgorithm != OrderByAlgorithm.NAIVE) {

@@ -217,7 +217,8 @@ public class CombinePlanNode implements PlanNode {
           // Selection order-by
           List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
           assert orderByExpressions != null;
-          if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+          if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER
+              && !_queryContext.hasJoin()) {
             return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
           } else {
             return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);

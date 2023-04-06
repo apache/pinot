@@ -332,6 +332,10 @@ public class CommonConstants {
         public static final String ROUTING_FORCE_HLC = "FORCE_HLC";
         public static final String DEFAULT_IN_PREDICATE_SORT_THRESHOLD = "1000";
       }
+
+      public static class SharedValueKey {
+        public static final String LOCAL_JOIN_RIGHT_TABLE_PREFIX = "localJoinRightTable_";
+      }
     }
 
     public static class FailureDetector {

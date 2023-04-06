@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -167,13 +166,6 @@ public class ImmutableSegmentLoader {
       }
     } else {
       indexLoadingConfig.addKnownColumns(columnMetadataMap.keySet());
-    }
-
-    URI indexDirURI = segmentDirectory.getIndexDir();
-    String scheme = indexDirURI.getScheme();
-    File localIndexDir = null;
-    if (scheme != null && scheme.equalsIgnoreCase("file")) {
-      localIndexDir = new File(indexDirURI);
     }
 
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
