@@ -163,11 +163,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
           String plan = queryPlanResult.getExplainPlan();
           RelNode explainRelRoot = queryPlanResult.getRelRoot();
-
-          if (!hasTableAccess(requesterIdentity, getTableNamesFromRelRoot(explainRelRoot))) {
-            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-            LOGGER.info("Access denied for requestId {}", requestId);
-            requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+          if (!hasTableAccess(requesterIdentity, getTableNamesFromRelRoot(explainRelRoot), requestId, requestContext)) {
             return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
           }
 
@@ -190,29 +186,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Compilation Time. This includes the time taken for parsing, compiling, create stage plans and assigning workers.
     long compilationEndTimeNs = System.nanoTime();
-    long compilationTime = (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs();
-    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTime);
+    long compilationTimeNs = (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs();
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTimeNs);
 
     // Validate table access.
-    if (!hasTableAccess(requesterIdentity, tableNames)) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.info("Access denied for requestId {}", requestId);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+    if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
 
     // Validate QPS quota
-    for (String tableName : tableNames) {
-      if (!_queryQuotaManager.acquire(tableName)) {
-        String errorMessage =
-            String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
-        LOGGER.info(errorMessage);
-        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
-        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
-        return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
-      }
+    if (hasExceededQPSQuota(tableNames, requestId, requestContext)) {
+      String errorMessage =
+          String.format("Request %d: %s exceeds query quota.", requestId, query);
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
     boolean traceEnabled = Boolean.parseBoolean(
@@ -225,7 +212,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
     }
 
-    long executionStartTime = System.nanoTime();
+    long executionStartTimeNs = System.nanoTime();
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
           sqlNodeAndOptions.getOptions(), stageIdStatsMap);
@@ -236,7 +223,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     long executionEndTimeNs = System.nanoTime();
-    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTime);
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
 
     // Set total query processing time
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
@@ -268,8 +255,36 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return brokerResponse;
   }
 
-  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames) {
-    return _accessControlFactory.create().hasAccess(requesterIdentity, tableNames);
+  /**
+   * Validates whether the requester has access to all the tables.
+   */
+  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames, long requestId,
+      RequestContext requestContext) {
+    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, tableNames);
+    if (!hasAccess) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.warn("Access denied for requestId {}", requestId);
+      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Returns true if the QPS quota of the tables has exceeded.
+   */
+  private boolean hasExceededQPSQuota(Set<String> tableNames, long requestId, RequestContext requestContext) {
+    for (String tableName : tableNames) {
+      if (!_queryQuotaManager.acquire(tableName)) {
+        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestId, tableName);
+        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
+        return true;
+      }
+    }
+    return false;
   }
 
   private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
