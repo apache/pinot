@@ -30,7 +30,6 @@ public class DispatchablePlanContext {
   private final WorkerManager _workerManager;
   private final long _requestId;
   private final PlannerContext _plannerContext;
-  private final List<Pair<Integer, String>> _fields;
   private final QueryPlan _queryPlan;
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
@@ -38,8 +37,7 @@ public class DispatchablePlanContext {
     _workerManager = workerManager;
     _requestId = requestId;
     _plannerContext = plannerContext;
-    _fields = resultFields;
-    _queryPlan = new QueryPlan(_fields, new HashMap<>(), new HashMap<>());
+    _queryPlan = new QueryPlan(resultFields, new HashMap<>(), new HashMap<>());
   }
 
   public QueryPlan getQueryPlan() {
@@ -56,9 +54,5 @@ public class DispatchablePlanContext {
 
   public PlannerContext getPlannerContext() {
     return _plannerContext;
-  }
-
-  public List<Pair<Integer, String>> getFields() {
-    return _fields;
   }
 }

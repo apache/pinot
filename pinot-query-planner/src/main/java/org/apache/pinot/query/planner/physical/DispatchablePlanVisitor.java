@@ -46,6 +46,8 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
    */
   public void constructDispatchablePlan(StageNode globalReceiverNode, DispatchablePlanContext physicalPlanContext) {
     globalReceiverNode.visit(DispatchablePlanVisitor.INSTANCE, physicalPlanContext);
+    // special case for the global mailbox receive node
+    physicalPlanContext.getQueryPlan().getQueryStageMap().put(0, globalReceiverNode);
     computeWorkerAssignment(globalReceiverNode, physicalPlanContext);
   }
 
@@ -98,12 +100,6 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   public Void visitMailboxReceive(MailboxReceiveNode node, DispatchablePlanContext context) {
     node.getSender().visit(this, context);
     getStageMetadata(node, context);
-
-    // special case for the global mailbox receive node
-    if (node.getStageId() == 0) {
-      context.getQueryPlan().getQueryStageMap().put(0, node);
-    }
-
     return null;
   }
 
