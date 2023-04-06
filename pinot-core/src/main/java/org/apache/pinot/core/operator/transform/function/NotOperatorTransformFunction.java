@@ -25,6 +25,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -52,9 +53,9 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
     super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument1 is required for not transform function");
     TransformResultMetadata argumentMetadata = arguments.get(0).getResultMetadata();
+    FieldSpec.DataType storedType = argumentMetadata.getDataType().getStoredType();
     Preconditions.checkState(
-        argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric()
-            || argumentMetadata.getDataType().getStoredType().isUnknown(),
+        argumentMetadata.isSingleValue() && storedType.isNumeric() || storedType.isUnknown(),
         "Unsupported argument type. Expecting single-valued boolean/number");
     _argument = arguments.get(0);
   }
