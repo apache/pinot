@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.cache.Cache;
 import org.mindrot.jbcrypt.BCrypt;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BcryptUtils {
 
     private static final int DEFALUT_LOG_ROUNDS = 10;
     private static String _bcryptPassword = null;
+    private static final Logger LOGGER = LoggerFactory.getLogger(BcryptUtils.class);
 
     private BcryptUtils() {
     }
@@ -42,9 +46,23 @@ public class BcryptUtils {
         try {
             isMatch = BCrypt.checkpw(pasword, encrypedPassword);
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-        } finally {
-            return isMatch;
+            LOGGER.error("BCrypt check password exception", e);
         }
+
+        return isMatch;
+    }
+
+    public static boolean checkpwWithCache(String password, String encrypedPassword,
+                                           Cache<String, String> userPasswordAuthCache) {
+        boolean isMatch = true;
+        String cachePass = userPasswordAuthCache.getIfPresent(encrypedPassword);
+        if (cachePass == null || !cachePass.equals(password)) {
+            isMatch = checkpw(password, encrypedPassword);
+            if (isMatch) {
+                userPasswordAuthCache.put(encrypedPassword, password);
+            }
+        }
+
+        return isMatch;
     }
 }
