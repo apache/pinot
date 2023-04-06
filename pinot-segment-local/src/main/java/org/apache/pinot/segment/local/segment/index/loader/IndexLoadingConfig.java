@@ -766,7 +766,7 @@ public class IndexLoadingConfig {
     if (_segmentTier == null || _starTreeIndexConfigsTierOverwrites == null) {
       return unmodifiable(_starTreeIndexConfigs);
     }
-    return _starTreeIndexConfigsTierOverwrites.getOrDefault(_segmentTier, _starTreeIndexConfigs);
+    return unmodifiable(_starTreeIndexConfigsTierOverwrites.getOrDefault(_segmentTier, _starTreeIndexConfigs));
   }
 
   public boolean isEnableDefaultStarTree() {
