@@ -33,6 +33,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -764,6 +765,11 @@ public class ClusterIntegrationTestUtils {
         if (columnType == Types.ARRAY) {
           // Multi-value column
           reusableColumnOrder.add(columnName);
+          if (columnValue.contains(",")) {
+            columnValue = Arrays.toString(Arrays.stream(
+                    columnValue.substring(1, columnValue.length() - 1).split(","))
+                .map(String::trim).sorted().toArray());
+          }
           reusableExpectedValueMap.put(columnName, columnValue);
         } else {
           // Single-value column
