@@ -19,8 +19,10 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class GreatestTransformFunction extends SelectTupleElementTransformFunction {
@@ -35,6 +37,22 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     initIntValuesSV(numDocs);
     int[] values = _arguments.get(0).transformToIntValuesSV(valueBlock);
     System.arraycopy(values, 0, _intValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToIntValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _intValuesSV[j] = Math.max(_intValuesSV[j], values[j]);
+      }
+    }
+    return _intValuesSV;
+  }
+
+  @Override
+  public Pair<int[], RoaringBitmap> transformToIntValuesSVWithNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
+    Pair<int[], RoaringBitmap> values = _arguments.get(0).transformToIntValuesSVWithNull(valueBlock);
+    System.arraycopy(values.getLeft(), 0, _intValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
       values = _arguments.get(i).transformToIntValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < values.length; j++) {
