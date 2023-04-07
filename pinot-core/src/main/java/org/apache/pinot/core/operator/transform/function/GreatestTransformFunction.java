@@ -59,14 +59,18 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(curNull == null || !curNull.contains(j)) {
-          _intValuesSV[j] = Math.max(_intValuesSV[j], values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _intValuesSV[j] = values.getLeft()[j];
+          } else {
+            _intValuesSV[j] = Math.max(_intValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      if(nullBitmap != null) {
+      if (nullBitmap != null && curNull != null) {
         nullBitmap.and(curNull);
       } else {
-        nullBitmap = curNull;
+        nullBitmap = null;
       }
     }
     return ImmutablePair.of(_intValuesSV, nullBitmap);
@@ -99,14 +103,18 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(curNull == null || !curNull.contains(j)) {
-          _longValuesSV[j] = Math.max(_longValuesSV[j], values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _longValuesSV[j] = values.getLeft()[j];
+          } else {
+            _longValuesSV[j] = Math.max(_longValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      if(nullBitmap != null) {
+      if (nullBitmap != null && curNull != null) {
         nullBitmap.and(curNull);
       } else {
-        nullBitmap = curNull;
+        nullBitmap = null;
       }
     }
     return ImmutablePair.of(_longValuesSV, nullBitmap);
@@ -139,14 +147,18 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(curNull != null || !curNull.contains(j)) {
-          _floatValuesSV[j] = Math.max(_floatValuesSV[j], values.getLeft()[j]);
+        if (curNull != null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _floatValuesSV[j] = values.getLeft()[j];
+          } else {
+            _floatValuesSV[j] = Math.max(_floatValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      if(nullBitmap != null) {
+      if (nullBitmap != null && curNull != null) {
         nullBitmap.and(curNull);
       } else {
-        nullBitmap = curNull;
+        nullBitmap = null;
       }
     }
     return ImmutablePair.of(_floatValuesSV, nullBitmap);
@@ -179,17 +191,18 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(curNull == null || !curNull.contains(j)) {
-          _doubleValuesSV[j] = Math.max(_doubleValuesSV[j], values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _doubleValuesSV[j] = values.getLeft()[j];
+          } else {
+            _doubleValuesSV[j] = Math.max(_doubleValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      if(curNull == null){
-        continue;
-      }
-      if(nullBitmap != null) {
+      if (nullBitmap != null && curNull != null) {
         nullBitmap.and(curNull);
       } else {
-        nullBitmap = curNull;
+        nullBitmap = null;
       }
     }
     return ImmutablePair.of(_doubleValuesSV, nullBitmap);
@@ -222,14 +235,18 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(curNull == null || !curNull.contains(j)) {
-          _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].max(values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _bigDecimalValuesSV[j] = values.getLeft()[j];
+          } else {
+            _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].max(values.getLeft()[j]);
+          }
         }
       }
-      if(nullBitmap != null) {
+      if (nullBitmap != null && curNull != null) {
         nullBitmap.and(curNull);
       } else {
-        nullBitmap = curNull;
+        nullBitmap = null;
       }
     }
     return ImmutablePair.of(_bigDecimalValuesSV, nullBitmap);
@@ -264,28 +281,20 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if((curNull != null || !curNull.contains(j)) && _stringValuesSV[j].compareTo(values.getLeft()[j]) < 0) {
-          _stringValuesSV[j] = values.getLeft()[j];
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _stringValuesSV[j] = values.getLeft()[j];
+          } else if (_stringValuesSV[j].compareTo(values.getLeft()[j]) < 0) {
+            _stringValuesSV[j] = values.getLeft()[j];
+          }
         }
       }
-      if(nullBitmap != null) {
+      if (nullBitmap != null && curNull != null) {
         nullBitmap.and(curNull);
       } else {
-        nullBitmap = curNull;
+        nullBitmap = null;
       }
     }
     return ImmutablePair.of(_stringValuesSV, nullBitmap);
-  }
-
-  @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    RoaringBitmap bitmap = new RoaringBitmap();
-    for(TransformFunction arg: _arguments){
-      bitmap.and(arg.getNullBitmap(valueBlock));
-    }
-    if(bitmap.isEmpty()){
-      return null;
-    }
-    return bitmap;
   }
 }

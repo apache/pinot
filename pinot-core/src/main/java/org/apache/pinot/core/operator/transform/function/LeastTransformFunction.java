@@ -59,11 +59,19 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(!curNull.contains(j)) {
-          _intValuesSV[j] = Math.min(_intValuesSV[j], values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _intValuesSV[j] = values.getLeft()[j];
+          } else {
+            _intValuesSV[j] = Math.min(_intValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      nullBitmap.and(curNull);
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
     }
     return ImmutablePair.of(_intValuesSV, nullBitmap);
   }
@@ -95,11 +103,19 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(!curNull.contains(j)) {
-          _longValuesSV[j] = Math.min(_longValuesSV[j], values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _longValuesSV[j] = values.getLeft()[j];
+          } else {
+            _longValuesSV[j] = Math.min(_longValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      nullBitmap.and(curNull);
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
     }
     return ImmutablePair.of(_longValuesSV, nullBitmap);
   }
@@ -122,7 +138,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public Pair<float[], RoaringBitmap> transformToFloatValuesSVWithNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    initLongValuesSV(numDocs);
+    initFloatValuesSV(numDocs);
     Pair<float[], RoaringBitmap> values = _arguments.get(0).transformToFloatValuesSVWithNull(valueBlock);
     System.arraycopy(values.getLeft(), 0, _floatValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
@@ -131,11 +147,19 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(!curNull.contains(j)) {
-          _floatValuesSV[j] = Math.min(_floatValuesSV[j], values.getLeft()[j]);
+        if (curNull != null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _floatValuesSV[j] = values.getLeft()[j];
+          } else {
+            _floatValuesSV[j] = Math.min(_floatValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      nullBitmap.and(curNull);
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
     }
     return ImmutablePair.of(_floatValuesSV, nullBitmap);
   }
@@ -158,7 +182,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public Pair<double[], RoaringBitmap> transformToDoubleValuesSVWithNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    initLongValuesSV(numDocs);
+    initDoubleValuesSV(numDocs);
     Pair<double[], RoaringBitmap> values = _arguments.get(0).transformToDoubleValuesSVWithNull(valueBlock);
     System.arraycopy(values.getLeft(), 0, _doubleValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
@@ -167,11 +191,19 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(!curNull.contains(j)) {
-          _doubleValuesSV[j] = Math.min(_doubleValuesSV[j], values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _doubleValuesSV[j] = values.getLeft()[j];
+          } else {
+            _doubleValuesSV[j] = Math.min(_doubleValuesSV[j], values.getLeft()[j]);
+          }
         }
       }
-      nullBitmap.and(curNull);
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
     }
     return ImmutablePair.of(_doubleValuesSV, nullBitmap);
   }
@@ -194,7 +226,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public Pair<BigDecimal[], RoaringBitmap> transformToBigDecimalValuesSVWithNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    initLongValuesSV(numDocs);
+    initBigDecimalValuesSV(numDocs);
     Pair<BigDecimal[], RoaringBitmap> values = _arguments.get(0).transformToBigDecimalValuesSVWithNull(valueBlock);
     System.arraycopy(values.getLeft(), 0, _bigDecimalValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
@@ -203,11 +235,19 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(!curNull.contains(j)) {
-          _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].min(values.getLeft()[j]);
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _bigDecimalValuesSV[j] = values.getLeft()[j];
+          } else {
+            _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].min(values.getLeft()[j]);
+          }
         }
       }
-      nullBitmap.and(curNull);
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
     }
     return ImmutablePair.of(_bigDecimalValuesSV, nullBitmap);
   }
@@ -232,7 +272,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public Pair<String[], RoaringBitmap> transformToStringValuesSVWithNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    initLongValuesSV(numDocs);
+    initStringValuesSV(numDocs);
     Pair<String[], RoaringBitmap> values = _arguments.get(0).transformToStringValuesSVWithNull(valueBlock);
     System.arraycopy(values.getLeft(), 0, _stringValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
@@ -241,24 +281,20 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
         // Ignore null values.
-        if(!curNull.contains(j) && _stringValuesSV[j].compareTo(values.getLeft()[j]) < 0) {
-          _stringValuesSV[j] = values.getLeft()[j];
+        if (curNull == null || !curNull.contains(j)) {
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _stringValuesSV[j] = values.getLeft()[j];
+          } else if (_stringValuesSV[j].compareTo(values.getLeft()[j]) > 0) {
+            _stringValuesSV[j] = values.getLeft()[j];
+          }
         }
       }
-      nullBitmap.and(curNull);
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
     }
     return ImmutablePair.of(_stringValuesSV, nullBitmap);
-  }
-
-  @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    RoaringBitmap bitmap = new RoaringBitmap();
-    for(TransformFunction arg: _arguments){
-      bitmap.and(arg.getNullBitmap(valueBlock));
-    }
-    if(bitmap.isEmpty()){
-      return null;
-    }
-    return bitmap;
   }
 }

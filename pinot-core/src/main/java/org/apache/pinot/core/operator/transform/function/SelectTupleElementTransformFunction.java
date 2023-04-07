@@ -23,8 +23,10 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class SelectTupleElementTransformFunction extends BaseTransformFunction {
@@ -63,7 +65,8 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
       }
       if (dataType == null) {
         dataType = argumentType;
-      } else if (ACCEPTABLE_COMBINATIONS.get(dataType).contains(argumentType) || argumentType.isUnknown()) {
+      } else if (dataType.isUnknown() || argumentType.isUnknown() || ACCEPTABLE_COMBINATIONS.get(dataType)
+          .contains(argumentType)) {
         dataType = getLowestCommonDenominatorType(dataType, argumentType);
       } else {
         throw new IllegalArgumentException(
@@ -82,6 +85,23 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
   @Override
   public String getName() {
     return _name;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    RoaringBitmap bitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    for (int i = 1; i < _arguments.size(); i++) {
+      RoaringBitmap curBitmap = _arguments.get(i).getNullBitmap(valueBlock);
+      if (bitmap != null && curBitmap != null) {
+        bitmap.and(curBitmap);
+      } else {
+        bitmap = null;
+      }
+    }
+    if (bitmap == null || bitmap.isEmpty()) {
+      return null;
+    }
+    return bitmap;
   }
 
   private static FieldSpec.DataType getLowestCommonDenominatorType(FieldSpec.DataType left, FieldSpec.DataType right) {
