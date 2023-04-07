@@ -214,7 +214,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _longValuesSV[i] = (long) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _longValuesSV[i] = (long) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -254,7 +254,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _floatValuesSV[i] = (float) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _floatValuesSV[i] = (float) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -294,7 +294,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _doubleValuesSV[i] = (double) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _doubleValuesSV[i] = (double) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -334,7 +334,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _bigDecimalValuesSV[i] = (BigDecimal) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _bigDecimalValuesSV[i] = (BigDecimal) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -376,7 +376,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _stringValuesSV[i] = (String) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _stringValuesSV[i] = (String) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -416,7 +416,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _bytesValuesSV[i] = (byte[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _bytesValuesSV[i] = (byte[]) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -456,7 +456,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _intValuesMV[i] = (int[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _intValuesMV[i] = (int[]) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -496,7 +496,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _longValuesMV[i] = (long[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _longValuesMV[i] = (long[]) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -536,7 +536,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _floatValuesMV[i] = (float[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _floatValuesMV[i] = (float[]) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -576,7 +576,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _doubleValuesMV[i] = (double[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _doubleValuesMV[i] = (double[]) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
@@ -616,7 +616,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _stringValuesMV[i] = (String[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+        _stringValuesMV[i] = (String[]) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
