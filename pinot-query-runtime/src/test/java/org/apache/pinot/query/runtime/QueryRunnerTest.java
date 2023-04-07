@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -95,7 +94,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1")
         .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
         .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
