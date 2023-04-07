@@ -221,10 +221,12 @@ public class QueryRunner {
               deadlineMs, distributedStagePlan.getMetadataMap(), isTraceEnabled);
       MultiStageOperator leafStageOperator =
           new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
+      leafStageOperator.getOperatorId().setOperatorIndex(1);
       mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext, leafStageOperator,
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(),
           sendNode.getCollationDirections(), sendNode.isSortOnSender(), sendNode.getStageId(),
           sendNode.getReceiverStageId());
+      mailboxSendOperator.getOperatorId().setOperatorIndex(0);
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);

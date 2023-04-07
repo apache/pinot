@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Joiner;
 import java.util.List;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -32,14 +32,14 @@ import org.slf4j.LoggerFactory;
 public abstract class MultiStageOperator implements Operator<TransferableBlock>, AutoCloseable {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
-  private final String _operatorId;
-  private final OpChainExecutionContext _context;
+  private final OperatorId _operatorId;
+  protected final OpChainExecutionContext _context;
   protected final OpChainStats _opChainStats;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
-    _operatorId =
-        Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
+    _operatorId = new OperatorId(_context.getRequestId(), _context.getStageId(), _context.getServer().toString(),
+        toExplainString(), null);
     _opChainStats = _context.getStats();
   }
 
@@ -63,7 +63,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     }
   }
 
-  public String getOperatorId() {
+  public OperatorId getOperatorId() {
     return _operatorId;
   }
 

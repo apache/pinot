@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;

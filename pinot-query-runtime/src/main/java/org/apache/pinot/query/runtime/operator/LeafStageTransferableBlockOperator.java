@@ -66,6 +66,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private final List<InstanceResponseBlock> _baseResultBlock;
   private final DataSchema _desiredDataSchema;
   private int _currentIndex;
+  private boolean _statsCollected = false;
 
   public LeafStageTransferableBlockOperator(OpChainExecutionContext context,
       List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
@@ -74,10 +75,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
-    for (InstanceResponseBlock instanceResponseBlock : baseResultBlock) {
-      OperatorStats operatorStats = _opChainStats.getOperatorStats(context, getOperatorId());
-      operatorStats.recordExecutionStats(instanceResponseBlock.getResponseMetadata());
-    }
   }
 
   @Override
@@ -93,6 +90,14 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    if (!_statsCollected) {
+      for (InstanceResponseBlock instanceResponseBlock : _baseResultBlock) {
+        OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
+        operatorStats.recordExecutionStats(instanceResponseBlock.getResponseMetadata());
+      }
+      _statsCollected = true;
+    }
+
     if (_currentIndex < 0) {
       throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
     }

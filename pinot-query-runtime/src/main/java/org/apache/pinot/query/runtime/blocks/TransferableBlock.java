@@ -28,6 +28,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
@@ -67,7 +68,7 @@ public class TransferableBlock implements Block {
     _numRows = _dataBlock.getNumberOfRows();
   }
 
-  public Map<String, OperatorStats> getResultMetadata() {
+  public Map<OperatorId, OperatorStats> getResultMetadata() {
     if (isSuccessfulEndOfStreamBlock()) {
       return OperatorUtils.getOperatorStatsFromMetadata((MetadataBlock) _dataBlock);
     }

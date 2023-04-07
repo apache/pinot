@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -43,7 +45,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 public class ExecutionStatsAggregator {
   private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-  private final Map<String, Map<String, String>> _operatorStats = new HashMap<>();
+  private final Map<OperatorId, Map<String, String>> _operatorStats = new TreeMap<>();
   private final Set<String> _tableNames = new HashSet<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final boolean _enableTrace;
@@ -125,9 +127,9 @@ public class ExecutionStatsAggregator {
     String operatorId = metadata.get(DataTable.MetadataKey.OPERATOR_ID.getName());
     if (operatorId != null) {
       if (_enableTrace) {
-        _operatorStats.put(operatorId, metadata);
+        _operatorStats.put(OperatorId.fromString(operatorId), metadata);
       } else {
-        _operatorStats.put(operatorId, new HashMap<>());
+        _operatorStats.put(OperatorId.fromString(operatorId), new HashMap<>());
       }
     }
 

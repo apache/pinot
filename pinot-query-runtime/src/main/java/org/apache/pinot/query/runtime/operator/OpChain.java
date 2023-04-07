@@ -42,6 +42,7 @@ public class OpChain implements AutoCloseable {
     _receivingMailbox = new HashSet<>(receivingMailboxes);
     _id = context.getId();
     _stats = context.getStats();
+    _stats.initializeStats(context, root);
   }
 
   public Operator<TransferableBlock> getRoot() {
