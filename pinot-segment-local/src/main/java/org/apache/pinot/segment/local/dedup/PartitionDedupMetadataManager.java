@@ -81,7 +81,7 @@ public class PartitionDedupMetadataManager {
     if (pk instanceof ByteArray) {
       return ((ByteArray) pk).getBytes();
     }
-    throw new RuntimeException();
+    throw new RuntimeException("Invalid primary key: " + pk);
   }
 
   public void removeSegment(IndexSegment segment) {
