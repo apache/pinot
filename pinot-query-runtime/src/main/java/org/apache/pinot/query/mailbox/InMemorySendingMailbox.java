@@ -55,8 +55,8 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   @Override
   public void complete() throws Exception {
-    _gotMailCallback.accept(_mailboxId);
     _transferStream.complete();
+    _gotMailCallback.accept(_mailboxId);
   }
 
   @Override
@@ -69,6 +69,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
     if (isInitialized() && !_transferStream.isCancelled()) {
       _transferStream.cancel();
     }
+    _gotMailCallback.accept(_mailboxId);
   }
 
   private void initialize() {
