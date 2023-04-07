@@ -1329,7 +1329,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(offset=[0], fetch=[10])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(col1=[$0], $1=[$2])",
           "\n        LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",

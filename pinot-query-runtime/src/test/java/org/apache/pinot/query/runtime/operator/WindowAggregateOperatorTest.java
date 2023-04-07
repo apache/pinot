@@ -46,6 +46,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
 
 
@@ -393,7 +394,7 @@ public class WindowAggregateOperatorTest {
     // TODO: Remove this test when support is added for RANK functions
     // Given:
     List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.ROW_NUMBER, FieldSpec.DataType.INT, "RANK", ImmutableList.of()));
+        new RexExpression.FunctionCall(SqlKind.RANK, FieldSpec.DataType.INT, "RANK", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
     DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
@@ -423,7 +424,7 @@ public class WindowAggregateOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "row_number"}, new DataSchema.ColumnDataType[]{INT, STRING, LONG});
 
     // When:
     WindowAggregateOperator operator =
@@ -438,10 +439,10 @@ public class WindowAggregateOperatorTest {
     TransferableBlock eosBlock = operator.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     Map<Integer, List<Object[]>> expectedPartitionToRowsMap = new HashMap<>();
-    expectedPartitionToRowsMap.put(1, Collections.singletonList(new Object[]{1, "foo", 1}));
-    expectedPartitionToRowsMap.put(2, Arrays.asList(new Object[]{2, "bar", 1}, new Object[]{2, "foo", 2.0},
-        new Object[]{2, "foo", 3.0}, new Object[]{2, "the", 4.0}));
-    expectedPartitionToRowsMap.put(3, Arrays.asList(new Object[]{3, "and", 1}, new Object[]{3, "true", 2.0}));
+    expectedPartitionToRowsMap.put(1, Collections.singletonList(new Object[]{1, "foo", 1L}));
+    expectedPartitionToRowsMap.put(2, Arrays.asList(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L},
+        new Object[]{2, "foo", 3L}, new Object[]{2, "the", 4L}));
+    expectedPartitionToRowsMap.put(3, Arrays.asList(new Object[]{3, "and", 1L}, new Object[]{3, "true", 2L}));
 
     Integer previousPartitionKey = null;
     Map<Integer, List<Object[]>> resultsPartitionToRowsMap = new HashMap<>();

@@ -401,12 +401,12 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     @Override
     public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
-      return 1;
+      return 1L;
     }
 
     @Override
     public Object merge(Object left, Object right) {
-      return ((Number) left).doubleValue() + 1;
+      return ((Number) left).longValue() + 1L;
     }
   }
 
