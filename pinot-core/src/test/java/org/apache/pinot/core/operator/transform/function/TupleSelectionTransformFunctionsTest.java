@@ -19,11 +19,13 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -300,6 +302,17 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(doubleValues[i], Math.max(Math.max(_intSVValues[i], -1), _doubleSVValues[i]));
+    }
+  }
+
+  @Test
+  public void testGreatestTransformFunctionNullLiteral() {
+    TransformFunction transformFunction =
+        testGreatestPreconditions(String.format("greatest(%s, null, %s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
+    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(doubleValues.getLeft()[i], Math.max(_intSVValues[i], _doubleSVValues[i]));
     }
   }
 

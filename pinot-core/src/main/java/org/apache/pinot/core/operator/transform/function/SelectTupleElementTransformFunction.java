@@ -31,7 +31,7 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
 
   private static final EnumSet<FieldSpec.DataType> SUPPORTED_DATATYPES = EnumSet.of(FieldSpec.DataType.INT,
       FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.BIG_DECIMAL,
-      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING);
+      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING, FieldSpec.DataType.UNKNOWN);
 
   private static final EnumMap<FieldSpec.DataType, EnumSet<FieldSpec.DataType>> ACCEPTABLE_COMBINATIONS =
       createAcceptableCombinations();
@@ -63,7 +63,7 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
       }
       if (dataType == null) {
         dataType = argumentType;
-      } else if (ACCEPTABLE_COMBINATIONS.get(dataType).contains(argumentType)) {
+      } else if (ACCEPTABLE_COMBINATIONS.get(dataType).contains(argumentType) || argumentType.isUnknown()) {
         dataType = getLowestCommonDenominatorType(dataType, argumentType);
       } else {
         throw new IllegalArgumentException(

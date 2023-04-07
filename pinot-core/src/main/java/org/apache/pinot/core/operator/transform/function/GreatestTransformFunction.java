@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -54,12 +55,21 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     System.arraycopy(values.getLeft(), 0, _intValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToIntValuesSV(valueBlock);
-      for (int j = 0; j < numDocs & j < values.length; j++) {
-        _intValuesSV[j] = Math.max(_intValuesSV[j], values[j]);
+      values = _arguments.get(i).transformToIntValuesSVWithNull(valueBlock);
+      RoaringBitmap curNull = values.getRight();
+      for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
+        // Ignore null values.
+        if(curNull == null || !curNull.contains(j)) {
+          _intValuesSV[j] = Math.max(_intValuesSV[j], values.getLeft()[j]);
+        }
+      }
+      if(nullBitmap != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = curNull;
       }
     }
-    return _intValuesSV;
+    return ImmutablePair.of(_intValuesSV, nullBitmap);
   }
 
   @Override
@@ -78,6 +88,31 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   }
 
   @Override
+  public Pair<long[], RoaringBitmap> transformToLongValuesSVWithNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesSV(numDocs);
+    Pair<long[], RoaringBitmap> values = _arguments.get(0).transformToLongValuesSVWithNull(valueBlock);
+    System.arraycopy(values.getLeft(), 0, _longValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = values.getRight();
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToLongValuesSVWithNull(valueBlock);
+      RoaringBitmap curNull = values.getRight();
+      for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
+        // Ignore null values.
+        if(curNull == null || !curNull.contains(j)) {
+          _longValuesSV[j] = Math.max(_longValuesSV[j], values.getLeft()[j]);
+        }
+      }
+      if(nullBitmap != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = curNull;
+      }
+    }
+    return ImmutablePair.of(_longValuesSV, nullBitmap);
+  }
+
+  @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesSV(numDocs);
@@ -90,6 +125,31 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       }
     }
     return _floatValuesSV;
+  }
+
+  @Override
+  public Pair<float[], RoaringBitmap> transformToFloatValuesSVWithNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initFloatValuesSV(numDocs);
+    Pair<float[], RoaringBitmap> values = _arguments.get(0).transformToFloatValuesSVWithNull(valueBlock);
+    System.arraycopy(values.getLeft(), 0, _floatValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = values.getRight();
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToFloatValuesSVWithNull(valueBlock);
+      RoaringBitmap curNull = values.getRight();
+      for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
+        // Ignore null values.
+        if(curNull != null || !curNull.contains(j)) {
+          _floatValuesSV[j] = Math.max(_floatValuesSV[j], values.getLeft()[j]);
+        }
+      }
+      if(nullBitmap != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = curNull;
+      }
+    }
+    return ImmutablePair.of(_floatValuesSV, nullBitmap);
   }
 
   @Override
@@ -108,6 +168,34 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   }
 
   @Override
+  public Pair<double[], RoaringBitmap> transformToDoubleValuesSVWithNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesSV(numDocs);
+    Pair<double[], RoaringBitmap> values = _arguments.get(0).transformToDoubleValuesSVWithNull(valueBlock);
+    System.arraycopy(values.getLeft(), 0, _doubleValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = values.getRight();
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToDoubleValuesSVWithNull(valueBlock);
+      RoaringBitmap curNull = values.getRight();
+      for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
+        // Ignore null values.
+        if(curNull == null || !curNull.contains(j)) {
+          _doubleValuesSV[j] = Math.max(_doubleValuesSV[j], values.getLeft()[j]);
+        }
+      }
+      if(curNull == null){
+        continue;
+      }
+      if(nullBitmap != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = curNull;
+      }
+    }
+    return ImmutablePair.of(_doubleValuesSV, nullBitmap);
+  }
+
+  @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initBigDecimalValuesSV(numDocs);
@@ -120,6 +208,31 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       }
     }
     return _bigDecimalValuesSV;
+  }
+
+  @Override
+  public Pair<BigDecimal[], RoaringBitmap> transformToBigDecimalValuesSVWithNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(numDocs);
+    Pair<BigDecimal[], RoaringBitmap> values = _arguments.get(0).transformToBigDecimalValuesSVWithNull(valueBlock);
+    System.arraycopy(values.getLeft(), 0, _bigDecimalValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = values.getRight();
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToBigDecimalValuesSVWithNull(valueBlock);
+      RoaringBitmap curNull = values.getRight();
+      for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
+        // Ignore null values.
+        if(curNull == null || !curNull.contains(j)) {
+          _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].max(values.getLeft()[j]);
+        }
+      }
+      if(nullBitmap != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = curNull;
+      }
+    }
+    return ImmutablePair.of(_bigDecimalValuesSV, nullBitmap);
   }
 
   @Override
@@ -137,5 +250,42 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       }
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public Pair<String[], RoaringBitmap> transformToStringValuesSVWithNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
+    Pair<String[], RoaringBitmap> values = _arguments.get(0).transformToStringValuesSVWithNull(valueBlock);
+    System.arraycopy(values.getLeft(), 0, _stringValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = values.getRight();
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToStringValuesSVWithNull(valueBlock);
+      RoaringBitmap curNull = values.getRight();
+      for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
+        // Ignore null values.
+        if((curNull != null || !curNull.contains(j)) && _stringValuesSV[j].compareTo(values.getLeft()[j]) < 0) {
+          _stringValuesSV[j] = values.getLeft()[j];
+        }
+      }
+      if(nullBitmap != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = curNull;
+      }
+    }
+    return ImmutablePair.of(_stringValuesSV, nullBitmap);
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for(TransformFunction arg: _arguments){
+      bitmap.and(arg.getNullBitmap(valueBlock));
+    }
+    if(bitmap.isEmpty()){
+      return null;
+    }
+    return bitmap;
   }
 }
