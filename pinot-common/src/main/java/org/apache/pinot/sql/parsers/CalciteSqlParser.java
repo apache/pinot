@@ -146,11 +146,25 @@ public class CalciteSqlParser {
     if (sqlNode instanceof SqlSelect) {
       SqlNode fromNode = ((SqlSelect) sqlNode).getFrom();
       if (fromNode instanceof SqlJoin) {
-        tableNames.addAll(extractTableNamesFromNode(((SqlJoin) fromNode).getLeft()));
-        tableNames.addAll(extractTableNamesFromNode(((SqlJoin) fromNode).getRight()));
+        SqlNode left = ((SqlJoin) fromNode).getLeft();
+        SqlNode right = ((SqlJoin) fromNode).getRight();
+        if (left instanceof SqlIdentifier) {
+          tableNames.addAll(((SqlIdentifier) left).names);
+        } else {
+          tableNames.addAll(extractTableNamesFromNode(left));
+        }
+        if (right instanceof SqlIdentifier) {
+          tableNames.addAll(((SqlIdentifier) right).names);
+        } else {
+          tableNames.addAll(extractTableNamesFromNode(right));
+        }
       } else {
         tableNames.addAll(((SqlIdentifier) fromNode).names);
         tableNames.addAll(extractTableNamesFromNode(((SqlSelect) sqlNode).getWhere()));
+      }
+    } else if (sqlNode instanceof SqlOrderBy) {
+      for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
+        tableNames.addAll(extractTableNamesFromNode(node));
       }
     } else if (sqlNode instanceof SqlBasicCall) {
       if (((SqlBasicCall) sqlNode).getOperator() instanceof SqlAsOperator) {
@@ -160,10 +174,6 @@ public class CalciteSqlParser {
         for (SqlNode node : ((SqlBasicCall) sqlNode).getOperandList()) {
           tableNames.addAll(extractTableNamesFromNode(node));
         }
-      }
-    } else if (sqlNode instanceof SqlOrderBy) {
-      for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
-        tableNames.addAll(extractTableNamesFromNode(node));
       }
     } else if (sqlNode instanceof SqlWith) {
       List<SqlNode> withList = ((SqlWith) sqlNode).withList;

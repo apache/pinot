@@ -3046,6 +3046,24 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tableNames.get(2), "tbl3");
 
     // query with JOIN clause
+    query = "SELECT tbl1.col1, tbl2.col2 FROM tbl1 JOIN tbl2 ON tbl1.key = tbl2.key WHERE tbl1.col1 = value1";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+
+    // query with WHERE clause JOIN
+    query = "SELECT tbl1.col1, tbl2.col2 FROM tbl1, tbl2 WHERE tbl1.key = tbl2.key AND tbl1.col1 = value1";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+
+    // query with JOIN clause and table alias
     query = "SELECT A.col1, B.col2 FROM tbl1 AS A JOIN tbl2 AS B ON A.key = B.key WHERE A.col1 = value1";
     sqlNodeAndOptions = RequestUtils.parseQuery(query);
     tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
@@ -3058,6 +3076,19 @@ public class CalciteSqlCompilerTest {
     query = "with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1), "
         + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
         + "select sum(col1) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from tbl4)";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+    Assert.assertEquals(tableNames.get(2), "tbl3");
+    Assert.assertEquals(tableNames.get(3), "tbl4");
+
+    // query with aliases, JOIN, IN/NOT-IN, group-by
+    query = "with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1 order by col2), "
+        + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
+        + "select sum(col1) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from tbl4) "
+        + "order by A.col1";
     sqlNodeAndOptions = RequestUtils.parseQuery(query);
     tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
     Assert.assertEquals(tableNames.size(), 4);

@@ -62,6 +62,7 @@ import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,7 +139,7 @@ public class QueryDispatcher {
           dispatchCalls++;
           _executorService.submit(() -> {
             client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
-                QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
+                    QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
                 .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
                 .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
                 .putAllMetadata(queryOptions).build(), stageId, serverInstance, deadline, dispatchCallbacks::offer);
@@ -149,12 +150,13 @@ public class QueryDispatcher {
     int successfulDispatchCalls = 0;
     // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
     while (!deadline.isExpired() && successfulDispatchCalls < dispatchCalls) {
-      AsyncQueryDispatchResponse resp = dispatchCallbacks.poll(
-          DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      AsyncQueryDispatchResponse resp =
+          dispatchCallbacks.poll(DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
-          throw new RuntimeException(String.format("Error dispatching query to server=%s stage=%s",
-              resp.getVirtualServer(), resp.getStageId()), resp.getThrowable());
+          throw new RuntimeException(
+              String.format("Error dispatching query to server=%s stage=%s", resp.getVirtualServer(),
+                  resp.getStageId()), resp.getThrowable());
         } else {
           Worker.QueryResponse response = resp.getQueryResponse();
           if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
@@ -182,8 +184,7 @@ public class QueryDispatcher {
         new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs, timeoutMs,
             queryPlan.getStageMetadataMap());
     MailboxReceiveOperator mailboxReceiveOperator =
-        createReduceStageOperator(
-            reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(), context);
+        createReduceStageOperator(reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(), context);
     List<DataBlock> resultDataBlocks =
         reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, queryPlan, context.getStats());
     return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
@@ -260,7 +261,11 @@ public class QueryDispatcher {
               row[colId++] = null;
             } else {
               int colRef = field.left;
-              row[colId++] = rawRow[colRef];
+              if (rawRow[colRef] instanceof ByteArray) {
+                row[colId++] = ((ByteArray) rawRow[colRef]).toHexString();
+              } else {
+                row[colId++] = rawRow[colRef];
+              }
             }
           }
           rows.add(row);

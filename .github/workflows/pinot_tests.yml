@@ -108,6 +108,8 @@ jobs:
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           flags: unittests${{ matrix.testset }}
           name: codecov-unit-tests
@@ -154,6 +156,8 @@ jobs:
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           flags: integration${{ matrix.testset }}
           name: codecov-integration-tests
