@@ -101,8 +101,9 @@ public class OperatorStats {
     if (_startTimeMs != -1) {
       _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName(),
           String.valueOf(_startTimeMs));
+      long endTimeMs = _endTimeMs == -1 ? System.currentTimeMillis() : _endTimeMs;
       _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName(),
-          String.valueOf(_endTimeMs));
+          String.valueOf(endTimeMs));
     }
     return _executionStats;
   }

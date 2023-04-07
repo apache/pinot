@@ -364,15 +364,14 @@ public class ExecutionStatsAggregator {
       @Nullable BrokerMetrics brokerMetrics) {
     if (_enableTrace) {
       setStats(rawTableName, brokerResponseStats, brokerMetrics);
-      brokerResponseStats.setNumBlocks(_numBlocks);
-      brokerResponseStats.setNumRows(_numRows);
-
-      brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
-      brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
-
       brokerResponseStats.setOperatorStats(_operatorStats);
       brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
     }
+
+    brokerResponseStats.setNumBlocks(_numBlocks);
+    brokerResponseStats.setNumRows(_numRows);
+    brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
+    brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
     if (_stageExecStartTimeMs >= 0 && _stageExecEndTimeMs >= 0) {
       brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
     }
