@@ -195,8 +195,6 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   @Override
   public void cancel(Throwable t) {
     super.cancel(t);
-    if (_upstreamErrorBlock != null) {
-      cleanUpResources();
-    }
+    cleanUpResources();
   }
 }
