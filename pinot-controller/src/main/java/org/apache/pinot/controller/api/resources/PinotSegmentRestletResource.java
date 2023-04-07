@@ -654,11 +654,10 @@ public class PinotSegmentRestletResource {
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
     Map<String, List<String>> serverToSegments;
 
-    String singleSegmentName = null;
-    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.JOB_TYPE)
-        .equals(ControllerJobType.RELOAD_SEGMENT.toString())) {
+    String singleSegmentName =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
+    if (singleSegmentName != null) {
       // No need to query servers where this segment is not supposed to be hosted
-      singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
       serverToSegments = new HashMap<>();
       List<String> segmentList = Arrays.asList(singleSegmentName);
       _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
