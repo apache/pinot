@@ -70,7 +70,7 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
         RelDistributions.hash(Collections.emptyList()),
         sort.getCollation(),
         false,
-        true);
+        !sort.getCollation().getKeys().isEmpty());
     call.transformTo(LogicalSort.create(exchange, sort.getCollation(), sort.offset, sort.fetch));
   }
 }

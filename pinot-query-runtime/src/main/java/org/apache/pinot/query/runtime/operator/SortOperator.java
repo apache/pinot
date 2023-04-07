@@ -80,8 +80,10 @@ public class SortOperator extends MultiStageOperator {
       _priorityQueue = null;
       _rows = new ArrayList<>();
     } else {
+      // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
+      // which elements to keep and which to remove based on the limits.
       _priorityQueue = new PriorityQueue<>(_numRowsToKeep,
-          new SortUtils.SortComparator(collationKeys, collationDirections, dataSchema, false));
+          new SortUtils.SortComparator(collationKeys, collationDirections, dataSchema, false, true));
       _rows = null;
     }
   }
