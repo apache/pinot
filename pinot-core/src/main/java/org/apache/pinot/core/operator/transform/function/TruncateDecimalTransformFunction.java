@@ -43,6 +43,7 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     int numArguments = arguments.size();
     // Check that there are more than 2 arguments or no arguments
     if (numArguments < 1 || numArguments > 2) {
