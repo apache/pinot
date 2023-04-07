@@ -97,7 +97,7 @@ public class SortedMailboxReceiveOperatorTest {
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 10L, 10L,
-            new HashMap<>());
+            new HashMap<>(), false);
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, collationKeys,
             collationDirections, false, true, inSchema, 456, 789, 10L);
@@ -109,14 +109,14 @@ public class SortedMailboxReceiveOperatorTest {
 
     // longer timeout or default timeout (10s) doesn't result in error.
     context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 2000L, 2000L,
-        new HashMap<>());
+        new HashMap<>(), false);
     receiveOp = new SortedMailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON,
         collationKeys, collationDirections, false, true, inSchema, 456, 789, 2000L);
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
     Assert.assertFalse(mailbox.isErrorBlock());
     context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-        Long.MAX_VALUE, new HashMap<>());
+        Long.MAX_VALUE, new HashMap<>(), false);
     receiveOp = new SortedMailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON,
         collationKeys, collationDirections, false, true, inSchema, 456, 789, null);
     Thread.sleep(200L);
@@ -146,7 +146,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
             collationKeys, collationDirections, false, true, inSchema, 456, 789, null);
@@ -172,7 +172,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
     SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
         ImmutableList.of(_server1, _server2), RelDistribution.Type.RANGE_DISTRIBUTED, collationKeys,
         collationDirections, false, true, inSchema, 456, 789, null);
@@ -208,7 +208,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -254,7 +254,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -303,7 +303,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -350,7 +350,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -398,7 +398,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -450,7 +450,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -489,7 +489,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
@@ -526,7 +526,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
@@ -574,7 +574,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
@@ -630,7 +630,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
@@ -686,7 +686,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
@@ -739,7 +739,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp =
         new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
@@ -798,7 +798,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
         ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirection,
@@ -882,7 +882,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
         ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirection,

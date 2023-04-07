@@ -217,8 +217,7 @@ public class OpChainTest {
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, ImmutableList.of(_server),
-            RelDistribution.Type.BROADCAST_DISTRIBUTED, Collections.emptyList(), Collections.emptyList(), false, false,
-            null, senderStageId, receivedStageId + 1, null);
+            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1, null);
 
     Assert.assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
     int numOperators = operators.size();
@@ -260,8 +259,7 @@ public class OpChainTest {
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, ImmutableList.of(_server),
-            RelDistribution.Type.BROADCAST_DISTRIBUTED, Collections.emptyList(), Collections.emptyList(), false, false,
-            null, senderStageId, receivedStageId + 1, null);
+            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1, null);
 
     Assert.assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
     Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 2);
