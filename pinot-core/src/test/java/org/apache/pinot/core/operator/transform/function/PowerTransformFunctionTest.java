@@ -115,8 +115,6 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.POWER.getName());
-    Assert.assertEquals(transformFunction.getName(),  TransformFunctionType.POWER.getName());
-    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.POWER.getName());
     double[] expectedValues = new double[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {

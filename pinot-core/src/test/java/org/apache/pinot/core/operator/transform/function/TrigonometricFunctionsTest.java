@@ -174,7 +174,6 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
         bitmap.add(i);
       }
     }
-    bitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 }

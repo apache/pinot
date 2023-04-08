@@ -290,36 +290,6 @@ public abstract class BaseTransformFunctionTest {
     testNullBitmap(transformFunction, expectedNull);
   }
 
-  protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
-      RoaringBitmap expectedNull) {
-    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
-    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
-    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
-    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues =
-        transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
-    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
-    assertEquals(intValues.getRight(), expectedNull);
-    assertEquals(longValues.getRight(), expectedNull);
-    assertEquals(floatValues.getRight(), expectedNull);
-    assertEquals(doubleValues.getRight(), expectedNull);
-    assertEquals(bigDecimalValues.getRight(), expectedNull);
-    assertEquals(stringValues.getRight(), expectedNull);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      if (expectedNull.contains(i)) {
-        continue;
-      }
-      // only compare the rows that are not null.
-      assertEquals(intValues.getLeft()[i], expectedValues[i]);
-      assertEquals(longValues.getLeft()[i], expectedValues[i]);
-      assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
-      assertEquals(doubleValues.getLeft()[i], (double) expectedValues[i]);
-      assertEquals(bigDecimalValues.getLeft()[i].intValue(), expectedValues[i]);
-      assertEquals(stringValues.getLeft()[i], Integer.toString(expectedValues[i]));
-    }
-    testNullBitmap(transformFunction, expectedNull);
-  }
-
   protected void testTransformFunction(TransformFunction transformFunction, long[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
@@ -487,33 +457,6 @@ public abstract class BaseTransformFunctionTest {
     testNullBitmap(transformFunction, null);
   }
 
-  protected void testTransformFunctionWithNull(TransformFunction transformFunction, boolean[] expectedValues,
-      RoaringBitmap expectedNulls) {
-    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
-    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
-    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
-    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues =
-        transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
-    assertEquals(intValues.getRight(), expectedNulls);
-    assertEquals(longValues.getRight(), expectedNulls);
-    assertEquals(floatValues.getRight(), expectedNulls);
-    assertEquals(doubleValues.getRight(), expectedNulls);
-    assertEquals(bigDecimalValues.getRight(), expectedNulls);
-
-    for (int i = 0; i < NUM_ROWS; i++) {
-      if (expectedNulls.contains(i)) {
-        continue;
-      }
-      assertEquals(intValues.getLeft()[i] == 1, expectedValues[i]);
-      assertEquals(longValues.getLeft()[i] == 1, expectedValues[i]);
-      assertEquals(floatValues.getLeft()[i] == 1, expectedValues[i]);
-      assertEquals(doubleValues.getLeft()[i] == 1, expectedValues[i]);
-      assertEquals(bigDecimalValues.getLeft()[i].intValue() == 1, expectedValues[i]);
-    }
-    testNullBitmap(transformFunction, expectedNulls);
-  }
-
   protected void testTransformFunction(TransformFunction transformFunction, Timestamp[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
@@ -666,15 +609,6 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValuesMV[i], expectedValues[i]);
     }
     testNullBitmap(transformFunction, null);
-  }
-
-  protected void testTransformFunctionWithNull(TransformFunction transformFunction, String[] expectedValues,
-      RoaringBitmap expectedNulls) {
-    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(stringValues.getLeft()[i], expectedValues[i]);
-    }
-    assertEquals(stringValues.getRight(), expectedNulls);
   }
 
   @AfterClass

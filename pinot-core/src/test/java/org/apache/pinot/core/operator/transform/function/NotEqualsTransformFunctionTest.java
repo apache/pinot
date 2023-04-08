@@ -45,10 +45,6 @@ public class NotEqualsTransformFunctionTest extends BinaryOperatorTransformFunct
     Assert.assertTrue(transformFunction instanceof NotEqualsTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not_equals");
     int[] expectedValues = new int[NUM_ROWS];
-
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.add(0L, NUM_ROWS);
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

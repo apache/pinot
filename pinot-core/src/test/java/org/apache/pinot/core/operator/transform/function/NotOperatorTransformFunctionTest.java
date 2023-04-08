@@ -94,8 +94,7 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
 
   @Test
   public void testNotNullLiteral() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("Not(null)", INT_SV_NULL_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("Not(null)", INT_SV_NULL_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof NotOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "not");

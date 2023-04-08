@@ -95,7 +95,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if(i % 2 == 0) {
+      if (i % 2 == 0) {
         expectedValues[i] = Math.abs(_intSVValues[i]);
       } else {
         bitmap.add(i);
@@ -518,8 +518,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpression(
-        String.format("log10(%s)", INT_SV_NULL_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("log10(%s)", INT_SV_NULL_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -632,8 +631,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.signum(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
-    expression = RequestContextUtils.getExpression(
-        String.format("sign(%s)", INT_SV_NULL_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("sign(%s)", INT_SV_NULL_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
