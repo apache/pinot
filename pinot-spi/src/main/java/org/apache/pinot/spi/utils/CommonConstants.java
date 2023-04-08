@@ -225,6 +225,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
+    // Comma separated list of packages that contains javax service resources.
+    public static final String BROKER_RESOURCE_PACKAGES = "broker.restlet.api.resource.packages";
+    public static final String DEFAULT_BROKER_RESOURCE_PACKAGES = "org.apache.pinot.broker.api.resources";
+
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
@@ -259,6 +263,7 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
+    public static final String DEFAULT_BROKER_RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
 
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
