@@ -28,6 +28,7 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.NlsString;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -49,6 +50,10 @@ public interface RexExpression {
     } else if (rexNode instanceof RexLiteral) {
       RexLiteral rexLiteral = ((RexLiteral) rexNode);
       FieldSpec.DataType dataType = RelToStageConverter.convertToFieldSpecDataType(rexLiteral.getType());
+      //Added to set the DataType as UNKNOWN
+      if (rexLiteral.getTypeName() == SqlTypeName.NULL) {
+        dataType = FieldSpec.DataType.UNKNOWN;
+      }
       return new RexExpression.Literal(dataType, toRexValue(dataType, rexLiteral.getValue()));
     } else if (rexNode instanceof RexCall) {
       RexCall rexCall = (RexCall) rexNode;
