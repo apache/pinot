@@ -454,7 +454,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(doubleValues.getLeft()[i] == 1, expectedValues[i]);
       assertEquals(bigDecimalValues.getLeft()[i].intValue() == 1, expectedValues[i]);
     }
-    testNullBitmap(transformFunction, null);
+    testNullBitmap(transformFunction, expectedNulls);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, Timestamp[] expectedValues) {
