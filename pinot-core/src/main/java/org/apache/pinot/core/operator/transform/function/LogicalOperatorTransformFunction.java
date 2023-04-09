@@ -51,10 +51,6 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
       Preconditions.checkState(
           argumentMetadata.isSingleValue() && storedType.isNumeric() || storedType.isUnknown(),
           "Unsupported argument type. Expecting single-valued boolean/number");
-      if (!(argumentMetadata.isSingleValue() && storedType.isNumeric()) && !storedType.isUnknown()) {
-        throw new IllegalArgumentException(
-            "Unsupported argument of index: " + i + ", expecting single-valued boolean/number");
-      }
     }
   }
 
