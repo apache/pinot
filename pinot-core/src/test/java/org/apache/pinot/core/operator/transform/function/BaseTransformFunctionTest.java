@@ -278,39 +278,6 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
     testNullBitmap(transformFunction, null);
-<<<<<<< HEAD
-  }
-
-  protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
-      RoaringBitmap expectedNull) {
-    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
-    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
-    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
-    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues =
-        transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
-    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
-    assertEquals(intValues.getRight(), expectedNull);
-    assertEquals(longValues.getRight(), expectedNull);
-    assertEquals(floatValues.getRight(), expectedNull);
-    assertEquals(doubleValues.getRight(), expectedNull);
-    assertEquals(bigDecimalValues.getRight(), expectedNull);
-    assertEquals(stringValues.getRight(), expectedNull);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      if (expectedNull.contains(i)) {
-        continue;
-      }
-      // only compare the rows that are not null.
-      assertEquals(intValues.getLeft()[i], expectedValues[i]);
-      assertEquals(longValues.getLeft()[i], expectedValues[i]);
-      assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
-      assertEquals(doubleValues.getLeft()[i], (double) expectedValues[i]);
-      assertEquals(bigDecimalValues.getLeft()[i].intValue(), expectedValues[i]);
-      assertEquals(stringValues.getLeft()[i], Integer.toString(expectedValues[i]));
-    }
-    testNullBitmap(transformFunction, expectedNull);
-=======
->>>>>>> 28051f2dda (add nullbitmap test)
   }
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
