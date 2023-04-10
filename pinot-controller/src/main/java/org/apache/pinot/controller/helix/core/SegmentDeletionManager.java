@@ -85,7 +85,7 @@ public class SegmentDeletionManager {
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
-  private final ConcurrentLinkedQueue<SegmentDeletionHook> _concurrentLinkedQueue;
+  private final ConcurrentLinkedQueue<SegmentDeletionHook> _segmentDeletionHooks;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -94,7 +94,7 @@ public class SegmentDeletionManager {
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
     _defaultDeletedSegmentsRetentionMs = TimeUnit.DAYS.toMillis(deletedSegmentsRetentionInDays);
-    _concurrentLinkedQueue = new ConcurrentLinkedQueue<>();
+    _segmentDeletionHooks = new ConcurrentLinkedQueue<>();
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -107,7 +107,7 @@ public class SegmentDeletionManager {
   }
 
   public void registerSegmentDeletionHook(SegmentDeletionHook segmentDeletionHook) {
-    _concurrentLinkedQueue.add(segmentDeletionHook);
+    _segmentDeletionHooks.add(segmentDeletionHook);
   }
 
   public void stop() {
@@ -170,15 +170,19 @@ public class SegmentDeletionManager {
       segmentsToRetryLater.clear();
     }
 
-    for (SegmentDeletionHook segmentDeletionHook : _concurrentLinkedQueue) {
-      segmentDeletionHook.process(tableName, segmentsToDelete);
-    }
-
     if (!segmentsToDelete.isEmpty()) {
       List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
       for (String segmentId : segmentsToDelete) {
         String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
         propStorePathList.add(segmentPropertyStorePath);
+      }
+
+      for (SegmentDeletionHook segmentDeletionHook : _segmentDeletionHooks) {
+        try {
+          segmentDeletionHook.process(tableName, segmentsToDelete);
+        } catch (Exception e) {
+          LOGGER.error("Failed to process segment deletion hook: {}", segmentDeletionHook, e);
+        }
       }
 
       boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
