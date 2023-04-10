@@ -19,7 +19,6 @@
 package org.apache.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashSet;
@@ -50,7 +49,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   // Supported window functions
   // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
   private static final Set<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND = ImmutableSet.of(SqlKind.SUM, SqlKind.SUM0,
-      SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.OTHER_FUNCTION);
+      SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.OTHER_FUNCTION);
 
   public PinotWindowExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalWindow.class, any()), factory, null);
@@ -146,24 +145,17 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   }
 
   private void validateWindowFrames(Window.Group windowGroup) {
-    // Has ROWS only aggregation call kind (e.g. ROW_NUMBER)?
-    boolean isRowsOnlyTypeAggregateCall = isRowsOnlyAggregationCallType(windowGroup.aggCalls);
     // For Phase 1 only the default frame is supported
-    Preconditions.checkState(!windowGroup.isRows || isRowsOnlyTypeAggregateCall,
-        "Default frame must be of type RANGE and not ROWS unless this is a ROWS only aggregation function");
+    Preconditions.checkState(!windowGroup.isRows, "Default frame must be of type RANGE and not ROWS");
     Preconditions.checkState(windowGroup.lowerBound.isPreceding() && windowGroup.lowerBound.isUnbounded(),
         String.format("Lower bound must be UNBOUNDED PRECEDING but it is: %s", windowGroup.lowerBound));
-    if (windowGroup.orderKeys.getKeys().isEmpty() && !isRowsOnlyTypeAggregateCall) {
+    if (windowGroup.orderKeys.getKeys().isEmpty()) {
       Preconditions.checkState(windowGroup.upperBound.isFollowing() && windowGroup.upperBound.isUnbounded(),
-          String.format("Upper bound must be UNBOUNDED FOLLOWING but it is: %s", windowGroup.upperBound));
+          String.format("Upper bound must be UNBOUNDED PRECEDING but it is: %s", windowGroup.upperBound));
     } else {
       Preconditions.checkState(windowGroup.upperBound.isCurrentRow(),
           String.format("Upper bound must be CURRENT ROW but it is: %s", windowGroup.upperBound));
     }
-  }
-
-  private boolean isRowsOnlyAggregationCallType(ImmutableList<Window.RexWinAggCall> aggCalls) {
-    return aggCalls.stream().anyMatch(aggCall -> aggCall.getKind().equals(SqlKind.ROW_NUMBER));
   }
 
   private boolean isPartitionByOnlyQuery(Window.Group windowGroup) {
