@@ -33,37 +33,37 @@ public class RangeIndexConfigTest {
     String confStr = "{}";
     RangeIndexConfig config = JsonUtils.stringToObject(confStr, RangeIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getVersion(), RangeIndexConfig.DEFAULT.getVersion(), "Unexpected version");
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     RangeIndexConfig config = JsonUtils.stringToObject(confStr, RangeIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getVersion(), RangeIndexConfig.DEFAULT.getVersion(), "Unexpected version");
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     RangeIndexConfig config = JsonUtils.stringToObject(confStr, RangeIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getVersion(), RangeIndexConfig.DEFAULT.getVersion(), "Unexpected version");
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     RangeIndexConfig config = JsonUtils.stringToObject(confStr, RangeIndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getVersion(), RangeIndexConfig.DEFAULT.getVersion(), "Unexpected version");
   }
 
@@ -75,7 +75,7 @@ public class RangeIndexConfigTest {
         + "}";
     RangeIndexConfig config = JsonUtils.stringToObject(confStr, RangeIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getVersion(), 42, "Unexpected version");
   }
 }

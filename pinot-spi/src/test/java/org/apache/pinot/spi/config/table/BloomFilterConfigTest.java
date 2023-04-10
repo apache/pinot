@@ -36,27 +36,27 @@ public class BloomFilterConfigTest {
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     BloomFilterConfig config = JsonUtils.stringToObject(confStr, BloomFilterConfig.class);
 
     Assert.assertTrue(config.isEnabled(), "Config should be enabled");
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     BloomFilterConfig config = JsonUtils.stringToObject(confStr, BloomFilterConfig.class);
 
     Assert.assertTrue(config.isEnabled(), "Config should be enabled");
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     BloomFilterConfig config = JsonUtils.stringToObject(confStr, BloomFilterConfig.class);
 
     Assert.assertFalse(config.isEnabled(), "Config should be disabled");

@@ -40,7 +40,7 @@ import javax.annotation.Nullable;
  * - excludeFields: Exclude the given fields, e.g. "b", "c", even if it is under the included paths.
  */
 public class JsonIndexConfig extends IndexConfig {
-  public static final JsonIndexConfig DISABLED = new JsonIndexConfig(false);
+  public static final JsonIndexConfig DISABLED = new JsonIndexConfig(true);
 
   private int _maxLevels = -1;
   private boolean _excludeArray = false;
@@ -50,21 +50,21 @@ public class JsonIndexConfig extends IndexConfig {
   private Set<String> _excludeFields;
 
   public JsonIndexConfig() {
-    super(true);
+    super(false);
   }
 
-  public JsonIndexConfig(@JsonProperty("enabled") Boolean enabled) {
-    super(enabled);
+  public JsonIndexConfig(Boolean disabled) {
+    super(disabled);
   }
 
   @JsonCreator
-  public JsonIndexConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty("maxLevels") int maxLevels,
+  public JsonIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("maxLevels") int maxLevels,
       @JsonProperty("excludeArray") boolean excludeArray,
       @JsonProperty("disableCrossArrayUnnest") boolean disableCrossArrayUnnest,
       @JsonProperty("includePaths") @Nullable Set<String> includePaths,
       @JsonProperty("excludePaths") @Nullable Set<String> excludePaths,
       @JsonProperty("excludeFields") @Nullable Set<String> excludeFields) {
-    super(enabled);
+    super(disabled);
     _maxLevels = maxLevels;
     _excludeArray = excludeArray;
     _disableCrossArrayUnnest = disableCrossArrayUnnest;

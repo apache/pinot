@@ -26,19 +26,19 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class RangeIndexConfig extends IndexConfig {
-  public static final RangeIndexConfig DEFAULT = new RangeIndexConfig(true, 2);
-  public static final RangeIndexConfig DISABLED = new RangeIndexConfig(false, null);
+  public static final RangeIndexConfig DEFAULT = new RangeIndexConfig(false, 2);
+  public static final RangeIndexConfig DISABLED = new RangeIndexConfig(true, null);
 
   private final int _version;
 
   public RangeIndexConfig(int version) {
-    this(true, version);
+    this(false, version);
   }
 
   @JsonCreator
-  public RangeIndexConfig(@JsonProperty("enabled") Boolean enabled,
+  public RangeIndexConfig(@JsonProperty("disabled") Boolean disabled,
       @JsonProperty("version") @Nullable Integer version) {
-    super(enabled);
+    super(disabled);
     _version = version != null ? version : 2;
   }
 

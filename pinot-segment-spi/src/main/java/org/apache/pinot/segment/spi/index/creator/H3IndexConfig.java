@@ -31,25 +31,25 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class H3IndexConfig extends IndexConfig {
-  public static final H3IndexConfig DISABLED = new H3IndexConfig(false, null);
+  public static final H3IndexConfig DISABLED = new H3IndexConfig(true, null);
   public static final String RESOLUTIONS_KEY = "resolutions";
 
   private final H3IndexResolution _resolution;
 
   public H3IndexConfig(H3IndexResolution resolution) {
-    this(true, resolution);
+    this(false, resolution);
   }
 
   @JsonCreator
-  public H3IndexConfig(@JsonProperty("enabled") @Nullable Boolean enabled,
+  public H3IndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("resolution") H3IndexResolution resolution) {
-    super(enabled);
+    super(disabled);
     _resolution = resolution;
   }
 
   // Used to read from older configs
   public H3IndexConfig(@Nullable Map<String, String> properties) {
-    super(true);
+    super(false);
     Preconditions.checkArgument(properties != null && properties.containsKey(RESOLUTIONS_KEY),
         "Properties must contain H3 resolutions");
     List<Integer> resolutions = new ArrayList<>();

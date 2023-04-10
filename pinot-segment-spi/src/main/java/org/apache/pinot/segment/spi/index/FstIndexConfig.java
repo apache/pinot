@@ -28,17 +28,17 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class FstIndexConfig extends IndexConfig {
-  public static final FstIndexConfig DISABLED = new FstIndexConfig(false, null);
+  public static final FstIndexConfig DISABLED = new FstIndexConfig(true, null);
   private final FSTType _fstType;
 
   public FstIndexConfig(@JsonProperty("type") @Nullable FSTType fstType) {
-    this(true, fstType);
+    this(false, fstType);
   }
 
   @JsonCreator
-  public FstIndexConfig(@JsonProperty("enabled") @Nullable Boolean enabled,
+  public FstIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("type") @Nullable FSTType fstType) {
-    super(enabled);
+    super(disabled);
     _fstType = fstType;
   }
 
