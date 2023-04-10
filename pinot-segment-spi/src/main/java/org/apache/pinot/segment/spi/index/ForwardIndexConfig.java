@@ -46,7 +46,7 @@ public class ForwardIndexConfig extends IndexConfig {
       @Nullable @JsonProperty("chunkCompressionType") ChunkCompressionType chunkCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion) {
-    super(enabled == null || enabled);
+    super(enabled);
     _chunkCompressionType = chunkCompressionType;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null && deriveNumDocsPerChunk;
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;

@@ -38,7 +38,7 @@ public class FstIndexConfig extends IndexConfig {
   @JsonCreator
   public FstIndexConfig(@JsonProperty("enabled") @Nullable Boolean enabled,
       @JsonProperty("type") @Nullable FSTType fstType) {
-    super((enabled != null && enabled) || fstType != null);
+    super(enabled);
     _fstType = fstType;
   }
 

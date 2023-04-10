@@ -50,7 +50,7 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
       @JsonProperty("stopWordsInclude") List<String> stopWordsInclude,
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude) {
-    super(enabled != null && enabled);
+    super(enabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;

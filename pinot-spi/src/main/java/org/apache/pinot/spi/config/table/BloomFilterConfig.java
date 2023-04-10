@@ -42,7 +42,7 @@ public class BloomFilterConfig extends IndexConfig {
   public BloomFilterConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty(value = "fpp") double fpp,
       @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,
       @JsonProperty(value = "loadOnHeap") boolean loadOnHeap) {
-    super(enabled != null && enabled);
+    super(enabled);
     if (fpp != 0.0) {
       Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);
       _fpp = fpp;

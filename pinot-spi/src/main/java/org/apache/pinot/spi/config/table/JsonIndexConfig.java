@@ -53,9 +53,24 @@ public class JsonIndexConfig extends IndexConfig {
     super(true);
   }
 
+  public JsonIndexConfig(@JsonProperty("enabled") Boolean enabled) {
+    super(enabled);
+  }
+
   @JsonCreator
-  public JsonIndexConfig(@JsonProperty("enable") @Nullable Boolean enabled) {
-    super(enabled != null && enabled);
+  public JsonIndexConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty("maxLevels") int maxLevels,
+      @JsonProperty("excludeArray") boolean excludeArray,
+      @JsonProperty("disableCrossArrayUnnest") boolean disableCrossArrayUnnest,
+      @JsonProperty("includePaths") @Nullable Set<String> includePaths,
+      @JsonProperty("excludePaths") @Nullable Set<String> excludePaths,
+      @JsonProperty("excludeFields") @Nullable Set<String> excludeFields) {
+    super(enabled);
+    _maxLevels = maxLevels;
+    _excludeArray = excludeArray;
+    _disableCrossArrayUnnest = disableCrossArrayUnnest;
+    _includePaths = includePaths;
+    _excludePaths = excludePaths;
+    _excludeFields = excludeFields;
   }
 
   public int getMaxLevels() {
