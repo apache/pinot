@@ -41,11 +41,7 @@ public class IndexConfig extends BaseJsonConfig {
    */
   @JsonCreator
   public IndexConfig(@JsonProperty("enabled") Boolean enabled) {
-    this(enabled == null || enabled);
-  }
-
-  public IndexConfig(@JsonProperty("enabled") boolean enabled) {
-    _enabled = enabled;
+    _enabled = enabled == null || enabled;
   }
 
   public boolean isEnabled() {
