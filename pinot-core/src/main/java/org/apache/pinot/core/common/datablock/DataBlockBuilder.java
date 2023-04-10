@@ -28,11 +28,11 @@ import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -216,6 +216,9 @@ public class DataBlockBuilder {
             long[] longs = new long[length];
             ArrayCopyUtils.copy(timestamps, longs, length);
             setColumn(rowBuilder, byteBuffer, longs);
+            break;
+          case UNKNOWN:
+            setColumn(rowBuilder, byteBuffer, (Object) null);
             break;
           default:
             throw new IllegalStateException(
@@ -462,6 +465,11 @@ public class DataBlockBuilder {
             setColumn(columnarBuilder, byteBuffer, (String[]) value);
           }
           break;
+        case UNKNOWN:
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            setColumn(columnarBuilder, byteBuffer, (Object) null);
+          }
+          break;
         default:
           throw new IllegalStateException(
               String.format("Unsupported data type: %s for column: %s", columnarBuilder._columnDataTypes[colId],
@@ -524,7 +532,7 @@ public class DataBlockBuilder {
     byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
     if (value == null) {
       byteBuffer.putInt(0);
-      builder._variableSizeDataOutputStream.writeInt(DataTable.CustomObject.NULL_TYPE_VALUE);
+      builder._variableSizeDataOutputStream.writeInt(CustomObject.NULL_TYPE_VALUE);
     } else {
       int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
       byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);

@@ -25,6 +25,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.stream.Collectors;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -47,6 +49,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
  * the worker manager later when we split out the query-spi layer.
  */
 public class WorkerManager {
+  private static final Random RANDOM = new Random();
 
   private final String _hostName;
   private final int _port;
@@ -58,9 +61,11 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
-  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata, long requestId) {
+  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata, long requestId,
+      Map<String, String> options) {
     List<String> scannedTables = stageMetadata.getScannedTables();
     if (scannedTables.size() == 1) {
+      // --- LEAF STAGE ---
       // table scan stage, need to attach server as well as segment info for each physical table type.
       String logicalTableName = scannedTables.get(0);
       Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName, requestId);
@@ -93,27 +98,52 @@ public class WorkerManager {
               "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
         }
       }
-      stageMetadata.setServerInstances(new ArrayList<>(serverInstanceToSegmentsMap.keySet()));
+      stageMetadata.setServerInstances(new ArrayList<>(
+          serverInstanceToSegmentsMap.keySet()
+              .stream()
+              .map(server -> new VirtualServer(server, 0)) // the leaf stage only has one server, so always use 0 here
+              .collect(Collectors.toList())));
       stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);
     } else if (PlannerUtils.isRootStage(stageId)) {
+      // --- ROOT STAGE / BROKER REDUCE STAGE ---
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
-      stageMetadata.setServerInstances(Lists.newArrayList(new WorkerInstance(_hostName, _port, _port, _port, _port)));
+      stageMetadata.setServerInstances(Lists.newArrayList(
+          new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), 0)));
     } else {
-      stageMetadata.setServerInstances(filterServers(_routingManager.getEnabledServerInstanceMap().values()));
+      // --- INTERMEDIATE STAGES ---
+      // TODO: actually make assignment strategy decisions for intermediate stages
+      stageMetadata.setServerInstances(assignServers(_routingManager.getEnabledServerInstanceMap().values(),
+          stageMetadata.isRequiresSingletonInstance(), options));
     }
   }
 
-  private static List<ServerInstance> filterServers(Collection<ServerInstance> servers) {
-    List<ServerInstance> serverInstances = new ArrayList<>();
+  private static List<VirtualServer> assignServers(Collection<ServerInstance> servers,
+      boolean requiresSingletonInstance, Map<String, String> options) {
+    int stageParallelism = Integer.parseInt(
+        options.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.STAGE_PARALLELISM, "1"));
+
+    List<VirtualServer> serverInstances = new ArrayList<>();
+    int idx = 0;
+    int matchingIdx = -1;
+    if (requiresSingletonInstance) {
+      matchingIdx = RANDOM.nextInt(servers.size());
+    }
     for (ServerInstance server : servers) {
-      String hostname = server.getHostname();
-      if (server.getQueryServicePort() > 0 && server.getQueryMailboxPort() > 0
-          && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
-          && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
-          && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
-        serverInstances.add(server);
+      if (matchingIdx == -1 || idx == matchingIdx) {
+        String hostname = server.getHostname();
+        if (server.getQueryServicePort() > 0 && server.getQueryMailboxPort() > 0
+            && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
+            && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
+            && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
+          for (int virtualId = 0; virtualId < stageParallelism; virtualId++) {
+            if (matchingIdx == -1 || virtualId == 0) {
+              serverInstances.add(new VirtualServer(server, virtualId));
+            }
+          }
+        }
       }
+      idx++;
     }
     return serverInstances;
   }

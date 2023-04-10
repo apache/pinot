@@ -18,18 +18,30 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import java.time.Duration;
 import java.util.UUID;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 
 
 /**
  * S3 related config
  */
 public class S3Config {
+  private static final Logger LOGGER = LoggerFactory.getLogger(S3Config.class);
 
   private static final boolean DEFAULT_DISABLE_ACL = true;
+  // From https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html, the part number must be an integer
+  // between 1 and 10000, inclusive; and the min part size allowed is 5MiB, except the last one.
+  private static final long MULTI_PART_UPLOAD_MIN_PART_SIZE = 5 * 1024 * 1024;
+  public static final int MULTI_PART_UPLOAD_MAX_PART_NUM = 10000;
 
   public static final String ACCESS_KEY = "accessKey";
   public static final String SECRET_KEY = "secretKey";
@@ -49,10 +61,18 @@ public class S3Config {
   public static final String EXTERNAL_ID = "externalId";
   public static final String SESSION_DURATION_SECONDS = "sessionDurationSeconds";
   public static final String ASYNC_SESSION_UPDATED_ENABLED = "asyncSessionUpdateEnabled";
+  public static final String MIN_OBJECT_SIZE_FOR_MULTI_PART_UPLOAD = "minObjectSizeForMultiPartUpload";
+  public static final String MULTI_PART_UPLOAD_PART_SIZE = "multiPartUploadPartSize";
+  private static final String DEFAULT_MULTI_PART_UPLOAD_PART_SIZE = "128MB";
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
-
+  public static final String HTTP_CLIENT_CONFIG_PREFIX = "httpclient";
+  public static final String HTTP_CLIENT_CONFIG_MAX_CONNECTIONS = "maxConnections";
+  private static final String HTTP_CLIENT_CONFIG_SOCKET_TIMEOUT = "socketTimeout";
+  private static final String HTTP_CLIENT_CONFIG_CONNECTION_TIMEOUT = "connectionTimeout";
+  private static final String HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE = "connectionTimeToLive";
+  private static final String HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT = "connectionAcquisitionTimeout";
   private final String _accessKey;
   private final String _secretKey;
   private final String _region;
@@ -69,6 +89,9 @@ public class S3Config {
   private String _externalId;
   private int _sessionDurationSeconds;
   private boolean _asyncSessionUpdateEnabled;
+  private final long _minObjectSizeForMultiPartUpload;
+  private final long _multiPartUploadPartSize;
+  private final ApacheHttpClient.Builder _httpClientBuilder;
 
   public S3Config(PinotConfiguration pinotConfig) {
     _disableAcl = pinotConfig.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
@@ -91,9 +114,69 @@ public class S3Config {
         Integer.parseInt(pinotConfig.getProperty(SESSION_DURATION_SECONDS, DEFAULT_SESSION_DURATION_SECONDS));
     _asyncSessionUpdateEnabled = Boolean.parseBoolean(
         pinotConfig.getProperty(ASYNC_SESSION_UPDATED_ENABLED, DEFAULT_ASYNC_SESSION_UPDATED_ENABLED));
-
+    // Objects uploaded via putObject are limited at 5G. Setting this to 5G by default, so that smaller objects
+    // continue to be uploaded by putObject methods just as before, while the larger ones are uploaded in multi parts.
+    _minObjectSizeForMultiPartUpload =
+        DataSizeUtils.toBytes(pinotConfig.getProperty(MIN_OBJECT_SIZE_FOR_MULTI_PART_UPLOAD, "5G"));
+    _multiPartUploadPartSize = DataSizeUtils.toBytes(
+        pinotConfig.getProperty(MULTI_PART_UPLOAD_PART_SIZE, DEFAULT_MULTI_PART_UPLOAD_PART_SIZE));
+    Preconditions.checkArgument(_multiPartUploadPartSize > MULTI_PART_UPLOAD_MIN_PART_SIZE,
+        "The part size for multipart upload must be larger than 5MB");
     if (_iamRoleBasedAccess) {
       Preconditions.checkNotNull(_roleArn, "Must provide 'roleArn' if iamRoleBasedAccess is enabled");
+    }
+    PinotConfiguration httpConfig = pinotConfig.subset(HTTP_CLIENT_CONFIG_PREFIX);
+    _httpClientBuilder = httpConfig.isEmpty() ? null : createHttpClientBuilder(httpConfig);
+  }
+
+  private static ApacheHttpClient.Builder createHttpClientBuilder(PinotConfiguration config) {
+    ApacheHttpClient.Builder httpClientBuilder = ApacheHttpClient.builder();
+    String value = config.getProperty(HTTP_CLIENT_CONFIG_MAX_CONNECTIONS);
+    if (value != null) {
+      int pv = Integer.parseInt(value);
+      LOGGER.debug("Set maxConnections to {} for http client builder", pv);
+      httpClientBuilder.maxConnections(pv);
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_SOCKET_TIMEOUT);
+    if (value != null) {
+      Duration pv = parseDuration(value);
+      httpClientBuilder.socketTimeout(pv);
+      LOGGER.debug("Set socketTimeout to {}ms for http client builder", pv.toMillis());
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIMEOUT);
+    if (value != null) {
+      Duration pv = parseDuration(value);
+      httpClientBuilder.connectionTimeout(pv);
+      LOGGER.debug("Set connectionTimeout to {}ms for http client builder", pv.toMillis());
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE);
+    if (value != null) {
+      Duration pv = parseDuration(value);
+      httpClientBuilder.connectionTimeToLive(pv);
+      LOGGER.debug("Set connectionTimeToLive to {}ms for http client builder", pv.toMillis());
+    }
+    value = config.getProperty(HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT);
+    if (value != null) {
+      Duration pv = parseDuration(value);
+      httpClientBuilder.connectionAcquisitionTimeout(pv);
+      LOGGER.debug("Set connectionAcquisitionTimeout to {}ms for http client builder", pv.toMillis());
+    }
+    return httpClientBuilder;
+  }
+
+  @VisibleForTesting
+  static Duration parseDuration(String durStr) {
+    try {
+      // try format like '1hr20s'
+      return Duration.ofMillis(TimeUtils.convertPeriodToMillis(durStr));
+    } catch (Exception ignore) {
+    }
+    try {
+      // try format like 'PT1H20S'
+      return Duration.parse(durStr);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid time duration '%s', for examples '1hr20s' or 'PT1H20S'", durStr), e);
     }
   }
 
@@ -151,5 +234,17 @@ public class S3Config {
 
   public boolean isAsyncSessionUpdateEnabled() {
     return _asyncSessionUpdateEnabled;
+  }
+
+  public long getMinObjectSizeForMultiPartUpload() {
+    return _minObjectSizeForMultiPartUpload;
+  }
+
+  public long getMultiPartUploadPartSize() {
+    return _multiPartUploadPartSize;
+  }
+
+  public ApacheHttpClient.Builder getHttpClientBuilder() {
+    return _httpClientBuilder;
   }
 }

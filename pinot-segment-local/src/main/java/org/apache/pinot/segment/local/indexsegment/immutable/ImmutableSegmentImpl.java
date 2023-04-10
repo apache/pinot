@@ -42,6 +42,9 @@ import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -162,22 +165,27 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public Dictionary getDictionary(String column) {
+  public <I extends IndexReader> I getIndex(String column, IndexType<?, I, ?> type) {
     ColumnIndexContainer container = _indexContainerMap.get(column);
     if (container == null) {
       throw new NullPointerException("Invalid column: " + column);
     }
-    return container.getDictionary();
+    return type.getIndexReader(container);
+  }
+
+  @Override
+  public Dictionary getDictionary(String column) {
+    return getIndex(column, StandardIndexes.dictionary());
   }
 
   @Override
   public ForwardIndexReader getForwardIndex(String column) {
-    return _indexContainerMap.get(column).getForwardIndex();
+    return getIndex(column, StandardIndexes.forward());
   }
 
   @Override
   public InvertedIndexReader getInvertedIndex(String column) {
-    return _indexContainerMap.get(column).getInvertedIndex();
+    return getIndex(column, StandardIndexes.inverted());
   }
 
   @Override
@@ -247,7 +255,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (_partitionDedupMetadataManager != null) {
       _partitionDedupMetadataManager.removeSegment(this);
     }
-
+    // StarTreeIndexContainer refers to other column index containers, so close it firstly.
+    if (_starTreeIndexContainer != null) {
+      try {
+        _starTreeIndexContainer.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close star-tree. Continuing with error.", e);
+      }
+    }
     for (Map.Entry<String, ColumnIndexContainer> entry : _indexContainerMap.entrySet()) {
       try {
         entry.getValue().close();
@@ -259,13 +274,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       _segmentDirectory.close();
     } catch (Exception e) {
       LOGGER.error("Failed to close segment directory: {}. Continuing with error.", _segmentDirectory, e);
-    }
-    if (_starTreeIndexContainer != null) {
-      try {
-        _starTreeIndexContainer.close();
-      } catch (IOException e) {
-        LOGGER.error("Failed to close star-tree. Continuing with error.", e);
-      }
     }
   }
 

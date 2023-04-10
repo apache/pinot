@@ -23,7 +23,6 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.PinotAppConfigs;
-import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -46,7 +45,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
   @Test
   public void testAppConfigs()
       throws JsonProcessingException, SocketException, UnknownHostException {
-    PinotConfiguration expectedServerConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    PinotConfiguration expectedServerConf = new PinotConfiguration();
     String hostname = expectedServerConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
         expectedServerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
             ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());

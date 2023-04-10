@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 /**
@@ -38,13 +39,39 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  *                 to be excluded.
  * - excludeFields: Exclude the given fields, e.g. "b", "c", even if it is under the included paths.
  */
-public class JsonIndexConfig extends BaseJsonConfig {
+public class JsonIndexConfig extends IndexConfig {
+  public static final JsonIndexConfig DISABLED = new JsonIndexConfig(false);
+
   private int _maxLevels = -1;
   private boolean _excludeArray = false;
   private boolean _disableCrossArrayUnnest = false;
   private Set<String> _includePaths;
   private Set<String> _excludePaths;
   private Set<String> _excludeFields;
+
+  public JsonIndexConfig() {
+    super(true);
+  }
+
+  public JsonIndexConfig(@JsonProperty("enabled") Boolean enabled) {
+    super(enabled);
+  }
+
+  @JsonCreator
+  public JsonIndexConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty("maxLevels") int maxLevels,
+      @JsonProperty("excludeArray") boolean excludeArray,
+      @JsonProperty("disableCrossArrayUnnest") boolean disableCrossArrayUnnest,
+      @JsonProperty("includePaths") @Nullable Set<String> includePaths,
+      @JsonProperty("excludePaths") @Nullable Set<String> excludePaths,
+      @JsonProperty("excludeFields") @Nullable Set<String> excludeFields) {
+    super(enabled);
+    _maxLevels = maxLevels;
+    _excludeArray = excludeArray;
+    _disableCrossArrayUnnest = disableCrossArrayUnnest;
+    _includePaths = includePaths;
+    _excludePaths = excludePaths;
+    _excludeFields = excludeFields;
+  }
 
   public int getMaxLevels() {
     return _maxLevels;

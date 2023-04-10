@@ -190,6 +190,17 @@ public class PinotMetricUtils {
   }
 
   /**
+   * Cleans up previous emitted metrics
+   */
+  @VisibleForTesting
+  public static void cleanUp() {
+    if (_pinotMetricsFactory != null) {
+      _pinotMetricsFactory.getPinotMetricsRegistry().shutdown();
+      _pinotMetricsFactory = null;
+    }
+  }
+
+  /**
    * Returns the metricsRegistry from the initialised metricsFactory.
    * If the metricsFactory is null, first creates and initializes the metricsFactory and registers the metrics registry.
    * @param metricsConfiguration metrics configs

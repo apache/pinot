@@ -40,12 +40,15 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   private final RangeBitmap.Appender _appender;
   private final File _rangeIndexFile;
   private final long _minValue;
+  private final FieldSpec.DataType _valueType;
 
-  private BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, long minValue, long maxValue) {
+  private BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, long minValue, long maxValue,
+      FieldSpec.DataType valueType) {
     Preconditions.checkArgument(fieldSpec.isSingleValueField(), "MV columns not supported");
     _rangeIndexFile = new File(indexDir, fieldSpec.getName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     _appender = RangeBitmap.appender(maxValue);
     _minValue = minValue;
+    _valueType = valueType;
   }
 
   /**
@@ -55,7 +58,7 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
    * @param cardinality the cardinality of the dictionary
    */
   public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality) {
-    this(indexDir, fieldSpec, 0, cardinality - 1);
+    this(indexDir, fieldSpec, 0, cardinality - 1, fieldSpec.getDataType());
   }
 
   /**
@@ -67,7 +70,13 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
    */
   public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, Comparable<?> minValue,
       Comparable<?> maxValue) {
-    this(indexDir, fieldSpec, minValue(fieldSpec, minValue), maxValue(fieldSpec, minValue, maxValue));
+    this(indexDir, fieldSpec, minValue(fieldSpec, minValue), maxValue(fieldSpec, minValue, maxValue),
+        fieldSpec.getDataType());
+  }
+
+  @Override
+  public FieldSpec.DataType getDataType() {
+    return _valueType;
   }
 
   @Override

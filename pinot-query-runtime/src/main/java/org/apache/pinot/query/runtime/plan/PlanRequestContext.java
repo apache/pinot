@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
@@ -32,22 +33,24 @@ public class PlanRequestContext {
   protected final MailboxService<TransferableBlock> _mailboxService;
   protected final long _requestId;
   protected final int _stageId;
+  // TODO: Timeout is not needed since deadline is already present.
   private final long _timeoutMs;
-  protected final String _hostName;
-  protected final int _port;
+  private final long _deadlineMs;
+  protected final VirtualServerAddress _server;
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
-
+  private final OpChainExecutionContext _opChainExecutionContext;
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, String hostName, int port, Map<Integer, StageMetadata> metadataMap) {
+      long timeoutMs, long deadlineMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _timeoutMs = timeoutMs;
-    _hostName = hostName;
-    _port = port;
+    _deadlineMs = deadlineMs;
+    _server = server;
     _metadataMap = metadataMap;
+    _opChainExecutionContext = new OpChainExecutionContext(this);
   }
 
   public long getRequestId() {
@@ -62,12 +65,12 @@ public class PlanRequestContext {
     return _timeoutMs;
   }
 
-  public String getHostName() {
-    return _hostName;
+  public long getDeadlineMs() {
+    return _deadlineMs;
   }
 
-  public int getPort() {
-    return _port;
+  public VirtualServerAddress getServer() {
+    return _server;
   }
 
   public Map<Integer, StageMetadata> getMetadataMap() {
@@ -84,5 +87,9 @@ public class PlanRequestContext {
 
   public List<MailboxIdentifier> getReceivingMailboxes() {
     return ImmutableList.copyOf(_receivingMailboxes);
+  }
+
+  public OpChainExecutionContext getOpChainExecutionContext() {
+    return _opChainExecutionContext;
   }
 }

@@ -28,7 +28,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -39,6 +38,7 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -119,19 +119,19 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       if (tables.size() == 1) {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_2", "Server_localhost_1")
-                : ImmutableList.of("Server_localhost_1"));
+            e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toList()),
+            tables.get(0).equals("a") ? ImmutableList.of("0@Server_localhost_2", "0@Server_localhost_1")
+                : ImmutableList.of("0@Server_localhost_1"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toSet()),
-            ImmutableSet.of("Server_localhost_1", "Server_localhost_2"));
+            e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toSet()),
+            ImmutableSet.of("0@Server_localhost_1", "0@Server_localhost_2"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toSet()),
-            ImmutableSet.of("Server_localhost_3"));
+            e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toSet()),
+            ImmutableSet.of("0@Server_localhost_3"));
       }
     }
   }
@@ -165,7 +165,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_2");
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "0@Server_localhost_2");
 
     query = "SELECT * FROM d";
     queryPlan = _queryEnvironment.planQuery(query);
@@ -225,6 +225,31 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testQueryWithHint()
+      throws Exception {
+    // Hinting the query to use final stage aggregation makes server directly return final result
+    // This is useful when data is already partitioned by col1
+    String query = "SELECT /*+ aggFinalStage */ col1, COUNT(*) FROM b GROUP BY col1";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 2);
+    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 2);
+    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
+      List<String> tables = e.getValue().getScannedTables();
+      if (tables.size() != 0) {
+        // table scan stages; for tableB it should have only 1
+        Assert.assertEquals(e.getValue().getServerInstances().stream()
+                .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
+            ImmutableList.of("0@Server_localhost_1"));
+      } else if (!PlannerUtils.isRootStage(e.getKey())) {
+        // join stage should have both servers used.
+        Assert.assertEquals(e.getValue().getServerInstances().stream()
+                .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
+            ImmutableList.of("0@Server_localhost_1", "0@Server_localhost_2"));
+      }
+    }
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
@@ -265,24 +290,58 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @DataProvider(name = "testQueryPlanDataProvider")
   private Object[][] provideQueriesWithExplainedPlan() {
+    //@formatter:off
     return new Object[][] {
-        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a", "{\n"
-            + "  \"rels\": [\n" + "    {\n" + "      \"id\": \"0\",\n" + "      \"relOp\": \"LogicalTableScan\",\n"
-            + "      \"table\": [\n" + "        \"a\"\n" + "      ],\n" + "      \"inputs\": []\n" + "    },\n"
-            + "    {\n" + "      \"id\": \"1\",\n" + "      \"relOp\": \"LogicalProject\",\n" + "      \"fields\": [\n"
-            + "        \"col1\",\n" + "        \"col3\"\n" + "      ],\n" + "      \"exprs\": [\n" + "        {\n"
-            + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        },\n" + "        {\n"
-            + "          \"input\": 1,\n" + "          \"name\": \"$1\"\n" + "        }\n" + "      ]\n" + "    }\n"
-            + "  ]\n" + "}"},
+        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
+              "{\n"
+            + "  \"rels\": [\n"
+            + "    {\n"
+            + "      \"id\": \"0\",\n"
+            + "      \"relOp\": \"LogicalTableScan\",\n"
+            + "      \"table\": [\n"
+            + "        \"a\"\n"
+            + "      ],\n"
+            + "      \"inputs\": []\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"id\": \"1\",\n"
+            + "      \"relOp\": \"LogicalProject\",\n"
+            + "      \"fields\": [\n"
+            + "        \"col1\",\n"
+            + "        \"col3\"\n"
+            + "      ],\n"
+            + "      \"exprs\": [\n"
+            + "        {\n"
+            + "          \"input\": 0,\n"
+            + "          \"name\": \"$0\"\n"
+            + "        },\n"
+            + "        {\n"
+            + "          \"input\": 2,\n"
+            + "          \"name\": \"$2\"\n"
+            + "        }\n"
+            + "      ]\n"
+            + "    }\n"
+            + "  ]\n"
+            + "}"},
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-            "Execution Plan\n" + "digraph {\n" + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-                + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
-                + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n" + "}\n"},
-        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1", "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col3=[$1])\n" + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
-            + "    LogicalExchange(distribution=[hash[0]])\n" + "      LogicalProject(col1=[$2])\n"
-            + "        LogicalTableScan(table=[[a]])\n" + "    LogicalExchange(distribution=[hash[1]])\n"
-            + "      LogicalProject(col3=[$1], col1=[$2])\n" + "        LogicalTableScan(table=[[b]])\n"},
+              "Execution Plan\n"
+            + "digraph {\n"
+            + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+            + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
+            + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+            + "}\n"},
+        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+              "Execution Plan\n"
+            + "LogicalProject(col1=[$0], col3=[$2])\n"
+            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "      LogicalProject(col1=[$0])\n"
+            + "        LogicalTableScan(table=[[a]])\n"
+            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "      LogicalProject(col1=[$0], col3=[$2])\n"
+            + "        LogicalTableScan(table=[[b]])\n"
+        },
     };
+    //@formatter:on
   }
 }

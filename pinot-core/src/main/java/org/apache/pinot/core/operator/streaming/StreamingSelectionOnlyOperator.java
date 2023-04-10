@@ -25,36 +25,44 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.roaringbitmap.RoaringBitmap;
 
 
+/**
+ * Streaming only selection operator returns one block at a time not one block per-segment.
+ * This is for efficient streaming of data return on a selection-only situation.
+ *
+ * This optimization doesn't apply to any other combine/merge required operators.
+ */
 public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
-
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
 
   private final IndexSegment _indexSegment;
-  private final TransformOperator _transformOperator;
   private final List<ExpressionContext> _expressions;
+  private final BaseProjectOperator<?> _projectOperator;
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _limit;
+  private final boolean _nullHandlingEnabled;
+  private final RoaringBitmap[] _nullBitmaps;
 
   private int _numDocsScanned = 0;
 
   public StreamingSelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator) {
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
     _indexSegment = indexSegment;
-    _transformOperator = transformOperator;
     _expressions = expressions;
+    _projectOperator = projectOperator;
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
 
     int numExpressions = expressions.size();
     _blockValSets = new BlockValSet[numExpressions];
@@ -62,13 +70,13 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = expressions.get(i);
-      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
       columnNames[i] = expression.toString();
+      ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
       columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
-
+    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
     _limit = queryContext.getLimit();
   }
 
@@ -79,20 +87,35 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
       // Already returned enough documents
       return null;
     }
-    TransformBlock transformBlock = _transformOperator.nextBlock();
-    if (transformBlock == null) {
+    ValueBlock valueBlock = _projectOperator.nextBlock();
+    if (valueBlock == null) {
       return null;
     }
     int numExpressions = _expressions.size();
     for (int i = 0; i < numExpressions; i++) {
-      _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
+      _blockValSets[i] = valueBlock.getBlockValueSet(_expressions.get(i));
     }
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
-    int numDocs = transformBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
     int numDocsToReturn = Math.min(_limit - _numDocsScanned, numDocs);
     List<Object[]> rows = new ArrayList<>(numDocsToReturn);
-    for (int i = 0; i < numDocsToReturn; i++) {
-      rows.add(blockValueFetcher.getRow(i));
+    if (_nullHandlingEnabled) {
+      for (int i = 0; i < numExpressions; i++) {
+        _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
+      }
+      for (int docId = 0; docId < numDocsToReturn; docId++) {
+        Object[] values = blockValueFetcher.getRow(docId);
+        for (int colId = 0; colId < numExpressions; colId++) {
+          if (_nullBitmaps[colId] != null && _nullBitmaps[colId].contains(docId)) {
+            values[colId] = null;
+          }
+        }
+        rows.add(values);
+      }
+    } else {
+      for (int i = 0; i < numDocsToReturn; i++) {
+        rows.add(blockValueFetcher.getRow(i));
+      }
     }
     _numDocsScanned += numDocs;
     return new SelectionResultsBlock(_dataSchema, rows);
@@ -104,14 +127,14 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+  public List<BaseProjectOperator<?>> getChildOperators() {
+    return Collections.singletonList(_projectOperator);
   }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _projectOperator.getNumColumnsProjected();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);

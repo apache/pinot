@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.store;
 import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -29,8 +28,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration.ConfigurationException;
@@ -39,10 +38,10 @@ import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexC
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
@@ -55,7 +54,6 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class SingleFileIndexDirectoryTest {
@@ -94,7 +92,7 @@ public class SingleFileIndexDirectoryTest {
     // segmentDir does not have anything to begin with
     assertEquals(TEMP_DIR.list().length, 0);
     SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-    PinotDataBuffer writtenBuffer = columnDirectory.newBuffer("foo", ColumnIndexType.DICTIONARY, 1024);
+    PinotDataBuffer writtenBuffer = columnDirectory.newBuffer("foo", StandardIndexes.dictionary(), 1024);
     String data = "This is a test string";
     final byte[] dataBytes = data.getBytes();
     int pos = 0;
@@ -103,9 +101,9 @@ public class SingleFileIndexDirectoryTest {
     }
     writtenBuffer.close();
 
-    Mockito.when(_segmentMetadata.getAllColumns()).thenReturn(new HashSet<String>(Arrays.asList("foo")));
+    Mockito.when(_segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Arrays.asList("foo")));
     try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
-        ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", ColumnIndexType.DICTIONARY)) {
+        ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", StandardIndexes.dictionary())) {
       assertEquals(1024, readBuffer.size());
       int length = dataBytes.length;
       for (int i = 0; i < length; i++) {
@@ -157,11 +155,11 @@ public class SingleFileIndexDirectoryTest {
       throws Exception {
     try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
         ReadMode.mmap)) {
-      columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024);
+      columnDirectory.newBuffer("column1", StandardIndexes.dictionary(), 1024);
     }
     try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
         ReadMode.mmap)) {
-      columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024);
+      columnDirectory.newBuffer("column1", StandardIndexes.dictionary(), 1024);
     }
   }
 
@@ -170,7 +168,7 @@ public class SingleFileIndexDirectoryTest {
       throws IOException, ConfigurationException {
     try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
         ReadMode.mmap)) {
-      columnDirectory.getBuffer("column1", ColumnIndexType.DICTIONARY);
+      columnDirectory.getBuffer("column1", StandardIndexes.dictionary());
     }
   }
 
@@ -178,9 +176,9 @@ public class SingleFileIndexDirectoryTest {
   public void testRemoveIndex()
       throws IOException, ConfigurationException {
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      sfd.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024);
-      sfd.removeIndex("col1", ColumnIndexType.DICTIONARY);
-      assertFalse(sfd.hasIndexFor("col1", ColumnIndexType.DICTIONARY));
+      sfd.newBuffer("col1", StandardIndexes.dictionary(), 1024);
+      sfd.removeIndex("col1", StandardIndexes.dictionary());
+      assertFalse(sfd.hasIndexFor("col1", StandardIndexes.dictionary()));
     }
   }
 
@@ -188,46 +186,46 @@ public class SingleFileIndexDirectoryTest {
   public void testCleanupRemovedIndices()
       throws IOException, ConfigurationException {
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      PinotDataBuffer buf = sfd.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      PinotDataBuffer buf = sfd.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 1); // from begin position.
 
-      buf = sfd.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024);
+      buf = sfd.newBuffer("col1", StandardIndexes.dictionary(), 1024);
       buf.putChar(111, 'h');
 
-      buf = sfd.newBuffer("col2", ColumnIndexType.FORWARD_INDEX, 1024);
+      buf = sfd.newBuffer("col2", StandardIndexes.forward(), 1024);
       buf.putChar(222, 'w');
 
-      buf = sfd.newBuffer("col1", ColumnIndexType.JSON_INDEX, 1024);
+      buf = sfd.newBuffer("col1", StandardIndexes.json(), 1024);
       buf.putLong(333, 111111L);
 
-      buf = sfd.newBuffer("col2", ColumnIndexType.H3_INDEX, 1024);
+      buf = sfd.newBuffer("col2", StandardIndexes.h3(), 1024);
       buf.putDouble(1016, 222.222); // touch end position.
     }
 
     // Remove the JSON index to trigger cleanup, but keep H3 index.
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.JSON_INDEX));
-      sfd.removeIndex("col1", ColumnIndexType.JSON_INDEX);
+      assertTrue(sfd.hasIndexFor("col1", StandardIndexes.json()));
+      sfd.removeIndex("col1", StandardIndexes.json());
     }
 
     // Read indices back and check the content.
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertFalse(sfd.hasIndexFor("col1", ColumnIndexType.JSON_INDEX));
+      assertFalse(sfd.hasIndexFor("col1", StandardIndexes.json()));
 
-      assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.FORWARD_INDEX));
-      PinotDataBuffer buf = sfd.getBuffer("col1", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(sfd.hasIndexFor("col1", StandardIndexes.forward()));
+      PinotDataBuffer buf = sfd.getBuffer("col1", StandardIndexes.forward());
       assertEquals(buf.getInt(0), 1);
 
-      assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.DICTIONARY));
-      buf = sfd.getBuffer("col1", ColumnIndexType.DICTIONARY);
+      assertTrue(sfd.hasIndexFor("col1", StandardIndexes.dictionary()));
+      buf = sfd.getBuffer("col1", StandardIndexes.dictionary());
       assertEquals(buf.getChar(111), 'h');
 
-      assertTrue(sfd.hasIndexFor("col2", ColumnIndexType.FORWARD_INDEX));
-      buf = sfd.getBuffer("col2", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(sfd.hasIndexFor("col2", StandardIndexes.forward()));
+      buf = sfd.getBuffer("col2", StandardIndexes.forward());
       assertEquals(buf.getChar(222), 'w');
 
-      assertTrue(sfd.hasIndexFor("col2", ColumnIndexType.H3_INDEX));
-      buf = sfd.getBuffer("col2", ColumnIndexType.H3_INDEX);
+      assertTrue(sfd.hasIndexFor("col2", StandardIndexes.h3()));
+      buf = sfd.getBuffer("col2", StandardIndexes.h3());
       assertEquals(buf.getDouble(1016), 222.222);
     }
   }
@@ -240,10 +238,10 @@ public class SingleFileIndexDirectoryTest {
             null, null);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
             null, null)) {
-      PinotDataBuffer buf = sfd.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      PinotDataBuffer buf = sfd.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 1);
 
-      buf = sfd.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024);
+      buf = sfd.newBuffer("col1", StandardIndexes.dictionary(), 1024);
       buf.putChar(111, 'h');
 
       fooCreator.add("{\"clean\":\"this\"}");
@@ -256,7 +254,7 @@ public class SingleFileIndexDirectoryTest {
 
     // Remove the Text index to trigger cleanup.
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertTrue(sfd.hasIndexFor("foo", ColumnIndexType.TEXT_INDEX));
+      assertTrue(sfd.hasIndexFor("foo", StandardIndexes.text()));
       // Use TextIndex once to trigger the creation of mapping files.
       LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 1, new HashMap<>());
       fooReader.getDocIds("clean");
@@ -264,7 +262,7 @@ public class SingleFileIndexDirectoryTest {
       barReader.getDocIds("retain hold");
 
       // Both files for TextIndex should be removed.
-      sfd.removeIndex("foo", ColumnIndexType.TEXT_INDEX);
+      sfd.removeIndex("foo", StandardIndexes.text());
       assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists());
       assertFalse(
           new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
@@ -274,17 +272,17 @@ public class SingleFileIndexDirectoryTest {
 
     // Read indices back and check the content.
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertFalse(sfd.hasIndexFor("foo", ColumnIndexType.TEXT_INDEX));
+      assertFalse(sfd.hasIndexFor("foo", StandardIndexes.text()));
 
-      assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.FORWARD_INDEX));
-      PinotDataBuffer buf = sfd.getBuffer("col1", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(sfd.hasIndexFor("col1", StandardIndexes.forward()));
+      PinotDataBuffer buf = sfd.getBuffer("col1", StandardIndexes.forward());
       assertEquals(buf.getInt(0), 1);
 
-      assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.DICTIONARY));
-      buf = sfd.getBuffer("col1", ColumnIndexType.DICTIONARY);
+      assertTrue(sfd.hasIndexFor("col1", StandardIndexes.dictionary()));
+      buf = sfd.getBuffer("col1", StandardIndexes.dictionary());
       assertEquals(buf.getChar(111), 'h');
 
-      assertTrue(sfd.hasIndexFor("bar", ColumnIndexType.TEXT_INDEX));
+      assertTrue(sfd.hasIndexFor("bar", StandardIndexes.text()));
 
       // Check if the text index still work.
       LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>());
@@ -302,24 +300,24 @@ public class SingleFileIndexDirectoryTest {
       FileUtils.touch(srcTmp);
     }
     File dstTmp = new File(TEMP_DIR, UUID.randomUUID().toString());
-    Map<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(ImmutableMap
-        .of(new IndexKey("foo", ColumnIndexType.INVERTED_INDEX),
-            new IndexEntry(new IndexKey("foo", ColumnIndexType.INVERTED_INDEX), 0, 0),
-            new IndexKey("foo", ColumnIndexType.FORWARD_INDEX),
-            new IndexEntry(new IndexKey("foo", ColumnIndexType.FORWARD_INDEX), 0, 0),
-            new IndexKey("bar", ColumnIndexType.FORWARD_INDEX),
-            new IndexEntry(new IndexKey("bar", ColumnIndexType.FORWARD_INDEX), 0, 0),
-            new IndexKey("bar", ColumnIndexType.DICTIONARY),
-            new IndexEntry(new IndexKey("bar", ColumnIndexType.DICTIONARY), 0, 0),
-            new IndexKey("bar", ColumnIndexType.JSON_INDEX),
-            new IndexEntry(new IndexKey("bar", ColumnIndexType.JSON_INDEX), 0, 0)));
+    TreeMap<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(ImmutableMap
+        .of(new IndexKey("foo", StandardIndexes.inverted()),
+            new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 0),
+            new IndexKey("foo", StandardIndexes.forward()),
+            new IndexEntry(new IndexKey("foo", StandardIndexes.forward()), 0, 0),
+            new IndexKey("bar", StandardIndexes.forward()),
+            new IndexEntry(new IndexKey("bar", StandardIndexes.forward()), 0, 0),
+            new IndexKey("bar", StandardIndexes.dictionary()),
+            new IndexEntry(new IndexKey("bar", StandardIndexes.dictionary()), 0, 0),
+            new IndexKey("bar", StandardIndexes.json()),
+            new IndexEntry(new IndexKey("bar", StandardIndexes.json()), 0, 0)));
     List<IndexEntry> retained = SingleFileIndexDirectory.copyIndices(srcTmp, dstTmp, indicesToCopy);
     List<IndexKey> retainedKeys = retained.stream().map(e -> e._key).collect(Collectors.toList());
     // The returned entries are sorted.
     assertEquals(retainedKeys, Arrays
-        .asList(new IndexKey("bar", ColumnIndexType.DICTIONARY), new IndexKey("bar", ColumnIndexType.FORWARD_INDEX),
-            new IndexKey("bar", ColumnIndexType.JSON_INDEX), new IndexKey("foo", ColumnIndexType.FORWARD_INDEX),
-            new IndexKey("foo", ColumnIndexType.INVERTED_INDEX)));
+        .asList(new IndexKey("bar", StandardIndexes.dictionary()), new IndexKey("bar", StandardIndexes.forward()),
+            new IndexKey("bar", StandardIndexes.json()), new IndexKey("foo", StandardIndexes.forward()),
+            new IndexKey("foo", StandardIndexes.inverted())));
   }
 
   @Test
@@ -327,9 +325,9 @@ public class SingleFileIndexDirectoryTest {
     ByteArrayOutputStream output = new ByteArrayOutputStream(1024 * 1024);
     try (PrintWriter pw = new PrintWriter(output)) {
       List<IndexEntry> entries = Arrays
-          .asList(new IndexEntry(new IndexKey("foo", ColumnIndexType.INVERTED_INDEX), 0, 1024),
-              new IndexEntry(new IndexKey("bar", ColumnIndexType.INVERTED_INDEX), 1024, 100),
-              new IndexEntry(new IndexKey("baz", ColumnIndexType.INVERTED_INDEX), 1124, 200));
+          .asList(new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 1024),
+              new IndexEntry(new IndexKey("bar", StandardIndexes.inverted()), 1024, 100),
+              new IndexEntry(new IndexKey("baz", StandardIndexes.inverted()), 1124, 200));
       SingleFileIndexDirectory.persistIndexMaps(entries, pw);
     }
     assertEquals(output.toString(), "foo.inverted_index.startOffset = 0\nfoo.inverted_index.size = 1024\n"
@@ -345,15 +343,15 @@ public class SingleFileIndexDirectoryTest {
             null, null);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
             null, null)) {
-      PinotDataBuffer buf = sfd.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      PinotDataBuffer buf = sfd.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 111);
-      buf = sfd.newBuffer("col2", ColumnIndexType.DICTIONARY, 1024);
+      buf = sfd.newBuffer("col2", StandardIndexes.dictionary(), 1024);
       buf.putInt(0, 222);
-      buf = sfd.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
+      buf = sfd.newBuffer("col3", StandardIndexes.forward(), 1024);
       buf.putInt(0, 333);
-      buf = sfd.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 1024);
+      buf = sfd.newBuffer("col4", StandardIndexes.inverted(), 1024);
       buf.putInt(0, 444);
-      buf = sfd.newBuffer("col5", ColumnIndexType.H3_INDEX, 1024);
+      buf = sfd.newBuffer("col5", StandardIndexes.h3(), 1024);
       buf.putInt(0, 555);
 
       fooCreator.add("{\"clean\":\"this\"}");
@@ -366,42 +364,32 @@ public class SingleFileIndexDirectoryTest {
 
     // Need segmentMetadata to tell the full set of columns in this segment.
     when(_segmentMetadata.getAllColumns())
-        .thenReturn(new HashSet<>(Arrays.asList("col1", "col2", "col3", "col4", "foo", "bar")));
+        .thenReturn(new TreeSet<>(Arrays.asList("col1", "col2", "col3", "col4", "foo", "bar")));
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.forward()),
           new HashSet<>(Arrays.asList("col1", "col3")));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.DICTIONARY),
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()),
           new HashSet<>(Collections.singletonList("col2")));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.inverted()),
           new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.H3_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()),
           new HashSet<>(Collections.singletonList("col5")));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.TEXT_INDEX), new HashSet<>(Arrays.asList("foo", "bar")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Arrays.asList("foo", "bar")));
 
-      sfd.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
-      sfd.removeIndex("col2", ColumnIndexType.DICTIONARY);
-      sfd.removeIndex("col5", ColumnIndexType.H3_INDEX);
-      sfd.removeIndex("foo", ColumnIndexType.TEXT_INDEX);
-      sfd.removeIndex("col111", ColumnIndexType.DICTIONARY);
+      sfd.removeIndex("col1", StandardIndexes.forward());
+      sfd.removeIndex("col2", StandardIndexes.dictionary());
+      sfd.removeIndex("col5", StandardIndexes.h3());
+      sfd.removeIndex("foo", StandardIndexes.text());
+      sfd.removeIndex("col111", StandardIndexes.dictionary());
 
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.forward()),
           new HashSet<>(Collections.singletonList("col3")));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.DICTIONARY), new HashSet<>(Collections.emptySet()));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()), new HashSet<>(Collections.emptySet()));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.inverted()),
           new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.H3_INDEX), new HashSet<>(Collections.emptySet()));
-      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.TEXT_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.emptySet()));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()),
           new HashSet<>(Collections.singletonList("bar")));
-    }
-  }
-
-  @Test(expectedExceptions = FileNotFoundException.class, expectedExceptionsMessageRegExp = ".*star_tree_index.*")
-  public void testLoadStarTreeIndex()
-      throws Exception {
-    Mockito.when(_segmentMetadata.getStarTreeV2MetadataList()).thenReturn(Collections.emptyList());
-    try (SingleFileIndexDirectory ignore = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      // Trying to load startree index but not able to find the file.
-      fail();
     }
   }
 }

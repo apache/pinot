@@ -27,10 +27,10 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
@@ -49,7 +49,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
-  private final TransformOperator _transformOperator;
+  private final BaseProjectOperator<?> _projectOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
   private final DataSchema _dataSchema;
@@ -58,10 +58,10 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private int _numDocsScanned = 0;
 
   public GroupByOperator(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext, boolean useStarTree) {
+      BaseProjectOperator<?> projectOperator, long numTotalDocs, QueryContext queryContext, boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
-    _transformOperator = transformOperator;
+    _projectOperator = projectOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
     _queryContext = queryContext;
@@ -78,7 +78,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       ExpressionContext groupByExpression = groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
       columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
-          _transformOperator.getResultMetadata(groupByExpression).getDataType());
+          _projectOperator.getResultColumnContext(groupByExpression).getDataType());
     }
 
     // Extract column names and data types for aggregation functions
@@ -97,14 +97,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
-      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
+      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     } else {
-      groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
+      groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     }
-    TransformBlock transformBlock;
-    while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      _numDocsScanned += transformBlock.getNumDocs();
-      groupByExecutor.process(transformBlock);
+    ValueBlock valueBlock;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      _numDocsScanned += valueBlock.getNumDocs();
+      groupByExecutor.process(valueBlock);
     }
 
     // Check if the groups limit is reached
@@ -136,13 +136,13 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+    return Collections.singletonList(_projectOperator);
   }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _projectOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
   }

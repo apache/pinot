@@ -38,6 +38,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -62,10 +63,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class TableSizeReaderTest {
@@ -323,16 +321,17 @@ public class TableSizeReaderTest {
     assertEquals(tableSizeDetails._reportedSizeInBytes, offlineSizes._reportedSizeInBytes);
     assertEquals(tableSizeDetails._estimatedSizeInBytes, offlineSizes._estimatedSizeInBytes);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 0);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER),
-        offlineSizes._estimatedSizeInBytes / NUM_REPLICAS);
-    assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER),
-        offlineSizes._estimatedSizeInBytes);
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER), offlineSizes._estimatedSizeInBytes / NUM_REPLICAS);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER),
-        160);
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER), offlineSizes._estimatedSizeInBytes);
+    assertEquals(
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER), 160);
   }
 
   @Test
@@ -348,16 +347,18 @@ public class TableSizeReaderTest {
     assertEquals(offlineSizes._reportedSizeInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
     assertEquals(tableSizeDetails._estimatedSizeInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
-        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER),
-        offlineSizes._estimatedSizeInBytes / NUM_REPLICAS);
-    assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER),
-        offlineSizes._estimatedSizeInBytes);
-    // 0 means not found for the gauge
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER), 0);
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER), offlineSizes._estimatedSizeInBytes / NUM_REPLICAS);
+    assertEquals(
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER), offlineSizes._estimatedSizeInBytes);
+    assertFalse(
+        MetricValueUtils.tableGaugeExists(_controllerMetrics, tableNameWithType,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER));
   }
 
   @Test
@@ -373,16 +374,18 @@ public class TableSizeReaderTest {
     validateTableSubTypeSize(servers, offlineSizes);
     assertNull(tableSizeDetails._realtimeSegments);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
-        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 20);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER),
-        offlineSizes._estimatedSizeInBytes / NUM_REPLICAS);
-    assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER),
-        offlineSizes._estimatedSizeInBytes);
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 20);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER),
-        160);
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER), offlineSizes._estimatedSizeInBytes / NUM_REPLICAS);
+    assertEquals(
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER), offlineSizes._estimatedSizeInBytes);
+    assertEquals(
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER), 160);
   }
 
   @Test
@@ -398,12 +401,13 @@ public class TableSizeReaderTest {
     validateTableSubTypeSize(servers, realtimeSegments);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(table);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER),
-        realtimeSegments._estimatedSizeInBytes / NUM_REPLICAS);
-    assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER),
-        realtimeSegments._estimatedSizeInBytes);
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER), realtimeSegments._estimatedSizeInBytes / NUM_REPLICAS);
     assertEquals(
-        _controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER),
-        120);
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER), realtimeSegments._estimatedSizeInBytes);
+    assertEquals(
+        MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER), 120);
   }
 }

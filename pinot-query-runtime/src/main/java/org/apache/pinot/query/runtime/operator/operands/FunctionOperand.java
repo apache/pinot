@@ -50,8 +50,10 @@ public class FunctionOperand extends TransformOperand {
     Preconditions.checkNotNull(functionInfo, "Cannot find function with Name: " + functionCall.getFunctionName());
     _functionInvoker = new FunctionInvoker(functionInfo);
     _resultName = computeColumnName(functionCall.getFunctionName(), _childOperandList);
-    // TODO: Check type match between functionCall's data type and result type.
     _resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
+    if (functionCall.getDataType() != FunctionUtils.getDataType(_functionInvoker.getResultClass())) {
+      _resultType = DataSchema.ColumnDataType.fromDataType(functionCall.getDataType(), true);
+    }
     _reusableOperandHolder = new Object[operandExpressions.size()];
   }
 

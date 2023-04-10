@@ -18,16 +18,22 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class MultiplexingMailboxServiceTest {
-  private static final StringMailboxIdentifier LOCAL_MAILBOX_ID = new StringMailboxIdentifier(
-      "localJobId", "localhost", 0, "localhost", 0);
-  private static final StringMailboxIdentifier NON_LOCAL_MAILBOX_ID = new StringMailboxIdentifier(
-      "localJobId", "localhost", 0, "localhost", 1);
+
+  private static final int DEFAULT_SENDER_STAGE_ID = 0;
+  private static final int DEFAULT_RECEIVER_STAGE_ID = 1;
+  private static final JsonMailboxIdentifier LOCAL_MAILBOX_ID = new JsonMailboxIdentifier(
+      "localJobId", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 0, 0),
+      DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
+  private static final JsonMailboxIdentifier NON_LOCAL_MAILBOX_ID = new JsonMailboxIdentifier(
+      "localJobId", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 1, 0),
+      DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
 
   @Test
   public void testHappyPath() {
@@ -39,11 +45,11 @@ public class MultiplexingMailboxServiceTest {
     Mockito.doReturn(1000).when(grpcMailboxService).getMailboxPort();
     Mockito.doReturn(1000).when(inMemoryMailboxService).getMailboxPort();
     Mockito.doReturn(Mockito.mock(InMemorySendingMailbox.class)).when(inMemoryMailboxService).getSendingMailbox(
-        Mockito.any());
+        Mockito.any(), Mockito.anyLong());
     Mockito.doReturn(Mockito.mock(InMemoryReceivingMailbox.class)).when(inMemoryMailboxService).getReceivingMailbox(
         Mockito.any());
     Mockito.doReturn(Mockito.mock(GrpcSendingMailbox.class)).when(grpcMailboxService).getSendingMailbox(
-        Mockito.any());
+        Mockito.any(), Mockito.anyLong());
     Mockito.doReturn(Mockito.mock(GrpcReceivingMailbox.class)).when(grpcMailboxService).getReceivingMailbox(
         Mockito.any());
 
@@ -60,8 +66,8 @@ public class MultiplexingMailboxServiceTest {
     Assert.assertEquals("localhost", multiplexService.getHostname());
     Assert.assertEquals(1000, multiplexService.getMailboxPort());
 
-    Assert.assertTrue(multiplexService.getSendingMailbox(LOCAL_MAILBOX_ID) instanceof InMemorySendingMailbox);
-    Assert.assertTrue(multiplexService.getSendingMailbox(NON_LOCAL_MAILBOX_ID) instanceof GrpcSendingMailbox);
+    Assert.assertTrue(multiplexService.getSendingMailbox(LOCAL_MAILBOX_ID, -1) instanceof InMemorySendingMailbox);
+    Assert.assertTrue(multiplexService.getSendingMailbox(NON_LOCAL_MAILBOX_ID, -1) instanceof GrpcSendingMailbox);
 
     Assert.assertTrue(multiplexService.getReceivingMailbox(LOCAL_MAILBOX_ID) instanceof InMemoryReceivingMailbox);
     Assert.assertTrue(multiplexService.getReceivingMailbox(NON_LOCAL_MAILBOX_ID) instanceof GrpcReceivingMailbox);

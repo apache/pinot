@@ -21,22 +21,18 @@ package org.apache.pinot.segment.local.segment.store;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
@@ -45,9 +41,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
   private final Map<IndexKey, PinotDataBuffer> _indexBuffers = new HashMap<>();
-  // Different from the other column-index entries, starTree index is multi-column index and has its own index map,
-  // thus manage it separately.
-  private PinotDataBuffer _starTreeIndexDataBuffer;
+
   /**
    * @param segmentDirectory File pointing to segment directory
    * @param segmentMetadata segment metadata. Metadata must be fully initialized
@@ -74,44 +68,21 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getBuffer(String column, ColumnIndexType type)
+  public PinotDataBuffer getBuffer(String column, IndexType<?, ?, ?> type)
       throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getReadBufferFor(key);
   }
 
   @Override
-  public PinotDataBuffer getStarTreeIndex()
-      throws IOException {
-    if (_starTreeIndexDataBuffer != null) {
-      return _starTreeIndexDataBuffer;
-    }
-    File indexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
-    if (_readMode == ReadMode.heap) {
-      _starTreeIndexDataBuffer =
-          PinotDataBuffer.loadFile(indexFile, 0, indexFile.length(), ByteOrder.BIG_ENDIAN, "Star-tree V2 data buffer");
-    } else {
-      _starTreeIndexDataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.BIG_ENDIAN,
-          "Star-tree V2 data buffer");
-    }
-    return _starTreeIndexDataBuffer;
-  }
-
-  @Override
-  public InputStream getStarTreeIndexMap()
-      throws IOException {
-    return new FileInputStream(new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
-  }
-
-  @Override
-  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
+  public PinotDataBuffer newBuffer(String column, IndexType<?, ?, ?> type, long sizeBytes)
       throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getWriteBufferFor(key, sizeBytes);
   }
 
   @Override
-  public boolean hasIndexFor(String column, ColumnIndexType type) {
+  public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
     File indexFile = getFileFor(column, type);
     return indexFile.exists();
   }
@@ -122,15 +93,12 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     for (PinotDataBuffer dataBuffer : _indexBuffers.values()) {
       dataBuffer.close();
     }
-    if (_starTreeIndexDataBuffer != null) {
-      _starTreeIndexDataBuffer.close();
-    }
   }
 
   @Override
-  public void removeIndex(String columnName, ColumnIndexType indexType) {
+  public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
     _indexBuffers.remove(new IndexKey(columnName, indexType));
-    if (indexType == ColumnIndexType.TEXT_INDEX) {
+    if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     } else {
       FileUtils.deleteQuietly(getFileFor(columnName, indexType));
@@ -138,7 +106,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
+  public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
     // _indexBuffers is just a cache of index files, thus not reliable as
     // the source of truth about which indices exist in the directory.
     // Call hasIndexFor() to check if a column-index exists for sure.
@@ -163,7 +131,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
           "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
               .toString());
     }
-    PinotDataBuffer buffer = mapForReads(file, key._type.toString() + ".reader");
+    PinotDataBuffer buffer = mapForReads(file, key._type.getId() + ".reader");
     _indexBuffers.put(key, buffer);
     return buffer;
   }
@@ -181,57 +149,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @VisibleForTesting
-  File getFileFor(String column, ColumnIndexType indexType) {
-    String fileExtension;
-    switch (indexType) {
-      case DICTIONARY:
-        fileExtension = V1Constants.Dict.FILE_EXTENSION;
-        break;
-      case FORWARD_INDEX:
-        ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-        if (columnMetadata.isSingleValue()) {
-          if (!columnMetadata.hasDictionary()) {
-            fileExtension = V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
-          } else if (columnMetadata.isSorted()) {
-            fileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-          } else {
-            fileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-          }
-        } else {
-          if (!columnMetadata.hasDictionary()) {
-            fileExtension = V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
-          } else {
-            fileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
-          }
-        }
-        break;
-      case INVERTED_INDEX:
-        fileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
-        break;
-      case RANGE_INDEX:
-        fileExtension = V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
-        break;
-      case BLOOM_FILTER:
-        fileExtension = V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
-        break;
-      case NULLVALUE_VECTOR:
-        fileExtension = V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
-        break;
-      case TEXT_INDEX:
-        fileExtension = V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
-        break;
-      case FST_INDEX:
-        fileExtension = V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
-        break;
-      case JSON_INDEX:
-        fileExtension = V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION;
-        break;
-      case H3_INDEX:
-        fileExtension = V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
-        break;
-      default:
-        throw new IllegalStateException("Unsupported index type: " + indexType);
-    }
+  File getFileFor(String column, IndexType<?, ?, ?> indexType) {
+    String fileExtension = indexType.getFileExtension(_segmentMetadata.getColumnMetadataFor(column));
     return new File(_segmentDirectory, column + fileExtension);
   }
 

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
@@ -52,6 +54,7 @@ public class QueryEnvironmentTestBase {
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
+        .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
         .setSchemaName("defaultSchemaName");
     TABLE_SCHEMAS.put("a_REALTIME", SCHEMA_BUILDER.setSchemaName("a").build());
     TABLE_SCHEMAS.put("b_REALTIME", SCHEMA_BUILDER.setSchemaName("b").build());
@@ -96,6 +99,32 @@ public class QueryEnvironmentTestBase {
             + " WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND"
             + " b.col2 NOT IN ('alice', 'charlie')"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER () FROM a"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2) FROM a"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2 ORDER BY a.col2) FROM a"},
+        new Object[]{"SELECT a.col1, AVG(a.col3) OVER (), SUM(a.col3) OVER () FROM a"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER () FROM a WHERE a.col3 >= 0"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2), MIN(a.col3) OVER (PARTITION BY a.col2) "
+            + "FROM a"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2, a.col1) FROM a"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2, a.col1), MIN(a.col3) OVER (ORDER BY a.col2, "
+            + "a.col1) FROM a"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2), MIN(a.col3) OVER (ORDER BY a.col2) FROM a"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0"
+            + " AND a.col2 = 'a' GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 "
+            + "AND a.col2 = 'a' GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a"
+            + ".col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 "
+            + "= b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1 as v1, a.col1 as v2, AVG(a.col3) FROM"
+            + " a GROUP BY v1, v2"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) "
+            + "FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 "
+            + "AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col3 FROM a JOIN b ON a.col1 = b"
+            + ".col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
     };
   }
 
@@ -120,5 +149,44 @@ public class QueryEnvironmentTestBase {
     return new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager("localhost", reducerPort, routingManager), tableCache);
+  }
+
+  /**
+   * JSON test case definition for query planner test cases. Tables and schemas will come from those already defined
+   * and part of the {@code QueryEnvironment} in this base and are not part of the JSON definition for now.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class QueryPlanTestCase {
+    // ignores the entire query test case
+    @JsonProperty("ignored")
+    public boolean _ignored;
+    @JsonProperty("queries")
+    public List<Query> _queries;
+
+    @Override
+    public String toString() {
+      return "QueryPlanTestCase{" + "_ignored=" + _ignored + ", _queries=" + _queries + '}';
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Query {
+      // ignores just a single query test from the test case
+      @JsonProperty("ignored")
+      public boolean _ignored;
+      @JsonProperty("sql")
+      public String _sql;
+      @JsonProperty("description")
+      public String _description;
+      @JsonProperty("output")
+      public List<String> _output = null;
+      @JsonProperty("expectedException")
+      public String _expectedException;
+
+      @Override
+      public String toString() {
+        return "Query{" + "_ignored=" + _ignored + ", _sql='" + _sql + '\'' + ", _description='" + _description + '\''
+            + ", _outputs=" + _output + ", _expectedException='" + _expectedException + '\'' + '}';
+      }
+    }
   }
 }

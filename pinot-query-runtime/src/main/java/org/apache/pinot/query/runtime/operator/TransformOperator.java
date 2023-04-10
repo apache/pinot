@@ -30,6 +30,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,14 +48,16 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
 public class TransformOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "TRANSFORM";
   private final MultiStageOperator _upstreamOperator;
+  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
-      List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+  public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+      DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+    super(context);
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
         "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
@@ -79,7 +84,8 @@ public class TransformOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      return transform(_upstreamOperator.nextBlock());
+      TransferableBlock block = _upstreamOperator.nextBlock();
+      return transform(block);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
@@ -94,7 +100,11 @@ public class TransformOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
 
-    if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+    if (TransferableBlockUtils.isEndOfStream(block)) {
+      return block;
+    }
+
+    if (TransferableBlockUtils.isNoOpBlock(block)) {
       return block;
     }
 
@@ -103,8 +113,8 @@ public class TransformOperator extends MultiStageOperator {
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
-        resultRow[i] = FunctionInvokeUtils.convert(_transformOperandsList.get(i).apply(row),
-            _resultSchema.getColumnDataType(i));
+        resultRow[i] =
+            FunctionInvokeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
       }
       resultRows.add(resultRow);
     }

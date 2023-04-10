@@ -36,14 +36,14 @@
       { "sql": "SELECT CAST(floatCol AS DOUBLE) * 1e100, CAST(intCol AS BIGINT) * 2000000000, CAST(longCol AS DOUBLE) * 1e100, CAST(boolCol AS INT) FROM {tbl}" },
       { "sql": "SELECT CAST(a.floatCol AS DOUBLE) * 1e100, CAST(a.intCol AS BIGINT) * 2000000000, CAST(b.longCol AS FLOAT) * 1e20, CAST(a.boolCol AS INT) FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true" },
       {
-        "ignored": true,
-        "comments": "primitive cast not work: cast as DECIMAL doesn't work",
-        "sql": "SELECT CAST(doubleCol AS DECIMAL) FROM {tbl} WHERE bigDecimalCol > 0 AND CAST(bytesCol AS VARCHAR) != '1000'"
+        "comments": "special cast not work: bytes cast to hex is not supported in h2, need to use RAWTOHEX(bytesCol) instead",
+        "sql": "SELECT CAST(doubleCol AS DECIMAL), CAST(bytesCol AS VARCHAR) FROM {tbl} WHERE bigDecimalCol > 0 AND CAST(bytesCol AS VARCHAR) != '1000'",
+        "h2Sql": "SELECT CAST(doubleCol AS DECIMAL), RAWTOHEX(bytesCol) FROM {tbl} WHERE bigDecimalCol > 0 AND RAWTOHEX(bytesCol) != '1000'"
       },
       {
         "ignored": true,
         "comments": "special cast not work: timestamp cast not supported, varchar cast not supported",
-        "sql": "SELECT CAST(b.timestampCol AS BIGINT), CAST(stringCol AS VARBINARY) FROM {tbl}"
+        "sql": "SELECT CAST(timestampCol AS BIGINT), CAST(stringCol AS VARBINARY) FROM {tbl}"
       }
     ]
   },

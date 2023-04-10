@@ -20,52 +20,42 @@ package org.apache.pinot.segment.spi.creator;
 
 import java.io.IOException;
 import org.apache.pinot.segment.spi.index.IndexingOverrides;
-import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
 public class IndexingOverridesTest {
 
   @Test
-  public void indexingOverridesLoadableWithoutDefaultImplementation()
-      throws IOException {
-    BloomFilterCreator mockBloomFilterCreator = mock(BloomFilterCreator.class);
-    BloomFilterReader mockBloomFilterReader = mock(BloomFilterReader.class);
+  public void indexingOverridesLoadableWithoutDefaultImplementation() {
+    MutableTextIndex mockMutableTextIndex = mock(MutableTextIndex.class);
     assertTrue(IndexingOverrides.registerProvider(new IndexingOverrides.Default() {
       @Override
-      public BloomFilterCreator newBloomFilterCreator(IndexCreationContext.BloomFilter context) {
-        return mockBloomFilterCreator;
-      }
-
-      @Override
-      public BloomFilterReader newBloomFilterReader(PinotDataBuffer dataBuffer, boolean onHeap) {
-        return mockBloomFilterReader;
+      public MutableTextIndex newTextIndex(MutableIndexContext.Text context) {
+        return mockMutableTextIndex;
       }
     }));
     // it's ok to load external overrides without an internal implementation present, e.g. for testing
-    assertEquals(mockBloomFilterCreator, IndexingOverrides.getIndexCreatorProvider()
-        .newBloomFilterCreator(mock(IndexCreationContext.BloomFilter.class)));
-    assertEquals(mockBloomFilterReader, IndexingOverrides.getIndexReaderProvider()
-        .newBloomFilterReader(mock(PinotDataBuffer.class), false));
+    assertSame(mockMutableTextIndex, IndexingOverrides.getMutableIndexProvider()
+        .newTextIndex(mock(MutableIndexContext.Text.class)));
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
   public void whenDefaultImplementationMissingThrowUnsupportedOperationExceptionCreator()
       throws IOException {
     // the implementation is missing so no indexes will be created anyway...
-    new IndexingOverrides.Default().newBloomFilterCreator(mock(IndexCreationContext.BloomFilter.class));
+    new IndexingOverrides.Default().newTextIndex(mock(MutableIndexContext.Text.class));
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
   public void whenDefaultImplementationMissingThrowUnsupportedOperationExceptionReader()
       throws IOException {
     // the implementation is missing so no indexes will be created anyway...
-    new IndexingOverrides.Default().newBloomFilterReader(mock(PinotDataBuffer.class), true);
+    new IndexingOverrides.Default().newTextIndex(mock(MutableIndexContext.Text.class));
   }
 }

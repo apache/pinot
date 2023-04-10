@@ -20,14 +20,15 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.PinotCalciteCatalogReader;
@@ -35,6 +36,7 @@ import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.hint.HintStrategyTable;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
@@ -78,7 +80,6 @@ public class QueryEnvironment {
   private final HepProgram _hepProgram;
 
   // Pinot extensions
-  private final Collection<RelOptRule> _logicalRuleSet;
   private final WorkerManager _workerManager;
   private final TableCache _tableCache;
 
@@ -102,16 +103,31 @@ public class QueryEnvironment {
         .defaultSchema(_rootSchema.plus())
         .sqlToRelConverterConfig(SqlToRelConverter.config()
             .withHintStrategyTable(getHintStrategyTable())
+            .withTrimUnusedFields(true)
+            // SUB-QUERY Threshold is useless as we are encoding all IN clause in-line anyway
+            .withInSubQueryThreshold(Integer.MAX_VALUE)
             .addRelBuilderConfigTransform(c -> c.withPushJoinCondition(true))
             .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true)))
         .build();
 
-    // optimizer rules
-    _logicalRuleSet = PinotQueryRuleSets.LOGICAL_OPT_RULES;
-
-    // optimizer
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
-    for (RelOptRule relOptRule : _logicalRuleSet) {
+    // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
+    // best to be explicit.
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
+    // First run the basic rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
+    // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
+    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
+      hepProgramBuilder.addRuleInstance(relOptRule);
+    }
+    // Pushdown filters using a single HepInstruction.
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+
+    // Prune duplicate/unnecessary nodes using a single HepInstruction.
+    // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
+
+    // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
+    for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
     _hepProgram = hepProgramBuilder.build();
@@ -127,18 +143,18 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @return a dispatchable query plan
+   * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
-  public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
+  public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return toDispatchablePlan(relRoot, plannerContext, requestId);
+      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId), null, relRoot.rel);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
-    } catch (Exception e) {
-      throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
+    } catch (Throwable t) {
+      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
   }
 
@@ -151,9 +167,9 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @return the explained query plan.
+   * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
-  public String explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
@@ -161,7 +177,7 @@ public class QueryEnvironment {
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      return PlannerUtils.explainPlan(relRoot.rel, format, level);
+      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), relRoot.rel);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -169,12 +185,39 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public QueryPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0);
+    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0).getQueryPlan();
   }
 
   @VisibleForTesting
   public String explainQuery(String sqlQuery) {
-    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery)).getExplainPlan();
+  }
+
+  /**
+   * Results of planning a query
+   */
+  public static class QueryPlannerResult {
+    private QueryPlan _queryPlan;
+    private String _explainPlan;
+    private RelNode _relRoot;
+
+    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, RelNode relRoot) {
+      _queryPlan = queryPlan;
+      _explainPlan = explainPlan;
+      _relRoot = relRoot;
+    }
+
+    public String getExplainPlan() {
+      return _explainPlan;
+    }
+
+    public QueryPlan getQueryPlan() {
+      return _queryPlan;
+    }
+
+    public RelNode getRelRoot() {
+      return _relRoot;
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -208,7 +251,8 @@ public class QueryEnvironment {
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
             StandardConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
-    return sqlToRelConverter.convertQuery(parsed, false, true);
+    RelRoot relRoot = sqlToRelConverter.convertQuery(parsed, false, true);
+    return relRoot.withRel(sqlToRelConverter.trimUnusedFields(false, relRoot.rel));
   }
 
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
@@ -234,6 +278,6 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
 
   private HintStrategyTable getHintStrategyTable() {
-    return HintStrategyTable.builder().build();
+    return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
   }
 }

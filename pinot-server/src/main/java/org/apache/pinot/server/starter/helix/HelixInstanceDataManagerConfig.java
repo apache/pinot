@@ -30,6 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_READ_MODE;
 
 
 /**
@@ -125,11 +128,19 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String DELETED_SEGMENTS_CACHE_TTL_MINUTES = "table.deleted.segments.cache.ttl.minutes";
   private static final String PEER_DOWNLOAD_SCHEME = "peer.download.scheme";
 
-  private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
+  // Check if the external view is dropped for a table, and if so, wait for the external view to
+  // be updated for a maximum of this time.
+  private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
+  private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
+
+  private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
-  private PinotConfiguration _instanceDataManagerConfiguration = null;
+  public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L;
+  public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = 1_000L;
+
+  private final PinotConfiguration _instanceDataManagerConfiguration;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
       throws ConfigurationException {
@@ -146,7 +157,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
       throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       Optional.ofNullable(_instanceDataManagerConfiguration.getProperty(keyString))
-
           .orElseThrow(() -> new ConfigurationException("Cannot find required key : " + keyString));
     }
   }
@@ -163,7 +173,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public String getInstanceDataDir() {
-    return _instanceDataManagerConfiguration.getProperty(INSTANCE_DATA_DIR);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_DATA_DIR, DEFAULT_INSTANCE_DATA_DIR);
   }
 
   @Override
@@ -173,7 +183,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public String getInstanceSegmentTarDir() {
-    return _instanceDataManagerConfiguration.getProperty(INSTANCE_SEGMENT_TAR_DIR);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_SEGMENT_TAR_DIR, DEFAULT_INSTANCE_SEGMENT_TAR_DIR);
   }
 
   @Override
@@ -188,7 +198,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public ReadMode getReadMode() {
-    return ReadMode.valueOf(_instanceDataManagerConfiguration.getProperty(READ_MODE));
+    return ReadMode.valueOf(_instanceDataManagerConfiguration.getProperty(READ_MODE, DEFAULT_READ_MODE));
   }
 
   @Override
@@ -278,6 +288,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getSegmentPeerDownloadScheme() {
     return _instanceDataManagerConfiguration.getProperty(PEER_DOWNLOAD_SCHEME);
+  }
+
+  @Override
+  public long getExternalViewDroppedMaxWaitMs() {
+    return _instanceDataManagerConfiguration.getProperty(EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS,
+        DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS);
+  }
+
+  @Override
+  public long getExternalViewDroppedCheckIntervalMs() {
+    return _instanceDataManagerConfiguration.getProperty(EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS,
+        DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS);
   }
 
   @Override

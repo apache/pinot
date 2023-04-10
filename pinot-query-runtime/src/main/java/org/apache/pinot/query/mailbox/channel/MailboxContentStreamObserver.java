@@ -19,25 +19,23 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
-import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
+import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.lang.Math.max;
 
 
 /**
@@ -48,60 +46,41 @@ import static java.lang.Math.max;
  * to the sender side.
  */
 public class MailboxContentStreamObserver implements StreamObserver<Mailbox.MailboxContent> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
+  public static final int DEFAULT_MAX_PENDING_MAILBOX_CONTENT = 5;
 
-  private static Mailbox.MailboxContent createErrorContent(Throwable e)
-      throws IOException {
-    return Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
-            TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
-        .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
+  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
+  private static final Mailbox.MailboxContent DEFAULT_ERROR_MAILBOX_CONTENT;
+  // This delta is added to the buffer offer on top of the query timeout to avoid a race between client cancellation
+  // due to deadline and server-side cancellation due to the receiving buffer being full.
+  private static final long BUFFER_OFFER_TIMEOUT_DELTA_MS = 1_000;
+
+  static {
+    try {
+      RuntimeException exception = new RuntimeException(
+          "Error creating error-content.. please file a bug in the apache/pinot repo");
+      DEFAULT_ERROR_MAILBOX_CONTENT = Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
+          TransferableBlockUtils.getErrorTransferableBlock(exception).getDataBlock().toBytes()))
+          .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
-  private final boolean _isEnabledFeedback;
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final BlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
-  private ReadWriteLock _bufferSizeLock = new ReentrantReadWriteLock();
-  @GuardedBy("bufferSizeLock")
-  private int _maxBufferSize = 0;
-  private ReadWriteLock _errorLock = new ReentrantReadWriteLock();
-  @GuardedBy("_errorLock")
   private Mailbox.MailboxContent _errorContent = null;
-  private StringMailboxIdentifier _mailboxId;
+  private JsonMailboxIdentifier _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
-
-  private void updateMaxBufferSize() {
-    _bufferSizeLock.writeLock().lock();
-    _maxBufferSize = max(_maxBufferSize, _receivingBuffer.size());
-    _bufferSizeLock.writeLock().unlock();
-  }
-
-  private int getMaxBufferSize() {
-    try {
-      _bufferSizeLock.readLock().lock();
-      return _maxBufferSize;
-    } finally {
-      _bufferSizeLock.readLock().unlock();
-    }
-  }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
       StreamObserver<Mailbox.MailboxStatus> responseObserver) {
-    this(mailboxService, responseObserver, false);
-  }
-
-  public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
-    // TODO: Replace unbounded queue with bounded queue when we have backpressure in place.
-    // It is possible this will create high memory pressure since we have memory leak issues.
-    _receivingBuffer = new LinkedBlockingQueue();
-    _isEnabledFeedback = isEnabledFeedback;
+    _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_MAILBOX_CONTENT);
   }
 
   /**
@@ -111,92 +90,82 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
    * to indicate when to call this method.
    */
   public Mailbox.MailboxContent poll() {
-    try {
-      _errorLock.readLock().lock();
-      if (_errorContent != null) {
-        return _errorContent;
-      }
-    } finally {
-      _errorLock.readLock().unlock();
+    if (_errorContent != null) {
+      return _errorContent;
     }
-    if (isCompleted()) {
+    if (hasConsumedAllData()) {
       return null;
     }
 
     return _receivingBuffer.poll();
   }
 
-  public boolean isCompleted() {
-    return _isCompleted.get() && _receivingBuffer.isEmpty();
-  }
-
   @Override
   public void onNext(Mailbox.MailboxContent mailboxContent) {
-    _mailboxId = new StringMailboxIdentifier(mailboxContent.getMailboxId());
+    _mailboxId = JsonMailboxIdentifier.parse(mailboxContent.getMailboxId());
 
+    long remainingTimeMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
     GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
-    _gotMailCallback = receivingMailbox.init(this);
+    _gotMailCallback = receivingMailbox.init(this, _responseObserver);
+    if (_errorContent != null) {
+      // This should never happen because gRPC calls StreamObserver in a single-threaded fashion, and if error-content
+      // is not null then we would have already issued a onError which means gRPC will not call onNext again.
+      LOGGER.warn("onNext called even though already errored out");
+      return;
+    }
 
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
       // when the receiving end receives a message put it in the mailbox queue.
-      // TODO: pass a timeout to _receivingBuffer.
-      if (!_receivingBuffer.offer(mailboxContent)) {
-        // TODO: close the stream.
-        RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
-        LOGGER.error(e.getMessage());
-        try {
-          _errorLock.writeLock().lock();
-          _errorContent = createErrorContent(e);
-        } catch (IOException ioe) {
-          e = new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
-          LOGGER.error("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
+      try {
+        final long offerTimeoutMs = remainingTimeMs + BUFFER_OFFER_TIMEOUT_DELTA_MS;
+        if (!_receivingBuffer.offer(mailboxContent, offerTimeoutMs, TimeUnit.MILLISECONDS)) {
+          RuntimeException e = new RuntimeException("Timed out offering to the receivingBuffer: " + _mailboxId);
           LOGGER.error(e.getMessage());
-          throw e;
-        } finally {
-          _errorLock.writeLock().unlock();
+          _errorContent = createErrorContent(e);
+          try {
+            _responseObserver.onError(Status.CANCELLED.asRuntimeException());
+          } catch (Exception ignored) {
+            // Exception can be thrown if the stream deadline has already been reached, so we simply ignore it.
+          }
         }
+      } catch (InterruptedException e) {
+        _errorContent = createErrorContent(e);
+        LOGGER.error("Interrupted while polling receivingBuffer", e);
+        _responseObserver.onError(Status.CANCELLED.asRuntimeException());
       }
       _gotMailCallback.accept(_mailboxId);
-
-      updateMaxBufferSize();
-
-      if (_isEnabledFeedback) {
-        // TODO: this has race conditions with onCompleted() because sender blindly closes connection channels once
-        // it has finished sending all the data packets.
-        int remainingCapacity = _receivingBuffer.remainingCapacity() - 1;
-        Mailbox.MailboxStatus.Builder builder =
-            Mailbox.MailboxStatus.newBuilder().setMailboxId(mailboxContent.getMailboxId())
-                .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY, String.valueOf(remainingCapacity));
-        if (mailboxContent.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY) != null) {
-          builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
-        }
-        Mailbox.MailboxStatus status = builder.build();
-        // returns the buffer available size to sender for rate controller / throttling.
-        _responseObserver.onNext(status);
-      }
     }
   }
 
   @Override
   public void onError(Throwable e) {
-    try {
-      _errorLock.writeLock().lock();
+    if (_errorContent == null) {
       _errorContent = createErrorContent(e);
-      _gotMailCallback.accept(_mailboxId);
-      // TODO: close the stream.
-      throw new RuntimeException(e);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
-    } finally {
-      _errorLock.writeLock().unlock();
-      LOGGER.error("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
     }
+    _gotMailCallback.accept(_mailboxId);
   }
 
   @Override
   public void onCompleted() {
     _isCompleted.set(true);
     _responseObserver.onCompleted();
-    LOGGER.debug("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
+  }
+
+  /**
+   * @return true if all data has been received via {@link #poll()}.
+   */
+  public boolean hasConsumedAllData() {
+    return _isCompleted.get() && _receivingBuffer.isEmpty();
+  }
+
+  private static Mailbox.MailboxContent createErrorContent(Throwable e) {
+    try {
+      return Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
+          TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
+          .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
+    } catch (IOException ioException) {
+      LOGGER.error("Error creating error MailboxContent", ioException);
+      return DEFAULT_ERROR_MAILBOX_CONTENT;
+    }
   }
 }

@@ -27,6 +27,15 @@
           [1, "foo"],
           [2, "bar"]
         ]
+      },
+      "tbl3": {
+        "schema":[
+          {"name": "intArrayCol", "type": "INT", "isSingleValue": false},
+          {"name": "strArrayCol", "type": "STRING", "isSingleValue": false}
+        ],
+        "inputs": [
+          [[1, 10], ["foo1", "foo2"]]
+        ]
       }
     },
     "queries": [
@@ -35,7 +44,7 @@
       { "sql": "SELECT {tbl1}.*, {tbl2}.strCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol"},
       { "sql": "SELECT intCol as \"value\", doubleCol + floatCol AS \"sum\" FROM {tbl1}"},
       { "sql": "SELECT intCol as \"from\" FROM {tbl1}"},
-      { "sql": "SELECT intCol as key, SUM(doubleCol + floatCol) AS aggSum FROM {tbl1} GROUP BY intCol"},
+      { "sql": "SELECT intCol as \"key\", SUM(doubleCol + floatCol) AS aggSum FROM {tbl1} GROUP BY intCol"},
       { "sql": "SELECT intCol, SUM(avgVal) FROM (SELECT strCol, intCol, AVG(doubleCol) AS avgVal FROM {tbl1} GROUP BY intCol, strCol) GROUP BY intCol"},
       { "sql": "SELECT strCol, MAX(sumVal), MAX(sumVal + avgVal) AS transVal FROM (SELECT strCol, intCol, SUM(floatCol + 2 * intCol) AS sumVal, AVG(doubleCol) AS avgVal FROM {tbl1} GROUP BY strCol, intCol) GROUP BY strCol ORDER BY MAX(sumVal)" },
       { "sql": "SELECT intCol, intCol AS intAlias FROM {tbl1} WHERE intCol < 100" },
@@ -53,11 +62,8 @@
       { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1}" },
       { "sql": "SELECT {tbl1}.intCol, {tbl1}.intCol, {tbl1}.doubleCol, {tbl2}.strCol, {tbl2}.strCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol" },
       { "sql": "SELECT {tbl2}.intCol, {tbl2}.intCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol AND {tbl1}.intCol < 100 ORDER BY {tbl1}.doubleCol" },
-      {
-        "ignored": true,
-        "comment": "select intCol, intCol without aliasing one of them is not supported.",
-        "sql": "SELECT intCol, intCol FROM {tbl1} WHERE intCol < 100"
-      }
+      { "sql": "SELECT intCol, intCol FROM {tbl1} WHERE intCol < 100"},
+      { "sql": "SELECT intArrayCol, strArrayCol FROM {tbl3}"}
     ]
   }
 }

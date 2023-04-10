@@ -127,6 +127,9 @@ public class DataBlockTestUtils {
           }
           row[colId] = timestampArray;
           break;
+        case UNKNOWN:
+          row[colId] = null;
+          break;
         default:
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
       }
@@ -173,6 +176,8 @@ public class DataBlockTestUtils {
         return dataBlock.getDoubleArray(rowId, colId);
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
+      case UNKNOWN:
+        return null;
       default:
         throw new UnsupportedOperationException("Can't retrieve data for column type: " + columnDataType);
     }

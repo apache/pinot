@@ -103,13 +103,17 @@ public class TableConfigBuilder {
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
+  private boolean _optimizeDictionaryForMetrics;
+  // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
+  // only when _optimizeDictionaryForMetrics is set to true.
+  private double _noDictionarySizeRatioThreshold;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
-  private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+  private Map<String, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private Map<InstancePartitionsType, String> _instancePartitionsMap;
   private Map<String, SegmentAssignmentConfig> _segmentAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
@@ -169,6 +173,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setRetentionTimeValue(String retentionTimeValue) {
     _retentionTimeValue = retentionTimeValue;
+    return this;
+  }
+
+  public TableConfigBuilder setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
+    _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
     return this;
   }
 
@@ -248,6 +257,16 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setInvertedIndexColumns(List<String> invertedIndexColumns) {
     _invertedIndexColumns = invertedIndexColumns;
+    return this;
+  }
+
+  public TableConfigBuilder setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
+    _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
+    return this;
+  }
+
+  public TableConfigBuilder setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {
+    _noDictionarySizeRatioThreshold = noDictionarySizeRatioThreshold;
     return this;
   }
 
@@ -339,7 +358,7 @@ public class TableConfigBuilder {
   }
 
   public TableConfigBuilder setInstanceAssignmentConfigMap(
-      Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     return this;
   }
@@ -439,6 +458,8 @@ public class TableConfigBuilder {
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
+    indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
+    indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

@@ -20,9 +20,9 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.routing.VirtualServer;
 
 
 /**
@@ -33,7 +33,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
  */
 public class DistributedStagePlan {
   private int _stageId;
-  private ServerInstance _serverInstance;
+  private VirtualServer _server;
   private StageNode _stageRoot;
   private Map<Integer, StageMetadata> _metadataMap;
 
@@ -42,10 +42,10 @@ public class DistributedStagePlan {
     _metadataMap = new HashMap<>();
   }
 
-  public DistributedStagePlan(int stageId, ServerInstance serverInstance, StageNode stageRoot,
+  public DistributedStagePlan(int stageId, VirtualServer server, StageNode stageRoot,
       Map<Integer, StageMetadata> metadataMap) {
     _stageId = stageId;
-    _serverInstance = serverInstance;
+    _server = server;
     _stageRoot = stageRoot;
     _metadataMap = metadataMap;
   }
@@ -54,8 +54,8 @@ public class DistributedStagePlan {
     return _stageId;
   }
 
-  public ServerInstance getServerInstance() {
-    return _serverInstance;
+  public VirtualServer getServer() {
+    return _server;
   }
 
   public StageNode getStageRoot() {
@@ -66,8 +66,8 @@ public class DistributedStagePlan {
     return _metadataMap;
   }
 
-  public void setServerInstance(ServerInstance serverInstance) {
-    _serverInstance = serverInstance;
+  public void setServer(VirtualServer serverInstance) {
+    _server = serverInstance;
   }
 
   public void setStageRoot(StageNode stageRoot) {

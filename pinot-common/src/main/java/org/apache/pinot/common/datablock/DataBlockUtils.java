@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -66,6 +68,11 @@ public final class DataBlockUtils {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
   }
 
+  public static MetadataBlock getEndOfStreamDataBlock(Map<String, String> stats) {
+    // TODO: add query statistics metadata for the block.
+    return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
+  }
+
   public static MetadataBlock getNoOpBlock() {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.NOOP);
   }
@@ -87,14 +94,14 @@ public final class DataBlockUtils {
     }
   }
 
-  public static List<Object[]> extractRows(DataBlock dataBlock) {
+  public static List<Object[]> extractRows(DataBlock dataBlock, Function<CustomObject, Object> customObjectSerde) {
     DataSchema dataSchema = dataBlock.getDataSchema();
     DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     RoaringBitmap[] nullBitmaps = extractNullBitmaps(dataBlock);
     int numRows = dataBlock.getNumberOfRows();
     List<Object[]> rows = new ArrayList<>(numRows);
     for (int rowId = 0; rowId < numRows; rowId++) {
-      rows.add(extractRowFromDataBlock(dataBlock, rowId, columnDataTypes, nullBitmaps));
+      rows.add(extractRowFromDataBlock(dataBlock, rowId, columnDataTypes, nullBitmaps, customObjectSerde));
     }
     return rows;
   }
@@ -189,8 +196,8 @@ public final class DataBlockUtils {
     return nullBitmaps;
   }
 
-  public static Object[] extractRowFromDataBlock(DataBlock dataBlock, int rowId, DataSchema.ColumnDataType[] dataTypes,
-      RoaringBitmap[] nullBitmaps) {
+  private static Object[] extractRowFromDataBlock(DataBlock dataBlock, int rowId, DataSchema.ColumnDataType[] dataTypes,
+      RoaringBitmap[] nullBitmaps, Function<CustomObject, Object> customObjectSerde) {
     int numColumns = nullBitmaps.length;
     Object[] row = new Object[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
@@ -249,6 +256,9 @@ public final class DataBlockUtils {
             break;
           case TIMESTAMP_ARRAY:
             row[colId] = DataSchema.ColumnDataType.TIMESTAMP_ARRAY.convert(dataBlock.getLongArray(rowId, colId));
+            break;
+          case OBJECT:
+            row[colId] = customObjectSerde.apply(dataBlock.getCustomObject(rowId, colId));
             break;
           default:
             throw new IllegalStateException(

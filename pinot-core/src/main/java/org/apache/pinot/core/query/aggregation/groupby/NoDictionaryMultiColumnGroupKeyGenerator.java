@@ -26,9 +26,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -58,7 +58,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
   private int _numGroups = 0;
 
-  public NoDictionaryMultiColumnGroupKeyGenerator(TransformOperator transformOperator,
+  public NoDictionaryMultiColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
@@ -69,14 +69,15 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
-      TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
-      _storedTypes[i] = transformResultMetadata.getDataType().getStoredType();
-      if (transformResultMetadata.hasDictionary()) {
-        _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
+      ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
+      _storedTypes[i] = columnContext.getDataType().getStoredType();
+      Dictionary dictionary = columnContext.getDictionary();
+      if (dictionary != null) {
+        _dictionaries[i] = dictionary;
       } else {
         _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_storedTypes[i]);
       }
-      _isSingleValueExpressions[i] = transformResultMetadata.isSingleValue();
+      _isSingleValueExpressions[i] = columnContext.isSingleValue();
     }
 
     _groupKeyMap = new Object2IntOpenHashMap<>();
@@ -90,11 +91,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
-    int numDocs = transformBlock.getNumDocs();
+  public void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys) {
+    int numDocs = valueBlock.getNumDocs();
     Object[] values = new Object[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
+      BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpressions[i]);
       if (_dictionaries[i] != null) {
         values[i] = blockValSet.getDictionaryIdsSV();
       } else {
@@ -152,11 +153,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys) {
-    int numDocs = transformBlock.getNumDocs();
+  public void generateKeysForBlock(ValueBlock valueBlock, int[][] groupKeys) {
+    int numDocs = valueBlock.getNumDocs();
     int[][][] keys = new int[numDocs][_numGroupByExpressions][];
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
+      BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpressions[i]);
       if (_dictionaries[i] != null) {
         if (_isSingleValueExpressions[i]) {
           int[] dictIds = blockValSet.getDictionaryIdsSV();

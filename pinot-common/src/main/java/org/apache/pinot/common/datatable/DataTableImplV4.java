@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -149,15 +150,12 @@ public class DataTableImplV4 implements DataTable {
     }
 
     // Read variable size data.
+    _variableSizeDataBytes = new byte[variableSizeDataLength];
     if (variableSizeDataLength != 0) {
-      _variableSizeDataBytes = new byte[variableSizeDataLength];
       byteBuffer.position(variableSizeDataStart);
       byteBuffer.get(_variableSizeDataBytes);
-      _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
-    } else {
-      _variableSizeDataBytes = null;
-      _variableSizeData = null;
     }
+    _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
 
     // Read metadata.
     int metadataLength = byteBuffer.getInt();

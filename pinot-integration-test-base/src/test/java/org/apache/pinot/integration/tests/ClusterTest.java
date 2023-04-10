@@ -61,7 +61,6 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
-import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -177,13 +176,11 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected PinotConfiguration getDefaultServerConfiguration() {
-    PinotConfiguration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
-
-    configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
-    configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-    configuration.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
-
-    return configuration;
+    PinotConfiguration serverConf = new PinotConfiguration();
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
+    serverConf.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
+    serverConf.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
+    return serverConf;
   }
 
   protected void overrideServerConf(PinotConfiguration serverConf) {
@@ -198,7 +195,7 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
         Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + serverId);
     serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - serverId);
-    serverConf.setProperty(Server.CONFIG_OF_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT + serverId);
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
@@ -469,6 +466,16 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
+   * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
+   */
+  protected JsonNode postQueryWithOptions(String query, String queryOptions) throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
+    payload.put("sql", query);
+    payload.put("queryOptions", queryOptions);
+    return JsonUtils.stringToJsonNode(sendPostRequest(_brokerBaseApiUrl + "/query/sql", payload.toString(), null));
+  }
+
+  /**
    * Queries the controller's sql query endpoint (/query/sql)
    */
   protected JsonNode postQueryToController(String query)
@@ -489,8 +496,22 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers)
       throws Exception {
+    return postQueryToController(query, controllerBaseApiUrl, headers, null);
+  }
+
+  /**
+   * Queries the controller's sql query endpoint (/sql)
+   */
+  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers,
+      Map<String, String> extraJsonProperties)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
+    if (MapUtils.isNotEmpty(extraJsonProperties)) {
+      for (Map.Entry<String, String> extraProperty :extraJsonProperties.entrySet()) {
+        payload.put(extraProperty.getKey(), extraProperty.getValue());
+      }
+    }
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
   }

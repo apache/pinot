@@ -60,14 +60,14 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   public PercentileSmartTDigestAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     try {
-      _percentile = Double.parseDouble(arguments.get(1).getLiteralString());
+      _percentile = arguments.get(1).getLiteral().getDoubleValue();
     } catch (Exception e) {
       throw new IllegalArgumentException(
           "Second argument of PERCENTILE_SMART_TDIGEST aggregation function must be a double literal (percentile)");
     }
     Preconditions.checkArgument(_percentile >= 0 && _percentile <= 100, "Invalid percentile: %s", _percentile);
     if (arguments.size() > 2) {
-      Parameters parameters = new Parameters(arguments.get(2).getLiteralString());
+      Parameters parameters = new Parameters(arguments.get(2).getLiteral().getStringValue());
       _compression = parameters._compression;
       _threshold = parameters._threshold;
     } else {
@@ -91,11 +91,6 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILESMARTTDIGEST;
-  }
-
-  @Override
-  public String getColumnName() {
-    return AggregationFunctionType.PERCENTILESMARTTDIGEST.getName() + _percentile + "_" + _expression;
   }
 
   @Override

@@ -34,8 +34,14 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -43,6 +49,22 @@ import static org.mockito.Mockito.mock;
 
 // TODO: add tests for Agg / GroupBy / Distinct result blocks
 public class LeafStageTransferableBlockOperatorTest {
+  private AutoCloseable _mocks;
+
+  @Mock
+  private VirtualServerAddress _serverAddress;
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
+  }
 
   @Test
   public void shouldReturnDataBlockThenMetadataBlock() {
@@ -52,7 +74,8 @@ public class LeafStageTransferableBlockOperatorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -66,18 +89,19 @@ public class LeafStageTransferableBlockOperatorTest {
   @Test
   public void shouldHandleDesiredDataSchemaConversionCorrectly() {
     // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT boolCol, tsCol, boolCol AS newNamedBoolCol FROM tbl");
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT boolCol, tsCol, boolCol AS newNamedBoolCol FROM tbl");
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "tsCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP});
-    DataSchema desiredSchema = new DataSchema(new String[]{"boolCol", "tsCol", "newNamedBoolCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP,
-            DataSchema.ColumnDataType.BOOLEAN});
+    DataSchema desiredSchema =
+        new DataSchema(new String[]{"boolCol", "tsCol", "newNamedBoolCol"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP, DataSchema.ColumnDataType.BOOLEAN
+        });
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(resultSchema, Arrays.asList(new Object[]{1, 1660000000000L},
-            new Object[]{0, 1600000000000L})), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList,
-        desiredSchema);
+        new SelectionResultsBlock(resultSchema,
+            Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L})), queryContext));
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, desiredSchema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -96,9 +120,10 @@ public class LeafStageTransferableBlockOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"boolCol", "tsCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP});
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{1, 1660000000000L},
-            new Object[]{0, 1600000000000L})), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+        new SelectionResultsBlock(schema,
+            Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L})), queryContext));
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -115,13 +140,15 @@ public class LeafStageTransferableBlockOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<InstanceResponseBlock> resultsBlockList = Arrays.asList(
-        new InstanceResponseBlock(new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), queryContext),
-        new InstanceResponseBlock(new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4})), queryContext),
+    List<InstanceResponseBlock> resultsBlockList = Arrays.asList(new InstanceResponseBlock(
+            new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})),
+            queryContext),
+        new InstanceResponseBlock(
+            new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4})),
+            queryContext),
         new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock1 = operator.nextBlock();
@@ -145,12 +172,13 @@ public class LeafStageTransferableBlockOperatorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
     errorBlock.addException(QueryException.QUERY_EXECUTION_ERROR.getErrorCode(), "foobar");
-    List<InstanceResponseBlock> resultsBlockList = Arrays.asList(
-        new InstanceResponseBlock(new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), queryContext),
+    List<InstanceResponseBlock> resultsBlockList = Arrays.asList(new InstanceResponseBlock(
+            new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})),
+            queryContext),
         errorBlock,
         new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -162,16 +190,16 @@ public class LeafStageTransferableBlockOperatorTest {
   @Test
   public void shouldReorderWhenQueryContextAskForNotInOrderGroupByAsDistinct() {
     // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT intCol, strCol FROM tbl GROUP BY strCol, intCol");
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT intCol, strCol FROM tbl GROUP BY strCol, intCol");
     // result schema doesn't match with DISTINCT columns using GROUP BY.
     DataSchema schema = new DataSchema(new String[]{"intCol", "strCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
-            new DistinctTable(schema, Arrays.asList(
-                new Record(new Object[]{1, "foo"}), new Record(new Object[]{2, "bar"})))), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
+        new DistinctResultsBlock(mock(DistinctAggregationFunction.class), new DistinctTable(schema,
+            Arrays.asList(new Record(new Object[]{1, "foo"}), new Record(new Object[]{2, "bar"})))), queryContext));
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -184,16 +212,15 @@ public class LeafStageTransferableBlockOperatorTest {
   @Test
   public void shouldParsedBlocksSuccessfullyWithDistinctQuery() {
     // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT DISTINCT strCol, intCol FROM tbl");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT strCol, intCol FROM tbl");
     // result schema doesn't match with DISTINCT columns using GROUP BY.
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
-            new DistinctTable(schema, Arrays.asList(
-                new Record(new Object[]{"foo", 1}), new Record(new Object[]{"bar", 2})))), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
+        new DistinctResultsBlock(mock(DistinctAggregationFunction.class), new DistinctTable(schema,
+            Arrays.asList(new Record(new Object[]{"foo", 1}), new Record(new Object[]{"bar", 2})))), queryContext));
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -209,12 +236,15 @@ public class LeafStageTransferableBlockOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT intCol, count(*), sum(doubleCol), strCol FROM tbl GROUP BY strCol, intCol");
     // result schema doesn't match with columns ordering using GROUP BY, this should not occur.
-    DataSchema schema = new DataSchema(new String[]{"intCol", "count(*)", "sum(doubleCol)", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.STRING});
+    DataSchema schema =
+        new DataSchema(new String[]{"intCol", "count(*)", "sum(doubleCol)", "strCol"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG,
+            DataSchema.ColumnDataType.STRING
+        });
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
         new InstanceResponseBlock(new GroupByResultsBlock(schema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -230,11 +260,14 @@ public class LeafStageTransferableBlockOperatorTest {
         + "sum(doubleCol) FROM tbl GROUP BY strCol, intCol HAVING sum(doubleCol) < 10 AND count(*) > 0");
     // result schema contains duplicate reference from agg and having. it will repeat itself.
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol", "count(*)", "sum(doubleCol)", "sum(doubleCol)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG
+        });
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
         new InstanceResponseBlock(new GroupByResultsBlock(schema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -246,15 +279,14 @@ public class LeafStageTransferableBlockOperatorTest {
   @Test
   public void shouldNotErrorOutWhenDealingWithAggregationResults() {
     // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT count(*), sum(doubleCol) FROM tbl");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT count(*), sum(doubleCol) FROM tbl");
     // result schema doesn't match with DISTINCT columns using GROUP BY.
     DataSchema schema = new DataSchema(new String[]{"count_star", "sum(doubleCol)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new AggregationResultsBlock(queryContext.getAggregationFunctions(),
-            Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
+        new AggregationResultsBlock(queryContext.getAggregationFunctions(), Collections.emptyList()), queryContext));
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), resultsBlockList, schema);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -275,8 +307,8 @@ public class LeafStageTransferableBlockOperatorTest {
     // When:
     List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
         new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(responseBlockList,
-        desiredSchema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), responseBlockList, desiredSchema);
     TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
@@ -287,19 +319,19 @@ public class LeafStageTransferableBlockOperatorTest {
   @Test
   public void shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsDistinct() {
     // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT strCol, intCol FROM tbl GROUP BY strCol, intCol");
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl GROUP BY strCol, intCol");
     DataSchema resultSchema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
 
     // When:
-    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
+    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(new InstanceResponseBlock(
+        new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
             new DistinctTable(resultSchema, Collections.emptyList())), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(responseBlockList,
-        desiredSchema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), responseBlockList, desiredSchema);
     TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
@@ -310,18 +342,18 @@ public class LeafStageTransferableBlockOperatorTest {
   @Test
   public void shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsGroupBy() {
     // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT strCol, SUM(intCol) FROM tbl GROUP BY strCol");
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT strCol, SUM(intCol) FROM tbl GROUP BY strCol");
     DataSchema resultSchema = new DataSchema(new String[]{"strCol", "SUM(intCol)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "SUM(intCol)"},
-      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
 
     // When:
     List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
         new InstanceResponseBlock(new GroupByResultsBlock(resultSchema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(responseBlockList,
-        desiredSchema);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), responseBlockList, desiredSchema);
     TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:

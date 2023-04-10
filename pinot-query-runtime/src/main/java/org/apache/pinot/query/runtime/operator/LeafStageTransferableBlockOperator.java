@@ -40,6 +40,9 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -57,17 +60,24 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
 
   private final InstanceResponseBlock _errorBlock;
   private final List<InstanceResponseBlock> _baseResultBlock;
   private final DataSchema _desiredDataSchema;
   private int _currentIndex;
 
-  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
+  public LeafStageTransferableBlockOperator(OpChainExecutionContext context,
+      List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
+    super(context);
     _baseResultBlock = baseResultBlock;
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
+    for (InstanceResponseBlock instanceResponseBlock : baseResultBlock) {
+      OperatorStats operatorStats = _opChainStats.getOperatorStats(context, getOperatorId());
+      operatorStats.recordExecutionStats(instanceResponseBlock.getResponseMetadata());
+    }
   }
 
   @Override
@@ -78,7 +88,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME;
+      return EXPLAIN_NAME;
   }
 
   @Override
@@ -282,7 +292,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     for (int colId = 0; colId < row.length; colId++) {
       Object value = row[colId];
       if (value != null) {
-        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+        if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.OBJECT) {
+          resultRow[colId] = value;
+        } else {
+          resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+        }
       }
     }
     return resultRow;

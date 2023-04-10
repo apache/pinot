@@ -29,6 +29,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /*
@@ -47,11 +50,14 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
 public class FilterOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "FILTER";
   private final MultiStageOperator _upstreamOperator;
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter) {
+  public FilterOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, DataSchema dataSchema,
+      RexExpression filter) {
+    super(context);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
@@ -72,7 +78,8 @@ public class FilterOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      return transform(_upstreamOperator.nextBlock());
+      TransferableBlock block = _upstreamOperator.nextBlock();
+      return transform(block);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }

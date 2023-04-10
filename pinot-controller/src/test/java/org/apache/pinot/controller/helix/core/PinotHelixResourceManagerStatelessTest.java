@@ -752,15 +752,15 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId1).getState(), LineageEntryState.IN_PROGRESS);
 
     // Check invalid segmentsTo
-    assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalStateException.class,
         () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"),
             Arrays.asList("s3", "s4"), false));
-    assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalStateException.class,
         () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"),
             Collections.singletonList("s2"), false));
 
     // Check invalid segmentsFrom
-    assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalStateException.class,
         () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s6"),
             Collections.singletonList("s7"), false));
 
@@ -969,6 +969,20 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Check endReplaceSegments is idempotent
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId9);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getState(), LineageEntryState.COMPLETED);
+
+    // Test empty segmentsTo. This is a special case where we are atomically removing segments.
+    List<String> segmentsFrom10 = Arrays.asList("s13", "s14");
+    List<String> segmentsTo10 = Collections.emptyList();
+    String lineageEntryId10 =
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom10, segmentsTo10, true);
+    segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
+    assertEquals(segmentLineage.getLineageEntryIds().size(), 9);
+    assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getState(), LineageEntryState.IN_PROGRESS);
+    _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId10);
+    segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
+    assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getSegmentsFrom(), segmentsFrom10);
+    assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getSegmentsTo(), segmentsTo10);
+    assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getState(), LineageEntryState.COMPLETED);
 
     // Delete the table
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);

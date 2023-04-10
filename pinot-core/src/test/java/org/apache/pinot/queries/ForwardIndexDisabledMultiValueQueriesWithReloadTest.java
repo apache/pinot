@@ -40,7 +40,10 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -153,9 +156,10 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);
     _invertedIndexColumns = Arrays.asList("column3", "column6", "column8", "column9");
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(_invertedIndexColumns);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
     _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6"));
-    segmentGeneratorConfig.setForwardIndexDisabledColumns(_forwardIndexDisabledColumns);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
+        _forwardIndexDisabledColumns);
     segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -754,7 +758,7 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     Set<String> forwardIndexDisabledColumns = new HashSet<>(_forwardIndexDisabledColumns);
     forwardIndexDisabledColumns.add("column7");
     indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
-    indexLoadingConfig.getNoDictionaryColumns().remove("column7");
+    indexLoadingConfig.removeNoDictionaryColumns("column7");
     indexLoadingConfig.setReadMode(ReadMode.heap);
 
     // Reload the segments to pick up the new configs
@@ -785,7 +789,7 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     Set<String> forwardIndexDisabledColumns = new HashSet<>(_forwardIndexDisabledColumns);
     forwardIndexDisabledColumns.remove("column6");
     indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
-    indexLoadingConfig.getNoDictionaryColumns().add("column7");
+    indexLoadingConfig.addNoDictionaryColumns("column7");
     indexLoadingConfig.setReadMode(ReadMode.heap);
 
     // Reload the segments to pick up the new configs

@@ -1,0 +1,108 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+name: Pinot Multi-Arch Platform Docker Image Build and Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      gitUrl:
+        description: "The Pinot git repo to check out to build, use https."
+        default: "https://github.com/apache/pinot.git"
+        required: true
+      commit:
+        description: "The branch/commit to check out to build Pinot image."
+        default: "master"
+        required: true
+      dockerImageName:
+        description: "The docker image name, default to 'apachepinot/pinot'."
+        default: "apachepinot/pinot"
+        required: true
+      tags:
+        description: "Tags to push of the image, comma separated, e.g. tag1,tag2,tag3"
+        default: ""
+
+jobs:
+  generate-build-info:
+    name: Generate Build Info
+    runs-on: ubuntu-latest
+    outputs:
+      commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
+      tags: ${{ steps.generate-build-info.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Generate Build Info
+        id: generate-build-info
+        env:
+          PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
+          PINOT_BRANCH: ${{ github.event.inputs.commit }}
+          TAGS: ${{ github.event.inputs.tags }}
+        run: |
+          .github/workflows/scripts/docker/.pinot_build_info_gen.sh
+  build-pinot-docker-image:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ "amd64", "arm64" ]
+        base-image-tag: [ "11-amazoncorretto", "11-ms-openjdk" ]
+    name: Build Pinot Docker Image on ${{ matrix.arch }} with base image ${{ matrix.base-image-tag }}
+    needs: [ generate-build-info ]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/setup-qemu-action@v2
+        name: Set up QEMU
+        with:
+          platforms: linux/${{ matrix.arch }}
+      - uses: docker/setup-buildx-action@v2
+        name: Set up Docker Buildx
+      - uses: actions/checkout@v3
+      - name: Build and push the Docker image
+        env:
+          DOCKER_FILE_BASE_DIR: "docker/images/pinot"
+          DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
+          BUILD_PLATFORM: "linux/${{ matrix.arch }}"
+          BASE_IMAGE_TAG: ${{ matrix.base-image-tag }}
+          PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
+          PINOT_BRANCH: "${{needs.generate-build-info.outputs.commit-id}}"
+          TAGS: "${{needs.generate-build-info.outputs.tags}}"
+        run: .github/workflows/scripts/docker/.pinot_single_platform_docker_image_build.sh
+  create-multi-arch-manifest:
+    name: Create Multi-Arch Manifest
+    runs-on: ubuntu-latest
+    needs: [ generate-build-info, build-pinot-docker-image ]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/setup-qemu-action@v2
+        name: Set up QEMU
+      - uses: docker/setup-buildx-action@v2
+        name: Set up Docker Buildx
+      - uses: actions/checkout@v3
+      - name: Create Multi-Arch Manifest
+        env:
+          TAGS: "${{needs.generate-build-info.outputs.tags}}"
+          BUILD_PLATFORM: "linux/arm64,linux/amd64"
+          BASE_IMAGE_TAGS: "11-amazoncorretto,11-ms-openjdk"
+        run: .github/workflows/scripts/docker/.pinot_multi_arch_docker_image_manifest_package.sh

@@ -290,8 +290,9 @@ public class SegmentPushUtils implements Serializable {
       // Check if there is a segment metadata tar gz file named `segmentName.metadata.tar.gz`, already in the remote
       // directory. This is to avoid generating a new segment metadata tar gz file every time we push a segment,
       // which requires downloading the entire segment tar gz file.
-      URI metadataTarGzFilePath = URI.create(
-          new File(tarFilePath).getParentFile() + File.separator + segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+
+      URI metadataTarGzFilePath = generateSegmentMetadataURI(tarFilePath, segmentName);
+      LOGGER.info("Checking if metadata tar gz file {} exists", metadataTarGzFilePath);
       if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
         segmentMetadataFile = new File(FileUtils.getTempDirectory(),
             "segmentMetadata-" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
@@ -441,5 +442,20 @@ public class SegmentPushUtils implements Serializable {
       }
       FileUtils.deleteQuietly(segmentMetadataDir);
     }
+  }
+
+  public static URI generateSegmentMetadataURI(String segmentTarPath, String segmentName)
+      throws URISyntaxException {
+    URI segmentTarURI = URI.create(segmentTarPath);
+    URI metadataTarGzFilePath = new URI(
+        segmentTarURI.getScheme(),
+        segmentTarURI.getUserInfo(),
+        segmentTarURI.getHost(),
+        segmentTarURI.getPort(),
+        new File(segmentTarURI.getPath()).getParentFile() + File.separator + segmentName
+            + Constants.METADATA_TAR_GZ_FILE_EXT,
+        segmentTarURI.getQuery(),
+        segmentTarURI.getFragment());
+    return metadataTarGzFilePath;
   }
 }

@@ -107,6 +107,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Cache used for identifying segments which could not be acquired since they were recently deleted.
   protected Cache<String, String> _recentlyDeletedSegments;
 
+  protected volatile boolean _shutDown;
+
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
@@ -182,11 +184,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void shutDown() {
     _logger.info("Shutting down table data manager for table: {}", _tableNameWithType);
+    _shutDown = true;
     doShutdown();
     _logger.info("Shut down table data manager for table: {}", _tableNameWithType);
   }
 
   protected abstract void doShutdown();
+
+  @Override
+  public boolean isShutDown() {
+    return _shutDown;
+  }
 
   /**
    * {@inheritDoc}
@@ -355,14 +363,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
-      // Create backup directory to handle failure of segment reloading.
-      createBackup(indexDir);
-
       // Download segment from deep store if CRC changes or forced to download;
       // otherwise, copy backup directory back to the original index directory.
       // And then continue to load the segment from the index directory.
       boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
       if (shouldDownload && allowDownload(segmentName, zkMetadata)) {
+        // Create backup directory to handle failure of segment reloading.
+        createBackup(indexDir);
         if (forceDownload) {
           LOGGER.info("Segment: {} of table: {} is forced to download", segmentName, _tableNameWithType);
         } else {
@@ -373,12 +380,27 @@ public abstract class BaseTableDataManager implements TableDataManager {
       } else {
         LOGGER.info("Reload existing segment: {} of table: {} on tier: {}", segmentName, _tableNameWithType,
             TierConfigUtils.normalizeTierName(segmentTier));
+        SegmentDirectory segmentDirectory =
+            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
+        // We should first try to reuse existing segment directory
+        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig,
+            schema)) {
+          LOGGER.info("Reloading segment: {} of table: {} using existing segment directory as no reprocessing needed",
+              segmentName, _tableNameWithType);
+          // No reprocessing needed, reuse the same segment
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+          addSegment(segment);
+          return;
+        }
+        // Create backup directory to handle failure of segment reloading.
+        createBackup(indexDir);
         // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
         // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
         // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
-        try (SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
-            indexLoadingConfig)) {
+        try {
           segmentDirectory.copyTo(indexDir);
+        } finally {
+          segmentDirectory.close();
         }
       }
 
@@ -401,6 +423,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
       throw reloadFailureException;
     }
+  }
+
+  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata,
+      String currentSegmentTier, SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      Schema schema)
+      throws Exception {
+    SegmentDirectoryLoader segmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+    return !segmentDirectoryLoader.needsTierMigration(segmentZKMetadata.getTier(), currentSegmentTier)
+        && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
   }
 
   @Override

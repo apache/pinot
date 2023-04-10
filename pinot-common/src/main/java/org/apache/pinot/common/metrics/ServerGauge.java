@@ -46,8 +46,9 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false),
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
   JVM_HEAP_USED_BYTES("bytes", true),
-  // Ingestion delay metric
-  REALTIME_INGESTION_DELAY_MS("milliseconds", false);
+  // Ingestion delay metrics
+  REALTIME_INGESTION_DELAY_MS("milliseconds", false),
+  END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false);
 
   private final String _gaugeName;
   private final String _unit;

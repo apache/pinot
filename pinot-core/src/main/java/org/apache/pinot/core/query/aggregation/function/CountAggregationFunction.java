@@ -34,7 +34,6 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class CountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
-  private static final String COUNT_STAR_COLUMN_NAME = "count_star";
   private static final String COUNT_STAR_RESULT_COLUMN_NAME = "count(*)";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
   // Special expression used by star-tree to pass in BlockValSet
@@ -50,17 +49,16 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     // Consider null values only when null handling is enabled and function is not COUNT(*)
-    _nullHandlingEnabled = nullHandlingEnabled && !expression.getIdentifier().equals("*");
+    // Note COUNT on any literal gives same result as COUNT(*)
+    // So allow for identifiers that are not * and functions, disable for literals and *
+    _nullHandlingEnabled = nullHandlingEnabled
+            && ((expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*"))
+            || (expression.getType() == ExpressionContext.Type.FUNCTION));
   }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.COUNT;
-  }
-
-  @Override
-  public String getColumnName() {
-    return _nullHandlingEnabled ? super.getColumnName() : COUNT_STAR_COLUMN_NAME;
   }
 
   @Override

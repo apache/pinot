@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.generic.GenericData;
@@ -450,11 +451,11 @@ public class QueryGenerator {
         if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
           // Multi-value column.
           for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-            h2ProjectionColumns.add(projectionColumn + "__MV" + i);
+            h2ProjectionColumns.add(String.format("`%s__MV%d`", projectionColumn, i));
           }
         } else {
           // Single-value column.
-          h2ProjectionColumns.add(projectionColumn);
+          h2ProjectionColumns.add(String.format("`%s`", projectionColumn));
         }
       }
       return joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
@@ -507,19 +508,26 @@ public class QueryGenerator {
       List<String> h2AggregateColumnAndFunctions = new ArrayList<>();
       for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
         String h2AggregateColumnAndFunction;
+        String pinotAggregateFunction = aggregateColumnAndFunction;
+        if (!pinotAggregateFunction.equals("COUNT(*)")) {
+          pinotAggregateFunction = pinotAggregateFunction.replace("(", "(`").replace(")", "`)");
+        }
+        if (!pinotAggregateFunction.contains("(")) {
+          pinotAggregateFunction = String.format("`%s`", pinotAggregateFunction);
+        }
         // Make 'AVG' and
-        if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
+        if (pinotAggregateFunction.startsWith("DISTINCTCOUNT(")) {
           // make 'DISTINCTCOUNT(..)' compatible with H2 SQL query using 'COUNT(DISTINCT(..)'
-          h2AggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
-        } else if (AGGREGATION_FUNCTIONS.contains(aggregateColumnAndFunction.substring(0, 3))) {
+          h2AggregateColumnAndFunction = pinotAggregateFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+        } else if (AGGREGATION_FUNCTIONS.contains(pinotAggregateFunction.substring(0, 3))) {
           // make AGG functions (SUM, MIN, MAX, AVG) compatible with H2 SQL query.
           // this is because Pinot queries casts all to double before doing aggregation
-          String aggFunctionName = aggregateColumnAndFunction.substring(0, 3);
-          h2AggregateColumnAndFunction = aggregateColumnAndFunction
+          String aggFunctionName = pinotAggregateFunction.substring(0, 3);
+          h2AggregateColumnAndFunction = pinotAggregateFunction
               .replace(aggFunctionName + "(", aggFunctionName + "(CAST(")
               .replace(")", " AS DOUBLE))");
         } else {
-          h2AggregateColumnAndFunction = aggregateColumnAndFunction;
+          h2AggregateColumnAndFunction = pinotAggregateFunction;
         }
         h2AggregateColumnAndFunctions.add(h2AggregateColumnAndFunction);
       }
@@ -528,7 +536,9 @@ public class QueryGenerator {
             _predicate.generateH2Query());
       } else {
         return joinWithSpaces("SELECT", StringUtils.join(h2AggregateColumnAndFunctions, ", "), "FROM", _h2TableName,
-            _predicate.generateH2Query(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
+            _predicate.generateH2Query(), "GROUP BY",
+            StringUtils.join(_groupColumns.stream().map(c -> String.format("`%s`", c))
+                .collect(Collectors.toList()), ", "),
             _havingPredicate.generateH2Query(), _limit.generateH2Query());
       }
     }
@@ -590,7 +600,9 @@ public class QueryGenerator {
    */
   private static class OrderByQueryFragment extends StringQueryFragment {
     OrderByQueryFragment(Set<String> columns) {
-      super(columns.isEmpty() ? "" : "ORDER BY " + StringUtils.join(columns, ", "));
+      super(columns.isEmpty() ? "" : "ORDER BY " + StringUtils.join(columns, ", "),
+          columns.isEmpty() ? "" : "ORDER BY " + StringUtils.join(
+              columns.stream().map(c -> String.format("`%s`", c)).collect(Collectors.toList()), ", "));
     }
   }
 
@@ -696,6 +708,9 @@ public class QueryGenerator {
       if (aggregationFunctionCount > 0) {
         h2Query += "HAVING";
         String aggregationFunction = _havingClauseAggregationFunctions.get(0);
+        if (!aggregationFunction.equals("COUNT(*)")) {
+          aggregationFunction = aggregationFunction.replace("(", "(`").replace(")", "`)");
+        }
         if (aggregationFunction.startsWith("AVG(")) {
           aggregationFunction = aggregationFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
         } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
@@ -705,6 +720,9 @@ public class QueryGenerator {
         h2Query = joinWithSpaces(h2Query, _havingClauseOperatorsAndValues.get(0));
         for (int i = 1; i < aggregationFunctionCount; i++) {
           aggregationFunction = _havingClauseAggregationFunctions.get(i);
+          if (!aggregationFunction.equals("COUNT(*)")) {
+            aggregationFunction = aggregationFunction.replace("(", "(`").replace(")", "`)");
+          }
           if (aggregationFunction.startsWith("AVG(")) {
             aggregationFunction = aggregationFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
           } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
@@ -916,7 +934,8 @@ public class QueryGenerator {
     public QueryFragment generatePredicate(String columnName) {
       String columnValue = pickRandom(_columnToValueList.get(columnName));
       String comparisonOperator = pickRandom(COMPARISON_OPERATORS);
-      return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue));
+      return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue),
+          joinWithSpaces(String.format("`%s`", columnName), comparisonOperator, columnValue));
     }
   }
 
@@ -938,9 +957,11 @@ public class QueryGenerator {
 
       boolean notIn = RANDOM.nextBoolean();
       if (notIn) {
-        return new StringQueryFragment(columnName + " NOT IN (" + inValues + ")");
+        return new StringQueryFragment(String.format("%s NOT IN (%s)", columnName, inValues),
+            String.format("`%s` NOT IN (%s)", columnName, inValues));
       } else {
-        return new StringQueryFragment(columnName + " IN (" + inValues + ")");
+        return new StringQueryFragment(String.format("%s IN (%s)", columnName, inValues),
+            String.format("`%s` IN (%s)", columnName, inValues));
       }
     }
   }
@@ -955,7 +976,9 @@ public class QueryGenerator {
       List<String> columnValues = _columnToValueList.get(columnName);
       String leftValue = pickRandom(columnValues);
       String rightValue = pickRandom(columnValues);
-      return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue);
+      return new StringQueryFragment(
+          String.format("%s BETWEEN %s AND %s", columnName, leftValue, rightValue),
+          String.format("`%s` BETWEEN %s AND %s", columnName, leftValue, rightValue));
     }
   }
 
@@ -975,11 +998,13 @@ public class QueryGenerator {
         int indexToReplaceWithRegex = 1 + _random.nextInt(value.length() - 2);
         String regex = value.substring(1, indexToReplaceWithRegex) + ".*" + value.substring(indexToReplaceWithRegex + 1,
             value.length() - 1);
-        return new StringQueryFragment(String.format(" REGEXP_LIKE(%s, '%s')", columnName, regex),
-            String.format(" REGEXP_LIKE(%s, '%s', 'i')", columnName, regex));
+        String regexpPredicate = String.format(" REGEXP_LIKE(%s, '%s')", columnName, regex);
+        String h2RegexpPredicate = String.format(" REGEXP_LIKE(`%s`, '%s', 'i')", columnName, regex);
+        return new StringQueryFragment(regexpPredicate, h2RegexpPredicate);
       } else {
         String equalsPredicate = String.format("%s = %s", columnName, value);
-        return new StringQueryFragment(equalsPredicate);
+        String h2EqualsPredicate = String.format("`%s` = %s", columnName, value);
+        return new StringQueryFragment(equalsPredicate, h2EqualsPredicate);
       }
     }
   }

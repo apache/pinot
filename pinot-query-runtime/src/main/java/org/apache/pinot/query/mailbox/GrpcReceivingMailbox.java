@@ -18,47 +18,53 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxContentStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * GRPC implementation of the {@link ReceivingMailbox}.
+ * GRPC implementation of the {@link ReceivingMailbox}. This mailbox doesn't hold any resources upon creation.
+ * Instead an explicit {@link #init} call is made when the sender sends the first data-block which attaches
+ * references to the {@link StreamObserver} to this mailbox.
  */
 public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcReceivingMailbox.class);
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
-  private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
-  private Consumer<MailboxIdentifier> _gotMailCallback;
+  private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
-  private final AtomicInteger _totalMsgReceived = new AtomicInteger(0);
 
   private MailboxContentStreamObserver _contentStreamObserver;
+  private StreamObserver<Mailbox.MailboxStatus> _statusStreamObserver;
 
-  public GrpcReceivingMailbox(String mailboxId, GrpcMailboxService mailboxService,
-      Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxService = mailboxService;
+  public GrpcReceivingMailbox(String mailboxId, Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = mailboxId;
     _gotMailCallback = gotMailCallback;
     _initializationLatch = new CountDownLatch(1);
   }
 
-  public Consumer<MailboxIdentifier> init(MailboxContentStreamObserver streamObserver) {
+  public Consumer<MailboxIdentifier> init(MailboxContentStreamObserver streamObserver,
+      StreamObserver<Mailbox.MailboxStatus> statusStreamObserver) {
     if (_initializationLatch.getCount() > 0) {
       _contentStreamObserver = streamObserver;
+      _statusStreamObserver = statusStreamObserver;
       _initializationLatch.countDown();
     }
     return _gotMailCallback;
@@ -73,25 +79,37 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
    *  2. If the received block from the sender is a data-block with 0 rows.
    * </p>
    */
+  @Nullable
   @Override
-  public TransferableBlock receive()
-      throws Exception {
+  public TransferableBlock receive() throws Exception {
     if (!waitForInitialize()) {
       return null;
     }
     MailboxContent mailboxContent = _contentStreamObserver.poll();
-    _totalMsgReceived.incrementAndGet();
     return mailboxContent == null ? null : fromMailboxContent(mailboxContent);
   }
 
   @Override
   public boolean isInitialized() {
-    return _initializationLatch.getCount() <= 0;
+    return _initializationLatch.getCount() == 0;
   }
 
   @Override
   public boolean isClosed() {
-    return isInitialized() && _contentStreamObserver.isCompleted();
+    return isInitialized() && _contentStreamObserver.hasConsumedAllData();
+  }
+
+  @Override
+  public void cancel() {
+    if (isInitialized()) {
+      try {
+        _statusStreamObserver.onError(Status.CANCELLED.asRuntimeException());
+      } catch (Exception e) {
+        // TODO: This can happen if the call is already closed. Consider removing this log altogether or find a way
+        //  to check if the stream is already closed.
+        LOGGER.info("Tried to cancel receiving mailbox", e);
+      }
+    }
   }
 
   private boolean waitForInitialize()
@@ -119,8 +137,9 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   private TransferableBlock fromMailboxContent(MailboxContent mailboxContent)
       throws IOException {
     ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
+    DataBlock dataBlock = null;
     if (byteBuffer.hasRemaining()) {
-      DataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+      dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
       if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
         return TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
       }
@@ -130,6 +149,9 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     }
 
     if (mailboxContent.getMetadataOrDefault(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "false").equals("true")) {
+      if (dataBlock instanceof MetadataBlock) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(((MetadataBlock) dataBlock).getStats());
+      }
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
 

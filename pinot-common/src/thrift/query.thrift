@@ -18,11 +18,6 @@
  */
 namespace java org.apache.pinot.common.request
 
-struct DataSource {
-  1: optional string tableName;
-  2: optional PinotQuery subquery;
-}
-
 struct PinotQuery {
   1: optional i32 version;
   2: optional DataSource dataSource;
@@ -39,10 +34,24 @@ struct PinotQuery {
   13: optional map<Expression, Expression> expressionOverrideHints;
 }
 
-enum ExpressionType {
-  LITERAL,
-  IDENTIFIER,
-  FUNCTION
+struct DataSource {
+  1: optional string tableName;
+  2: optional PinotQuery subquery;
+  3: optional Join join;
+}
+
+struct Join {
+  1: required JoinType type;
+  2: required DataSource left;
+  3: required DataSource right;
+  4: optional Expression condition;
+}
+
+enum JoinType {
+  INNER,
+  LEFT,
+  RIGHT,
+  FULL
 }
 
 struct Expression {
@@ -52,19 +61,27 @@ struct Expression {
   4: optional Identifier identifier;
 }
 
-struct Identifier {
-  1: required string name;
+enum ExpressionType {
+  LITERAL,
+  IDENTIFIER,
+  FUNCTION
 }
 
 union Literal {
   1: optional bool boolValue;
-  2: optional byte byteValue;
+  2: optional i8 byteValue;
   3: optional i16 shortValue;
   4: optional i32 intValue;
   5: optional i64 longValue;
   6: optional double doubleValue;
   7: optional string stringValue;
   8: optional binary binaryValue;
+  // Set to true when the literal value is a null.
+  9: optional bool nullValue;
+}
+
+struct Identifier {
+  1: required string name;
 }
 
 struct Function {

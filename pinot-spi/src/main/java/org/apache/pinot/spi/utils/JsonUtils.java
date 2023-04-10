@@ -351,7 +351,16 @@ public class JsonUtils {
    * </pre>
    */
   public static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
-    return flatten(node, jsonIndexConfig, 0, "$", false);
+    try {
+      return flatten(node, jsonIndexConfig, 0, "$", false);
+    } catch (OutOfMemoryError oom) {
+      throw new OutOfMemoryError(
+          String.format("Flattening JSON node: %s with config: %s requires too much memory, please adjust the config",
+              node, jsonIndexConfig));
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Caught exception while flattening JSON node: %s with config: %s", node, jsonIndexConfig), e);
+    }
   }
 
   private static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig, int level,

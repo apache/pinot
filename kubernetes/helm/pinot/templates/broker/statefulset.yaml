@@ -60,7 +60,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
-          "StartBroker",
+          "{{ .Values.broker.startCommand }}",
           "-clusterName", "{{ .Values.cluster.name }}",
           "-zkAddress", {{ include "zookeeper.url" . | quote }},
           "-configFileName", "/var/pinot/broker/config/pinot-broker.conf"

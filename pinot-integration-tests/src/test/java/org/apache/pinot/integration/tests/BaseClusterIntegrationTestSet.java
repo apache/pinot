@@ -205,7 +205,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT MAX(ArrTime) FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrTime) - MIN(ArrTime)";
     testQuery(query);
     query = "SELECT MAX(ArrDelay), Month FROM mytable GROUP BY Month ORDER BY ABS(Month - 6) + MAX(ArrDelay)";
-    testQuery(query);
+    h2Query = "SELECT MAX(ArrDelay), `Month` FROM mytable GROUP BY `Month` ORDER BY ABS(`Month` - 6) + MAX(ArrDelay)";
+    testQuery(query, h2Query);
 
     // Post-aggregation in SELECT
     query = "SELECT MAX(ArrDelay) + MAX(AirTime) FROM mytable";
@@ -271,7 +272,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
             + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
     h2Query =
-        "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
+        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
             + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
             + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
             + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
@@ -444,7 +445,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       QueryGenerator.Query query = queryGenerator.generateQuery();
       if (useMultistageEngine) {
         // multistage engine follows standard SQL thus should use H2 query string for testing.
-        testQuery(query.generateH2Query(), query.generateH2Query());
+        testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
       } else {
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }
@@ -622,7 +623,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Validate all fields are present
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
     assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
     return jobId;
   }
@@ -633,7 +634,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
     return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 

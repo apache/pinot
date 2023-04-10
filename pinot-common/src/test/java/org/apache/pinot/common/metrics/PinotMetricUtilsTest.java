@@ -111,6 +111,7 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testMetricRegistryFailure() {
+    PinotMetricUtils.cleanUp();
     try {
       Map<String, Object> properties = new HashMap<>();
       properties.put("factory.className", "NonExistentClass");
@@ -120,5 +121,17 @@ public class PinotMetricUtilsTest {
     } catch (IllegalStateException e) {
       // Expected
     }
+  }
+
+  @Test
+  public void testCleanUp() {
+    PinotMetricUtils.cleanUp();
+    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMetricsRegistry registry1 = PinotMetricUtils.getPinotMetricsRegistry();
+    Assert.assertEquals(registry, registry1);
+    PinotMetricUtils.cleanUp();
+    // after cleaning up, a new one will be created
+    PinotMetricsRegistry registry2 = PinotMetricUtils.getPinotMetricsRegistry();
+    Assert.assertNotEquals(registry, registry2);
   }
 }

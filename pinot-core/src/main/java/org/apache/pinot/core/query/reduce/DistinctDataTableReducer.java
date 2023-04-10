@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -37,6 +38,7 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -72,12 +74,14 @@ public class DistinctDataTableReducer implements DataTableReducer {
     // DataTable; if all returns are DataTable we can directly merge with priority queue (with dedup).
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
     for (DataTable dataTable : dataTableMap.values()) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
       // Do not use the cached data schema because it might be either single object (legacy) or normal data table
       dataSchema = dataTable.getDataSchema();
       int numColumns = dataSchema.size();
       if (numColumns == 1 && dataSchema.getColumnDataType(0) == ColumnDataType.OBJECT) {
         // DistinctTable is still being returned as a single object
-        DataTable.CustomObject customObject = dataTable.getCustomObject(0, 0);
+        CustomObject customObject = dataTable.getCustomObject(0, 0);
         assert customObject != null;
         DistinctTable distinctTable = ObjectSerDeUtils.deserialize(customObject);
         if (!distinctTable.isEmpty()) {

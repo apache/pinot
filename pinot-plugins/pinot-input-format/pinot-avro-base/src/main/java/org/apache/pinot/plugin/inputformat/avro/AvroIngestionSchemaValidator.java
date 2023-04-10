@@ -88,8 +88,11 @@ public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
   }
 
   private void validateSchemas() {
-    for (String columnName : _pinotSchema.getPhysicalColumnNames()) {
-      FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(columnName);
+    for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+      String columnName = fieldSpec.getName();
       org.apache.avro.Schema.Field avroColumnField = _avroSchema.getField(columnName);
       if (avroColumnField == null) {
         _missingPinotColumn.addMismatchReason(String

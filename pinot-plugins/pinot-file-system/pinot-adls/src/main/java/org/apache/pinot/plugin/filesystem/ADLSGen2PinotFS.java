@@ -630,8 +630,22 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     int bytesRead;
     long totalBytesRead = 0;
     byte[] buffer = new byte[BUFFER_SIZE];
-    DataLakeFileClient fileClient =
-        _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(dstUri));
+    // TODO: the newer client now has the API 'uploadFromFile' that directly takes the file as an input. We can replace
+    // this upload logic with the 'uploadFromFile'/
+    DataLakeFileClient fileClient;
+    try {
+      fileClient = _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(dstUri));
+    } catch (DataLakeStorageException e) {
+      // If the path already exists, doing nothing and return true
+      if (e.getStatusCode() == ALREADY_EXISTS_STATUS_CODE && e.getErrorCode().equals(PATH_ALREADY_EXISTS_ERROR_CODE)) {
+        LOGGER.info("The destination path already exists and we are overwriting the file (dstUri={})", dstUri);
+        fileClient = _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(dstUri), true);
+      } else {
+        LOGGER.error("Exception thrown while calling copy stream to destination (dstUri={}, errorStatus ={})", dstUri,
+            e.getStatusCode(), e);
+        throw new IOException(e);
+      }
+    }
 
     // Update MD5 metadata
     if (contentMd5 != null) {
@@ -657,7 +671,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         totalBytesRead += bytesRead;
       }
       // Call flush on ADLS Gen 2
-      fileClient.flush(totalBytesRead);
+      fileClient.flush(totalBytesRead, true);
 
       return true;
     } catch (DataLakeStorageException | NoSuchAlgorithmException e) {

@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
 /**
@@ -31,17 +32,16 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * by send/receive stages.
  */
 public class OpChain implements AutoCloseable {
-
   private final MultiStageOperator _root;
   private final Set<MailboxIdentifier> _receivingMailbox;
   private final OpChainStats _stats;
-  private final String _id;
+  private final OpChainId _id;
 
-  public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
+  public OpChain(OpChainExecutionContext context, MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes) {
     _root = root;
     _receivingMailbox = new HashSet<>(receivingMailboxes);
-    _id = String.format("%s_%s", requestId, stageId);
-    _stats = new OpChainStats(_id);
+    _id = context.getId();
+    _stats = context.getStats();
   }
 
   public Operator<TransferableBlock> getRoot() {
@@ -52,6 +52,11 @@ public class OpChain implements AutoCloseable {
     return _receivingMailbox;
   }
 
+  public OpChainId getId() {
+    return _id;
+  }
+
+  // TODO: Move OperatorStats here.
   public OpChainStats getStats() {
     return _stats;
   }
@@ -61,8 +66,19 @@ public class OpChain implements AutoCloseable {
     return "OpChain{" + _id + "}";
   }
 
+  /**
+   * close() is called when we finish execution successfully.
+   */
   @Override
   public void close() {
     _root.close();
+  }
+
+  /**
+   * cancel() is called when execution runs into error.
+   * @param e
+   */
+  public void cancel(Throwable e) {
+    _root.cancel(e);
   }
 }

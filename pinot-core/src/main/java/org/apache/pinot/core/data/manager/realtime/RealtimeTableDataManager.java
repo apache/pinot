@@ -29,11 +29,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
@@ -45,7 +43,6 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -87,8 +84,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FO
 
 @ThreadSafe
 public class RealtimeTableDataManager extends BaseTableDataManager {
-  private final ExecutorService _segmentAsyncExecutorService =
-      Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
@@ -119,13 +114,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
-  private final AtomicBoolean _allSegmentsLoaded = new AtomicBoolean();
+  public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+
+  // TODO: Change it to BooleanSupplier
+  private final Supplier<Boolean> _isServerReadyToServeQueries;
+
+  // Object to track ingestion delay for all partitions
+  private IngestionDelayTracker _ingestionDelayTracker;
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
-  // Object to track ingestion delay for all partitions
-  private IngestionDelayTracker _ingestionDelayTracker;
-  private final Supplier<Boolean> _isServerReadyToServeQueries;
+  private BooleanSupplier _isTableReadyToConsumeData;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
@@ -140,8 +139,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
     // Tracks ingestion delay of all partitions being served for this table
-    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this,
-        _isServerReadyToServeQueries);
+    _ingestionDelayTracker =
+        new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this, _isServerReadyToServeQueries);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
@@ -208,6 +207,36 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
     }
+
+    // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
+    if (isDedupEnabled() || isPartialUpsertEnabled()) {
+      _isTableReadyToConsumeData = new BooleanSupplier() {
+        volatile boolean _allSegmentsLoaded;
+        long _lastCheckTimeMs;
+
+        @Override
+        public boolean getAsBoolean() {
+          if (_allSegmentsLoaded) {
+            return true;
+          } else {
+            synchronized (this) {
+              if (_allSegmentsLoaded) {
+                return true;
+              }
+              long currentTimeMs = System.currentTimeMillis();
+              if (currentTimeMs - _lastCheckTimeMs <= READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
+                return false;
+              }
+              _lastCheckTimeMs = currentTimeMs;
+              _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
+              return _allSegmentsLoaded;
+            }
+          }
+        }
+      };
+    } else {
+      _isTableReadyToConsumeData = () -> true;
+    }
   }
 
   @Override
@@ -216,16 +245,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
-    _segmentAsyncExecutorService.shutdown();
     if (_tableUpsertMetadataManager != null) {
+      // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
+      _tableUpsertMetadataManager.stop();
+      for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
+        segmentDataManager.destroy();
+      }
       try {
         _tableUpsertMetadataManager.close();
       } catch (IOException e) {
         _logger.warn("Cannot close upsert metadata manager properly for table: {}", _tableNameWithType, e);
       }
-    }
-    for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
-      segmentDataManager.destroy();
+    } else {
+      for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
+        segmentDataManager.destroy();
+      }
     }
     if (_leaseExtender != null) {
       _leaseExtender.shutDown();
@@ -240,8 +274,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param ingestionTimeMs Ingestion delay being reported.
    * @param partitionGroupId Partition ID for which delay is being updated.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, partitionGroupId);
+  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, firstStreamIngestionTimeMs, partitionGroupId);
   }
 
   /*
@@ -271,7 +305,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /**
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
-   * @apiNote  this involves Zookeeper read and should not be used frequently due to efficiency concerns.
+   * @apiNote this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
   public Set<Integer> getHostedPartitionsGroupIds() {
     Set<Integer> partitionsHostedByThisServer = new HashSet<>();
@@ -407,22 +441,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionDedupMetadataManager partitionDedupMetadataManager =
           _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
               : null;
-      // For dedup and partial-upsert, wait for all segments loaded before creating the consuming segment
-      if (isDedupEnabled() || isPartialUpsertEnabled()) {
-        if (!_allSegmentsLoaded.get()) {
-          synchronized (_allSegmentsLoaded) {
-            if (!_allSegmentsLoaded.get()) {
-              TableStateUtils.waitForAllSegmentsLoaded(_helixManager, _tableNameWithType);
-              _allSegmentsLoaded.set(true);
-            }
-          }
-        }
-      }
-
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
-              partitionDedupMetadataManager);
+              partitionDedupMetadataManager, _isTableReadyToConsumeData);
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
       segmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,

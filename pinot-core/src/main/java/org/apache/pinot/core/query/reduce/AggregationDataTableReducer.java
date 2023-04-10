@@ -35,6 +35,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -44,13 +45,9 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
-  private final AggregationFunction[] _aggregationFunctions;
-  private final List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
 
   AggregationDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    _aggregationFunctions = queryContext.getAggregationFunctions();
-    _filteredAggregationFunctions = queryContext.getFilteredAggregationFunctions();
   }
 
   /**
@@ -79,7 +76,9 @@ public class AggregationDataTableReducer implements DataTableReducer {
 
   private void reduceWithIntermediateResult(DataSchema dataSchema, Collection<DataTable> dataTables,
       BrokerResponseNative brokerResponseNative) {
-    int numAggregationFunctions = _aggregationFunctions.length;
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+    int numAggregationFunctions = aggregationFunctions.length;
     Object[] intermediateResults = new Object[numAggregationFunctions];
     for (DataTable dataTable : dataTables) {
       for (int i = 0; i < numAggregationFunctions; i++) {
@@ -99,13 +98,14 @@ public class AggregationDataTableReducer implements DataTableReducer {
         if (mergedIntermediateResult == null) {
           intermediateResults[i] = intermediateResultToMerge;
         } else {
-          intermediateResults[i] = _aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
+          intermediateResults[i] = aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
         }
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      AggregationFunction aggregationFunction = aggregationFunctions[i];
       Comparable result = aggregationFunction.extractFinalResult(intermediateResults[i]);
       finalResults[i] = result == null ? null : aggregationFunction.getFinalResultColumnType().convert(result);
     }
@@ -114,7 +114,9 @@ public class AggregationDataTableReducer implements DataTableReducer {
 
   private void reduceWithFinalResult(DataSchema dataSchema, DataTable dataTable,
       BrokerResponseNative brokerResponseNative) {
-    int numAggregationFunctions = _aggregationFunctions.length;
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+    int numAggregationFunctions = aggregationFunctions.length;
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
@@ -152,20 +154,18 @@ public class AggregationDataTableReducer implements DataTableReducer {
    * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
    */
   private DataSchema getPrePostAggregationDataSchema() {
-    int numAggregationFunctions = _aggregationFunctions.length;
-    String[] columnNames = new String[numAggregationFunctions];
-    ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregationFunctions];
-
-    int i = 0;
-    for (Pair<AggregationFunction, FilterContext> aggFilterPair : _filteredAggregationFunctions) {
-      AggregationFunction aggregationFunction = aggFilterPair.getLeft();
-      String columnName =
-          AggregationFunctionUtils.getResultColumnName(aggregationFunction, aggFilterPair.getRight());
-      columnNames[i] = columnName;
+    List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
+        _queryContext.getFilteredAggregationFunctions();
+    assert filteredAggregationFunctions != null;
+    int numColumns = filteredAggregationFunctions.size();
+    String[] columnNames = new String[numColumns];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
+      AggregationFunction aggregationFunction = pair.getLeft();
+      columnNames[i] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
       columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
-      i++;
     }
-
     return new DataSchema(columnNames, columnDataTypes);
   }
 }

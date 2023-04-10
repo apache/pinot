@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import com.google.common.base.Joiner;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 
 
 public final class Utils {
-  private static final Joiner JOINER = Joiner.on(':');
 
   private Utils() {
     // do not instantiate.
@@ -30,11 +29,12 @@ public final class Utils {
 
   public static String constructChannelId(String mailboxId) {
     MailboxIdentifier mailboxIdentifier = toMailboxIdentifier(mailboxId);
-    return JOINER.join(mailboxIdentifier.getToHost(), mailboxIdentifier.getToPort());
+    VirtualServerAddress dest = mailboxIdentifier.getToHost();
+    return dest.toString();
   }
 
   public static MailboxIdentifier toMailboxIdentifier(String mailboxId) {
-    return new StringMailboxIdentifier(mailboxId);
+    return JsonMailboxIdentifier.parse(mailboxId);
   }
 
   public static String fromMailboxIdentifier(MailboxIdentifier mailboxId) {

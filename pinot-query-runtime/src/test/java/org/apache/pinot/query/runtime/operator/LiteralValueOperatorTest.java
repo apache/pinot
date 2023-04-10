@@ -23,13 +23,40 @@ import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class LiteralValueOperatorTest {
+
+  private AutoCloseable _mocks;
+
+  @Mock
+  private PlanRequestContext _context;
+
+  @Mock
+  private VirtualServerAddress _serverAddress;
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
+  }
 
   @Test
   public void shouldReturnLiteralBlock() {
@@ -37,14 +64,9 @@ public class LiteralValueOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"sLiteral", "iLiteral"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
     List<List<RexExpression>> literals = ImmutableList.of(
-        ImmutableList.of(
-            new RexExpression.Literal(DataType.STRING, "foo"),
-            new RexExpression.Literal(DataType.INT, 1)),
-        ImmutableList.of(
-            new RexExpression.Literal(DataType.STRING, ""),
-            new RexExpression.Literal(DataType.INT, 2))
-    );
-    LiteralValueOperator operator = new LiteralValueOperator(schema, literals);
+        ImmutableList.of(new RexExpression.Literal(DataType.STRING, "foo"), new RexExpression.Literal(DataType.INT, 1)),
+        ImmutableList.of(new RexExpression.Literal(DataType.STRING, ""), new RexExpression.Literal(DataType.INT, 2)));
+    LiteralValueOperator operator = new LiteralValueOperator(OperatorTestUtil.getDefaultContext(), schema, literals);
 
     // When:
     TransferableBlock transferableBlock = operator.nextBlock();
@@ -60,7 +82,7 @@ public class LiteralValueOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{}, new ColumnDataType[]{});
     List<List<RexExpression>> literals = ImmutableList.of(ImmutableList.of());
-    LiteralValueOperator operator = new LiteralValueOperator(schema, literals);
+    LiteralValueOperator operator = new LiteralValueOperator(OperatorTestUtil.getDefaultContext(), schema, literals);
 
     // When:
     TransferableBlock transferableBlock = operator.nextBlock();

@@ -25,12 +25,10 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
@@ -41,7 +39,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
@@ -50,6 +47,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreI
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -58,11 +57,11 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -136,6 +135,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   @Override
   public boolean needUpdateDefaultColumns() {
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Need to update default columns with actionMap: {}", defaultColumnActionMap);
+    }
     return !defaultColumnActionMap.isEmpty();
   }
 
@@ -147,6 +149,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       throws Exception {
     // Compute the action needed for each column.
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Update default columns with actionMap: {}", defaultColumnActionMap);
+    }
     if (defaultColumnActionMap.isEmpty()) {
       return;
     }
@@ -215,10 +220,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     Map<String, DefaultColumnAction> defaultColumnActionMap = new HashMap<>();
 
     // Compute ADD and UPDATE actions.
-    Collection<String> columnsInSchema = _schema.getPhysicalColumnNames();
-    for (String column : columnsInSchema) {
-      FieldSpec fieldSpecInSchema = _schema.getFieldSpecFor(column);
-      Preconditions.checkNotNull(fieldSpecInSchema);
+    for (FieldSpec fieldSpecInSchema : _schema.getAllFieldSpecs()) {
+      if (fieldSpecInSchema.isVirtualColumn()) {
+        continue;
+      }
+      String column = fieldSpecInSchema.getName();
       FieldSpec.FieldType fieldTypeInSchema = fieldSpecInSchema.getFieldType();
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
 
@@ -292,21 +298,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
 
     // Compute REMOVE actions.
-    Set<String> columnsInMetadata = _segmentMetadata.getAllColumns();
-    for (String column : columnsInMetadata) {
-      if (!columnsInSchema.contains(column)) {
-        ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-
-        // Only remove auto-generated columns.
-        if (columnMetadata.isAutoGenerated()) {
-          FieldSpec.FieldType fieldTypeInMetadata = columnMetadata.getFieldSpec().getFieldType();
-          if (fieldTypeInMetadata == DIMENSION) {
-            defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DIMENSION);
-          } else if (fieldTypeInMetadata == METRIC) {
-            defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_METRIC);
-          } else if (fieldTypeInMetadata == DATE_TIME) {
-            defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DATE_TIME);
-          }
+    for (ColumnMetadata columnMetadata : _segmentMetadata.getColumnMetadataMap().values()) {
+      String column = columnMetadata.getColumnName();
+      // Only remove auto-generated columns
+      if (!_schema.hasColumn(column) && columnMetadata.isAutoGenerated()) {
+        FieldSpec.FieldType fieldTypeInMetadata = columnMetadata.getFieldSpec().getFieldType();
+        if (fieldTypeInMetadata == DIMENSION) {
+          defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DIMENSION);
+        } else if (fieldTypeInMetadata == METRIC) {
+          defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_METRIC);
+        } else if (fieldTypeInMetadata == DATE_TIME) {
+          defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DATE_TIME);
         }
       }
     }
@@ -331,8 +333,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     String segmentName = _segmentMetadata.getName();
     LOGGER.info("Removing default column: {} from segment: {}", column, segmentName);
     // Delete existing dictionary and forward index
-    _segmentWriter.removeIndex(column, ColumnIndexType.DICTIONARY);
-    _segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
+    _segmentWriter.removeIndex(column, StandardIndexes.dictionary());
+    _segmentWriter.removeIndex(column, StandardIndexes.forward());
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
     LOGGER.info("Removed default column: {} from segment: {}", column, segmentName);
@@ -365,7 +367,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               return false;
             }
             // TODO: Support creation of derived columns from forward index disabled columns
-            if (!_segmentWriter.hasIndexFor(argument, ColumnIndexType.FORWARD_INDEX)) {
+            if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
               throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
                   + "column %s because argument: %s does not have a forward index. Enable forward index and "
                   + "refresh/backfill the segments to create a derived column from source column %s", column, argument,
@@ -403,33 +405,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   /**
-   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
-   * compatibility mismatch. The checks performed are:
-   *     - Validate dictionary is enabled.
-   *     - Validate inverted index is enabled.
-   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
-   *       multi-value column (since multi-value defaults to index v1).
-   */
-  protected void validateForwardIndexDisabledConfigsIfPresent(String column, boolean forwardIndexDisabled) {
-    if (!forwardIndexDisabled) {
-      return;
-    }
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
-          String.format("Inverted index must be enabled for forward index disabled column: %s", column));
-      Preconditions.checkState(!_indexLoadingConfig.getNoDictionaryColumns().contains(column),
-          String.format("Dictionary disabled column: %s cannot disable the forward index", column));
-      if (_indexLoadingConfig.getRangeIndexColumns() != null
-          && _indexLoadingConfig.getRangeIndexColumns().contains(column)) {
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            String.format("Multi-value column with range index: %s cannot disable the forward index", column));
-        Preconditions.checkState(_indexLoadingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
-            String.format("Single-value column with range index version < 2: %s cannot disable the forward index",
-                column));
-      }
-  }
-
-  /**
    * Check and return whether the forward index is disabled for a given column
    */
   protected boolean isForwardIndexDisabled(String column) {
@@ -450,9 +425,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     Object defaultValue = fieldSpec.getDefaultNullValue();
     boolean isSingleValue = fieldSpec.isSingleValueField();
     int maxNumberOfMultiValueElements = isSingleValue ? 0 : 1;
-    boolean forwardIndexDisabled = isForwardIndexDisabled(column);
-
-    validateForwardIndexDisabledConfigsIfPresent(column, forwardIndexDisabled);
 
     Object sortedArray;
     switch (dataType.getStoredType()) {
@@ -519,12 +491,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     } else {
       // Multi-value column.
 
+      boolean forwardIndexDisabled = isForwardIndexDisabled(column);
       if (forwardIndexDisabled) {
         // Generate an inverted index instead of forward index for multi-value columns when forward index is disabled
         try (DictionaryBasedInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(_indexDir, fieldSpec,
             1, totalDocs, totalDocs)) {
+          int[] dictIds = new int[]{0};
           for (int docId = 0; docId < totalDocs; docId++) {
-            creator.add(0);
+            creator.add(dictIds, 1);
           }
           creator.seal();
         }
@@ -543,7 +517,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (_indexLoadingConfig.getTableConfig() != null
         && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
         && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled()) {
-      if (!_segmentWriter.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
+      if (!_segmentWriter.hasIndexFor(column, StandardIndexes.nullValueVector())) {
         try (NullValueVectorCreator nullValueVectorCreator =
             new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
           for (int docId = 0; docId < totalDocs; docId++) {
@@ -809,9 +783,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     ValueReader(ColumnMetadata columnMetadata)
         throws IOException {
-      _forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+      _forwardIndexReader = ForwardIndexType.read(_segmentWriter, columnMetadata);
       if (columnMetadata.hasDictionary()) {
-        _dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
+        _dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);
       } else {
         _dictionary = null;
       }

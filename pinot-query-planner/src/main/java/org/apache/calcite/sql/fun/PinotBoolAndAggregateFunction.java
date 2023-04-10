@@ -29,7 +29,9 @@ import org.apache.calcite.util.Optionality;
 
 public class PinotBoolAndAggregateFunction extends SqlAggFunction {
 
-  public PinotBoolAndAggregateFunction() {
+  public static final PinotBoolAndAggregateFunction INSTANCE = new PinotBoolAndAggregateFunction();
+
+  private PinotBoolAndAggregateFunction() {
     super("BOOL_AND", null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN,
         null, OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION,
         false, false, Optionality.FORBIDDEN);

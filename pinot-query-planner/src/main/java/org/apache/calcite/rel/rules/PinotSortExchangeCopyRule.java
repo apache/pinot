@@ -26,10 +26,11 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.SortExchange;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalSortExchange;
+import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
@@ -42,6 +43,9 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
   public static final PinotSortExchangeCopyRule SORT_EXCHANGE_COPY =
       PinotSortExchangeCopyRule.Config.DEFAULT.toRule();
   private static final TypeFactory TYPE_FACTORY = new TypeFactory(new TypeSystem());
+  private static final RexBuilder REX_BUILDER = new RexBuilder(TYPE_FACTORY);
+  private static final RexLiteral REX_ZERO = REX_BUILDER.makeLiteral(0,
+      TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
 
   /**
    * Creates a PinotSortExchangeCopyRule.
@@ -80,14 +84,14 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
     } else if (sort.offset == null) {
       fetch = sort.fetch;
     } else {
-      RexBuilder rexBuilder = new RexBuilder(TYPE_FACTORY);
       int total = RexExpressionUtils.getValueAsInt(sort.fetch) + RexExpressionUtils.getValueAsInt(sort.offset);
-      fetch = rexBuilder.makeLiteral(total, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
+      fetch = REX_BUILDER.makeLiteral(total, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
     }
 
     final RelNode newExchangeInput = sort.copy(sort.getTraitSet(), exchange.getInput(), collation, null, fetch);
     final RelNode exchangeCopy = exchange.copy(exchange.getTraitSet(), newExchangeInput, exchange.getDistribution());
-    final RelNode sortCopy = sort.copy(sort.getTraitSet(), exchangeCopy, collation, sort.offset, sort.fetch);
+    final RelNode sortCopy = sort.copy(sort.getTraitSet(), exchangeCopy, collation,
+        sort.offset == null ? REX_ZERO : sort.offset, sort.fetch);
 
     call.transformTo(sortCopy);
   }
@@ -95,7 +99,7 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
   public interface Config extends RelRule.Config {
 
     Config DEFAULT = ImmutableSortExchangeCopyRule.Config.of()
-        .withOperandFor(LogicalSort.class, LogicalSortExchange.class);
+        .withOperandFor(LogicalSort.class, PinotLogicalSortExchange.class);
 
     @Override default PinotSortExchangeCopyRule toRule() {
       return new PinotSortExchangeCopyRule(this);

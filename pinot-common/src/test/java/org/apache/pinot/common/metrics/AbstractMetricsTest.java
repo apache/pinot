@@ -18,13 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricName;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetric;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricName;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
-import org.apache.pinot.plugin.metrics.yammer.YammerSettableGauge;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetric;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -43,23 +38,14 @@ public class AbstractMetricsTest {
     String metricName = "test";
     // add gauge
     controllerMetrics.setOrUpdateGauge(metricName, () -> 1L);
-    checkGauge(controllerMetrics, metricName, 1);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 1);
 
     // update gauge
     controllerMetrics.setOrUpdateGauge(metricName, () -> 2L);
-    checkGauge(controllerMetrics, metricName, 2);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 2);
 
     // remove gauge
     controllerMetrics.removeGauge(metricName);
     Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
-  }
-
-  private void checkGauge(ControllerMetrics controllerMetrics, String metricName, long value) {
-    Assert.assertEquals(controllerMetrics.getMetricsRegistry().allMetrics().size(), 1);
-    PinotMetric pinotMetric = controllerMetrics.getMetricsRegistry().allMetrics()
-        .get(new YammerMetricName(new MetricName(ControllerMetrics.class, "pinot.controller." + metricName)));
-    Assert.assertTrue(pinotMetric instanceof YammerMetric);
-    Assert.assertTrue(pinotMetric.getMetric() instanceof YammerSettableGauge);
-    Assert.assertEquals(((YammerSettableGauge<Long>) pinotMetric.getMetric()).value(), Long.valueOf(value));
   }
 }

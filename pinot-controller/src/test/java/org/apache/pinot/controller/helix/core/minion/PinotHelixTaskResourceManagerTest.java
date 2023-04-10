@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
@@ -35,6 +39,8 @@ import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -42,6 +48,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -197,6 +204,72 @@ public class PinotHelixTaskResourceManagerTest {
     assertEquals(taskProgress, "No worker has run this subtask");
     taskProgress = (String) progress.get(subtaskNames[2]);
     assertEquals(taskProgress, "No worker has run this subtask");
+  }
+
+  @Test
+  public void testGetSubtaskWithGivenStateProgressNoWorker()
+      throws JsonProcessingException {
+    CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), mock(TaskDriver.class));
+    // No worker to run subtasks.
+    Map<String, String> selectedMinionWorkerEndpoints = new HashMap<>();
+    Map<String, Object> progress =
+        mgr.getSubtaskOnWorkerProgress("IN_PROGRESS", httpHelper,
+            selectedMinionWorkerEndpoints, Collections.emptyMap(), 1000);
+    assertTrue(progress.isEmpty());
+    verify(httpHelper, Mockito.never()).doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt());
+  }
+
+  @Test
+  public void testGetSubtaskWithGivenStateProgress()
+      throws IOException {
+    CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
+    CompletionServiceHelper.CompletionServiceResponse httpResp =
+        new CompletionServiceHelper.CompletionServiceResponse();
+    String taskIdPrefix = "Task_SegmentGenerationAndPushTask_someone";
+    String workerIdPrefix = "worker";
+    String[] subtaskIds = new String[6];
+    String[] workerIds = new String[3];
+    Map<String, String> selectedMinionWorkerEndpoints = new HashMap<>();
+    for (int i = 0; i < 3; i++) {
+      workerIds[i] = workerIdPrefix + i;
+      String workerEndpoint = "http://" + workerIds[i] + ":9000";
+      selectedMinionWorkerEndpoints.put(workerIds[i], workerEndpoint);
+
+      subtaskIds[2 * i] = taskIdPrefix + "_" + (2 * i);
+      subtaskIds[2 * i + 1] = taskIdPrefix + "_" + (2 * i + 1);
+      // Notice that for testing purpose, we map subtask names to empty strings. In reality, subtask names will be
+      // mapped to jsonized org.apache.pinot.minion.event.MinionEventObserver
+      httpResp._httpResponses.put(
+          String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS", workerEndpoint),
+          JsonUtils.objectToString(ImmutableMap.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
+    }
+    httpResp._failedResponseCount = 1;
+    ArgumentCaptor<List<String>> workerEndpointCaptor = ArgumentCaptor.forClass(List.class);
+    when(httpHelper.doMultiGetRequest(workerEndpointCaptor.capture(), any(), anyBoolean(), any(), anyInt()))
+        .thenReturn(httpResp);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), mock(TaskDriver.class));
+
+    Map<String, Object> progress =
+        mgr.getSubtaskOnWorkerProgress("IN_PROGRESS", httpHelper, selectedMinionWorkerEndpoints,
+            Collections.emptyMap(), 1000);
+    List<String> value = workerEndpointCaptor.getValue();
+    Set<String> expectedWorkerUrls = selectedMinionWorkerEndpoints.values().stream()
+        .map(workerEndpoint
+            -> String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS", workerEndpoint))
+        .collect(Collectors.toSet());
+    assertEquals(new HashSet<>(value), expectedWorkerUrls);
+    assertEquals(progress.size(), 3);
+    for (int i = 0; i < 3; i++) {
+      Object responseFromMinionWorker = progress.get(workerIds[i]);
+      Map<String, Object> subtaskProgressMap = (Map<String, Object>) responseFromMinionWorker;
+      assertEquals(subtaskProgressMap.size(), 2);
+      assertTrue(subtaskProgressMap.containsKey(subtaskIds[2 * i]));
+      assertTrue(subtaskProgressMap.containsKey(subtaskIds[2 * i + 1]));
+    }
   }
 
   @Test

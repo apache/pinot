@@ -12,6 +12,9 @@
           ["bar", 2],
           ["alice", 42],
           ["bob", 196883]
+        ],
+        "partitionColumns": [
+          "strCol"
         ]
       }
     },
@@ -22,6 +25,10 @@
       { "sql": "SELECT * FROM {tbl} WHERE intCol > 5" },
       { "sql": "SELECT * FROM {tbl} WHERE strCol IN ('foo', 'bar')" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol IN (196883, 42)" },
+      { "sql": "SELECT * FROM {tbl} WHERE strCol IN ('foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar')" },
+      { "sql": "SELECT * FROM {tbl} WHERE intCol IN (1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 22, 23, 24, 25, 26, 27, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)" },
+      { "sql": "SELECT * FROM {tbl} WHERE strCol NOT IN ('foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar', 'foo', 'bar')" },
+      { "sql": "SELECT * FROM {tbl} WHERE intCol NOT IN (1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 22, 23, 24, 25, 26, 27, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol NOT IN (196883, 42) AND strCol IN ('alice')" },
       { "sql": "SELECT * FROM {tbl} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE intCol > 100)" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol < (SELECT SUM(intCol) FROM {tbl} AS b WHERE strCol BETWEEN 'bar' AND 'foo')" },
@@ -94,6 +101,12 @@
       { "sql": "SELECT strCol FROM {tbl1} GROUP BY strCol, intCol" },
       { "sql": "SELECT strCol, intCol FROM {tbl1} GROUP BY strCol, intCol" },
       { "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol > b.strCol1" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol WHERE a.strCol > b.strCol1" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol AND a.strCol > b.strCol1" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol BETWEEN b.strCol1 AND b.strCol2" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol WHERE a.strCol BETWEEN b.strCol1 AND b.strCol2" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol AND a.strCol BETWEEN b.strCol1 AND b.strCol2" },
       { "sql": "SELECT strCol, b.strCol2, (sum(a.intCol) * b.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY strCol, b.strCol2, b.intCol" },
       { "sql": "SELECT MOD(b.intCol, 2), sum(a.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY MOD(b.intCol, 2)" },
       { "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING SUM(intCol) > 3" },
@@ -108,6 +121,16 @@
         "ignored": true,
         "comment": "correlation is not supported. SOME is only supported if expand = false",
         "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING AVG(intCol) >= ANY (SELECT AVG(intCol) FROM {tbl1} GROUP BY strCol)"
+      },
+      {
+        "ignored": true,
+        "comments": "where clause inequality join condition is not supported",
+        "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b WHERE a.intCol > b.intCol"
+      },
+      {
+        "ignored": true,
+        "comments": "where clause inequality join condition is not supported yet",
+        "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b WHERE a.strCol BETWEEN b.strCol1 AND b.strCol2"
       }
     ]
   }

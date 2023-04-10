@@ -25,9 +25,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -70,7 +70,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are more than 1 arguments
     if (arguments.size() % 2 != 1 || arguments.size() < 3) {
       throw new IllegalArgumentException("At least 3 odd number of arguments are required for CASE-WHEN-ELSE function");
@@ -241,12 +241,12 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   /**
-   * Evaluate the ProjectionBlock for the WHEN statements, returns an array with the
+   * Evaluate the ValueBlock for the WHEN statements, returns an array with the
    * index(1 to N) of matched WHEN clause ordered by match priority, 0 means nothing
    * matched, so go to ELSE.
    */
-  private int[] getSelectedArray(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  private int[] getSelectedArray(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     if (_selectedResults == null || _selectedResults.length < numDocs) {
       _selectedResults = new int[numDocs];
     } else {
@@ -256,7 +256,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     int numWhenStatements = _whenStatements.size();
     for (int i = numWhenStatements - 1; i >= 0; i--) {
       TransformFunction whenStatement = _whenStatements.get(i);
-      int[] conditions = whenStatement.transformToIntValuesSV(projectionBlock);
+      int[] conditions = whenStatement.transformToIntValuesSV(valueBlock);
       for (int j = 0; j < numDocs & j < conditions.length; j++) {
         _selectedResults[j] = Math.max(conditions[j] * (i + 1), _selectedResults[j]);
       }
@@ -276,20 +276,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
-      return super.transformToIntValuesSV(projectionBlock);
+      return super.transformToIntValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    int[] selected = getSelectedArray(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
         TransformFunction transformFunction = _elseThenStatements.get(i);
-        int[] intValues = transformFunction.transformToIntValuesSV(projectionBlock);
+        int[] intValues = transformFunction.transformToIntValuesSV(valueBlock);
         if (_numSelections == 1) {
           System.arraycopy(intValues, 0, _intValuesSV, 0, numDocs);
         } else {
@@ -305,20 +303,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
-      return super.transformToLongValuesSV(projectionBlock);
+      return super.transformToLongValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[numDocs];
-    }
+    int[] selected = getSelectedArray(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
         TransformFunction transformFunction = _elseThenStatements.get(i);
-        long[] longValues = transformFunction.transformToLongValuesSV(projectionBlock);
+        long[] longValues = transformFunction.transformToLongValuesSV(valueBlock);
         if (_numSelections == 1) {
           System.arraycopy(longValues, 0, _longValuesSV, 0, numDocs);
         } else {
@@ -334,20 +330,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
-      return super.transformToFloatValuesSV(projectionBlock);
+      return super.transformToFloatValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[numDocs];
-    }
+    int[] selected = getSelectedArray(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    initFloatValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
         TransformFunction transformFunction = _elseThenStatements.get(i);
-        float[] floatValues = transformFunction.transformToFloatValuesSV(projectionBlock);
+        float[] floatValues = transformFunction.transformToFloatValuesSV(valueBlock);
         if (_numSelections == 1) {
           System.arraycopy(floatValues, 0, _floatValuesSV, 0, numDocs);
         } else {
@@ -363,20 +357,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
-      return super.transformToDoubleValuesSV(projectionBlock);
+      return super.transformToDoubleValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[numDocs];
-    }
+    int[] selected = getSelectedArray(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
         TransformFunction transformFunction = _elseThenStatements.get(i);
-        double[] doubleValues = transformFunction.transformToDoubleValuesSV(projectionBlock);
+        double[] doubleValues = transformFunction.transformToDoubleValuesSV(valueBlock);
         if (_numSelections == 1) {
           System.arraycopy(doubleValues, 0, _doubleValuesSV, 0, numDocs);
         } else {
@@ -392,20 +384,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType() != DataType.BIG_DECIMAL) {
-      return super.transformToBigDecimalValuesSV(projectionBlock);
+      return super.transformToBigDecimalValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[numDocs];
-    }
+    int[] selected = getSelectedArray(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
         TransformFunction transformFunction = _elseThenStatements.get(i);
-        BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(valueBlock);
         if (_numSelections == 1) {
           System.arraycopy(bigDecimalValues, 0, _bigDecimalValuesSV, 0, numDocs);
         } else {
@@ -421,20 +411,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
-      return super.transformToStringValuesSV(projectionBlock);
+      return super.transformToStringValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[numDocs];
-    }
+    int[] selected = getSelectedArray(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
         TransformFunction transformFunction = _elseThenStatements.get(i);
-        String[] stringValues = transformFunction.transformToStringValuesSV(projectionBlock);
+        String[] stringValues = transformFunction.transformToStringValuesSV(valueBlock);
         if (_numSelections == 1) {
           System.arraycopy(stringValues, 0, _stringValuesSV, 0, numDocs);
         } else {
@@ -450,20 +438,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
-      return super.transformToBytesValuesSV(projectionBlock);
+      return super.transformToBytesValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
-      _bytesValuesSV = new byte[numDocs][];
-    }
+    int[] selected = getSelectedArray(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    initBytesValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
         TransformFunction transformFunction = _elseThenStatements.get(i);
-        byte[][] bytesValues = transformFunction.transformToBytesValuesSV(projectionBlock);
+        byte[][] bytesValues = transformFunction.transformToBytesValuesSV(valueBlock);
         if (_numSelections == 1) {
           System.arraycopy(bytesValues, 0, _bytesValuesSV, 0, numDocs);
         } else {

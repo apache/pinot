@@ -21,7 +21,7 @@ package org.apache.pinot.core.query.distinct.dictionary;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -41,13 +41,13 @@ public class DictionaryBasedMultiColumnDistinctOnlyExecutor extends BaseDictiona
   }
 
   @Override
-  public boolean process(TransformBlock transformBlock) {
-    int numDocs = transformBlock.getNumDocs();
+  public boolean process(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     int numExpressions = _expressions.size();
     if (!_hasMVExpression) {
       int[][] dictIdsArray = new int[numDocs][numExpressions];
       for (int i = 0; i < numExpressions; i++) {
-        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressions.get(i));
+        BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expressions.get(i));
         int[] dictIdsForExpression = blockValueSet.getDictionaryIdsSV();
         for (int j = 0; j < numDocs; j++) {
           dictIdsArray[j][i] = dictIdsForExpression[j];
@@ -63,7 +63,7 @@ public class DictionaryBasedMultiColumnDistinctOnlyExecutor extends BaseDictiona
       int[][] svDictIds = new int[numExpressions][];
       int[][][] mvDictIds = new int[numExpressions][][];
       for (int i = 0; i < numExpressions; i++) {
-        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressions.get(i));
+        BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expressions.get(i));
         if (blockValueSet.isSingleValue()) {
           svDictIds[i] = blockValueSet.getDictionaryIdsSV();
         } else {

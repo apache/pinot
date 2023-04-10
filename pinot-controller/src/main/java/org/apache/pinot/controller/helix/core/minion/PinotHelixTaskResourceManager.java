@@ -37,6 +37,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
@@ -53,7 +54,6 @@ import org.apache.helix.task.WorkflowContext;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
-import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -621,6 +621,59 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Gets progress of all subtasks with specified state tracked by given minion workers in memory
+   * @param subtaskState a specified subtask state, valid values are in org.apache.pinot.minion.event.MinionTaskState
+   * @param executor an {@link Executor} used to run logic on
+   * @param connMgr a {@link HttpConnectionManager} used to manage http connections
+   * @param selectedMinionWorkerEndpoints a map of worker id to http endpoint for minions to get subtask progress from
+   * @param requestHeaders http headers used to send requests to minion workers
+   * @param timeoutMs timeout (in millisecond) for requests sent to minion workers
+   * @return a map of minion worker id to subtask progress
+   */
+  public synchronized Map<String, Object> getSubtaskOnWorkerProgress(String subtaskState,
+      Executor executor, HttpConnectionManager connMgr, Map<String, String> selectedMinionWorkerEndpoints,
+      Map<String, String> requestHeaders, int timeoutMs)
+      throws JsonProcessingException {
+    return getSubtaskOnWorkerProgress(subtaskState,
+        new CompletionServiceHelper(executor, connMgr, HashBiMap.create(0)), selectedMinionWorkerEndpoints,
+        requestHeaders, timeoutMs);
+  }
+
+  @VisibleForTesting
+  Map<String, Object> getSubtaskOnWorkerProgress(String subtaskState,
+      CompletionServiceHelper completionServiceHelper, Map<String, String> selectedMinionWorkerEndpoints,
+      Map<String, String> requestHeaders, int timeoutMs)
+      throws JsonProcessingException {
+    Map<String, Object> minionWorkerIdSubtaskProgressMap = new HashMap<>();
+    if (selectedMinionWorkerEndpoints.isEmpty()) {
+      return minionWorkerIdSubtaskProgressMap;
+    }
+    Map<String, String> minionWorkerUrlToWorkerIdMap = selectedMinionWorkerEndpoints.entrySet().stream()
+        .collect(Collectors.toMap(
+            entry -> String.format("%s/tasks/subtask/state/progress?subTaskState=%s", entry.getValue(), subtaskState),
+            Map.Entry::getKey));
+    List<String> workerUrls = new ArrayList<>(minionWorkerUrlToWorkerIdMap.keySet());
+    LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);
+    // Scatter and gather progress from multiple workers.
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
+    for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
+      String worker = entry.getKey();
+      String resp = entry.getValue();
+      LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
+      minionWorkerIdSubtaskProgressMap
+          .put(minionWorkerUrlToWorkerIdMap.get(worker), JsonUtils.stringToObject(resp, Map.class));
+    }
+    if (serviceResponse._failedResponseCount > 0) {
+      // Instead of aborting, subtasks without worker side progress return the task status tracked by Helix.
+      // The detailed worker failure response is logged as error by CompletionServiceResponse for debugging.
+      LOGGER.warn("There were {} workers failed to report task progress. Got partial progress info: {}",
+          serviceResponse._failedResponseCount, minionWorkerIdSubtaskProgressMap);
+    }
+    return minionWorkerIdSubtaskProgressMap;
+  }
+
+  /**
    * Helper method to return a map of task names to corresponding task state
    * where the task corresponds to the given Pinot table name. This is used to
    * check status of all tasks for a given table.
@@ -864,8 +917,7 @@ public class PinotHelixTaskResourceManager {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     ZNRecord raw = MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, taskType, tableNameWithType);
     if (raw == null) {
-      throw new NoTaskMetadataException(
-          String.format("No task metadata for task type: %s from table: %s", taskType, tableNameWithType));
+      return JsonUtils.objectToString(JsonUtils.newObjectNode());
     }
     return JsonUtils.objectToString(raw);
   }

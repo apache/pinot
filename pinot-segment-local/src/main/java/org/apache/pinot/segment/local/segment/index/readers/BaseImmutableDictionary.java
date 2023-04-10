@@ -22,12 +22,13 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.ValueReader;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.ByteArray;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -212,7 +213,6 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     byte[] utf8 = value.getBytes(UTF_8);
     while (low <= high) {
       int mid = (low + high) >>> 1;
-      // method requires zero padding byte, not safe to call in nonzero padding byte branch below
       int compareResult = _valueReader.compareUtf8Bytes(mid, _numBytesPerValue, utf8);
       if (compareResult < 0) {
         low = mid + 1;
@@ -228,11 +228,9 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   protected int binarySearch(byte[] value) {
     int low = 0;
     int high = _length - 1;
-
     while (low <= high) {
       int mid = (low + high) >>> 1;
-      byte[] midValue = _valueReader.getBytes(mid, _numBytesPerValue);
-      int compareResult = ByteArray.compare(midValue, value);
+      int compareResult = _valueReader.compareBytes(mid, _numBytesPerValue, value);
       if (compareResult < 0) {
         low = mid + 1;
       } else if (compareResult > 0) {
@@ -282,5 +280,38 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   protected byte[] getBuffer() {
     return new byte[_numBytesPerValue];
+  }
+
+  /**
+   * Returns the dictionary id for the given sorted values.
+   * @param sortedValues
+   * @param dictIds
+   */
+  @Override
+  public void getDictIds(List<String> sortedValues, IntSet dictIds) {
+    int valueIdx = 0;
+    int dictIdx = 0;
+    byte[] utf8 = null;
+    boolean needNewUtf8 = true;
+    int sortedValuesSize = sortedValues.size();
+    int dictLength = length();
+    while (valueIdx < sortedValuesSize && dictIdx < dictLength) {
+      if (needNewUtf8) {
+        utf8 = sortedValues.get(valueIdx).getBytes(StandardCharsets.UTF_8);
+      }
+      int comparison = _valueReader.compareUtf8Bytes(dictIdx, _numBytesPerValue, utf8);
+      if (comparison == 0) {
+        dictIds.add(dictIdx);
+        dictIdx++;
+        valueIdx++;
+        needNewUtf8 = true;
+      } else if (comparison > 0) {
+        valueIdx++;
+        needNewUtf8 = true;
+      } else {
+        dictIdx++;
+        needNewUtf8 = false;
+      }
+    }
   }
 }

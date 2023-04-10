@@ -53,7 +53,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -232,9 +231,9 @@ public class ClusterIntegrationTestUtils {
         break;
     }
     if (nullable) {
-      return fieldName + " " + h2FieldType;
+      return String.format("`%s` %s", fieldName, h2FieldType);
     } else {
-      return fieldName + " " + h2FieldType + " not null";
+      return String.format("`%s` %s not null", fieldName, h2FieldType);
     }
   }
 
@@ -545,37 +544,71 @@ public class ClusterIntegrationTestUtils {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection)
       throws Exception {
-    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, null);
   }
 
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
-    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null);
   }
 
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
-      @Nullable Map<String, String> extraJsonProperties) {
+  /**
+   * Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
+   * query.
+   */
+  static void testQueryWithMatchingRowCount(String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      throws Exception {
     try {
-      testQueryInternal(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, extraJsonProperties);
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, true, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
     }
   }
 
-  private static void testQueryInternal(String pinotQuery, String brokerUrl,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
+      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
+      @Nullable Map<String, String> extraJsonProperties) {
+    try {
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, false, false);
+    } catch (Exception e) {
+      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+    }
+  }
+
+  static void testQueryViaController(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties) {
+    try {
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, false, true);
+    } catch (Exception e) {
+      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+    }
+  }
+
+  private static void testQueryInternal(String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean matchingRowCount, boolean viaController)
       throws Exception {
     // broker response
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers, extraJsonProperties);
+    JsonNode pinotResponse;
+    if (viaController) {
+      pinotResponse = ClusterTest.postQueryToController(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+    } else {
+      pinotResponse = ClusterTest.postQuery(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+    }
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
@@ -609,7 +642,13 @@ public class ClusterIntegrationTestUtils {
       List<String> expectedOrderByValues = new ArrayList<>();
       int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2ResultSet.getMetaData(),
           orderByColumns);
-
+      if (matchingRowCount) {
+        if (numRows != h2NumRows) {
+          throw new RuntimeException("Pinot # of rows " + numRows + " doesn't match h2 # of rows " + h2NumRows);
+        } else {
+          return;
+        }
+      }
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
           pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
     } else {
@@ -626,7 +665,7 @@ public class ClusterIntegrationTestUtils {
           if (h2Value == null) {
             if (pinotNumRecordsSelected != 0) {
               throw new RuntimeException("No record selected in H2 but " + pinotNumRecordsSelected
-                  + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, brokerUrl, headers,
+                  + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, queryResourceUrl, headers,
                   extraJsonProperties));
             }
 
@@ -649,7 +688,7 @@ public class ClusterIntegrationTestUtils {
             throw new RuntimeException(
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                     + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                    brokerUrl, headers, extraJsonProperties));
+                    queryResourceUrl, headers, extraJsonProperties));
           }
         }
       } else {
@@ -673,7 +712,7 @@ public class ClusterIntegrationTestUtils {
                   throw new RuntimeException(
                       "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                           + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                          brokerUrl, headers, extraJsonProperties));
+                          queryResourceUrl, headers, extraJsonProperties));
                 }
               }
               if (!h2ResultSet.next()) {
@@ -855,20 +894,36 @@ public class ClusterIntegrationTestUtils {
 
   private static String removeTrailingZeroForNumber(String value, String type) {
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DOUBLE") || type.toUpperCase()
+    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT")
+        || type.toUpperCase().equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION") || type.toUpperCase()
         .equals("BIGINT")) {
       try {
-        return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
+        String result = (new BigDecimal(value)).stripTrailingZeros().toPlainString();
+        if (type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT") || type.toUpperCase()
+            .equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION")) {
+          if (!result.contains("\\.")) {
+            return result + ".0";
+          }
+        }
       } catch (NumberFormatException e) {
       }
     }
     return value;
   }
 
+  public static boolean isParsable(String input) {
+    try {
+      Double.parseDouble(input);
+      return true;
+    } catch (NumberFormatException e) {
+      return false;
+    }
+  }
+
   public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
     // Fuzzy compare expected value and actual value
     boolean error = false;
-    if (NumberUtils.isParsable(h2Value)) {
+    if (isParsable(h2Value)) {
       double expectedValue = Double.parseDouble(h2Value);
       double actualValueBroker = Double.parseDouble(brokerValue);
       double actualValueConnection = Double.parseDouble(connectionValue);

@@ -76,6 +76,15 @@ import org.slf4j.LoggerFactory;
 
 public class IngestionDelayTracker {
 
+  // Class to wrap supported timestamps collected for an ingested event
+  private static class IngestionTimestamps {
+    IngestionTimestamps(long ingestionTimesMs, long firstStreamIngestionTimeMs) {
+      _ingestionTimeMs = ingestionTimesMs;
+      _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
+    }
+    private final long _ingestionTimeMs;
+    private final long _firstStreamIngestionTimeMs;
+  }
   // Sleep interval for timer thread that triggers read of ideal state
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 300000; // 5 minutes +/- precision in timeouts
   // Once a partition is marked for verification, we wait 10 minutes to pull its ideal state.
@@ -85,7 +94,7 @@ public class IngestionDelayTracker {
   private static final Logger _logger = LoggerFactory.getLogger(IngestionDelayTracker.class.getSimpleName());
 
   // HashMap used to store ingestion time measures for all partitions active for the current table.
-  private final Map<Integer, Long> _partitionToIngestionTimeMsMap = new ConcurrentHashMap<>();
+  private final Map<Integer, IngestionTimestamps> _partitionToIngestionTimestampsMap = new ConcurrentHashMap<>();
   // We mark partitions that go from CONSUMING to ONLINE in _partitionsMarkedForVerification: if they do not
   // go back to CONSUMING in some period of time, we verify whether they are still hosted in this server by reading
   // ideal state. This is done with the goal of minimizing reading ideal state for efficiency reasons.
@@ -141,9 +150,9 @@ public class IngestionDelayTracker {
    *
    * @param ingestionTimeMs original ingestion time in milliseconds.
    */
-  private long getIngestionDelayMs(Long ingestionTimeMs) {
-    if (ingestionTimeMs == null) {
-      return 0; // return 0 when not initialized
+  private long getIngestionDelayMs(long ingestionTimeMs) {
+    if (ingestionTimeMs < 0) {
+      return 0;
     }
     // Compute aged delay for current partition
     long agedIngestionDelayMs = _clock.millis() - ingestionTimeMs;
@@ -159,7 +168,7 @@ public class IngestionDelayTracker {
    * @param partitionGroupId partition ID which we should stop tracking.
    */
   private void removePartitionId(int partitionGroupId) {
-    _partitionToIngestionTimeMsMap.remove(partitionGroupId);
+    _partitionToIngestionTimestampsMap.remove(partitionGroupId);
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
     _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
@@ -196,21 +205,36 @@ public class IngestionDelayTracker {
    * Called by LLRealTimeSegmentDataManagers to post ingestion time updates to this tracker class.
    *
    * @param ingestionTimeMs ingestion time being recorded.
+   * @param firstStreamIngestionTimeMs time the event was ingested in the first stage of the ingestion pipeline.
    * @param partitionGroupId partition ID for which this ingestion time is being recorded.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, int partitionGroupId) {
+  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
-    // TODO: see if we can install gauges after the server is ready.
     if (!_isServerReadyToServeQueries.get()) {
       // Do not update the ingestion delay metrics during server startup period
       return;
     }
-    Long previousMeasure = _partitionToIngestionTimeMsMap.put(partitionGroupId,
-        ingestionTimeMs);
+    if ((ingestionTimeMs < 0) && (firstStreamIngestionTimeMs < 0)) {
+      // If stream does not return a valid ingestion timestamps don't publish a metric
+      return;
+    }
+    IngestionTimestamps previousMeasure = _partitionToIngestionTimestampsMap.put(partitionGroupId,
+        new IngestionTimestamps(ingestionTimeMs, firstStreamIngestionTimeMs));
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
-          ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionGroupId));
+      // Only publish the metric if supported by the underlying stream. If not supported the stream
+      // returns Long.MIN_VALUE
+      if (ingestionTimeMs >= 0) {
+        _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+            () -> getPartitionIngestionDelayMs(partitionGroupId));
+      }
+      if (firstStreamIngestionTimeMs >= 0) {
+        // Only publish this metric when creation time is supported by the underlying stream
+        // When this timestamp is not supported it always returns the value Long.MIN_VALUE
+        _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
+            ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
+            () -> getPartitionEndToEndIngestionDelayMs(partitionGroupId));
+      }
     }
     // If we are consuming we do not need to track this partition for removal.
     _partitionsMarkedForVerification.remove(partitionGroupId);
@@ -283,8 +307,27 @@ public class IngestionDelayTracker {
    */
   public long getPartitionIngestionDelayMs(int partitionGroupId) {
     // Not protected as this will only be invoked when metric is installed which happens after server ready
-    Long currentMeasure = _partitionToIngestionTimeMsMap.get(partitionGroupId);
-    return getIngestionDelayMs(currentMeasure);
+    IngestionTimestamps currentMeasure = _partitionToIngestionTimestampsMap.get(partitionGroupId);
+    if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
+      return 0;
+    }
+    return getIngestionDelayMs(currentMeasure._ingestionTimeMs);
+  }
+
+  /*
+   * Method to get end to end ingestion delay for a given partition.
+   *
+   * @param partitionGroupId partition for which we are retrieving the delay
+   *
+   * @return End to end ingestion delay in milliseconds for the given partition ID.
+   */
+  public long getPartitionEndToEndIngestionDelayMs(int partitionGroupId) {
+    // Not protected as this will only be invoked when metric is installed which happens after server ready
+    IngestionTimestamps currentMeasure = _partitionToIngestionTimestampsMap.get(partitionGroupId);
+    if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
+      return 0;
+    }
+    return getIngestionDelayMs(currentMeasure._firstStreamIngestionTimeMs);
   }
 
   /*
@@ -299,7 +342,7 @@ public class IngestionDelayTracker {
       return;
     }
     // Remove partitions so their related metrics get uninstalled.
-    for (Map.Entry<Integer, Long> entry : _partitionToIngestionTimeMsMap.entrySet()) {
+    for (Map.Entry<Integer, IngestionTimestamps> entry : _partitionToIngestionTimestampsMap.entrySet()) {
       removePartitionId(entry.getKey());
     }
   }

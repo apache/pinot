@@ -25,13 +25,8 @@ import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -39,8 +34,7 @@ import org.testng.annotations.Test;
 
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String SCHEMA_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
+  private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
 
   @Override
   protected String getSchemaFileName() {
@@ -79,9 +73,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-
-    // Setting data table version to 4
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @Test
@@ -99,6 +90,27 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     super.testGeneratedQueries(false, true);
   }
 
+  @Test
+  public void testQueryOptions()
+      throws Exception {
+    String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
+    String h2Query = "SELECT * FROM mytable limit 1";
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
+        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+  }
+
+  @Test
+  public void testMultiValueColumnSelectionQuery()
+      throws Exception {
+    String pinotQuery =
+        "SELECT DivAirportIDs, DivAirports FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
+            + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    String h2Query =
+        "SELECT DivAirportIDs__MV0, DivAirports__MV0 FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
+        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+  }
+
   @Override
   protected Connection getPinotConnection() {
     Properties properties = new Properties();
@@ -107,19 +119,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
     }
     return _pinotConnection;
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-    brokerConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8421);
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-    serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, 8842);
-    serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8422);
   }
 
   @Override

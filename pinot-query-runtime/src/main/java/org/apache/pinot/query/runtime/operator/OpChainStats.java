@@ -21,30 +21,37 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Suppliers;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 
 /**
  * {@code OpChainStats} tracks execution statistics for {@link OpChain}s.
  */
+@NotThreadSafe
 public class OpChainStats {
 
   // use memoized supplier so that the timing doesn't start until the
   // first time we get the timer
-  private final Supplier<ThreadResourceUsageProvider> _exTimer
-      = Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
+  private final Supplier<ThreadResourceUsageProvider> _exTimer =
+      Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
 
   // this is used to make sure that toString() doesn't have side
   // effects (accidentally starting the timer)
   private volatile boolean _exTimerStarted = false;
 
+  private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
   private final Stopwatch _queuedStopwatch = Stopwatch.createUnstarted();
   private final AtomicLong _queuedCount = new AtomicLong();
 
   private final String _id;
+  private final ConcurrentHashMap<String, OperatorStats> _operatorStatsMap = new ConcurrentHashMap<>();
 
   public OpChainStats(String id) {
     _id = id;
@@ -62,20 +69,39 @@ public class OpChainStats {
     if (!_queuedStopwatch.isRunning()) {
       _queuedStopwatch.start();
     }
+    if (_executeStopwatch.isRunning()) {
+      _executeStopwatch.stop();
+    }
   }
 
-  public void startExecutionTimer() {
+  public ConcurrentHashMap<String, OperatorStats> getOperatorStatsMap() {
+    return _operatorStatsMap;
+  }
+
+  public OperatorStats getOperatorStats(OpChainExecutionContext context, String operatorId) {
+    return _operatorStatsMap.computeIfAbsent(operatorId, (id) -> {
+       OperatorStats operatorStats = new OperatorStats(context);
+       operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), operatorId);
+       return operatorStats;
+     });
+  }
+
+  private void startExecutionTimer() {
     _exTimerStarted = true;
     _exTimer.get();
+    if (!_executeStopwatch.isRunning()) {
+      _executeStopwatch.start();
+    }
+  }
+
+  public long getExecutionTime() {
+    return _executeStopwatch.elapsed(TimeUnit.MILLISECONDS);
   }
 
   @Override
   public String toString() {
-    return String.format("(%s) Queued Count: %s, Executing Time: %sms, Queued Time: %sms",
-        _id,
-        _queuedCount.get(),
-        _exTimerStarted ? TimeUnit.NANOSECONDS.toMillis(_exTimer.get().getThreadTimeNs()) : 0,
-        _queuedStopwatch.elapsed(TimeUnit.MILLISECONDS)
-    );
+    return String.format("(%s) Queued Count: %s, Executing Time: %sms, Queued Time: %sms", _id, _queuedCount.get(),
+        _exTimerStarted ? _executeStopwatch.elapsed(TimeUnit.MILLISECONDS) : 0,
+        _queuedStopwatch.elapsed(TimeUnit.MILLISECONDS));
   }
 }

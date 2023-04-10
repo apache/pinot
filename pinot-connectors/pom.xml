@@ -38,7 +38,9 @@
   </properties>
 
   <modules>
-    <module>pinot-spark-connector</module>
+    <module>pinot-spark-common</module>
+    <module>pinot-spark-2-connector</module>
+    <module>pinot-spark-3-connector</module>
     <module>pinot-flink-connector</module>
   </modules>
 

@@ -18,17 +18,24 @@
  */
 package org.apache.pinot.query.planner.stage;
 
-import java.util.ArrayList;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
-import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 public class AggregateNode extends AbstractStageNode {
+  public static final RelHint FINAL_STAGE_HINT = RelHint.builder(
+      PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE).build();
+  public static final RelHint INTERMEDIATE_STAGE_HINT = RelHint.builder(
+      PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE).build();
+
+  private List<RelHint> _relHints;
   @ProtoProperties
   private List<RexExpression> _aggCalls;
   @ProtoProperties
@@ -38,13 +45,22 @@ public class AggregateNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public AggregateNode(int stageId, DataSchema dataSchema, List<AggregateCall> aggCalls, ImmutableBitSet groupSet) {
+  public AggregateNode(int stageId, DataSchema dataSchema, List<AggregateCall> aggCalls, List<RexExpression> groupSet,
+      List<RelHint> relHints) {
     super(stageId, dataSchema);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
-    _groupSet = new ArrayList<>(groupSet.cardinality());
-    for (Integer integer : groupSet) {
-      _groupSet.add(new RexExpression.InputRef(integer));
-    }
+    _groupSet = groupSet;
+    _relHints = relHints;
+    Preconditions.checkState(!(isFinalStage(this) && isIntermediateStage(this)),
+        "Unable to compile aggregation with both hints for final and intermediate agg type.");
+  }
+
+  public static boolean isFinalStage(AggregateNode aggNode) {
+    return aggNode.getRelHints().contains(FINAL_STAGE_HINT);
+  }
+
+  public static boolean isIntermediateStage(AggregateNode aggNode) {
+    return aggNode.getRelHints().contains(INTERMEDIATE_STAGE_HINT);
   }
 
   public List<RexExpression> getAggCalls() {
@@ -53,6 +69,10 @@ public class AggregateNode extends AbstractStageNode {
 
   public List<RexExpression> getGroupSet() {
     return _groupSet;
+  }
+
+  public List<RelHint> getRelHints() {
+    return _relHints;
   }
 
   @Override

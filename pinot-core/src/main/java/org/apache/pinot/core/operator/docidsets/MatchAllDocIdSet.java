@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.MatchAllDocIdIterator;
 
 
-public final class MatchAllDocIdSet implements FilterBlockDocIdSet {
+public final class MatchAllDocIdSet implements BlockDocIdSet {
   private final int _numDocs;
 
   public MatchAllDocIdSet(int numDocs) {

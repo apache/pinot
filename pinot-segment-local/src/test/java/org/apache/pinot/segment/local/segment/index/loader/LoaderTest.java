@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,19 +31,24 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.FstIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -60,7 +64,6 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -258,7 +261,8 @@ public class LoaderTest {
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "testTable");
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     List<String> fstIndexCreationColumns = Lists.newArrayList(FST_INDEX_COL_NAME);
-    segmentGeneratorConfig.setFSTIndexCreationColumns(fstIndexCreationColumns);
+    FstIndexConfig fstConfig = new FstIndexConfig(segmentGeneratorConfig.getFSTIndexType());
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.fst(), fstConfig, fstIndexCreationColumns);
     segmentGeneratorConfig.setSegmentVersion(segmentVersion);
     driver.init(segmentGeneratorConfig);
     driver.build();
@@ -290,7 +294,7 @@ public class LoaderTest {
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_pinotConfiguration).build());
     SegmentDirectory.Reader reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
-    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
+    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, StandardIndexes.fst()));
     indexSegment.destroy();
 
     // CASE 2: set the segment version to load in IndexLoadingConfig as V3
@@ -307,7 +311,7 @@ public class LoaderTest {
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_pinotConfiguration).build());
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
-    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
+    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, StandardIndexes.fst()));
     indexSegment.destroy();
 
     // Test for scenarios by creating on-disk segment in V1 and then loading
@@ -382,7 +386,7 @@ public class LoaderTest {
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_pinotConfiguration).build());
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
-    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
+    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, StandardIndexes.fst()));
     indexSegment.destroy();
   }
 
@@ -392,11 +396,10 @@ public class LoaderTest {
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "testTable");
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    List<String> forwardIndexDisabledColumns = new ArrayList<>();
-    forwardIndexDisabledColumns.add(NO_FORWARD_INDEX_COL_NAME);
-    segmentGeneratorConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
+        NO_FORWARD_INDEX_COL_NAME);
     if (enableInvertedIndex) {
-      segmentGeneratorConfig.createInvertedIndexForColumn(NO_FORWARD_INDEX_COL_NAME);
+      segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, NO_FORWARD_INDEX_COL_NAME);
     }
     segmentGeneratorConfig.setSegmentVersion(segmentVersion);
     driver.init(segmentGeneratorConfig);
@@ -523,20 +526,18 @@ public class LoaderTest {
     indexSegment.destroy();
 
     // Test scenarios to create a column with no forward index but without enabling inverted index for it
+    // This should still work as the original constraint to enforce that a column has a dictionary + inverted index
+    // has been relaxed.
     try {
       constructSegmentWithForwardIndexDisabled(SegmentVersion.v3, false);
-      Assert.fail("Disabling forward index without enabling inverted index is not allowed!");
     } catch (IllegalStateException e) {
-      assertEquals(String.format("Cannot disable forward index for column %s without inverted index enabled",
-          NO_FORWARD_INDEX_COL_NAME), e.getMessage());
+      Assert.fail("Disabling forward index without enabling inverted index is allowed now");
     }
 
     try {
       constructSegmentWithForwardIndexDisabled(SegmentVersion.v1, false);
-      Assert.fail("Disabling forward index without enabling inverted index is not allowed!");
     } catch (IllegalStateException e) {
-      assertEquals(String.format("Cannot disable forward index for column %s without inverted index enabled",
-          NO_FORWARD_INDEX_COL_NAME), e.getMessage());
+      Assert.fail("Disabling forward index without enabling inverted index is allowed now");
     }
   }
 
@@ -546,9 +547,9 @@ public class LoaderTest {
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "testTable");
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    List<String> textIndexCreationColumns = Lists.newArrayList(TEXT_INDEX_COL_NAME);
     List<String> rawIndexCreationColumns = Lists.newArrayList(TEXT_INDEX_COL_NAME);
-    segmentGeneratorConfig.setTextIndexCreationColumns(textIndexCreationColumns);
+    TextIndexConfig textIndexConfig = new TextIndexConfigBuilder(segmentGeneratorConfig.getFSTIndexType()).build();
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.text(), textIndexConfig, TEXT_INDEX_COL_NAME);
     segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexCreationColumns);
     segmentGeneratorConfig.setSegmentVersion(segmentVersion);
     driver.init(segmentGeneratorConfig);

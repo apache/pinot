@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.aggregation;
 
 import java.util.List;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 /**
@@ -29,11 +29,9 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 public interface AggregationExecutor {
 
   /**
-   * Performs aggregation on the given transform block.
-   *
-   * @param transformBlock Transform Block
+   * Performs aggregation on the given value block.
    */
-  void aggregate(TransformBlock transformBlock);
+  void aggregate(ValueBlock valueBlock);
 
   /**
    * Returns the result of aggregation.

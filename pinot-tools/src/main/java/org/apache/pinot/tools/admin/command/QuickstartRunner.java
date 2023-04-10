@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -53,10 +54,6 @@ public class QuickstartRunner {
   private static final int DEFAULT_SERVER_NETTY_PORT = 7050;
   private static final int DEFAULT_SERVER_GRPC_PORT = 7100;
   private static final int DEFAULT_MINION_PORT = 6000;
-
-  private static final int DEFAULT_BROKER_MULTISTAGE_RUNNER_PORT = 8421;
-  private static final int DEFAULT_SERVER_MULTISTAGE_RUNNER_PORT = 8442;
-  private static final int DEFAULT_SERVER_MULTISTAGE_SERVER_PORT = 8842;
 
   private static final String DEFAULT_ZK_DIR = "PinotZkDir";
   private static final String DEFAULT_CONTROLLER_DIR = "PinotControllerDir";
@@ -100,7 +97,12 @@ public class QuickstartRunner {
     _tempDir = tempDir;
     _enableTenantIsolation = enableIsolation;
     _authProvider = authProvider;
-    _configOverrides = configOverrides;
+    _configOverrides = new HashMap<>(configOverrides);
+    if (numMinions > 0) {
+      // configure the controller to schedule tasks when minion is enabled
+      _configOverrides.put("controller.task.scheduler.enabled", true);
+      _configOverrides.put("controller.task.skipLateCronSchedule", true);
+    }
     _zkExternalAddress = zkExternalAddress;
     _deleteExistingData = deleteExistingData;
     if (deleteExistingData) {
@@ -137,7 +139,6 @@ public class QuickstartRunner {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
       brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
-          .setBrokerMultiStageRunnerPort(DEFAULT_BROKER_MULTISTAGE_RUNNER_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       if (!brokerStarter.execute()) {
@@ -153,8 +154,6 @@ public class QuickstartRunner {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setGrpcPort(DEFAULT_SERVER_GRPC_PORT + i)
-          .setMultiStageServerPort(DEFAULT_SERVER_MULTISTAGE_SERVER_PORT + i)
-          .setMultiStageRunnerPort(DEFAULT_SERVER_MULTISTAGE_RUNNER_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())

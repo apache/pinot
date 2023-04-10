@@ -20,17 +20,21 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -44,6 +48,8 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 
 public class MailboxReceiveOperatorTest {
 
+  private static final int DEFAULT_RECEIVER_STAGE_ID = 10;
+
   private AutoCloseable _mocks;
 
   @Mock
@@ -55,9 +61,13 @@ public class MailboxReceiveOperatorTest {
   @Mock
   private MailboxService<TransferableBlock> _mailboxService;
   @Mock
-  private ServerInstance _server1;
+  private VirtualServer _server1;
   @Mock
-  private ServerInstance _server2;
+  private VirtualServer _server2;
+
+  private final VirtualServerAddress _testAddr = new VirtualServerAddress("test", 123, 0);
+
+  private final Random _random = new Random();
 
   @BeforeMethod
   public void setUp() {
@@ -74,9 +84,11 @@ public class MailboxReceiveOperatorTest {
   public void shouldTimeoutOnExtraLongSleep()
       throws InterruptedException {
     // shorter timeoutMs should result in error.
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 10L, 10L,
+            new HashMap<>());
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
-            789, 10L);
+        new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 10L);
     Thread.sleep(200L);
     TransferableBlock mailbox = receiveOp.nextBlock();
     Assert.assertTrue(mailbox.isErrorBlock());
@@ -84,15 +96,15 @@ public class MailboxReceiveOperatorTest {
     Assert.assertTrue(errorBlock.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
 
     // longer timeout or default timeout (10s) doesn't result in error.
-    receiveOp =
-        new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
-            789, 2000L);
+    context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 2000L, 2000L,
+        new HashMap<>());
+    receiveOp = new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 2000L);
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
     Assert.assertFalse(mailbox.isErrorBlock());
-    receiveOp =
-        new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
-            789, null);
+    context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
+        Long.MAX_VALUE, new HashMap<>());
+    receiveOp = new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, null);
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
     Assert.assertFalse(mailbox.isErrorBlock());
@@ -111,8 +123,12 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_server2.getHostname()).thenReturn("singleton");
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
 
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, "test", 123, 456, 789, null);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            456, 789, null);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
@@ -126,8 +142,11 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_server2.getHostname()).thenReturn("singleton");
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
 
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.RANGE_DISTRIBUTED, "test", 123, 456, 789, null);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
+        RelDistribution.Type.RANGE_DISTRIBUTED, 456, 789, null);
   }
 
   @Test
@@ -149,9 +168,15 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
 
     // Receive end of stream block directly when there is no match.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
@@ -176,13 +201,21 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
+
     // Receive end of stream block directly when mailbox is close.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
   }
@@ -207,15 +240,22 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     // Receive null mailbox during timeout.
     Mockito.when(_mailbox.receive()).thenReturn(null);
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive NoOpBlock.
     Assert.assertTrue(receiveOp.nextBlock().isNoOpBlock());
   }
@@ -240,14 +280,21 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive EosBloc.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
   }
@@ -272,17 +319,28 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Object[] expRow = new Object[]{1, 1};
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_mailbox.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+    Mockito.when(_mailbox.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
+    while (receivedBlock.isNoOpBlock()) {
+      receivedBlock = receiveOp.nextBlock();
+    }
     List<Object[]> resultRows = receivedBlock.getContainer();
     Assert.assertEquals(resultRows.size(), 1);
     Assert.assertEquals(resultRows.get(0), expRow);
@@ -308,15 +366,23 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Exception e = new Exception("errorBlock");
+    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(e));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock());
     MetadataBlock error = (MetadataBlock) receivedBlock.getDataBlock();
@@ -340,22 +406,33 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
 
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Object[] expRow = new Object[]{1, 1};
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
+    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
+    while (receivedBlock.isNoOpBlock()) {
+      receivedBlock = receiveOp.nextBlock();
+    }
     List<Object[]> resultRows = receivedBlock.getContainer();
     Assert.assertEquals(resultRows.size(), 1);
     Assert.assertEquals(resultRows.get(0), expRow);
@@ -378,23 +455,34 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox.receive()).thenReturn(null);
+    Mockito.when(_mailbox.receive()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Object[] expRow = new Object[]{1, 1};
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
+    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
+    while (receivedBlock.isNoOpBlock()) {
+      receivedBlock = receiveOp.nextBlock();
+    }
     List<Object[]> resultRows = receivedBlock.getContainer();
     Assert.assertEquals(resultRows.size(), 1);
     Assert.assertEquals(resultRows.get(0), expRow);
@@ -417,10 +505,11 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Object[] expRow1 = new Object[]{1, 1};
@@ -430,13 +519,18 @@ public class MailboxReceiveOperatorTest {
             TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     Object[] expRow3 = new Object[]{3, 3};
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive first block from first server.
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
@@ -472,23 +566,30 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive())
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("mailboxError")));
 
     Object[] expRow3 = new Object[]{3, 3};
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     // Receive error block from first server.
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock());
@@ -513,22 +614,29 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive()).thenThrow(new Exception("mailboxError"));
 
     Object[] expRow3 = new Object[]{3, 3};
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
+
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
+            Long.MAX_VALUE, new HashMap<>());
+
+    MailboxReceiveOperator receiveOp =
+        new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
+            stageId, DEFAULT_RECEIVER_STAGE_ID, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock(), "server-1 should have returned an error-block");
   }

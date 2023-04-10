@@ -486,6 +486,46 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   }
 
   @Test
+  public void testForceUpdateTableSchemaAndConfigs()
+      throws IOException {
+    String tableName = "testUpdate1";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = createDummySchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+    String response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertNotNull(tableConfigs.getOffline());
+
+    // Remove field from schema and try to update schema without the 'forceTableSchemaUpdate' option
+    schema.removeField("dimA");
+    tableConfigs =
+        new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
+
+    String tableConfigUpdateUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName);
+    try {
+      sendPutRequest(tableConfigUpdateUrl, tableConfigs.toPrettyJsonString());
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().contains("is not backward-compatible with the existing schema"));
+    }
+
+    // Skip validate table configs – Exception is still thrown
+    String newTableConfigUpdateUrl = tableConfigUpdateUrl + "?validationTypesToSkip=ALL";
+    try {
+      sendPutRequest(newTableConfigUpdateUrl, tableConfigs.toPrettyJsonString());
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().contains("is not backward-compatible with the existing schema"));
+    }
+
+    // Skip table config validation as well as force update the table schema – no exceptions are thrown
+    newTableConfigUpdateUrl = tableConfigUpdateUrl + "?validationTypesToSkip=ALL&forceTableSchemaUpdate=true";
+    response = sendPutRequest(newTableConfigUpdateUrl, tableConfigs.toPrettyJsonString());
+    Assert.assertTrue(response.contains("TableConfigs updated for testUpdate1"));
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  @Test
   public void testDeleteConfig()
       throws Exception {
     // create with 1 config

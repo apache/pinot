@@ -26,8 +26,9 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -49,7 +50,7 @@ public class DefaultFetchPlannerTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     FetchContext fetchContext = planner.planFetchForProcessing(indexSegment, queryContext);
     assertEquals(fetchContext.getSegmentName(), "s0");
-    Map<String, List<ColumnIndexType>> columns = fetchContext.getColumnToIndexList();
+    Map<String, List<IndexType<?, ?, ?>>> columns = fetchContext.getColumnToIndexList();
     assertEquals(columns.size(), 3);
     // null means to get all index types created for the column.
     assertNull(columns.get("c0"));
@@ -81,10 +82,10 @@ public class DefaultFetchPlannerTest {
     fetchContext = planner.planFetchForPruning(indexSegment, queryContext);
     assertFalse(fetchContext.isEmpty());
     assertEquals(fetchContext.getSegmentName(), "s0");
-    Map<String, List<ColumnIndexType>> columns = fetchContext.getColumnToIndexList();
+    Map<String, List<IndexType<?, ?, ?>>> columns = fetchContext.getColumnToIndexList();
     assertEquals(columns.size(), 1);
-    List<ColumnIndexType> idxTypes = columns.get("c0");
+    List<IndexType<?, ?, ?>> idxTypes = columns.get("c0");
     assertEquals(idxTypes.size(), 1);
-    assertEquals(idxTypes.get(0), ColumnIndexType.BLOOM_FILTER);
+    assertEquals(idxTypes.get(0), StandardIndexes.bloomFilter());
   }
 }

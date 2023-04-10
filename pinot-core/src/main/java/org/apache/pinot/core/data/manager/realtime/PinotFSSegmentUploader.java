@@ -43,9 +43,9 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
 
-  private String _segmentStoreUriStr;
-  private ExecutorService _executorService = Executors.newCachedThreadPool();
-  private int _timeoutInMs;
+  private final String _segmentStoreUriStr;
+  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private final int _timeoutInMs;
 
   public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis) {
     _segmentStoreUriStr = segmentStoreDirUri;
@@ -54,6 +54,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
 
   public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
     if (_segmentStoreUriStr == null || _segmentStoreUriStr.isEmpty()) {
+      LOGGER.error("Missing segment store uri. Failed to upload segment file {} for {}.", segmentFile.getName(),
+          segmentName.getSegmentName());
       return null;
     }
     Callable<URI> uploadTask = () -> {

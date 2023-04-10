@@ -38,15 +38,10 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
  *   Numeric column</li>
  * </ul>
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Double> {
+  private final static ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
 
-  private final static ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR
-      = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
-
-  public LastDoubleValueWithTimeAggregationFunction(
-      ExpressionContext dataCol,
-      ExpressionContext timeCol) {
+  public LastDoubleValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol) {
     super(dataCol, timeCol, ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE);
   }
 
@@ -81,8 +76,7 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
 
   @Override
   public void aggregateGroupResultWithRawDataSv(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet, BlockValSet timeValSet) {
+      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -93,11 +87,8 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
   }
 
   @Override
-  public void aggregateGroupResultWithRawDataMv(int length,
-      int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet,
-      BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataMv(int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -112,11 +103,6 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'DOUBLE')";
-  }
-
-  @Override
-  public String getColumnName() {
-    return getType().getName() + "_" + _expression + "_" + _timeCol + "_DOUBLE";
   }
 
   @Override

@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -47,6 +48,8 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
@@ -60,6 +63,8 @@ import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQuer
 import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -73,13 +78,12 @@ import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
  */
 public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPlanRequestContext> {
   private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerRequestPlanVisitor.class);
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
-      ImmutableList.of(
-          PredicateComparisonRewriter.class.getName(),
-          NonAggregationGroupByToDistinctQueryRewriter.class.getName()
-      );
-  private static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(
-      QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
+      ImmutableList.of(PredicateComparisonRewriter.class.getName(),
+          NonAggregationGroupByToDistinctQueryRewriter.class.getName());
+  private static final List<QueryRewriter> QUERY_REWRITERS =
+      new ArrayList<>(QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
 
   private static final ServerRequestPlanVisitor INSTANCE = new ServerRequestPlanVisitor();
@@ -87,16 +91,25 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
 
   public static ServerPlanRequestContext build(MailboxService<TransferableBlock> mailboxService,
       DistributedStagePlan stagePlan, Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
-      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
+      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList, long deadlineMs) {
     // Before-visit: construct the ServerPlanRequestContext baseline
-    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
+    long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16)
+        + (stagePlan.getStageId() << 8) + (tableType == TableType.REALTIME ? 1 : 0);
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
+    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap);
+    if (leafNodeLimit != null) {
+      pinotQuery.setLimit(leafNodeLimit);
+    } else {
+      pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
+    }
+    LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     pinotQuery.setExplain(false);
-    ServerPlanRequestContext context = new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(),
-        timeoutMs, stagePlan.getServerInstance().getHostname(), stagePlan.getServerInstance().getPort(),
-        stagePlan.getMetadataMap(), pinotQuery, tableType, timeBoundaryInfo);
+    ServerPlanRequestContext context =
+        new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
+            new VirtualServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
+            timeBoundaryInfo);
 
     // visit the plan and create query physical plan.
     ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);
@@ -112,8 +125,8 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
 
     // 2. set pinot query options according to requestMetadataMap
-    pinotQuery.setQueryOptions(ImmutableMap.of(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-        String.valueOf(timeoutMs)));
+    pinotQuery.setQueryOptions(
+        ImmutableMap.of(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs)));
 
     // 3. wrapped around in broker request
     BrokerRequest brokerRequest = new BrokerRequest();
@@ -129,7 +142,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setBrokerId("unknown");
-    instanceRequest.setEnableTrace(false);
+    instanceRequest.setEnableTrace(Boolean.parseBoolean(requestMetadataMap.get(CommonConstants.Broker.Request.TRACE)));
     instanceRequest.setSearchSegments(segmentList);
     instanceRequest.setQuery(brokerRequest);
 
@@ -145,19 +158,25 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     // set group-by list
-    context.getPinotQuery().setGroupByList(CalciteRexExpressionParser.convertGroupByList(
-        node.getGroupSet(), context.getPinotQuery()));
+    context.getPinotQuery()
+        .setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), context.getPinotQuery()));
     // set agg list
-    context.getPinotQuery().setSelectList(CalciteRexExpressionParser.addSelectList(
-        context.getPinotQuery().getGroupByList(), node.getAggCalls(), context.getPinotQuery()));
+    context.getPinotQuery().setSelectList(
+        CalciteRexExpressionParser.addSelectList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
+            context.getPinotQuery()));
     return _aVoid;
+  }
+
+  @Override
+  public Void visitWindow(WindowNode node, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Window not yet supported!");
   }
 
   @Override
   public Void visitFilter(FilterNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    context.getPinotQuery().setFilterExpression(CalciteRexExpressionParser.toExpression(
-        node.getCondition(), context.getPinotQuery()));
+    context.getPinotQuery()
+        .setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), context.getPinotQuery()));
     return _aVoid;
   }
 
@@ -182,8 +201,8 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   @Override
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    context.getPinotQuery().setSelectList(CalciteRexExpressionParser.overwriteSelectList(
-        node.getProjects(), context.getPinotQuery()));
+    context.getPinotQuery()
+        .setSelectList(CalciteRexExpressionParser.overwriteSelectList(node.getProjects(), context.getPinotQuery()));
     return _aVoid;
   }
 
@@ -191,8 +210,9 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     if (node.getCollationKeys().size() > 0) {
-      context.getPinotQuery().setOrderByList(CalciteRexExpressionParser.convertOrderByList(node.getCollationKeys(),
-          node.getCollationDirections(), context.getPinotQuery()));
+      context.getPinotQuery().setOrderByList(
+          CalciteRexExpressionParser.convertOrderByList(node.getCollationKeys(), node.getCollationDirections(),
+              context.getPinotQuery()));
     }
     if (node.getFetch() > 0) {
       context.getPinotQuery().setLimit(node.getFetch());
@@ -210,8 +230,8 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
         .tableNameWithType(TableNameBuilder.extractRawTableName(node.getTableName()));
     dataSource.setTableName(tableNameWithType);
     context.getPinotQuery().setDataSource(dataSource);
-    context.getPinotQuery().setSelectList(node.getTableScanColumns().stream()
-        .map(RequestUtils::getIdentifierExpression).collect(Collectors.toList()));
+    context.getPinotQuery().setSelectList(
+        node.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression).collect(Collectors.toList()));
     return _aVoid;
   }
 
@@ -226,6 +246,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
       child.visit(this, context);
     }
   }
+
   /**
    * Helper method to attach the time boundary to the given PinotQuery.
    */
