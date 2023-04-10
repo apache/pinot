@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -88,10 +87,15 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId),
-            QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
-            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    Map<String, String> requestMetadataMap = new HashMap<>();
+    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
+    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
+        String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+
+    if (executionStatsAggregatorMap != null) {
+      requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
+    }
+
     int reducerStageId = -1;
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
@@ -104,13 +108,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
       }
       if (executionStatsAggregatorMap != null) {
-        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(false));
+        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
     Preconditions.checkState(reducerStageId != -1);
     ResultTable resultTable = QueryDispatcher.runReducer(requestId, queryPlan, reducerStageId,
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-        executionStatsAggregatorMap, false);
+        executionStatsAggregatorMap, true);
     return resultTable.getRows();
   }
 
