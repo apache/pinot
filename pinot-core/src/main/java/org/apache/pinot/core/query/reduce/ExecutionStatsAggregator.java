@@ -365,13 +365,13 @@ public class ExecutionStatsAggregator {
     if (_enableTrace) {
       setStats(rawTableName, brokerResponseStats, brokerMetrics);
       brokerResponseStats.setOperatorStats(_operatorStats);
-      brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
     }
 
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
     brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
     brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
+    brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
     if (_stageExecStartTimeMs >= 0 && _stageExecEndTimeMs >= 0) {
       brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
     }
