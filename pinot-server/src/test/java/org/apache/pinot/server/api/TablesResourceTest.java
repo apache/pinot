@@ -248,8 +248,7 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testGetInvalidRecordCount()
-  {
+  public void testGetInvalidRecordCount() {
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
     String segmentInvalidRecordCountPath =
         "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)
