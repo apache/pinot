@@ -119,7 +119,7 @@ public abstract class DistinctFromTransformFunctionTest {
     // column with 1/3 rows equal to first column, 1/3 rows not equal to first column, and 1/3 rows as null.
     FileUtils.deleteQuietly(new File(getIndexDirPath(SEGMENT_NAME)));
     for (int i = 0; i < NUM_ROWS; i++) {
-      _intSVValues[i] = RANDOM.nextInt();;
+      _intSVValues[i] = RANDOM.nextInt();
     }
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
