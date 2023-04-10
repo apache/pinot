@@ -42,7 +42,7 @@ public class DictionaryIndexConfig extends IndexConfig {
   @JsonCreator
   public DictionaryIndexConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty("onHeap") Boolean onHeap,
       @JsonProperty("useVarLengthDictionary") @Nullable Boolean useVarLengthDictionary) {
-    super(enabled != null && enabled);
+    super(enabled);
     _onHeap = onHeap != null && onHeap;
     _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);
   }

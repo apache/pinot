@@ -35,7 +35,15 @@ public class IndexConfig extends BaseJsonConfig {
   public static final IndexConfig DISABLED = new IndexConfig(false);
   private final boolean _enabled;
 
+  /**
+   * This is used as the default constructor for subclasses. The attribute {@link #_enabled} will be initialized to
+   * {@code enabled == null || enabled}, so it will be false if and only if {@code Boolean.FALSE.equals(enabled)}.
+   */
   @JsonCreator
+  public IndexConfig(@JsonProperty("enabled") Boolean enabled) {
+    this(enabled == null || enabled);
+  }
+
   public IndexConfig(@JsonProperty("enabled") boolean enabled) {
     _enabled = enabled;
   }

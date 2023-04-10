@@ -38,7 +38,7 @@ public class RangeIndexConfig extends IndexConfig {
   @JsonCreator
   public RangeIndexConfig(@JsonProperty("enabled") Boolean enabled,
       @JsonProperty("version") @Nullable Integer version) {
-    super(enabled != null && enabled && version != null);
+    super(enabled);
     _version = version != null ? version : 2;
   }
 
