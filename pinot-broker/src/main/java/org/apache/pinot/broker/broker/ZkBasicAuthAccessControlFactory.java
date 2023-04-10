@@ -20,9 +20,11 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -79,11 +81,42 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
         @Override
         public boolean hasAccess(RequesterIdentity requesterIdentity) {
-            return hasAccess(requesterIdentity, null);
+            return hasAccess(requesterIdentity, (BrokerRequest) null);
         }
 
         @Override
         public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+            if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
+                .isSetTableName()) {
+                // no table restrictions? accept
+                return true;
+            }
+
+            return hasAccess(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+        }
+
+        @Override
+        public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+            Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
+            if (!principalOpt.isPresent()) {
+                // no matching token? reject
+                return false;
+            }
+            if (tables == null || tables.isEmpty()) {
+                return true;
+            }
+
+            ZkBasicAuthPrincipal principal = principalOpt.get();
+            for (String table : tables) {
+                if (!principal.hasTable(table)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
             Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity,
                 "HttpRequesterIdentity required");
             HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
@@ -95,28 +128,15 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
 
             Map<String, String> name2password = tokens.stream().collect(Collectors
-              .toMap(BasicAuthUtils::extractUsername, BasicAuthUtils::extractPassword));
+                .toMap(BasicAuthUtils::extractUsername, BasicAuthUtils::extractPassword));
             Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
-              .collect(Collectors.toMap(name2password::get, _name2principal::get));
+                .collect(Collectors.toMap(name2password::get, _name2principal::get));
 
             Optional<ZkBasicAuthPrincipal> principalOpt =
-              password2principal.entrySet().stream()
-                .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
-                .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
-
-            if (!principalOpt.isPresent()) {
-                // no matching token? reject
-                return false;
-            }
-
-            ZkBasicAuthPrincipal principal = principalOpt.get();
-            if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
-                .isSetTableName()) {
-                // no table restrictions? accept
-                return true;
-            }
-
-            return principal.hasTable(brokerRequest.getQuerySource().getTableName());
+                password2principal.entrySet().stream()
+                    .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
+                    .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
+            return principalOpt;
         }
     }
 }
