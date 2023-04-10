@@ -967,6 +967,11 @@ public final class TableConfigUtils {
               + " version >= 2 to use this feature", columnName));
     }
 
+    Preconditions.checkState(
+        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(),
+        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+            + " not supported with forward index for column: %s, disabled", columnName));
+
     boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
         || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);
     boolean hasInvertedIndex = indexingConfigs.getInvertedIndexColumns() != null

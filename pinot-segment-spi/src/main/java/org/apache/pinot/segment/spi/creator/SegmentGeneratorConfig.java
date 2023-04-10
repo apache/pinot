@@ -79,7 +79,6 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
-  public static final double DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD = 0.85d;
   public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
 
   private final TableConfig _tableConfig;
@@ -124,7 +123,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _failOnEmptySegment = false;
   private boolean _optimizeDictionary = false;
   private boolean _optimizeDictionaryForMetrics = false;
-  private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
+  private double _noDictionarySizeRatioThreshold = IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
   private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
 
   // constructed from FieldConfig

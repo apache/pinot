@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -189,6 +190,64 @@ public class DictionaryIndexType
     }
 
     return false;
+  }
+
+  /**
+   * This function evaluates whether to override dictionary (i.e use noDictionary)
+   * for a column even when its explicitly configured. This evaluation is for both dimension and metric
+   * column types.
+   */
+  public static boolean ignoreDictionaryOverride(boolean optimizeDictionary,
+      boolean optimizeDictionaryForMetrics, double noDictionarySizeRatioThreshold,
+      FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality,
+      int totalNumberOfEntries) {
+    if (optimizeDictionary) {
+      // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
+      if ((fieldIndexConfigs.getConfig(StandardIndexes.json()).isEnabled() || fieldIndexConfigs.getConfig(
+          StandardIndexes.text()).isEnabled())) {
+        return false;
+      }
+      // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
+      // This is done to reduce the cost of dictionary for high cardinality columns
+      // Off by default and needs optimizeDictionary to be set to true
+      if (fieldSpec.isSingleValueField() && fieldSpec.getDataType().isFixedWidth()) {
+        // if you can safely enable dictionary, you can ignore overrides
+        return canSafelyCreateDictionaryWithinThreshold(cardinality, totalNumberOfEntries,
+            noDictionarySizeRatioThreshold, fieldSpec);
+      }
+    }
+
+    if (optimizeDictionaryForMetrics && !optimizeDictionary) {
+      if (fieldSpec.isSingleValueField() && fieldSpec.getDataType().isFixedWidth() && fieldSpec.getFieldType()
+          == FieldSpec.FieldType.METRIC) {
+        // if you can safely enable dictionary, you can ignore overrides
+        return canSafelyCreateDictionaryWithinThreshold(cardinality, totalNumberOfEntries,
+            noDictionarySizeRatioThreshold, fieldSpec);
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Given the column cardinality, totalNumberOfEntries, this function checks if the savings ratio
+   * is larger than the configured threshold (noDictionarySizeRatioThreshold). If savings ratio is
+   * smaller than the threshold, we want to override to noDictionary.
+   */
+  private static boolean canSafelyCreateDictionaryWithinThreshold(int cardinality, int totalNumberOfEntries,
+      double noDictionarySizeRatioThreshold, FieldSpec spec) {
+    long dictionarySize = cardinality * (long) spec.getDataType().size();
+    long forwardIndexSize =
+        ((long) totalNumberOfEntries * PinotDataBitSet.getNumBitsPerValue(cardinality - 1)
+            + Byte.SIZE - 1) / Byte.SIZE;
+
+    double indexWithDictSize = dictionarySize + forwardIndexSize;
+    double indexWithoutDictSize = totalNumberOfEntries * spec.getDataType().size();
+
+    double indexSizeRatio = indexWithoutDictSize / indexWithDictSize;
+    if (indexSizeRatio <= noDictionarySizeRatioThreshold) {
+      return false;
+    }
+    return true;
   }
 
   public SegmentDictionaryCreator createIndexCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary)

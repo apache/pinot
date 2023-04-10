@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -55,12 +56,15 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -2237,6 +2241,48 @@ public class ForwardIndexHandlerTest {
           + "Regeneration of the forward index is required to create new indexes as well. Please refresh or back-fill "
           + "the forward index");
     }
+  }
+
+  /**
+   * Tests to verify various combinations of inputs to test dictionary override optimization.
+   */
+  @Test
+  public void testDictionaryOverride() {
+    FieldSpec fieldSpec = new MetricFieldSpec();
+    fieldSpec.setName("test");
+    fieldSpec.setDataType(FieldSpec.DataType.DOUBLE);
+    IndexType index1 = Mockito.mock(IndexType.class);
+    Mockito.when(index1.getId()).thenReturn("index1");
+    IndexConfig indexConf = new IndexConfig(true);
+    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+        .add(index1, indexConf)
+        .build();
+    // No need to disable dictionary
+    boolean result = DictionaryIndexType.ignoreDictionaryOverride(false, true,
+        2, fieldSpec,
+        fieldIndexConfigs, 5, 20);
+    Assert.assertEquals(result, true);
+
+    // Set a higher noDictionarySizeRatioThreshold
+    result = DictionaryIndexType.ignoreDictionaryOverride(false, true,
+        5, fieldSpec,
+        fieldIndexConfigs, 5, 20);
+    Assert.assertEquals(result, false);
+
+    // optimizeDictionary and optimizeDictionaryForMetrics both turned on
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true,
+        5, fieldSpec,
+        fieldIndexConfigs, 5, 20);
+    Assert.assertEquals(result, false);
+
+    // Don't ignore for Json. We want to disable dictionary for json.
+    fieldSpec = new DimensionFieldSpec();
+    fieldSpec.setName("test");
+    fieldSpec.setDataType(FieldSpec.DataType.JSON);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true,
+        5, fieldSpec,
+        fieldIndexConfigs, 5, 20);
+    Assert.assertEquals(result, true);
   }
 
   private void validateIndexesForForwardIndexDisabledColumns(String columnName)

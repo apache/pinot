@@ -944,6 +944,18 @@ public class TableConfigUtilsTest {
       Assert.fail("Validation should pass since forward index can be disabled for a column without an inverted index");
     }
 
+    try {
+      // Enable forward index disabled flag for a column and verify that dictionary override options are not set.
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      tableConfig.getIndexingConfig().setOptimizeDictionaryForMetrics(true);
+      tableConfig.getIndexingConfig().setOptimizeDictionaryForMetrics(true);
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "Dictionary override optimization options (OptimizeDictionary, "
+          + "optimizeDictionaryForMetrics) not supported with forward index for column: myCol2, disabled");
+    }
+
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol1")).setInvertedIndexColumns(Arrays.asList("myCol2")).build();
     try {

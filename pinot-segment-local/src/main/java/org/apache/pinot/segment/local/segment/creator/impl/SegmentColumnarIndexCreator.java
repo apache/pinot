@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -83,7 +84,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   // Allow at most 512 characters for the metadata property
   private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
-
   private SegmentGeneratorConfig _config;
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
@@ -278,52 +278,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private boolean createDictionaryForColumn(ColumnIndexCreationInfo info, SegmentGeneratorConfig config,
       FieldSpec spec) {
     String column = spec.getName();
+    boolean createDictionary = false;
     if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
         .containsKey(column)) {
-      return false;
+      return createDictionary;
     }
 
-    if (config.isOptimizeDictionary()) {
-
-      FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
-      // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
-      if ((fieldIndexConfigs.getConfig(StandardIndexes.json()).isEnabled()
-          || fieldIndexConfigs.getConfig(StandardIndexes.text()).isEnabled())) {
-        return false;
-      }
-
-      // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
-      // This is done to reduce the cost of dictionary for high cardinality columns
-      // Off by default and needs optimizeDictionary to be set to true
-      if (spec.isSingleValueField() && spec.getDataType().isFixedWidth()) {
-        return shouldCreateDictionaryWithinThreshold(info, config, spec);
-      }
+    FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
+    if (DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
+        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(), spec,
+        fieldIndexConfigs, info.getDistinctValueCount(), info.getTotalNumberOfEntries())) {
+      // Ignore overrides and pick from config
+      createDictionary = info.isCreateDictionary();
     }
-
-    if (config.isOptimizeDictionaryForMetrics() && !config.isOptimizeDictionary()) {
-      if (spec.isSingleValueField() && spec.getDataType().isFixedWidth() && spec.getFieldType() == FieldType.METRIC) {
-        return shouldCreateDictionaryWithinThreshold(info, config, spec);
-      }
-    }
-
-    return info.isCreateDictionary();
-  }
-
-  private boolean shouldCreateDictionaryWithinThreshold(ColumnIndexCreationInfo info,
-      SegmentGeneratorConfig config, FieldSpec spec) {
-    long dictionarySize = info.getDistinctValueCount() * (long) spec.getDataType().size();
-    long forwardIndexSize =
-        ((long) info.getTotalNumberOfEntries()
-            * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1) + Byte.SIZE - 1) / Byte.SIZE;
-
-    double indexWithDictSize = dictionarySize + forwardIndexSize;
-    double indexWithoutDictSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
-
-    double indexSizeRatio = indexWithoutDictSize / indexWithDictSize;
-    if (indexSizeRatio <= config.getNoDictionarySizeRatioThreshold()) {
-      return false;
-    }
-    return info.isCreateDictionary();
+    return createDictionary;
   }
 
   /**
