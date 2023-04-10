@@ -238,7 +238,7 @@ public class PinotHelixTaskResourceManager {
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
-  public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, long taskTimeoutMs,
+  public String submitTask(List<PinotTaskConfig> pinotTaskConfigs, long taskTimeoutMs,
       int numConcurrentTasksPerInstance) {
     return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, taskTimeoutMs, numConcurrentTasksPerInstance);
   }
@@ -252,7 +252,7 @@ public class PinotHelixTaskResourceManager {
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
-  public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, String minionInstanceTag,
+  public String submitTask(List<PinotTaskConfig> pinotTaskConfigs, String minionInstanceTag,
       long taskTimeoutMs, int numConcurrentTasksPerInstance) {
     int numChildTasks = pinotTaskConfigs.size();
     Preconditions.checkState(numChildTasks > 0);
@@ -274,7 +274,7 @@ public class PinotHelixTaskResourceManager {
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
-  public synchronized String submitTask(String parentTaskName, List<PinotTaskConfig> pinotTaskConfigs,
+  public String submitTask(String parentTaskName, List<PinotTaskConfig> pinotTaskConfigs,
       String minionInstanceTag, long taskTimeoutMs, int numConcurrentTasksPerInstance) {
     int numChildTasks = pinotTaskConfigs.size();
     Preconditions.checkState(numChildTasks > 0);
@@ -303,7 +303,7 @@ public class PinotHelixTaskResourceManager {
 
     // Wait until task state is available
     while (getTaskState(parentTaskName) == null) {
-      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      Uninterruptibles.sleepUninterruptibly(1000, TimeUnit.MILLISECONDS);
     }
 
     return parentTaskName;
@@ -435,7 +435,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskName Task name
    * @return Task state
    */
-  public synchronized TaskState getTaskState(String taskName) {
+  public TaskState getTaskState(String taskName) {
     String taskType = getTaskType(taskName);
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {
