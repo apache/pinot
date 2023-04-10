@@ -138,7 +138,7 @@ public class MinionConstants {
     public static final String TASK_TYPE = "UpsertCompactionTask";
     /**
      * The maximum amount of old records allowed for an existing segment.
-     * e.g. if set to "2500000", then an existing segment will be compacted
+     * e.g. if the current amount surpasses 2500000, then the segment will be compacted
      */
     public static final String INVALID_RECORDS_THRESHOLD = "invalidRecordsThreshold";
   }

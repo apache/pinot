@@ -76,21 +76,6 @@ public class UpsertCompactionTaskGeneratorTest {
     tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
     assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
-    compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
-
-    compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
-
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
-
     tableConfigBuilder.setSegmentPartitionConfig(new SegmentPartitionConfig(
         Collections.singletonMap("memberId",
             new ColumnPartitionConfig("murmur", 1))));

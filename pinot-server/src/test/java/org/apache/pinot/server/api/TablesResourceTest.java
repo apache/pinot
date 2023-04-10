@@ -247,6 +247,17 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
+  @Test
+  public void testGetInvalidRecordCount()
+  {
+    IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
+    String segmentInvalidRecordCountPath =
+        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)
+            + "/segments/" + defaultSegment.getSegmentName() + "/invalidRecordCount";
+    String count = _webTarget.path(segmentInvalidRecordCountPath).request().get(String.class);
+    Assert.assertEquals(count, "0");
+  }
+
   // Verify metadata file from segments.
   private void downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment)
       throws IOException {

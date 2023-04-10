@@ -82,6 +82,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -459,6 +460,49 @@ public class TablesResource {
       Response.ResponseBuilder builder = Response.ok(validDocIdsBytes);
       builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsBytes.length);
       return builder.build();
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
+  @GET
+  @Path("/tables/{tableNameWithType}/segments/{segmentName}/invalidRecordCount")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide segment invalid record count",
+      notes = "Provide invalid record count for the segment on the server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getInvalidRecordCount(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName) {
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+
+    try {
+      IndexSegment indexSegment = segmentDataManager.getSegment();
+      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
+        throw new WebApplicationException(
+            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
+            Response.Status.BAD_REQUEST);
+      }
+      MutableRoaringBitmap validDocIds =
+          indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
+      if (validDocIds == null) {
+        throw new WebApplicationException(
+            String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
+            Response.Status.NOT_FOUND);
+      }
+      return String.valueOf(indexSegment.getSegmentMetadata().getTotalDocs() - (int) validDocIds.stream().count());
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }

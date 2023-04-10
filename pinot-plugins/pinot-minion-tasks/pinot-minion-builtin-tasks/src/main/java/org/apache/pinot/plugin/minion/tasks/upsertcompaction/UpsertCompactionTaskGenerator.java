@@ -45,6 +45,10 @@ import org.slf4j.LoggerFactory;
 @TaskGenerator
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
+  private static final String DEFAULT_BUCKET_PERIOD = "1d";
+  private static final String DEFAULT_BUFFER_PERIOD = "7d";
+  private static final String DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = "5000000";
+  private static final String DEFAULT_INVALID_RECORDS_THRESHOLD = "100000";
   @Override
   public String getTaskType() {
     return MinionConstants.UpsertCompactionTask.TASK_TYPE;
@@ -65,7 +69,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
       Map<String, String> compactionConfigs = getCompactionConfigs(taskConfigs);
-      String bufferPeriod = compactionConfigs.get(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY);
+      String bufferPeriod = compactionConfigs.getOrDefault(
+          UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
       long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
       List<SegmentZKMetadata> completedSegments = new ArrayList<>();
       List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
@@ -113,13 +118,12 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
     configs.put(MinionConstants.SEGMENT_NAME_KEY,
         StringUtils.join(completedSegmentNames, MinionConstants.SEGMENT_NAME_SEPARATOR));
-    // TODO: use default values if the keys below aren't supplied
-    configs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY,
-        compactionConfigs.get(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY));
-    configs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
-        compactionConfigs.get(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY));
-    configs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD,
-        compactionConfigs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD));
+    configs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, compactionConfigs.getOrDefault(
+            UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, DEFAULT_BUCKET_PERIOD));
+    configs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, compactionConfigs.getOrDefault(
+        UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT));
+    configs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, compactionConfigs.getOrDefault(
+        UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, DEFAULT_INVALID_RECORDS_THRESHOLD));
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs);
     return pinotTaskConfig;
   }
@@ -158,28 +162,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     if (!tableConfig.isUpsertEnabled()) {
       String message = "Skip generation task: {} for table: {}, table without upsert enabled is not supported";
       LOGGER.warn(message, taskType, tableNameWithType);
-      return false;
-    }
-    TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
-    if (tableTaskConfig == null) {
-      String message = "Skip generation task: {} for table: {}, unable to find task config";
-      LOGGER.warn(message, taskType, tableNameWithType);
-      return false;
-    }
-    Map<String, String> compactionConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
-    if (!compactionConfigs.containsKey(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY)) {
-      LOGGER.warn("Skip generation task: {} for table: {}, unable to find {} key in compaction task config",
-          taskType, tableNameWithType, UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY);
-      return false;
-    }
-    if (!compactionConfigs.containsKey(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY)) {
-      LOGGER.warn("Skip generation task: {} for table: {}, unable to find {} key in compaction task config",
-          taskType, tableNameWithType, UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY);
-      return false;
-    }
-    if (!compactionConfigs.containsKey(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY)) {
-      LOGGER.warn("Skip generation task: {} for table: {}, unable to find {} key in compaction task config",
-          taskType, tableNameWithType, UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
       return false;
     }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
