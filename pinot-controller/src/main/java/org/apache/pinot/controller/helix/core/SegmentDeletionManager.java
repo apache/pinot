@@ -75,8 +75,8 @@ public class SegmentDeletionManager {
     RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
-  public interface SegmentDeletionHook {
-    void process(String tableName, List<String> segmentsToDelete);
+  public interface SegmentDeletionListener {
+    void onSegmentDeletion(String tableName, List<String> segmentsToDelete);
   }
 
   private final ScheduledExecutorService _executorService;
@@ -85,7 +85,7 @@ public class SegmentDeletionManager {
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
-  private final ConcurrentLinkedQueue<SegmentDeletionHook> _segmentDeletionHooks;
+  private final ConcurrentLinkedQueue<SegmentDeletionListener> _segmentDeletionListeners;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -94,7 +94,7 @@ public class SegmentDeletionManager {
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
     _defaultDeletedSegmentsRetentionMs = TimeUnit.DAYS.toMillis(deletedSegmentsRetentionInDays);
-    _segmentDeletionHooks = new ConcurrentLinkedQueue<>();
+    _segmentDeletionListeners = new ConcurrentLinkedQueue<>();
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -106,8 +106,8 @@ public class SegmentDeletionManager {
     });
   }
 
-  public void registerSegmentDeletionHook(SegmentDeletionHook segmentDeletionHook) {
-    _segmentDeletionHooks.add(segmentDeletionHook);
+  public void registerSegmentDeletionListener(SegmentDeletionListener segmentDeletionListener) {
+    _segmentDeletionListeners.add(segmentDeletionListener);
   }
 
   public void stop() {
@@ -177,11 +177,11 @@ public class SegmentDeletionManager {
         propStorePathList.add(segmentPropertyStorePath);
       }
 
-      for (SegmentDeletionHook segmentDeletionHook : _segmentDeletionHooks) {
+      for (SegmentDeletionListener segmentDeletionListener : _segmentDeletionListeners) {
         try {
-          segmentDeletionHook.process(tableName, segmentsToDelete);
+          segmentDeletionListener.onSegmentDeletion(tableName, segmentsToDelete);
         } catch (Exception e) {
-          LOGGER.error("Failed to process segment deletion hook: {}", segmentDeletionHook, e);
+          LOGGER.error("Failed to process segment deletion listener: {}", segmentDeletionListener, e);
         }
       }
 
