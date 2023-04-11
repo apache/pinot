@@ -49,11 +49,16 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
-      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
-      operatorStats.startTimer();
-      TransferableBlock nextBlock = getNextBlock();
-      operatorStats.recordRow(1, nextBlock.getNumRows());
-      operatorStats.endTimer(nextBlock);
+      TransferableBlock nextBlock;
+      if (shouldCollectStats()) {
+        OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+        operatorStats.startTimer();
+        nextBlock = getNextBlock();
+        operatorStats.recordRow(1, nextBlock.getNumRows());
+        operatorStats.endTimer(nextBlock);
+      } else {
+        nextBlock = getNextBlock();
+      }
       return nextBlock;
     }
   }
@@ -64,6 +69,10 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
   // Make it protected because we should always call nextBlock()
   protected abstract TransferableBlock getNextBlock();
+
+  protected boolean shouldCollectStats() {
+    return _context.isTraceEnabled();
+  }
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
