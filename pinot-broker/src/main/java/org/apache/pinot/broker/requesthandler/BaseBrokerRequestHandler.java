@@ -539,18 +539,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-        if (pinotQuery.isExplain()) {
-          // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
-          return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
-        }
-
-        // Send empty response since we don't need to evaluate either offline or realtime request.
-        BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-        // Extract source info from incoming request
-        _queryLogger.log(
-            new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, 0, new ServerStats(),
-                brokerResponse, System.nanoTime(), requesterIdentity));
-        return brokerResponse;
+        return getEmptyBrokerOnlyResponse(requestId, query, requesterIdentity, requestContext, pinotQuery, tableName);
       }
 
       if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -618,9 +607,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-        LOGGER.info("No server found for request {}: {}", requestId, query);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
-        return new BrokerResponseNative(exceptions);
+        if (!exceptions.isEmpty()) {
+          LOGGER.info("No server found for request {}: {}", requestId, query);
+          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
+          return new BrokerResponseNative(exceptions);
+        } else {
+          // When all segments have been pruned, we can just return an empty response.
+          return getEmptyBrokerOnlyResponse(requestId, query, requesterIdentity, requestContext, pinotQuery,
+              tableName);
+        }
       }
       long routingEndTimeNs = System.nanoTime();
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING,
@@ -726,6 +721,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  private BrokerResponseNative getEmptyBrokerOnlyResponse(long requestId, String query,
+      RequesterIdentity requesterIdentity, RequestContext requestContext, PinotQuery pinotQuery, String tableName) {
+    if (pinotQuery.isExplain()) {
+      // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+      return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+    }
+
+    // Send empty response since we don't need to evaluate either offline or realtime request.
+    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    // Extract source info from incoming request
+    _queryLogger.log(new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, 0, new ServerStats(),
+        brokerResponse, System.nanoTime(), requesterIdentity));
+    return brokerResponse;
   }
 
   private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
