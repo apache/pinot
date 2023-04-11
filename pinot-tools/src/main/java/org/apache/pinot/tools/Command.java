@@ -19,6 +19,7 @@
 package org.apache.pinot.tools;
 
 import java.util.concurrent.Callable;
+import picocli.CommandLine;
 
 
 /**
@@ -28,19 +29,16 @@ import java.util.concurrent.Callable;
  */
 public interface Command extends Callable<Integer> {
 
-  default Integer call() throws Exception {
+  default Integer call()
+      throws Exception {
     // run execute() and returns 0 if success otherwise return -1.
     return execute() ? 0 : -1;
   }
 
-  public boolean execute()
+  boolean execute()
       throws Exception;
 
-  public void printUsage();
-
-  public String description();
-
-  // Should return true if -help option is specified for the command, false otherwise.
-  // This is to facilitate PinotAdministrator to print help for individual commands.
-  public boolean getHelp();
+  default String getDescription() {
+    return String.join("\n", this.getClass().getAnnotation(CommandLine.Command.class).description());
+  }
 }

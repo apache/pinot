@@ -31,7 +31,9 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "QuickStart")
+@CommandLine.Command(name = "QuickStart", description = "Launch a complete Pinot cluster within one single process "
+                                                        + "and import pre-built datasets.", mixinStandardHelpOptions
+    = true)
 public class QuickStartCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartCommand.class.getName());
 
@@ -54,15 +56,6 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
   @CommandLine.Option(names = {"-configFile", "-configFilePath"}, required = false,
       description = "Config file path to override default pinot configs")
   private String _configFilePath;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -127,11 +120,6 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
   public void cleanup() {
   }
 
-  @Override
-  public String description() {
-    return "Run Pinot QuickStart.";
-  }
-
   public QuickStartBase selectQuickStart(String type)
       throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
     Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
@@ -141,8 +129,8 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
         return quickStartBase;
       }
     }
-    throw new UnsupportedOperationException("Unsupported QuickStart type: " + type + ". "
-        + "Valid types are: " + errroMessageFor(quickStarts));
+    throw new UnsupportedOperationException(
+        "Unsupported QuickStart type: " + type + ". " + "Valid types are: " + errroMessageFor(quickStarts));
   }
 
   @Override

@@ -53,7 +53,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROL
  * <li>All remaining bootstrap services in parallel</li>
  * </ol>
  */
-@CommandLine.Command(name = "StartServiceManager")
+@CommandLine.Command(name = "StartServiceManager", description = "Start the Pinot Service Process at the specified "
+                                                                 + "port.", mixinStandardHelpOptions = true)
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
   private static final long START_TICK = System.nanoTime();
@@ -61,9 +62,6 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   // multiple instances allowed per role for testing many minions
   private final List<Entry<ServiceRole, Map<String, Object>>> _bootstrapConfigurations = new ArrayList<>();
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help;
   @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
   // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
@@ -132,15 +130,6 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   }
 
   @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  public void setHelp(boolean help) {
-    _help = help;
-  }
-
-  @Override
   public String getName() {
     return "StartPinotService";
   }
@@ -163,11 +152,6 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     if (_pinotServiceManager != null) {
       _pinotServiceManager.stopAll();
     }
-  }
-
-  @Override
-  public String description() {
-    return "Start the Pinot Service Process at the specified port.";
   }
 
   @Override
@@ -218,14 +202,13 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
         return PinotConfigUtils.generateControllerConf(_zkAddress, _clusterName, null, DEFAULT_CONTROLLER_PORT, null,
             ControllerConf.ControllerMode.DUAL, true);
       case BROKER:
-        return PinotConfigUtils
-            .generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT,
-                QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
+        return PinotConfigUtils.generateBrokerConf(_clusterName, _zkAddress, null,
+            CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
       case SERVER:
-        return PinotConfigUtils
-            .generateServerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
-                CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.Server.DEFAULT_GRPC_PORT,
-                QueryConfig.DEFAULT_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT, null, null);
+        return PinotConfigUtils.generateServerConf(_clusterName, _zkAddress, null,
+            CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
+            CommonConstants.Server.DEFAULT_GRPC_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT,
+            QueryConfig.DEFAULT_QUERY_RUNNER_PORT, null, null);
       default:
         throw new RuntimeException("No default config found for service role: " + serviceRole);
     }

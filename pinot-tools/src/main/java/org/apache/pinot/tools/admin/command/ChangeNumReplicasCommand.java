@@ -25,7 +25,9 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "ChangeNumReplicas")
+@CommandLine.Command(name = "ChangeNumReplicas", description = "Re-writes idealState to reflect the value of "
+                                                               + "numReplicas in table config",
+    mixinStandardHelpOptions = true)
 public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
 
@@ -41,14 +43,6 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
 
   @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute command (Run the replica changer)")
   private boolean _exec;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -66,10 +60,5 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
       LOGGER.info("Use the -exec option to actually execute the command");
     }
     return true;
-  }
-
-  @Override
-  public String description() {
-    return "Re-writes idealState to reflect the value of numReplicas in table config";
   }
 }

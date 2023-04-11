@@ -34,7 +34,8 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
-@CommandLine.Command
+@CommandLine.Command(name = "PerfBanchmarkRunner", description = "Start Pinot cluster with optional preloaded "
+                                                                 + "segments.", mixinStandardHelpOptions = true)
 public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkRunner.class);
 
@@ -80,23 +81,9 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       description = "Comma separated bloom filter columns to be created (non-batch load).")
   private String _bloomFilterColumns;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
   @Override
   public String getName() {
     return getClass().getSimpleName();
-  }
-
-  @Override
-  public String description() {
-    return "Start Pinot cluster with optional preloaded segments.";
   }
 
   @Override

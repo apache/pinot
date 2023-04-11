@@ -39,13 +39,10 @@ import picocli.CommandLine;
  * Class to implement StartServer command.
  *
  */
-@CommandLine.Command(name = "StartServer")
+@CommandLine.Command(name = "StartServer", description = "Start the Pinot Server process at the specified port.",
+    mixinStandardHelpOptions = true)
 public class StartServerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   @CommandLine.Option(names = {"-serverHost"}, required = false, description = "Host name for server.")
   private String _serverHost;
 
@@ -88,11 +85,6 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @CommandLine.Option(names = {"-configOverride"}, required = false, split = ",")
   private Map<String, Object> _configOverrides = new HashMap<>();
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   public String getServerHost() {
     return _serverHost;
@@ -221,11 +213,6 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public void cleanup() {
-  }
-
-  @Override
-  public String description() {
-    return "Start the Pinot Server process at the specified port.";
   }
 
   @Override

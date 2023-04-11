@@ -24,10 +24,11 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "mv", aliases = {"move"}, description = "Move file from source to destination")
+@CommandLine.Command(name = "mv", aliases = {"move"}, description = "Move file from source to destination, moving "
+                                                                    + "from two different PinotFS is not supported.",
+    mixinStandardHelpOptions = true)
 public class MoveFiles extends BaseFileOperation {
-  @CommandLine.Option(names = {"-o", "--overwrite"},
-      description = "Overwrite if destination already exists")
+  @CommandLine.Option(names = {"-o", "--overwrite"}, description = "Overwrite if destination already exists")
   private boolean _overwrite;
 
   @CommandLine.Parameters(index = "0", description = "Source file")
@@ -81,13 +82,8 @@ public class MoveFiles extends BaseFileOperation {
     return false;
   }
 
-  @Override
-  public void printUsage() {
-    System.out.println("mv [-o] <source-uri> <destination-uri>");
-  }
-
-  @Override
-  public String description() {
-    return "Move file from source to destination, moving from two different PinotFS is not supported.";
-  }
+//  @Override
+//  public void getDescription() {
+//    System.out.println("mv [-o] <source-uri> <destination-uri>");
+//  }
 }

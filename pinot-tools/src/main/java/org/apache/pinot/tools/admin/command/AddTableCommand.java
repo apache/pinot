@@ -43,7 +43,7 @@ import picocli.CommandLine;
  * Class to implement CreateResource command.
  *
  */
-@CommandLine.Command(name = "AddTable")
+@CommandLine.Command(name = "AddTable", description = "Create a Pinot table", mixinStandardHelpOptions = true)
 public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
@@ -94,27 +94,13 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
   private String _controllerAddress;
 
   private AuthProvider _authProvider;
 
   @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
   public String getName() {
     return "AddTable";
-  }
-
-  @Override
-  public String description() {
-    return "Create a Pinot table";
   }
 
   @Override

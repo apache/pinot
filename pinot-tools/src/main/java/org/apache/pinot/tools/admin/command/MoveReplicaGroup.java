@@ -59,7 +59,9 @@ import picocli.CommandLine;
  * This command is intended to be run multiple times to migrate all the replicas of a table to the destination
  * servers (if intended).
  */
-@CommandLine.Command(name = "MoveReplicaGroup")
+@CommandLine.Command(name = "MoveReplicaGroup", description = "Move complete set of segment replica from source "
+                                                              + "servers to tagged servers in cluster",
+    mixinStandardHelpOptions = true)
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);
 
@@ -91,24 +93,12 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       description = "Execute replica group move. dryRun(default) if not specified")
   private boolean _exec = false;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, description = "Prints help")
-  private boolean _help = false;
-
   private ZKHelixAdmin _helix;
   private PinotZKChanger _zkChanger;
 
   @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
   public String getName() {
     return "MoveReplicaGroup";
-  }
-
-  public String description() {
-    return "Move complete set of segment replica from source servers to tagged servers in cluster";
   }
 
   public String toString() {

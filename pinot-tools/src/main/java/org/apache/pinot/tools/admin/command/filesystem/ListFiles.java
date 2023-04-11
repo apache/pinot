@@ -26,10 +26,10 @@ import org.apache.pinot.spi.utils.StringUtil;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "ls", aliases = {"list"}, description = "List files")
+@CommandLine.Command(name = "ls", aliases = {"list"}, description = "List all files under a given URI",
+    mixinStandardHelpOptions = true)
 public class ListFiles extends BaseFileOperation {
-  @CommandLine.Option(names = {"-r", "--recursive"},
-      description = "Recursively list subdirectories")
+  @CommandLine.Option(names = {"-r", "--recursive"}, description = "Recursively list subdirectories")
   private boolean _recursive;
 
   @CommandLine.Parameters(arity = "1..*", description = "File paths to list")
@@ -79,15 +79,5 @@ public class ListFiles extends BaseFileOperation {
       }
     }
     return true;
-  }
-
-  @Override
-  public void printUsage() {
-    System.out.println("ls [-r] <path-uri>...");
-  }
-
-  @Override
-  public String description() {
-    return "List all files under a given URI";
   }
 }

@@ -25,7 +25,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "DeleteCluster")
+@CommandLine.Command(name = "DeleteCluster", description = "Remove the Pinot Cluster from Helix.",
+    mixinStandardHelpOptions = true)
 public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteClusterCommand.class);
 
@@ -35,23 +36,9 @@ public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   @Override
   public String toString() {
     return ("DeleteCluster -clusterName " + _clusterName + " -zkAddress " + _zkAddress);
-  }
-
-  @Override
-  public String description() {
-    return "Remove the Pinot Cluster from Helix.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

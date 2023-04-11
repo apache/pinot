@@ -27,7 +27,8 @@ import picocli.CommandLine;
 /**
  * Command to run GitHubEventsQuickStart
  */
-@CommandLine.Command(name = "GitHubEventsQuickStart")
+@CommandLine.Command(name = "GitHubEventsQuickStart", description = "Runs the GitHubEventsQuickstart",
+    mixinStandardHelpOptions = true)
 public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand implements Command {
 
   @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
@@ -37,20 +38,12 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
       description = "Stream DataSource to use for ingesting data. Supported values - Kafka,Kinesis")
   private String _sourceType;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
-
   public void setPersonalAccessToken(String personalAccessToken) {
     _personalAccessToken = personalAccessToken;
   }
 
   public void setSourceType(String sourceType) {
     _sourceType = sourceType;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override
@@ -65,11 +58,6 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
 
   @Override
   public void cleanup() {
-  }
-
-  @Override
-  public String description() {
-    return "Runs the GitHubEventsQuickstart";
   }
 
   @Override

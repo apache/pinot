@@ -24,10 +24,10 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "rm", aliases = {"delete", "del"}, description = "Delete files")
+@CommandLine.Command(name = "rm", aliases = {"delete", "del"}, description = "Delete files",
+    mixinStandardHelpOptions = true)
 public class DeleteFiles extends BaseFileOperation {
-  @CommandLine.Option(names = {"-f", "--force"},
-      description = "Force delete if possible")
+  @CommandLine.Option(names = {"-f", "--force"}, description = "Force delete if possible")
   private boolean _force;
 
   @CommandLine.Parameters(arity = "1..*", description = "File paths to delete")
@@ -69,13 +69,8 @@ public class DeleteFiles extends BaseFileOperation {
     return true;
   }
 
-  @Override
-  public void printUsage() {
-    System.out.println("rm [-f] <path-uri>...");
-  }
-
-  @Override
-  public String description() {
-    return "Delete files";
-  }
+//  @Override
+//  public void getDescription() {
+//    System.out.println("rm [-f] <path-uri>...");
+//  }
 }

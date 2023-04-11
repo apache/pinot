@@ -45,15 +45,14 @@ import picocli.CommandLine;
 /**
  * Class for command to stream Avro data into Kafka.
  */
-@CommandLine.Command(name = "StreamAvroIntoKafka")
+@CommandLine.Command(name = "StreamAvroIntoKafka", description =
+    "Stream the specified Avro file into a Kafka topic, which can be read by Pinot\n"
+    + "by using org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder as the\n"
+    + "message decoder class name (stream.kafka.decoder.class.name).", mixinStandardHelpOptions = true)
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
   @CommandLine.Option(names = {"-avroFile"}, required = true, description = "Avro file to stream.")
   private String _avroFile = null;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   @CommandLine.Option(names = {"-kafkaBrokerList"}, required = false, description = "Kafka broker list.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
@@ -73,11 +72,6 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   private String _millisBetweenMessages = "1000";
 
   @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
   public String getName() {
     return "StreamAvroToKafka";
   }
@@ -86,13 +80,6 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   public String toString() {
     return "StreamAvroInfoKafka -avroFile " + _avroFile + " -kafkaBrokerList " + _kafkaBrokerList + " -kafkaTopic "
         + _kafkaTopic + "-outputFormat" + _outputFormat + " -millisBetweenMessages " + _millisBetweenMessages;
-  }
-
-  @Override
-  public String description() {
-    return "Stream the specified Avro file into a Kafka topic, which can be read by Pinot\n"
-        + "by using org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder as the\n"
-        + "message decoder class name (stream.kafka.decoder.class.name).";
   }
 
   @Override

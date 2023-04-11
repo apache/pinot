@@ -62,7 +62,7 @@ import picocli.CommandLine;
  * <table_name>/rawdata/...
  * ```
  */
-@CommandLine.Command(name = "BootstrapTable")
+@CommandLine.Command(name = "BootstrapTable", description = "Bootstrap Table.", mixinStandardHelpOptions = true)
 public class BootstrapTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableCommand.class.getName());
 
@@ -91,16 +91,7 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -124,11 +115,6 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
 
   @Override
   public void cleanup() {
-  }
-
-  @Override
-  public String description() {
-    return "Run Pinot Bootstrap Table.";
   }
 
   @Override

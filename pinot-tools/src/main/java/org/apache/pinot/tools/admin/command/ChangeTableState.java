@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "ChangeTableState")
+@CommandLine.Command(name = "ChangeTableState", description = "Change the state (enable|disable|drop) of Pinot table"
+    , mixinStandardHelpOptions = true)
 public class ChangeTableState extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChangeTableState.class);
 
@@ -60,10 +61,6 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
 
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   private AuthProvider _authProvider;
 
@@ -97,15 +94,6 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
       throw new RuntimeException("Failed to change table state, error: " + httpGet.getResponseBodyAsString());
     }
     return true;
-  }
-
-  @Override
-  public String description() {
-    return "Change the state (enable|disable|drop) of Pinot table";
-  }
-
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override
