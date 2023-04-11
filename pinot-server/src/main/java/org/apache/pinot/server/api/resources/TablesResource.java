@@ -474,7 +474,7 @@ public class TablesResource {
       @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
       @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
-  public String getInvalidRecordCount(
+  public Integer getInvalidRecordCount(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName) {
@@ -501,7 +501,7 @@ public class TablesResource {
             String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
             Response.Status.NOT_FOUND);
       }
-      return String.valueOf(indexSegment.getSegmentMetadata().getTotalDocs() - (int) validDocIds.stream().count());
+      return indexSegment.getSegmentMetadata().getTotalDocs() - (int) validDocIds.stream().count();
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }

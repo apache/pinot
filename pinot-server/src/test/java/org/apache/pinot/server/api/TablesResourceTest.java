@@ -253,8 +253,8 @@ public class TablesResourceTest extends BaseResourceTest {
     String segmentInvalidRecordCountPath =
         "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)
             + "/segments/" + defaultSegment.getSegmentName() + "/invalidRecordCount";
-    String count = _webTarget.path(segmentInvalidRecordCountPath).request().get(String.class);
-    Assert.assertEquals(count, "0");
+    Integer count = _webTarget.path(segmentInvalidRecordCountPath).request().get(Integer.class);
+    Assert.assertEquals(count.intValue(), 99992);
   }
 
   // Verify metadata file from segments.
