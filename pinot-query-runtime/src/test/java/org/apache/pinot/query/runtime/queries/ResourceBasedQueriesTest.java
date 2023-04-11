@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -252,6 +253,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         // check stats only for leaf stage
         BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
 
+        Assert.assertEquals(brokerResponseStats.getOperatorStats().keySet(),
+            brokerResponseStats.getOperatorStats().keySet().stream().sorted().collect(
+                Collectors.toCollection(LinkedHashSet::new)));
         if (brokerResponseStats.getTableNames().isEmpty()) {
           continue;
         }

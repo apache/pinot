@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -41,7 +42,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -116,6 +116,8 @@ public class OpChainTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    Mockito.when(_upstreamOperator.getOperatorId()).thenReturn(new OperatorId(1L, 1, "", "upstream", 0));
   }
 
   @AfterMethod
@@ -340,6 +342,11 @@ public class OpChainTest {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
 
+    @Override
+    public List<MultiStageOperator> getChildOperators() {
+      return Collections.emptyList();
+    }
+
     @Nullable
     @Override
     public String toExplainString() {
@@ -367,6 +374,11 @@ public class OpChainTest {
         // IGNORE
       }
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    }
+
+    @Override
+    public List<MultiStageOperator> getChildOperators() {
+      return Collections.emptyList();
     }
 
     @Nullable

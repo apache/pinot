@@ -129,15 +129,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   }
 
   /**
-   * Leaf stage operators should always collect stats for the tables used in queries
-   * Otherwise the Broker response will just contain zeros for every stat value
-   */
-  @Override
-  protected boolean shouldCollectStats() {
-    return true;
-  }
-
-  /**
    * this is data transfer block compose method is here to ensure that V1 results match what the expected projection
    * schema in the calcite logical operator.
    * <p> it applies different clean up mechanism based on different type of {@link BaseResultsBlock} and the
