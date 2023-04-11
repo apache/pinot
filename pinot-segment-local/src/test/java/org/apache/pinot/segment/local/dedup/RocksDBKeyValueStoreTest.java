@@ -27,9 +27,9 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-public class LocalKeyValueStoreTest {
+public class RocksDBKeyValueStoreTest {
 
-    LocalKeyValueStore _keyValueStore = new LocalKeyValueStore("test".getBytes(StandardCharsets.UTF_8));
+    LocalKeyValueStore _keyValueStore = new RocksDBKeyValueStore("test".getBytes(StandardCharsets.UTF_8));
     byte[] _nonExistingKey = "non-existing".getBytes();
     byte[] _key = "someKey".getBytes();
     byte[] _key2 = "someKey".getBytes();

@@ -51,7 +51,7 @@ public class PartitionDedupMetadataManager {
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _hashFunction = hashFunction;
-    _keyValueStore = new LocalKeyValueStore((tableNameWithType + "@" + partitionId).getBytes());
+    _keyValueStore = new RocksDBKeyValueStore((tableNameWithType + "@" + partitionId).getBytes());
   }
 
   public void addSegment(IndexSegment segment) {
