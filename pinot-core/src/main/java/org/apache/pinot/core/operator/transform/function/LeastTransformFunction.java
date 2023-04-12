@@ -25,7 +25,16 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.roaringbitmap.RoaringBitmap;
 
-
+/**
+ * The <code>LeastTransformFunction</code> implements the Least operator.
+ *
+ * Return the smallest results for the arguments
+ *
+ * Expected result:
+ * Least(columnA, columnB, columnC): smallest among columnA, columnB, columnC
+ *
+ * Note that null values will be ignored for evaluation. If all values are null, we return null.
+ */
 public class LeastTransformFunction extends SelectTupleElementTransformFunction {
 
   public LeastTransformFunction() {

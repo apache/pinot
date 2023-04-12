@@ -25,7 +25,16 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.roaringbitmap.RoaringBitmap;
 
-
+/**
+ * The <code>GreatestTransformFunction</code> implements the Least operator.
+ *
+ * Return the greatest results for the arguments
+ *
+ * Expected result:
+ * greatest(columnA, columnB, columnC): largest among columnA, columnB, columnC
+ *
+ * Note that null values will be ignored for evaluation. If all values are null, we return null.
+ */
 public class GreatestTransformFunction extends SelectTupleElementTransformFunction {
 
   public GreatestTransformFunction() {
