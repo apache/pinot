@@ -1472,6 +1472,12 @@ public class PinotHelixResourceManager {
           + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
           + " with it.");
     }
+    if (_helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType) != null) {
+      throw new TableAlreadyExistsException("External view for " + tableNameWithType
+          + " still exists. If the table is just deleted, please wait for the clean up to finish before recreating it. "
+          + "If the external view is not removed after a long time, try restarting the servers showing up in the "
+          + "external view");
+    }
 
     validateTableTenantConfig(tableConfig);
     TableType tableType = tableConfig.getTableType();
