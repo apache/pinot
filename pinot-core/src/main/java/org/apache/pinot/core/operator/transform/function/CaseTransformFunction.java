@@ -58,6 +58,10 @@ import org.roaringbitmap.RoaringBitmap;
  *    <code>THEN_EXPRESSION_$i</code> is a <code>TransformFunction</code> represents <code>result$i</code>
  *    <code>ELSE_EXPRESSION</code> is a <code>TransformFunction</code> represents <code>result</code>
  *
+ * ELSE_EXPRESSION can be omitted.
+ * When none of when statements is evaluated to be true, and there is no else expression, we output null.
+ * Note that when statement is considered as false if it is evaluated to be null.
+ *
  */
 public class CaseTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "case";
@@ -252,7 +256,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
 
   /**
    * Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause
-   * ordered by match priority, 0 means nothing matched, so go to ELSE.
+   * -1 means there is no match.
    */
   private int[] getSelectedArray(ValueBlock valueBlock, boolean nullHandlingEnabled) {
     int numDocs = valueBlock.getNumDocs();
@@ -286,6 +290,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     return _selectedResults;
   }
 
+  // Returns an array of valueBlock length to indicate whether a row is selected or not.
+  // When nullHandlingEnabled is set to true, we also check whether the row is null and set to false if null.
   private static int[] getWhenConditions(TransformFunction whenStatement, ValueBlock valueBlock,
       boolean nullHandlingEnabled) {
     if (!nullHandlingEnabled) {

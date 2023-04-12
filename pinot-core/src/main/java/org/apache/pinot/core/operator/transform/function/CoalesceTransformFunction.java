@@ -35,19 +35,17 @@ import org.roaringbitmap.RoaringBitmap;
 /**
  * The <code>CoalesceTransformFunction</code> implements the Coalesce operator.
  *
- * The results are in String format for first non-null value in the argument list.
- * If all arguments are null, return a 'null' string.
- * Note: arguments have to be column names and single type. The type can be either numeric or string.
+ * The results are first non-null value in the argument list.
+ * If all arguments are null, return null.
+ *
+ * Note: arguments have to be compatible type.
  * Number of arguments has to be greater than 0.
  *
  * Expected result:
  * Coalesce(nullColumn, columnA): columnA
  * Coalesce(columnA, nullColumn): nullColumn
- * Coalesce(nullColumnA, nullColumnB): "null"
+ * Coalesce(nullColumnA, nullColumnB): null
  *
- * Note this operator only takes column names for now.
- * SQL Syntax:
- *    Coalesce(columnA, columnB)
  */
 public class CoalesceTransformFunction extends BaseTransformFunction {
   private TransformFunction[] _transformFunctions;
@@ -68,7 +66,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   /**
    * Get compatible data type of left and right.
-   * <p>
+   *
    * When left or right is numerical, we check both data types are numerical and widen the type.
    * Otherwise, return string type.
    *
