@@ -373,10 +373,6 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(doubleValues.getLeft()[i], Math.max(_intSVValues[i], _doubleSVValues[i]));
     }
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 04ce4d77d4 (least and greatest)
     assertEquals(doubleValues.getRight(), null);
     assertEquals(transformFunction.getNullBitmap(_projectionBlock), null);
   }
@@ -425,11 +421,6 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     }
     assertEquals(intValues.getRight(), expectedNull);
     assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNull);
-<<<<<<< HEAD
-=======
->>>>>>> 492a21a215 (least)
-=======
->>>>>>> 04ce4d77d4 (least and greatest)
   }
 
   @Test
