@@ -21,16 +21,22 @@ package org.apache.pinot.connector.flink.sink;
 import java.net.URI;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
+import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
 import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.slf4j.Logger;
@@ -60,10 +66,13 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   private TableConfig _tableConfig;
   private Schema _schema;
 
+  private ListState<GenericRow> _pendingRows;
+
   private transient SegmentWriter _segmentWriter;
   private transient SegmentUploader _segmentUploader;
   private transient ExecutorService _executor;
   private transient long _segmentNumRecord;
+  private transient boolean _isCheckpointingEnabled;
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
@@ -88,6 +97,8 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     _segmentUploader.init(_tableConfig);
     _segmentNumRecord = 0;
     _executor = Executors.newFixedThreadPool(_executorPoolSize);
+    _isCheckpointingEnabled = ((StreamingRuntimeContext) this.getRuntimeContext()).isCheckpointingEnabled();
+
     LOG.info("Open Pinot Sink with the table {}", _tableConfig.toJsonString());
   }
 
@@ -96,7 +107,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
       throws Exception {
     LOG.info("Closing Pinot Sink");
     try {
-      if (_segmentNumRecord > 0) {
+      if (_segmentNumRecord > 0 && !_isCheckpointingEnabled) {
         flush();
       }
     } catch (Exception e) {
@@ -117,24 +128,15 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   @Override
   public void invoke(T value, Context context)
       throws Exception {
-    _segmentWriter.collect(_recordConverter.convertToRow(value));
+    GenericRow row = _recordConverter.convertToRow(value);
+    if (_isCheckpointingEnabled) {
+      _pendingRows.add(row);
+    }
+    _segmentWriter.collect(row);
     _segmentNumRecord++;
-    if (_segmentNumRecord > _segmentFlushMaxNumRecords) {
+    if (_segmentNumRecord >= _segmentFlushMaxNumRecords) {
       flush();
     }
-  }
-
-  @Override
-  public void snapshotState(FunctionSnapshotContext functionSnapshotContext)
-      throws Exception {
-    throw new UnsupportedOperationException("snapshotState is invoked in Pinot sink");
-  }
-
-  @Override
-  public void initializeState(FunctionInitializationContext functionInitializationContext)
-      throws Exception {
-    // no initialization needed
-    // ...
   }
 
   private void flush()
@@ -142,13 +144,39 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     URI segmentURI = _segmentWriter.flush();
     LOG.info("Pinot segment writer flushed with {} records to {}", _segmentNumRecord, segmentURI);
     _segmentNumRecord = 0;
-    _executor.submit(() -> {
+
+    Future<Boolean> future = _executor.submit(() -> {
       try {
         _segmentUploader.uploadSegment(segmentURI, null);
+
       } catch (Exception e) {
         throw new RuntimeException("Failed to upload pinot segment", e);
       }
       LOG.info("Pinot segment uploaded to {}", segmentURI);
+      return true;
     });
+
+    if (_isCheckpointingEnabled && future.get()) {
+      _pendingRows.clear();
+    }
+  }
+
+
+  @Override
+  public void snapshotState(FunctionSnapshotContext functionSnapshotContext)
+      throws Exception {
+      // nothing to do here, state is already up to date
+  }
+
+  @Override
+  public void initializeState(FunctionInitializationContext functionInitializationContext)
+      throws Exception {
+    _pendingRows = functionInitializationContext.getOperatorStateStore()
+        .getListState(new ListStateDescriptor("pending-rows", TypeInformation.of(GenericRow.class)));
+
+    for (GenericRow row: _pendingRows.get()) {
+      _segmentWriter.collect(row);
+      _segmentNumRecord++;
+    }
   }
 }

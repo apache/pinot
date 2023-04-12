@@ -45,3 +45,6 @@ For more examples, please see `src/main/java/org/apache/pinot/connector/flink/Fl
  - To correctly partition the output segments by the primary key, the Flink job *must* also include the partitionByKey operator before the Sink operator
  - The parallelism of the job *must* be set the same as the number of partitions of the Pinot table, so that the sink in each task executor can generate the segment of same partitions.
  - It’s important to plan the resource usage to avoid capacity issues such as out of memory. In particular, Pinot sink has an in-memory buffer of records, and it flushes when the threshold is reached. Currently, the threshold on the number of records is supported via the config of `segmentFlushMaxNumRecords`. In the future, we could add other types of threshold such as the memory usage of the buffer.
+
+## Notes for checkpointing
+If Flink checkpointing is enabled, the connector will store all segment rows in Flink state until the segment is successfully uploaded to Pinot. Since the state could be quite large, it is recommended to use the Flink RocksDB state backend to avoid OOM errors.
