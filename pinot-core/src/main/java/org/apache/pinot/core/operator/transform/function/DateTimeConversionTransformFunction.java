@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFT
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -157,5 +158,10 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
           length);
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock){
+    return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }
