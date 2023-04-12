@@ -69,6 +69,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are more than 1 arguments
     int numArguments = arguments.size();
     if (numArguments < 2) {
