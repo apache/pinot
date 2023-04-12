@@ -81,6 +81,8 @@ public class GroovyTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    // TODO: Proper support of null
+    super.init(arguments, columnContextMap);
     int numArgs = arguments.size();
     if (numArgs < 2) {
       throw new IllegalArgumentException("GROOVY transform function requires at least 2 arguments");
