@@ -22,15 +22,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class FieldConfig extends BaseJsonConfig {
@@ -146,23 +143,6 @@ public class FieldConfig extends BaseJsonConfig {
 
   public JsonNode getTierOverwrites() {
     return _tierOverwrites;
-  }
-
-  /**
-   * @return the primary field config is no tier overwrites are found.
-   */
-  public FieldConfig withTierOverwrites(String tier) {
-    if (tier == null || !_tierOverwrites.has(tier)) {
-      return this;
-    }
-    try {
-      JsonNode tierCfgJsonNode = _tierOverwrites.get(tier);
-      // Add column name, which may be absent in JsonNode but required to deserialize JsonNode to FieldConfig.
-      ((ObjectNode) tierCfgJsonNode).put("name", _name);
-      return JsonUtils.jsonNodeToObject(tierCfgJsonNode, FieldConfig.class);
-    } catch (IOException e) {
-      return this;
-    }
   }
 
   @Nullable

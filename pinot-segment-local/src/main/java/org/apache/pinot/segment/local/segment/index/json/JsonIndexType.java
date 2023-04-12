@@ -74,7 +74,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   }
 
   @Override
-  public ColumnConfigDeserializer<JsonIndexConfig> createDeserializer(@Nullable String tier) {
+  public ColumnConfigDeserializer<JsonIndexConfig> createDeserializer() {
     // reads tableConfig.indexingConfig.jsonIndexConfigs
     ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexConf =
         IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getJsonIndexConfigs());
@@ -83,7 +83,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
         IndexConfigDeserializer.fromCollection(
             tableConfig -> tableConfig.getIndexingConfig().getJsonIndexColumns(),
             (accum, column) -> accum.put(column, new JsonIndexConfig()));
-    return IndexConfigDeserializer.fromIndexes("json", tier, getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("json", getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(fromJsonIndexCols.withExclusiveAlternative(fromJsonIndexConf)));
   }

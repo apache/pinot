@@ -71,8 +71,8 @@ public class BloomIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer(@Nullable String tier) {
-    return IndexConfigDeserializer.fromIndexes("bloom", tier, getIndexConfigClass())
+  public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes("bloom", getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(// reads tableConfig.indexingConfig.bloomFilterConfigs
                 IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())

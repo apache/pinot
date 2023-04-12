@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -37,6 +38,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -45,23 +47,37 @@ public class IndexLoadingConfigTest {
   private static final String TABLE_NAME = "table01";
 
   @Test
-  public void testCalculateIndexConfigsWithTierOverwrites()
+  public void testCalculateIndexConfigsWithoutTierOverwrites()
       throws IOException {
     InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
     when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
     // Schema has two string columns: col1 and col2.
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
             .addSingleValueDimension("col2", FieldSpec.DataType.STRING).build();
     // On the default tier, both are dict-encoded. col1 has inverted index as set in `tableIndexConfig` and col2 has
-    // bloom filter as configured with `fieldConfigList`.
-    FieldConfig col2Cfg = new FieldConfig("col2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null,
-        JsonUtils.stringToJsonNode("{\"bloom\": {\"enabled\": \"true\"}}"), null, null);
+    // bloom filter as configured with `fieldConfigList`; and there is one ST index built with col1.
+    String col2CfgStr = "{"
+        + "  \"name\": \"col2\","
+        + "  \"indexes\": {"
+        + "    \"bloom\": {\"enabled\": \"true\"}"
+        + "  }"
+        + "}";
+    FieldConfig col2Cfg = JsonUtils.stringToObject(col2CfgStr, FieldConfig.class);
+    String stIdxCfgStr = "{"
+        + "  \"dimensionsSplitOrder\": [\"col1\"],"
+        + "  \"functionColumnPairs\": [\"MAX__col1\"],"
+        + "  \"maxLeafRecords\": 10"
+        + "}";
+    StarTreeIndexConfig stIdxCfg = JsonUtils.stringToObject(stIdxCfgStr, StarTreeIndexConfig.class);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Collections.singletonList("col1"))
+        .setStarTreeIndexConfigs(Collections.singletonList(stIdxCfg))
         .setFieldConfigList(Collections.singletonList(col2Cfg)).build();
     IndexLoadingConfig ilc = new IndexLoadingConfig(idmCfg, tableConfig, schema);
-    Map<String, FieldIndexConfigs> allFieldCfgs = ilc.calculateIndexConfigsByColName();
+    // Check index configs for default tier
+    assertEquals(ilc.getStarTreeIndexConfigs().size(), 1);
+    Map<String, FieldIndexConfigs> allFieldCfgs = ilc.getFieldIndexConfigByColName();
     FieldIndexConfigs fieldCfgs = allFieldCfgs.get("col1");
     assertTrue(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.bloomFilter()).isEnabled());
@@ -70,20 +86,63 @@ public class IndexLoadingConfigTest {
     assertFalse(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
     assertTrue(fieldCfgs.getConfig(StandardIndexes.bloomFilter()).isEnabled());
     assertTrue(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());
+  }
 
-    // On the cold tier, we overwrite col1 to use bloom filter only and col2 to use raw encoding w/o any index.
-    FieldConfig col1Cfg = new FieldConfig("col1", FieldConfig.EncodingType.DICTIONARY, null, null, null, null,
-        JsonUtils.stringToJsonNode("{\"inverted\": {\"enabled\": \"true\"}}"), null, JsonUtils.stringToJsonNode(
-        "{\"coldTier\": {\"encodingType\": \"DICTIONARY\", \"indexes\": {\"bloom\": {\"enabled\": " + "\"true\"}}}}"));
-    col2Cfg = new FieldConfig("col2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null,
-        JsonUtils.stringToJsonNode("{\"bloom\": {\"enabled\": \"true\"}}"), null,
-        JsonUtils.stringToJsonNode("{\"coldTier\": {\"encodingType\": \"RAW\"}}"));
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+  @Test
+  public void testCalculateIndexConfigsWithTierOverwrites()
+      throws IOException {
+    InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
+    when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
+    // Schema has two string columns: col1 and col2.
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
+            .addSingleValueDimension("col2", FieldSpec.DataType.STRING).build();
+    // On the default tier, both are dict-encoded. col1 has inverted index as set in `tableIndexConfig` and col2 has
+    // bloom filter as configured with `fieldConfigList`; and there is one ST index built with col1.
+    // On the coldTier, we overwrite col1 to use bloom filter only and col2 to use raw encoding w/o any index.
+    String col1CfgStr = "{"
+        + "  \"name\": \"col1\","
+        + "  \"indexes\": {"
+        + "    \"inverted\": {\"enabled\": \"true\"}"
+        + "  },"
+        + "  \"tierOverwrites\": {"
+        + "    \"coldTier\": {"
+        + "      \"indexes\": {"
+        + "        \"bloom\": {\"enabled\": \"true\"}"
+        + "      }"
+        + "    }"
+        + "  }"
+        + "}";
+    FieldConfig col1Cfg = JsonUtils.stringToObject(col1CfgStr, FieldConfig.class);
+    String col2CfgStr = "{"
+        + "  \"name\": \"col2\","
+        + "  \"indexes\": {"
+        + "    \"bloom\": {\"enabled\": \"true\"}"
+        + "  },"
+        + "  \"tierOverwrites\": {"
+        + "    \"coldTier\": {"
+        + "      \"encodingType\": \"RAW\","
+        + "      \"indexes\": {}"
+        + "    }"
+        + "  }"
+        + "}";
+    FieldConfig col2Cfg = JsonUtils.stringToObject(col2CfgStr, FieldConfig.class);
+    String stIdxCfgStr = "{"
+        + "  \"dimensionsSplitOrder\": [\"col1\"],"
+        + "  \"functionColumnPairs\": [\"MAX__col1\"],"
+        + "  \"maxLeafRecords\": 10"
+        + "}";
+    StarTreeIndexConfig stIdxCfg = JsonUtils.stringToObject(stIdxCfgStr, StarTreeIndexConfig.class);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(Collections.singletonList(stIdxCfg))
+        .setTierOverwrites(JsonUtils.stringToJsonNode("{\"coldTier\": {\"starTreeIndexConfigs\": []}}"))
         .setFieldConfigList(Arrays.asList(col1Cfg, col2Cfg)).build();
-    ilc = new IndexLoadingConfig(idmCfg, tableConfig, schema);
+    IndexLoadingConfig ilc = new IndexLoadingConfig(idmCfg, tableConfig, schema);
     ilc.setSegmentTier("coldTier");
-    allFieldCfgs = ilc.calculateIndexConfigsByColName();
-    fieldCfgs = allFieldCfgs.get("col1");
+    // Check index configs for coldTier
+    assertEquals(ilc.getStarTreeIndexConfigs().size(), 0);
+    Map<String, FieldIndexConfigs> allFieldCfgs = ilc.getFieldIndexConfigByColName();
+    FieldIndexConfigs fieldCfgs = allFieldCfgs.get("col1");
     assertFalse(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
     assertTrue(fieldCfgs.getConfig(StandardIndexes.bloomFilter()).isEnabled());
     assertTrue(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());

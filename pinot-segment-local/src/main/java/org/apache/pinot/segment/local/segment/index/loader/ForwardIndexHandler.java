@@ -226,7 +226,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       if (existingForwardIndexColumns.contains(column) && !newIsFwd) {
         // Existing column has a forward index. New column config disables the forward index
-        LOGGER.debug("Existing column: {} has forward index but new column config disables it", column);
+
         ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op. Do not return an
@@ -260,7 +260,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
       } else if (existingForwardIndexDisabledColumns.contains(column) && newIsFwd) {
         // Existing column does not have a forward index. New column config enables the forward index
-        LOGGER.debug("Existing column: {} does not have a forward index but new column config enables it", column);
+
         ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (columnMetadata != null && columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op and forward index
@@ -286,7 +286,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       } else if (existingForwardIndexDisabledColumns.contains(column) && !newIsFwd) {
         // Forward index is disabled for the existing column and should remain disabled based on the latest config
         // Need some checks to see whether the dictionary is being enabled or disabled here and take appropriate actions
-        LOGGER.debug("Existing column: {} does not have a forward index and new column config keeps so", column);
+
         // If the dictionary is not enabled on the existing column it must be on the new noDictionary column list.
         // Cannot enable the dictionary for a column with forward index disabled.
         Preconditions.checkState(existingDictColumns.contains(column) || !newIsDict,
@@ -304,7 +304,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
       } else if (existingNoDictColumns.contains(column) && newIsDict) {
         // Existing column is RAW. New column is dictionary enabled.
-        LOGGER.debug("Existing column: {} has RAW forward index but new column config requires dict-encoded", column);
         if (_schema == null || _tableConfig == null) {
           // This can only happen in tests.
           LOGGER.warn("Cannot enable dictionary for column={} as schema or tableConfig is null.", column);
@@ -314,19 +313,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
       } else if (existingDictColumns.contains(column) && !newIsDict) {
         // Existing column has dictionary. New config for the column is RAW.
-        LOGGER.debug("Existing column: {} has dict-encoded forward index but new column config requires RAW", column);
         if (shouldDisableDictionary(column, _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column))) {
           columnOperationsMap.put(column, Collections.singletonList(Operation.DISABLE_DICTIONARY));
         }
       } else if (existingNoDictColumns.contains(column) && !newIsDict) {
         // Both existing and new column is RAW forward index encoded. Check if compression needs to be changed.
-        LOGGER.debug("Existing column: {} has RAW forward index and new column config keeps so", column);
         if (shouldChangeCompressionType(column, segmentReader)) {
           columnOperationsMap.put(column, Collections.singletonList(Operation.CHANGE_RAW_INDEX_COMPRESSION_TYPE));
         }
       }
     }
-    LOGGER.debug("Got column operations: {}", columnOperationsMap);
+
     return columnOperationsMap;
   }
 

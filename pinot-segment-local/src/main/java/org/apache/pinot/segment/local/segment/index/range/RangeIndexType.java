@@ -83,8 +83,8 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   @Override
-  public ColumnConfigDeserializer<RangeIndexConfig> createDeserializer(@Nullable String tier) {
-    return IndexConfigDeserializer.fromIndexes("range", tier, getIndexConfigClass())
+  public ColumnConfigDeserializer<RangeIndexConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes("range", getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           if (tableConfig.getIndexingConfig() == null) {
             return Collections.emptyMap();

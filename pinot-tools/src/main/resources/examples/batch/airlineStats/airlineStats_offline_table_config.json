@@ -68,27 +68,31 @@
         "maxLeafRecords": 10
       }
     ],
-    "starTreeIndexConfigsTierOverwrites": {
-      "hotTier": [
-        {
-          "dimensionsSplitOrder": [
-            "Carrier",
-            "CancellationCode",
-            "Origin",
-            "Dest"
-          ],
-          "skipStarNodeCreationForDimensions": [],
-          "functionColumnPairs": [
-            "MAX__CarrierDelay",
-            "AVG__CarrierDelay"
-          ],
-          "maxLeafRecords": 10
-        }
-      ],
-      "coldTier": []
-    },
     "enableDynamicStarTreeCreation": true,
-    "loadMode": "MMAP"
+    "loadMode": "MMAP",
+    "tierOverwrites": {
+      "hotTier": {
+        "starTreeIndexConfigs": [
+          {
+            "dimensionsSplitOrder": [
+              "Carrier",
+              "CancellationCode",
+              "Origin",
+              "Dest"
+            ],
+            "skipStarNodeCreationForDimensions": [],
+            "functionColumnPairs": [
+              "MAX__CarrierDelay",
+              "AVG__CarrierDelay"
+            ],
+            "maxLeafRecords": 10
+          }
+        ]
+      },
+      "coldTier": {
+        "starTreeIndexConfigs": []
+      }
+    }
   },
   "metadata": {
     "customConfigs": {}

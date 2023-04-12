@@ -19,10 +19,8 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -33,9 +31,9 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
 
   private final String _id;
   private ColumnConfigDeserializer<C> _deserializer;
-  private final Map<String, ColumnConfigDeserializer<C>> _deserializersByTier = new HashMap<>();
   private IndexReaderFactory<IR> _readerFactory;
-  protected abstract ColumnConfigDeserializer<C> createDeserializer(@Nullable String tier);
+
+  protected abstract ColumnConfigDeserializer<C> createDeserializer();
 
   protected abstract IndexReaderFactory<IR> createReaderFactory();
 
@@ -50,18 +48,8 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
 
   @Override
   public Map<String, C> getConfig(TableConfig tableConfig, Schema schema) {
-    return getConfig(tableConfig, schema, null);
-  }
-
-  @Override
-  public Map<String, C> getConfig(TableConfig tableConfig, Schema schema, @Nullable String tier) {
-    if (tier != null) {
-      ColumnConfigDeserializer<C> deserializer =
-          _deserializersByTier.computeIfAbsent(tier, t -> createDeserializer(tier));
-      return deserializer.deserialize(tableConfig, schema);
-    }
     if (_deserializer == null) {
-      _deserializer = createDeserializer(null);
+      _deserializer = createDeserializer();
     }
     return _deserializer.deserialize(tableConfig, schema);
   }

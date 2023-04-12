@@ -110,7 +110,7 @@ public class DictionaryIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<DictionaryIndexConfig> createDeserializer(@Nullable String tier) {
+  public ColumnConfigDeserializer<DictionaryIndexConfig> createDeserializer() {
     // reads tableConfig.indexingConfig.noDictionaryConfig
     ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictConf = IndexConfigDeserializer.fromMap(
         tableConfig -> tableConfig.getIndexingConfig() == null ? Collections.emptyMap()
@@ -127,7 +127,6 @@ public class DictionaryIndexType
     ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigList = IndexConfigDeserializer.fromCollection(
         TableConfig::getFieldConfigList,
         (accum, fieldConfig) -> {
-          fieldConfig = fieldConfig.withTierOverwrites(tier);
           if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
             accum.put(fieldConfig.getName(), DictionaryIndexConfig.disabled());
           }
@@ -155,7 +154,7 @@ public class DictionaryIndexType
         .withFallbackAlternative(fromNoDictCol)
         .withFallbackAlternative(fromFieldConfigList)
         .withFallbackAlternative(fromIndexingConfig)
-        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getId(), tier, getIndexConfigClass()));
+        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass()));
   }
 
   @Override

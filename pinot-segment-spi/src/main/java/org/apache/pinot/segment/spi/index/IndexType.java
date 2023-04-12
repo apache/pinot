@@ -61,8 +61,6 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
 
   Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
 
-  Map<String, C> getConfig(TableConfig tableConfig, Schema schema, @Nullable String tier);
-
   /**
    * Returns the {@link IndexCreator} that can should be used to create an index of this type with the given context
    * and configuration.

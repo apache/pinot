@@ -126,7 +126,7 @@ public class ForwardIndexType
   }
 
   @Override
-  public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer(@Nullable String tier) {
+  public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
     ColumnConfigDeserializer<ForwardIndexConfig> fromFieldConfig = IndexConfigDeserializer.fromCollection(
         TableConfig::getFieldConfigList,
@@ -144,7 +144,7 @@ public class ForwardIndexType
           // the default `fromIndexes` deserializer.
         }
     );
-    return IndexConfigDeserializer.fromIndexes("forward", tier, getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes("forward", getIndexConfigClass())
         .withExclusiveAlternative(fromFieldConfig);
   }
 

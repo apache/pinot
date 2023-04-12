@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -53,7 +54,6 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _onHeapDictionaryColumns;
   private boolean _enableDefaultStarTree;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
-  private Map<String, List<StarTreeIndexConfig>> _starTreeIndexConfigsTierOverwrites;
   // Whether to allow creating star-tree when server loads the segment
   private boolean _enableDynamicStarTreeCreation;
   private SegmentPartitionConfig _segmentPartitionConfig;
@@ -85,6 +85,8 @@ public class IndexingConfig extends BaseJsonConfig {
    * other data types.
    */
   private List<String> _varLengthDictionaryColumns;
+
+  private JsonNode _tierOverwrites;
 
   @Nullable
   public List<String> getInvertedIndexColumns() {
@@ -271,14 +273,12 @@ public class IndexingConfig extends BaseJsonConfig {
     _starTreeIndexConfigs = starTreeIndexConfigs;
   }
 
-  @Nullable
-  public Map<String, List<StarTreeIndexConfig>> getStarTreeIndexConfigsTierOverwrites() {
-    return _starTreeIndexConfigsTierOverwrites;
+  public JsonNode getTierOverwrites() {
+    return _tierOverwrites;
   }
 
-  public void setStarTreeIndexConfigsTierOverwrites(
-      Map<String, List<StarTreeIndexConfig>> starTreeIndexConfigsTierOverwrites) {
-    _starTreeIndexConfigsTierOverwrites = starTreeIndexConfigsTierOverwrites;
+  public void setTierOverwrites(JsonNode tierOverwrites) {
+    _tierOverwrites = tierOverwrites;
   }
 
   public boolean isEnableDynamicStarTreeCreation() {

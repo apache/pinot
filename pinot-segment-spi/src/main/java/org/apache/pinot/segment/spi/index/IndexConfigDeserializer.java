@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -82,10 +81,9 @@ public class IndexConfigDeserializer {
 
   /**
    * Returns a {@link ColumnConfigDeserializer} that reads a specific fieldName of the <pre>indexes</pre> attribute on
-   * each FieldConfig. When a specific tier is provided, the tier specific FieldConfig is used if present.
+   * each FieldConfig.
    */
-  public static <C extends IndexConfig> ColumnConfigDeserializer<C> fromIndexes(String fieldName, @Nullable String tier,
-      Class<C> cfgClass) {
+  public static <C extends IndexConfig> ColumnConfigDeserializer<C> fromIndexes(String fieldName, Class<C> aClass) {
     return (tableConfig, schema) -> {
       Map<String, C> result = new HashMap<>();
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
@@ -94,13 +92,13 @@ public class IndexConfigDeserializer {
           if (!fc.getIndexes().isObject()) {
             continue;
           }
-          JsonNode jsonNode = fc.withTierOverwrites(tier).getIndexes().get(fieldName);
+          JsonNode jsonNode = fc.getIndexes().get(fieldName);
           if (jsonNode == null) {
             continue;
           }
           C config;
           try {
-            config = JsonUtils.jsonNodeToObject(jsonNode, cfgClass);
+            config = JsonUtils.jsonNodeToObject(jsonNode, aClass);
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }
