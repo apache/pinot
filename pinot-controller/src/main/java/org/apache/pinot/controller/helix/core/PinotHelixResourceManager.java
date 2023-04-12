@@ -1384,18 +1384,27 @@ public class PinotHelixResourceManager {
    * @param schema The schema to be deleted.
    * @return True on success, false otherwise.
    */
+  @Deprecated
   public boolean deleteSchema(Schema schema) {
     if (schema != null) {
-      String schemaName = schema.getSchemaName();
-      LOGGER.info("Deleting schema: {}", schemaName);
-      String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
-      if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-        _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-        LOGGER.info("Deleted schema: {}", schemaName);
-        return true;
-      }
+      deleteSchema(schema.getSchemaName());
     }
     return false;
+  }
+
+  /**
+   * Deletes the given schema. Returns {@code true} when schema exists, {@code false} when schema does not exist.
+   */
+  public boolean deleteSchema(String schemaName) {
+    LOGGER.info("Deleting schema: {}", schemaName);
+    String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
+    if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+      LOGGER.info("Deleted schema: {}", schemaName);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   @Nullable

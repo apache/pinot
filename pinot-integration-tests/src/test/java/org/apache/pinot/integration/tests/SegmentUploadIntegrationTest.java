@@ -43,6 +43,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -362,7 +363,9 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   @AfterMethod
   public void tearDownTest()
       throws IOException {
-    dropOfflineTable(getTableName());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    dropOfflineTable(offlineTableName);
+    waitForEVToDisappear(offlineTableName);
   }
 
   @AfterClass

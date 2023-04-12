@@ -26,6 +26,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,6 +77,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -663,6 +665,11 @@ public class ControllerTest {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
+  public void waitForEVToDisappear(String tableNameWithType) {
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) == null, 60_000L,
+        "Failed to clean up the external view for table: " + tableNameWithType);
+  }
+
   public List<String> listSegments(String tableName)
       throws IOException {
     return listSegments(tableName, null, false);
@@ -984,19 +991,28 @@ public class ControllerTest {
    * test functionality.
    */
   public void cleanup() {
-
-    // Delete all tables.
-    List<String> tables = getHelixResourceManager().getAllTables();
-    for (String table : tables) {
-      getHelixResourceManager().deleteOfflineTable(table);
-      getHelixResourceManager().deleteRealtimeTable(table);
+    // Delete all tables
+    List<String> tables = _helixResourceManager.getAllTables();
+    for (String tableNameWithType : tables) {
+      if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+        _helixResourceManager.deleteOfflineTable(tableNameWithType);
+      } else {
+        _helixResourceManager.deleteRealtimeTable(tableNameWithType);
+      }
     }
 
+    // Wait for all external views to disappear
+    Set<String> tablesWithEV = new HashSet<>(tables);
+    TestUtils.waitForCondition(aVoid -> {
+      tablesWithEV.removeIf(t -> _helixResourceManager.getTableExternalView(t) == null);
+      return tablesWithEV.isEmpty();
+    }, 60_000L, "Failed to clean up all the external views");
+
     // Delete all schemas.
-    List<String> schemaNames = getHelixResourceManager().getSchemaNames();
+    List<String> schemaNames = _helixResourceManager.getSchemaNames();
     if (CollectionUtils.isNotEmpty(schemaNames)) {
       for (String schemaName : schemaNames) {
-        getHelixResourceManager().deleteSchema(getHelixResourceManager().getSchema(schemaName));
+        getHelixResourceManager().deleteSchema(schemaName);
       }
     }
   }
