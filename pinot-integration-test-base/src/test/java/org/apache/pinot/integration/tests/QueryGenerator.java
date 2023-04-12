@@ -448,15 +448,7 @@ public class QueryGenerator {
     public String generateH2Query() {
       List<String> h2ProjectionColumns = new ArrayList<>();
       for (String projectionColumn : _projectionColumns) {
-        if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
-          // Multi-value column.
-          for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-            h2ProjectionColumns.add(String.format("`%s__MV%d`", projectionColumn, i));
-          }
-        } else {
-          // Single-value column.
-          h2ProjectionColumns.add(String.format("`%s`", projectionColumn));
-        }
+        h2ProjectionColumns.add(String.format("`%s`", projectionColumn));
       }
       return joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
           _predicate.generateH2Query(), _orderBy.generateH2Query(), _limit.generateH2Query());
@@ -1027,8 +1019,9 @@ public class QueryGenerator {
 
       List<String> h2ComparisonClauses =
           new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
-      for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-        h2ComparisonClauses.add(joinWithSpaces(columnName + "__MV" + i, comparisonOperator, columnValue));
+      for (int i = 1; i <= ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
+        h2ComparisonClauses.add(
+            joinWithSpaces(String.format("%s[%d]", columnName, i), comparisonOperator, columnValue));
       }
 
       return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue),
@@ -1055,8 +1048,8 @@ public class QueryGenerator {
 
       List<String> h2InClauses =
           new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
-      for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-        h2InClauses.add(columnName + "__MV" + i + " IN (" + inValues + ")");
+      for (int i = 1; i <= ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
+        h2InClauses.add(columnName + "[" + i + "] IN (" + inValues + ")");
       }
 
       return new StringQueryFragment(columnName + " IN (" + inValues + ")",
@@ -1077,8 +1070,8 @@ public class QueryGenerator {
 
       List<String> h2ComparisonClauses =
           new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
-      for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-        h2ComparisonClauses.add(columnName + "__MV" + i + " BETWEEN " + leftValue + " AND " + rightValue);
+      for (int i = 1; i <= ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
+        h2ComparisonClauses.add(columnName + "[" + i + "] BETWEEN " + leftValue + " AND " + rightValue);
       }
 
       return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue,
