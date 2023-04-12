@@ -922,7 +922,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
-    initStringValuesSV(numDocs);
+    initBytesValuesSV(numDocs);
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
