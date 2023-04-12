@@ -20,9 +20,11 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -48,43 +50,29 @@ import org.roaringbitmap.RoaringBitmap;
  *    Coalesce(columnA, columnB)
  */
 public class CoalesceTransformFunction extends BaseTransformFunction {
-  public static final int NULL_INT = Integer.MIN_VALUE;
-  public static final long NULL_LONG = Long.MIN_VALUE;
-  public static final float NULL_FLOAT = Float.NEGATIVE_INFINITY;
-  public static final double NULL_DOUBLE = Double.NEGATIVE_INFINITY;
-  public static final BigDecimal NULL_BIG_DECIMAL = BigDecimal.valueOf(Long.MIN_VALUE);
-  public static final String NULL_STRING = "null";
-
   private TransformFunction[] _transformFunctions;
   private DataType _dataType;
   private TransformResultMetadata _resultMetadata;
 
   /**
-   * Returns a bit map of corresponding column.
-   * Returns an empty bitmap by default if null option is disabled.
+   * Returns a bit map of corresponding column. Returns an empty bitmap by default if null option is disabled.
    */
   private static RoaringBitmap[] getNullBitMaps(ValueBlock valueBlock, TransformFunction[] transformFunctions) {
     RoaringBitmap[] roaringBitmaps = new RoaringBitmap[transformFunctions.length];
     for (int i = 0; i < roaringBitmaps.length; i++) {
       TransformFunction func = transformFunctions[i];
-      if (func instanceof IdentifierTransformFunction) {
-        String columnName = ((IdentifierTransformFunction) func).getColumnName();
-        RoaringBitmap nullBitmap = valueBlock.getBlockValueSet(columnName).getNullBitmap();
-        roaringBitmaps[i] = nullBitmap;
-      } else {
-        // Consider literal as not null.
-        roaringBitmaps[i] = new RoaringBitmap();
-      }
+      roaringBitmaps[i] = func.getNullBitmap(valueBlock);
     }
     return roaringBitmaps;
   }
 
   /**
    * Get compatible data type of left and right.
-   *
+   * <p>
    * When left or right is numerical, we check both data types are numerical and widen the type.
-   * Otherwise, left and right have to be the same type.
-   * @param left data type
+   * Otherwise, return string type.
+   *
+   * @param left  data type
    * @param right data type
    * @return compatible data type.
    */
@@ -104,6 +92,12 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       }
       return DataType.INT;
     }
+    if (left == DataType.UNKNOWN) {
+      return right;
+    }
+    if (right == DataType.UNKNOWN) {
+      return left;
+    }
     return DataType.STRING;
   }
 
@@ -116,7 +110,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     int[][] data = new int[width][length];
-    RoaringBitmap filledData = new RoaringBitmap();
+    BitSet filledData = new BitSet(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
       boolean hasNonNullValue = false;
       for (int j = 0; j < width; j++) {
@@ -124,8 +118,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
           continue;
         }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
+        if (!filledData.get(j)) {
+          filledData.set(j);
           data[j] = _transformFunctions[j].transformToIntValuesSV(valueBlock);
         }
         hasNonNullValue = true;
@@ -133,7 +127,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _intValuesSV[i] = NULL_INT;
+        _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
       }
     }
     return _intValuesSV;
@@ -148,7 +142,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     long[][] data = new long[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    BitSet filledData = new BitSet(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
       boolean hasNonNullValue = false;
       for (int j = 0; j < width; j++) {
@@ -156,8 +150,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
           continue;
         }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
+        if (!filledData.get(j)) {
+          filledData.set(j);
           data[j] = _transformFunctions[j].transformToLongValuesSV(valueBlock);
         }
         hasNonNullValue = true;
@@ -165,7 +159,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _longValuesSV[i] = NULL_LONG;
+        _longValuesSV[i] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
       }
     }
     return _longValuesSV;
@@ -180,7 +174,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     float[][] data = new float[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    BitSet filledData = new BitSet(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
       boolean hasNonNullValue = false;
       for (int j = 0; j < width; j++) {
@@ -188,8 +182,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
           continue;
         }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
+        if (!filledData.get(j)) {
+          filledData.set(j);
           data[j] = _transformFunctions[j].transformToFloatValuesSV(valueBlock);
         }
         hasNonNullValue = true;
@@ -197,7 +191,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _floatValuesSV[i] = NULL_FLOAT;
+        _floatValuesSV[i] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
       }
     }
     return _floatValuesSV;
@@ -212,7 +206,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     double[][] data = new double[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    BitSet filledData = new BitSet(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
       boolean hasNonNullValue = false;
       for (int j = 0; j < width; j++) {
@@ -220,8 +214,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
           continue;
         }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
+        if (!filledData.get(j)) {
+          filledData.set(j);
           data[j] = _transformFunctions[j].transformToDoubleValuesSV(valueBlock);
         }
         hasNonNullValue = true;
@@ -229,7 +223,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _doubleValuesSV[i] = NULL_DOUBLE;
+        _doubleValuesSV[i] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
       }
     }
     return _doubleValuesSV;
@@ -244,7 +238,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     BigDecimal[][] data = new BigDecimal[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    BitSet filledData = new BitSet(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
       boolean hasNonNullValue = false;
       for (int j = 0; j < width; j++) {
@@ -252,8 +246,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
           continue;
         }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
+        if (!filledData.get(j)) {
+          filledData.set(j);
           data[j] = _transformFunctions[j].transformToBigDecimalValuesSV(valueBlock);
         }
         hasNonNullValue = true;
@@ -261,7 +255,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _bigDecimalValuesSV[i] = NULL_BIG_DECIMAL;
+        _bigDecimalValuesSV[i] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
       }
     }
     return _bigDecimalValuesSV;
@@ -276,7 +270,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     String[][] data = new String[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    BitSet filledData = new BitSet(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
       boolean hasNonNullValue = false;
       for (int j = 0; j < width; j++) {
@@ -284,8 +278,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
           continue;
         }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
+        if (!filledData.get(j)) {
+          filledData.set(j);
           data[j] = _transformFunctions[j].transformToStringValuesSV(valueBlock);
         }
         hasNonNullValue = true;
@@ -293,7 +287,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _stringValuesSV[i] = NULL_STRING;
+        _stringValuesSV[i] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
       }
     }
     return _stringValuesSV;
@@ -311,9 +305,6 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     _transformFunctions = new TransformFunction[argSize];
     for (int i = 0; i < argSize; i++) {
       TransformFunction func = arguments.get(i);
-      Preconditions.checkArgument(
-          func instanceof IdentifierTransformFunction || func instanceof LiteralTransformFunction,
-          "Only column names and literals are supported in COALESCE.");
       DataType dataType = func.getResultMetadata().getDataType();
       if (_dataType != null) {
         _dataType = getCompatibleType(_dataType, dataType);
@@ -398,5 +389,23 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       return super.transformToStringValuesSV(valueBlock);
     }
     return getStringTransformResults(valueBlock);
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
+    RoaringBitmap bitmap = nullBitMaps[0];
+    for (int i = 1; i < nullBitMaps.length; i++) {
+      RoaringBitmap curBitmap = nullBitMaps[i];
+      if (bitmap != null && curBitmap != null) {
+        bitmap.and(curBitmap);
+      } else {
+        bitmap = null;
+      }
+    }
+    if (bitmap == null || bitmap.isEmpty()) {
+      return null;
+    }
+    return bitmap;
   }
 }

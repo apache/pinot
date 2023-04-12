@@ -22,13 +22,18 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -58,9 +63,10 @@ public class CaseTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "case";
 
   private List<TransformFunction> _whenStatements = new ArrayList<>();
-  private List<TransformFunction> _elseThenStatements = new ArrayList<>();
+  private List<TransformFunction> _thenStatements = new ArrayList<>();
+  private TransformFunction _elseStatement;
+
   private boolean[] _selections;
-  private int _numSelections;
   private TransformResultMetadata _resultMetadata;
   private int[] _selectedResults;
 
@@ -71,17 +77,16 @@ public class CaseTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // Check that there are more than 1 arguments
-    if (arguments.size() % 2 != 1 || arguments.size() < 3) {
-      throw new IllegalArgumentException("At least 3 odd number of arguments are required for CASE-WHEN-ELSE function");
+    // Check that there are more than 2 arguments
+    // Else statement can be omitted.
+    if (arguments.size() < 2) {
+      throw new IllegalArgumentException("At least two arguments are required for CASE-WHEN function");
     }
     int numWhenStatements = arguments.size() / 2;
     _whenStatements = new ArrayList<>(numWhenStatements);
-    _elseThenStatements = new ArrayList<>(numWhenStatements + 1);
+    _thenStatements = new ArrayList<>(numWhenStatements);
     constructStatementList(arguments);
-    _selections = new boolean[_elseThenStatements.size()];
-    Collections.reverse(_elseThenStatements);
-    Collections.reverse(_whenStatements);
+    _selections = new boolean[_thenStatements.size()];
     _resultMetadata = calculateResultMetadata();
   }
 
@@ -109,9 +114,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
     // alternating WHEN and THEN clause, last one ELSE
     for (int i = 0; i < numWhenStatements; i++) {
       _whenStatements.add(arguments.get(i * 2));
-      _elseThenStatements.add(arguments.get(i * 2 + 1));
+      _thenStatements.add(arguments.get(i * 2 + 1));
     }
-    _elseThenStatements.add(arguments.get(arguments.size() - 1));
+    if (arguments.size() % 2 != 0) {
+      _elseStatement = arguments.get(arguments.size() - 1);
+    }
   }
 
   // TODO: Legacy format, this is here for backward compatibility support, remove after release 0.12
@@ -121,20 +128,23 @@ public class CaseTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < numWhenStatements; i++) {
       _whenStatements.add(arguments.get(i));
     }
-    for (int i = numWhenStatements; i < numWhenStatements * 2 + 1; i++) {
-      _elseThenStatements.add(arguments.get(i));
+    for (int i = numWhenStatements; i < numWhenStatements * 2; i++) {
+      _thenStatements.add(arguments.get(i));
+    }
+    if (arguments.size() % 2 != 0) {
+      _elseStatement = arguments.get(arguments.size() - 1);
     }
   }
 
   private TransformResultMetadata calculateResultMetadata() {
-    TransformFunction elseStatement = _elseThenStatements.get(0);
+    TransformFunction elseStatement = _thenStatements.get(0);
     TransformResultMetadata elseStatementResultMetadata = elseStatement.getResultMetadata();
     DataType dataType = elseStatementResultMetadata.getDataType();
     Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
         "Unsupported multi-value expression in the ELSE clause");
-    int numThenStatements = _elseThenStatements.size() - 1;
+    int numThenStatements = _thenStatements.size();
     for (int i = 0; i < numThenStatements; i++) {
-      TransformFunction thenStatement = _elseThenStatements.get(i + 1);
+      TransformFunction thenStatement = _thenStatements.get(i);
       TransformResultMetadata thenStatementResultMetadata = thenStatement.getResultMetadata();
       if (!thenStatementResultMetadata.isSingleValue()) {
         throw new IllegalStateException("Unsupported multi-value expression in the THEN clause of index: " + i);
@@ -241,38 +251,57 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   /**
-   * Evaluate the ValueBlock for the WHEN statements, returns an array with the
-   * index(1 to N) of matched WHEN clause ordered by match priority, 0 means nothing
-   * matched, so go to ELSE.
+   * Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause
+   * ordered by match priority, 0 means nothing matched, so go to ELSE.
    */
-  private int[] getSelectedArray(ValueBlock valueBlock) {
+  private int[] getSelectedArray(ValueBlock valueBlock, boolean nullHandlingEnabled) {
     int numDocs = valueBlock.getNumDocs();
     if (_selectedResults == null || _selectedResults.length < numDocs) {
       _selectedResults = new int[numDocs];
-    } else {
-      Arrays.fill(_selectedResults, 0, numDocs, 0);
-      Arrays.fill(_selections, false);
     }
+    Arrays.fill(_selectedResults, 0, numDocs, -1);
+    Arrays.fill(_selections, false);
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
     int numWhenStatements = _whenStatements.size();
-    for (int i = numWhenStatements - 1; i >= 0; i--) {
+    for (int i = 0; i < numWhenStatements; i++) {
       TransformFunction whenStatement = _whenStatements.get(i);
-      int[] conditions = whenStatement.transformToIntValuesSV(valueBlock);
-      for (int j = 0; j < numDocs & j < conditions.length; j++) {
-        _selectedResults[j] = Math.max(conditions[j] * (i + 1), _selectedResults[j]);
+      int[] conditions = getWhenConditions(whenStatement, valueBlock, nullHandlingEnabled);
+      for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+        if (conditions[docId] == 1) {
+          unselectedDocs.clear(docId);
+          _selectedResults[docId] = i;
+        }
+      }
+      if (unselectedDocs.isEmpty()) {
+        break;
       }
     }
     // try to prune clauses now
     for (int i = 0; i < numDocs; i++) {
-      _selections[_selectedResults[i]] = true;
-    }
-    int numSelections = 0;
-    for (boolean selection : _selections) {
-      if (selection) {
-        numSelections++;
+      if (_selectedResults[i] != -1) {
+        _selections[_selectedResults[i]] = true;
       }
     }
-    _numSelections = numSelections;
     return _selectedResults;
+  }
+
+  private static int[] getWhenConditions(TransformFunction whenStatement, ValueBlock valueBlock,
+      boolean nullHandlingEnabled) {
+    if (!nullHandlingEnabled) {
+      return whenStatement.transformToIntValuesSV(valueBlock);
+    }
+    Pair<int[], RoaringBitmap> result = whenStatement.transformToIntValuesSVWithNull(valueBlock);
+    RoaringBitmap bitmap = result.getRight();
+    int[] intResult = result.getLeft();
+    if (bitmap != null) {
+      bitmap.forEach((IntConsumer) (i) -> {
+        if (bitmap.contains(i)) {
+          intResult[i] = 0;
+        }
+      });
+    }
+    return intResult;
   }
 
   @Override
@@ -280,22 +309,36 @@ public class CaseTransformFunction extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(valueBlock);
+    int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initIntValuesSV(numDocs);
-    int numElseThenStatements = _elseThenStatements.size();
-    for (int i = 0; i < numElseThenStatements; i++) {
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    for (int i = 0; i < numThenStatements; i++) {
       if (_selections[i]) {
-        TransformFunction transformFunction = _elseThenStatements.get(i);
+        TransformFunction transformFunction = _thenStatements.get(i);
         int[] intValues = transformFunction.transformToIntValuesSV(valueBlock);
-        if (_numSelections == 1) {
-          System.arraycopy(intValues, 0, _intValuesSV, 0, numDocs);
-        } else {
-          for (int j = 0; j < numDocs; j++) {
-            if (selected[j] == i) {
-              _intValuesSV[j] = intValues[j];
-            }
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            unselectedDocs.clear(docId);
+            _intValuesSV[docId] = intValues[docId];
           }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _intValuesSV[docId] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+        }
+      } else {
+        int[] intValues = _elseStatement.transformToIntValuesSV(valueBlock);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _intValuesSV[docId] = intValues[docId];
         }
       }
     }
@@ -303,25 +346,92 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<int[], RoaringBitmap> transformToIntValuesSVWithNull(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
+      return super.transformToIntValuesSVWithNull(valueBlock);
+    }
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        Pair<int[], RoaringBitmap> intValuesNullPair = transformFunction.transformToIntValuesSVWithNull(valueBlock);
+        int[] intValues = intValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = intValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _intValuesSV[docId] = intValues[docId];
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _intValuesSV[docId] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+          bitmap.add(docId);
+        }
+      } else {
+        Pair<int[], RoaringBitmap> intValuesNullPair = _elseStatement.transformToIntValuesSVWithNull(valueBlock);
+        int[] intValues = intValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = intValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _intValuesSV[docId] = intValues[docId];
+          if (nullBitmap != null && nullBitmap.contains(docId)) {
+            bitmap.add(docId);
+          }
+        }
+      }
+    }
+    return ImmutablePair.of(_intValuesSV, bitmap);
+  }
+
+  @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(valueBlock);
+    int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initLongValuesSV(numDocs);
-    int numElseThenStatements = _elseThenStatements.size();
-    for (int i = 0; i < numElseThenStatements; i++) {
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    for (int i = 0; i < numThenStatements; i++) {
       if (_selections[i]) {
-        TransformFunction transformFunction = _elseThenStatements.get(i);
+        TransformFunction transformFunction = _thenStatements.get(i);
         long[] longValues = transformFunction.transformToLongValuesSV(valueBlock);
-        if (_numSelections == 1) {
-          System.arraycopy(longValues, 0, _longValuesSV, 0, numDocs);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _longValuesSV[docId] = longValues[docId];
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _longValuesSV[docId] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+          }
         } else {
-          for (int j = 0; j < numDocs; j++) {
-            if (selected[j] == i) {
-              _longValuesSV[j] = longValues[j];
-            }
+          long[] longValues = _elseStatement.transformToLongValuesSV(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _longValuesSV[docId] = longValues[docId];
           }
         }
       }
@@ -330,25 +440,92 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<long[], RoaringBitmap> transformToLongValuesSVWithNull(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
+      return super.transformToLongValuesSVWithNull(valueBlock);
+    }
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesSV(numDocs);
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        Pair<long[], RoaringBitmap> longValuesNullPair = transformFunction.transformToLongValuesSVWithNull(valueBlock);
+        long[] longValues = longValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = longValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _longValuesSV[docId] = longValues[docId];
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _longValuesSV[docId] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+          bitmap.add(docId);
+        }
+      } else {
+        Pair<long[], RoaringBitmap> longValuesNullPair = _elseStatement.transformToLongValuesSVWithNull(valueBlock);
+        long[] longValues = longValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = longValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _longValuesSV[docId] = longValues[docId];
+          if (nullBitmap != null && nullBitmap.contains(docId)) {
+            bitmap.add(docId);
+          }
+        }
+      }
+    }
+    return ImmutablePair.of(_longValuesSV, bitmap);
+  }
+
+  @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(valueBlock);
+    int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesSV(numDocs);
-    int numElseThenStatements = _elseThenStatements.size();
-    for (int i = 0; i < numElseThenStatements; i++) {
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    for (int i = 0; i < numThenStatements; i++) {
       if (_selections[i]) {
-        TransformFunction transformFunction = _elseThenStatements.get(i);
+        TransformFunction transformFunction = _thenStatements.get(i);
         float[] floatValues = transformFunction.transformToFloatValuesSV(valueBlock);
-        if (_numSelections == 1) {
-          System.arraycopy(floatValues, 0, _floatValuesSV, 0, numDocs);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _floatValuesSV[docId] = floatValues[docId];
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _floatValuesSV[docId] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+          }
         } else {
-          for (int j = 0; j < numDocs; j++) {
-            if (selected[j] == i) {
-              _floatValuesSV[j] = floatValues[j];
-            }
+          float[] floatValues = _elseStatement.transformToFloatValuesSV(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _floatValuesSV[docId] = floatValues[docId];
           }
         }
       }
@@ -357,25 +534,93 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<float[], RoaringBitmap> transformToFloatValuesSVWithNull(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
+      return super.transformToFloatValuesSVWithNull(valueBlock);
+    }
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    initFloatValuesSV(numDocs);
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        Pair<float[], RoaringBitmap> floatValuesNullPair =
+            transformFunction.transformToFloatValuesSVWithNull(valueBlock);
+        float[] floatValues = floatValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = floatValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _floatValuesSV[docId] = floatValues[docId];
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _floatValuesSV[docId] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+          bitmap.add(docId);
+        }
+      } else {
+        Pair<float[], RoaringBitmap> floatValuesNullPair = _elseStatement.transformToFloatValuesSVWithNull(valueBlock);
+        float[] floatValues = floatValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = floatValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _floatValuesSV[docId] = floatValues[docId];
+          if (nullBitmap != null && nullBitmap.contains(docId)) {
+            bitmap.add(docId);
+          }
+        }
+      }
+    }
+    return ImmutablePair.of(_floatValuesSV, bitmap);
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(valueBlock);
+    int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesSV(numDocs);
-    int numElseThenStatements = _elseThenStatements.size();
-    for (int i = 0; i < numElseThenStatements; i++) {
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    for (int i = 0; i < numThenStatements; i++) {
       if (_selections[i]) {
-        TransformFunction transformFunction = _elseThenStatements.get(i);
+        TransformFunction transformFunction = _thenStatements.get(i);
         double[] doubleValues = transformFunction.transformToDoubleValuesSV(valueBlock);
-        if (_numSelections == 1) {
-          System.arraycopy(doubleValues, 0, _doubleValuesSV, 0, numDocs);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _doubleValuesSV[docId] = doubleValues[docId];
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _doubleValuesSV[docId] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+          }
         } else {
-          for (int j = 0; j < numDocs; j++) {
-            if (selected[j] == i) {
-              _doubleValuesSV[j] = doubleValues[j];
-            }
+          double[] doubleValues = _elseStatement.transformToDoubleValuesSV(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _doubleValuesSV[docId] = doubleValues[docId];
           }
         }
       }
@@ -384,25 +629,94 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<double[], RoaringBitmap> transformToDoubleValuesSVWithNull(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
+      return super.transformToDoubleValuesSVWithNull(valueBlock);
+    }
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesSV(numDocs);
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        Pair<double[], RoaringBitmap> doubleValuesNullPair =
+            transformFunction.transformToDoubleValuesSVWithNull(valueBlock);
+        double[] doubleValues = doubleValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = doubleValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _doubleValuesSV[docId] = doubleValues[docId];
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _doubleValuesSV[docId] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+          bitmap.add(docId);
+        }
+      } else {
+        Pair<double[], RoaringBitmap> doubleValuesNullPair =
+            _elseStatement.transformToDoubleValuesSVWithNull(valueBlock);
+        double[] doubleValues = doubleValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = doubleValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _doubleValuesSV[docId] = doubleValues[docId];
+          if (nullBitmap != null && nullBitmap.contains(docId)) {
+            bitmap.add(docId);
+          }
+        }
+      }
+    }
+    return ImmutablePair.of(_doubleValuesSV, bitmap);
+  }
+
+  @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType() != DataType.BIG_DECIMAL) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
       return super.transformToBigDecimalValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(valueBlock);
+    int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initBigDecimalValuesSV(numDocs);
-    int numElseThenStatements = _elseThenStatements.size();
-    for (int i = 0; i < numElseThenStatements; i++) {
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    for (int i = 0; i < numThenStatements; i++) {
       if (_selections[i]) {
-        TransformFunction transformFunction = _elseThenStatements.get(i);
+        TransformFunction transformFunction = _thenStatements.get(i);
         BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(valueBlock);
-        if (_numSelections == 1) {
-          System.arraycopy(bigDecimalValues, 0, _bigDecimalValuesSV, 0, numDocs);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _bigDecimalValuesSV[docId] = bigDecimalValues[docId];
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _bigDecimalValuesSV[docId] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
+          }
         } else {
-          for (int j = 0; j < numDocs; j++) {
-            if (selected[j] == i) {
-              _bigDecimalValuesSV[j] = bigDecimalValues[j];
-            }
+          BigDecimal[] bigDecimalValues = _elseStatement.transformToBigDecimalValuesSV(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _bigDecimalValuesSV[docId] = bigDecimalValues[docId];
           }
         }
       }
@@ -411,25 +725,94 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<BigDecimal[], RoaringBitmap> transformToBigDecimalValuesSVWithNull(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
+      return super.transformToBigDecimalValuesSVWithNull(valueBlock);
+    }
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(numDocs);
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        Pair<BigDecimal[], RoaringBitmap> bigDecimalValuesNullPair =
+            transformFunction.transformToBigDecimalValuesSVWithNull(valueBlock);
+        BigDecimal[] bigDecimals = bigDecimalValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = bigDecimalValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _bigDecimalValuesSV[docId] = bigDecimals[docId];
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _bigDecimalValuesSV[docId] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
+          bitmap.add(docId);
+        }
+      } else {
+        Pair<BigDecimal[], RoaringBitmap> bigDecimalNullPair =
+            _elseStatement.transformToBigDecimalValuesSVWithNull(valueBlock);
+        BigDecimal[] bigDecimals = bigDecimalNullPair.getLeft();
+        RoaringBitmap nullBitmap = bigDecimalNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _bigDecimalValuesSV[docId] = bigDecimals[docId];
+          if (nullBitmap != null && nullBitmap.contains(docId)) {
+            bitmap.add(docId);
+          }
+        }
+      }
+    }
+    return ImmutablePair.of(_bigDecimalValuesSV, bitmap);
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(valueBlock);
+    int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initStringValuesSV(numDocs);
-    int numElseThenStatements = _elseThenStatements.size();
-    for (int i = 0; i < numElseThenStatements; i++) {
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    for (int i = 0; i < numThenStatements; i++) {
       if (_selections[i]) {
-        TransformFunction transformFunction = _elseThenStatements.get(i);
+        TransformFunction transformFunction = _thenStatements.get(i);
         String[] stringValues = transformFunction.transformToStringValuesSV(valueBlock);
-        if (_numSelections == 1) {
-          System.arraycopy(stringValues, 0, _stringValuesSV, 0, numDocs);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _stringValuesSV[docId] = stringValues[docId];
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _stringValuesSV[docId] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+          }
         } else {
-          for (int j = 0; j < numDocs; j++) {
-            if (selected[j] == i) {
-              _stringValuesSV[j] = stringValues[j];
-            }
+          String[] stringValues = _elseStatement.transformToStringValuesSV(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _stringValuesSV[docId] = stringValues[docId];
           }
         }
       }
@@ -438,29 +821,196 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public Pair<String[], RoaringBitmap> transformToStringValuesSVWithNull(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
+      return super.transformToStringValuesSVWithNull(valueBlock);
+    }
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        Pair<String[], RoaringBitmap> stringValuesNullPair =
+            transformFunction.transformToStringValuesSVWithNull(valueBlock);
+        String[] stringValues = stringValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = stringValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _stringValuesSV[docId] = stringValues[docId];
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _stringValuesSV[docId] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+          bitmap.add(docId);
+        }
+      } else {
+        Pair<String[], RoaringBitmap> stringNullPair = _elseStatement.transformToStringValuesSVWithNull(valueBlock);
+        String[] stringValues = stringNullPair.getLeft();
+        RoaringBitmap nullBitmap = stringNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _stringValuesSV[docId] = stringValues[docId];
+          if (nullBitmap != null && nullBitmap.contains(docId)) {
+            bitmap.add(docId);
+          }
+        }
+      }
+    }
+    return ImmutablePair.of(_stringValuesSV, bitmap);
+  }
+
+  @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSV(valueBlock);
     }
-    int[] selected = getSelectedArray(valueBlock);
+    int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initBytesValuesSV(numDocs);
-    int numElseThenStatements = _elseThenStatements.size();
-    for (int i = 0; i < numElseThenStatements; i++) {
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    for (int i = 0; i < numThenStatements; i++) {
       if (_selections[i]) {
-        TransformFunction transformFunction = _elseThenStatements.get(i);
-        byte[][] bytesValues = transformFunction.transformToBytesValuesSV(valueBlock);
-        if (_numSelections == 1) {
-          System.arraycopy(bytesValues, 0, _bytesValuesSV, 0, numDocs);
+        TransformFunction transformFunction = _thenStatements.get(i);
+        byte[][] byteValues = transformFunction.transformToBytesValuesSV(valueBlock);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _bytesValuesSV[docId] = byteValues[docId];
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _bytesValuesSV[docId] = (byte[]) DataSchema.ColumnDataType.BYTES.getNullPlaceholder();
+          }
         } else {
-          for (int j = 0; j < numDocs; j++) {
-            if (selected[j] == i) {
-              _bytesValuesSV[j] = bytesValues[j];
-            }
+          byte[][] bytesValues = _elseStatement.transformToBytesValuesSV(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _bytesValuesSV[docId] = bytesValues[docId];
           }
         }
       }
     }
     return _bytesValuesSV;
+  }
+
+  @Override
+  public Pair<byte[][], RoaringBitmap> transformToBytesValuesSVWithNull(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
+      return super.transformToBytesValuesSVWithNull(valueBlock);
+    }
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        Pair<byte[][], RoaringBitmap> byteValuesNullPair =
+            transformFunction.transformToBytesValuesSVWithNull(valueBlock);
+        byte[][] byteValues = byteValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = byteValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            _bytesValuesSV[docId] = byteValues[docId];
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (!unselectedDocs.isEmpty()) {
+      if (_elseStatement == null) {
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _bytesValuesSV[docId] = (byte[]) DataSchema.ColumnDataType.BYTES.getNullPlaceholder();
+          bitmap.add(docId);
+        }
+      } else {
+        Pair<byte[][], RoaringBitmap> byteValuesNullPair = _elseStatement.transformToBytesValuesSVWithNull(valueBlock);
+        byte[][] byteValues = byteValuesNullPair.getLeft();
+        RoaringBitmap nullBitmap = byteValuesNullPair.getRight();
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          _bytesValuesSV[docId] = byteValues[docId];
+          if (nullBitmap != null && nullBitmap.contains(docId)) {
+            bitmap.add(docId);
+          }
+        }
+      }
+    }
+    return ImmutablePair.of(_bytesValuesSV, bitmap);
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    int[] selected = getSelectedArray(valueBlock, true);
+    int numDocs = valueBlock.getNumDocs();
+    int numThenStatements = _thenStatements.size();
+    BitSet unselectedDocs = new BitSet();
+    unselectedDocs.set(0, numDocs);
+    final RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < numThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        RoaringBitmap nullBitmap = transformFunction.getNullBitmap(valueBlock);
+        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+          if (selected[docId] == i) {
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+            unselectedDocs.clear(docId);
+          }
+        }
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            bitmap.add(docId);
+          }
+        } else {
+          RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            if (nullBitmap != null && nullBitmap.contains(docId)) {
+              bitmap.add(docId);
+            }
+          }
+        }
+      }
+    }
+    if (bitmap.isEmpty()) {
+      return null;
+    }
+    return bitmap;
   }
 }
