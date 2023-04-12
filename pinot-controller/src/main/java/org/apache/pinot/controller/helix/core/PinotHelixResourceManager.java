@@ -258,14 +258,15 @@ public class PinotHelixResourceManager {
    * TODO:For the <a href="https://github.com/apache/pinot/pull/10451">backwards incompatible change</a>, this is a
    * reminder to clean up old Zk nodes when the controller starts up.
    */
-  public synchronized void start(HelixManager helixZkManager) {
+  public synchronized void start(HelixManager helixZkManager,
+      List<PinotSegmentDeletionListener> pinotSegmentDeletionListeners) {
     _helixZkManager = helixZkManager;
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
-        _deletedSegmentsRetentionInDays);
+        _deletedSegmentsRetentionInDays, pinotSegmentDeletionListeners);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
 
     // Add listener on instance config changes to invalidate _instanceAdminEndpointCache

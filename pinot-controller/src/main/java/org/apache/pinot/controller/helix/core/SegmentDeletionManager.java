@@ -23,13 +23,13 @@ import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -75,26 +75,28 @@ public class SegmentDeletionManager {
     RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
-  public interface SegmentDeletionListener {
-    void onSegmentDeletion(String tableName, List<String> segmentsToDelete);
-  }
-
   private final ScheduledExecutorService _executorService;
   private final String _dataDir;
   private final String _helixClusterName;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
-  private final ConcurrentLinkedQueue<SegmentDeletionListener> _segmentDeletionListeners;
+  private final List<PinotSegmentDeletionListener> _pinotSegmentDeletionListeners;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
+    this(dataDir, helixAdmin, helixClusterName, propertyStore, deletedSegmentsRetentionInDays, Collections.emptyList());
+  }
+
+  public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays,
+      List<PinotSegmentDeletionListener> pinotSegmentDeletionListeners) {
     _dataDir = dataDir;
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
     _defaultDeletedSegmentsRetentionMs = TimeUnit.DAYS.toMillis(deletedSegmentsRetentionInDays);
-    _segmentDeletionListeners = new ConcurrentLinkedQueue<>();
+    _pinotSegmentDeletionListeners = pinotSegmentDeletionListeners;
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -106,8 +108,8 @@ public class SegmentDeletionManager {
     });
   }
 
-  public void registerSegmentDeletionListener(SegmentDeletionListener segmentDeletionListener) {
-    _segmentDeletionListeners.add(segmentDeletionListener);
+  public void registerSegmentDeletionListener(PinotSegmentDeletionListener pinotSegmentDeletionListener) {
+    _pinotSegmentDeletionListeners.add(pinotSegmentDeletionListener);
   }
 
   public void stop() {
@@ -177,11 +179,11 @@ public class SegmentDeletionManager {
         propStorePathList.add(segmentPropertyStorePath);
       }
 
-      for (SegmentDeletionListener segmentDeletionListener : _segmentDeletionListeners) {
+      for (PinotSegmentDeletionListener pinotSegmentDeletionListener : _pinotSegmentDeletionListeners) {
         try {
-          segmentDeletionListener.onSegmentDeletion(tableName, segmentsToDelete);
+          pinotSegmentDeletionListener.onSegmentDeletion(tableName, segmentsToDelete);
         } catch (Exception e) {
-          LOGGER.error("Failed to process segment deletion listener: {}", segmentDeletionListener, e);
+          LOGGER.error("Failed to process segment deletion listener: {}", pinotSegmentDeletionListener, e);
         }
       }
 
