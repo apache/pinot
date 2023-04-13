@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +33,7 @@ import javax.annotation.Nullable;
  * If primary keys in the table have lifecycle, they won't get updated after a certain period time, then we can use the
  * following configuration to enable upsert ttl feature. Pinot will only keeps track of alive primary keys in heap.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class UpsertTTLConfig {
 
   @JsonPropertyDescription("ttl time unit, supported time units are DAYS, HOURS, MINUTES, SECONDS, MILLISECONDS")
