@@ -451,7 +451,9 @@ public class PinotSchemaRestletResource {
     }
 
     // If the schema is associated with a table, we should not delete it.
-    // TODO: Check OFFLINE tables as well
+    // TODO: Check OFFLINE tables as well. There are 2 side effects:
+    //       - Increases ZK read when there are lots of OFFLINE tables
+    //       - Behavior change since we don't allow deleting schema for OFFLINE tables
     List<String> realtimeTables = _pinotHelixResourceManager.getAllRealtimeTables();
     for (String realtimeTableName : realtimeTables) {
       if (schemaName.equals(TableNameBuilder.extractRawTableName(realtimeTableName))) {
