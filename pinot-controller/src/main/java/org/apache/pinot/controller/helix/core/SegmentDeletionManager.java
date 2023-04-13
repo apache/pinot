@@ -23,7 +23,6 @@ import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +37,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -83,9 +83,13 @@ public class SegmentDeletionManager {
   private final long _defaultDeletedSegmentsRetentionMs;
   private final List<PinotSegmentDeletionListener> _pinotSegmentDeletionListeners;
 
-  public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
-    this(dataDir, helixAdmin, helixClusterName, propertyStore, deletedSegmentsRetentionInDays, Collections.emptyList());
+  /**
+   * Interface for segment deletion listener. Invoked when a segment is deleted via the SegmentDeletionManager.
+   */
+  public interface PinotSegmentDeletionListener {
+    void init(HelixManager helixManager);
+
+    void onSegmentDeletion(String tableName, Collection<String> segmentsToDelete);
   }
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
@@ -106,10 +110,6 @@ public class SegmentDeletionManager {
         return thread;
       }
     });
-  }
-
-  public void registerSegmentDeletionListener(PinotSegmentDeletionListener pinotSegmentDeletionListener) {
-    _pinotSegmentDeletionListeners.add(pinotSegmentDeletionListener);
   }
 
   public void stop() {

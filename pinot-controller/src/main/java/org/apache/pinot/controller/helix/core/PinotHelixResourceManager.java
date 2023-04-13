@@ -138,6 +138,7 @@ import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObs
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.annotations.segment.lifecycle.SegmentDeletionListener;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -165,6 +166,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -258,15 +260,14 @@ public class PinotHelixResourceManager {
    * TODO:For the <a href="https://github.com/apache/pinot/pull/10451">backwards incompatible change</a>, this is a
    * reminder to clean up old Zk nodes when the controller starts up.
    */
-  public synchronized void start(HelixManager helixZkManager,
-      List<PinotSegmentDeletionListener> pinotSegmentDeletionListeners) {
+  public synchronized void start(HelixManager helixZkManager) {
     _helixZkManager = helixZkManager;
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
-        _deletedSegmentsRetentionInDays, pinotSegmentDeletionListeners);
+        _deletedSegmentsRetentionInDays, getSegmentDeletionListeners());
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
 
     // Add listener on instance config changes to invalidate _instanceAdminEndpointCache
@@ -301,6 +302,27 @@ public class PinotHelixResourceManager {
         Boolean.parseBoolean(configs.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean.parseBoolean(
             configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
     _tableCache = new TableCache(_propertyStore, caseInsensitive);
+  }
+
+  private List<SegmentDeletionManager.PinotSegmentDeletionListener> getSegmentDeletionListeners() {
+    List<SegmentDeletionManager.PinotSegmentDeletionListener> pinotSegmentDeletionListeners = new ArrayList<>();
+    Set<Class<?>> classes = PinotReflectionUtils.getClassesThroughReflection(".*\\.plugin\\.segment\\.deletion\\..*",
+        SegmentDeletionListener.class);
+    for (Class<?> clazz : classes) {
+      SegmentDeletionListener annotation = clazz.getAnnotation(SegmentDeletionListener.class);
+      if (annotation.enabled()) {
+        try {
+          SegmentDeletionManager.PinotSegmentDeletionListener pinotSegmentDeletionListener =
+              (SegmentDeletionManager.PinotSegmentDeletionListener) clazz.newInstance();
+          pinotSegmentDeletionListener.init(_helixZkManager);
+          pinotSegmentDeletionListeners.add(pinotSegmentDeletionListener);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while initializing segment deletion listener : {}, skipping it", clazz, e);
+        }
+      }
+    }
+
+    return pinotSegmentDeletionListeners;
   }
 
   /**

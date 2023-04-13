@@ -31,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -80,7 +79,6 @@ import org.apache.pinot.controller.api.resources.InvalidControllerConfigExceptio
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.PinotSegmentDeletionListener;
 import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -102,7 +100,6 @@ import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.spi.annotations.segment.lifecycle.SegmentDeletionListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -113,7 +110,6 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
@@ -411,7 +407,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _leadControllerManager.start();
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
-    _helixResourceManager.start(_helixParticipantManager, getSegmentDeletionListeners());
+    _helixResourceManager.start(_helixParticipantManager);
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager =
@@ -663,28 +659,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   protected TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> getTaskManagerStatusCache() {
     return new InMemoryTaskManagerStatusCache();
-  }
-
-  protected List<PinotSegmentDeletionListener> getSegmentDeletionListeners() {
-    List<PinotSegmentDeletionListener> pinotSegmentDeletionListeners = new ArrayList<>();
-    Set<Class<?>> classes = PinotReflectionUtils.getClassesThroughReflection(".*\\.plugin\\.segment\\.deletion\\..*",
-        SegmentDeletionListener.class);
-    for (Class<?> clazz : classes) {
-      SegmentDeletionListener annotation = clazz.getAnnotation(SegmentDeletionListener.class);
-      if (annotation.enabled()) {
-        try {
-          PinotSegmentDeletionListener pinotSegmentDeletionListener =
-              (PinotSegmentDeletionListener) clazz.newInstance();
-          pinotSegmentDeletionListener.init(_helixParticipantManager);
-          pinotSegmentDeletionListeners.add(pinotSegmentDeletionListener);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while initializing and registering event observer factory: {}, skipping it",
-              clazz, e);
-        }
-      }
-    }
-
-    return pinotSegmentDeletionListeners;
   }
 
   @VisibleForTesting

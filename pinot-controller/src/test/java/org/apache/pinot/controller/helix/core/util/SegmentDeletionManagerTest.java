@@ -23,6 +23,7 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -306,15 +307,16 @@ public class SegmentDeletionManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     File tempDir = Files.createTempDir();
     tempDir.deleteOnExit();
-    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
-        tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
+    SegmentDeletionManager deletionManager =
+        new SegmentDeletionManager(tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7,
+            Collections.emptyList());
 
     // create table segment files.
     Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
     createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted());
     final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
-    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
-        + File.separator + TABLE_NAME);
+    final File deletedTableDir =
+        new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments" + File.separator + TABLE_NAME);
 
     // delete the segments instantly.
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
@@ -380,12 +382,13 @@ public class SegmentDeletionManagerTest {
     public Set<String> _segmentsToRetry = new HashSet<>();
 
     FakeDeletionManager(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-      super(null, helixAdmin, CLUSTER_NAME, propertyStore, 0);
+      super(null, helixAdmin, CLUSTER_NAME, propertyStore, 0, Collections.emptyList());
     }
 
     FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, int
         deletedSegmentsRetentionInDays) {
-      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays);
+      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays,
+          Collections.emptyList());
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {

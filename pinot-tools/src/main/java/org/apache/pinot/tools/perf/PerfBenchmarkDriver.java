@@ -290,7 +290,7 @@ public class PerfBenchmarkDriver {
       _helixResourceManager = new PinotHelixResourceManager(controllerConf);
       String instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
       HelixManager helixManager = registerAndConnectAsHelixSpectator(instanceId);
-      _helixResourceManager.start(helixManager, Collections.emptyList());
+      _helixResourceManager.start(helixManager);
     }
 
     // Create server tenants if required
