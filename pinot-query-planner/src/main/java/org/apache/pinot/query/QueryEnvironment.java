@@ -20,7 +20,10 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
@@ -149,7 +152,9 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId), null, relRoot.rel);
+      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
+      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId, tableNames), null,
+          tableNames);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -177,7 +182,8 @@ public class QueryEnvironment {
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), relRoot.rel);
+      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
+      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -199,12 +205,12 @@ public class QueryEnvironment {
   public static class QueryPlannerResult {
     private QueryPlan _queryPlan;
     private String _explainPlan;
-    private RelNode _relRoot;
+    Set<String> _tableNames;
 
-    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, RelNode relRoot) {
+    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, Set<String> tableNames) {
       _queryPlan = queryPlan;
       _explainPlan = explainPlan;
-      _relRoot = relRoot;
+      _tableNames = tableNames;
     }
 
     public String getExplainPlan() {
@@ -215,8 +221,9 @@ public class QueryEnvironment {
       return _queryPlan;
     }
 
-    public RelNode getRelRoot() {
-      return _relRoot;
+    // Returns all the table names in the query.
+    public Set<String> getTableNames() {
+      return _tableNames;
     }
   }
 
@@ -267,10 +274,11 @@ public class QueryEnvironment {
     }
   }
 
-  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
+  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
+      Set<String> tableNames) {
     // 5. construct a dispatchable query plan.
     StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager, requestId, _tableCache);
-    return queryStagePlanner.makePlan(relRoot);
+    return queryStagePlanner.makePlan(relRoot, tableNames);
   }
 
   // --------------------------------------------------------------------------
@@ -279,5 +287,16 @@ public class QueryEnvironment {
 
   private HintStrategyTable getHintStrategyTable() {
     return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
+  }
+
+
+  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
+    Set<String> tableNames = new HashSet<>();
+    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
+    for (String qualifiedTableName : qualifiedTableNames) {
+      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
+      tableNames.add(tableName);
+    }
+    return tableNames;
   }
 }
