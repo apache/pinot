@@ -234,17 +234,17 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void deleteTable(String tableNameWithType)
       throws Exception {
-    // Wait externalview to converge
     long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
-    _tableDataManagerMap.compute(tableNameWithType, (k, v) -> {
-      if (v != null) {
-        v.preShutDown();
-        LOGGER.info("Completed pre shutdown routine for table: {}", tableNameWithType);
-      } else {
-        LOGGER.warn("Failed to find table data manager for table: {}, skip shutting down the table", tableNameWithType);
-      }
-      return null;
-    });
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.preShutDown();
+      LOGGER.info("Completed pre shutdown routine for table: {}", tableNameWithType);
+    } else {
+      LOGGER.warn("Failed to find table data manager for table: {}, skip shutting down the table", tableNameWithType);
+      return;
+    }
+
+    // Wait externalview to converge
     do {
       ExternalView externalView = _helixManager.getHelixDataAccessor()
           .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
