@@ -178,6 +178,14 @@ public class PinotQueryResource {
           new Exception("Unable to find table name from SQL thus cannot dispatch to broker.")).toString();
     }
 
+    for (String tableName : tableNames) {
+      if (!(_pinotHelixResourceManager.hasRealtimeTable(tableName)
+          || _pinotHelixResourceManager.hasOfflineTable(tableName))) {
+        return QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, new Exception(String
+            .format("Unable to find table : %s ", tableName))).toString();
+      }
+    }
+
     String brokerTenant = getCommonBrokerTenant(tableNames);
     String serverTenant = getCommonServerTenant(tableNames);
     if (brokerTenant == null || serverTenant == null) {
