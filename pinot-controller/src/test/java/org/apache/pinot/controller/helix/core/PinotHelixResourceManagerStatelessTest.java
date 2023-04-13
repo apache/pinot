@@ -279,6 +279,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
     assertTrue(brokerResource.getPartitionSet().isEmpty());
 
+    waitForEVToDisappear(OFFLINE_TABLE_NAME);
     resetBrokerTags();
   }
 
@@ -322,6 +323,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Delete the table
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    waitForEVToDisappear(OFFLINE_TABLE_NAME);
 
     // Reset the brokers
     resetBrokerTags();
@@ -395,6 +397,9 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       return externalView.getStateMap(OFFLINE_TABLE_NAME) == null
           && externalView.getStateMap(REALTIME_TABLE_NAME) == null;
     }, 60_000L, "Failed to get all brokers DROPPED");
+
+    waitForEVToDisappear(REALTIME_TABLE_NAME);
+    waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   private void waitForTableOnlineInBrokerResourceEV(String tableNameWithType) {
@@ -988,6 +993,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
+    waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   @Test
@@ -1257,6 +1263,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
+    waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   private static void assertSetEquals(Collection<String> actual, String... expected) {
