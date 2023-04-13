@@ -110,10 +110,6 @@
       <groupId>com.google.auto.service</groupId>
       <artifactId>auto-service</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
-    </dependency>
 
     <!-- Test dependencies -->
     <dependency>

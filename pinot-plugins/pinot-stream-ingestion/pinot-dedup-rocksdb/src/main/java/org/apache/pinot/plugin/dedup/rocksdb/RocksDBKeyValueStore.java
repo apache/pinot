@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.dedup;
+package org.apache.pinot.plugin.dedup.rocksdb;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Options;
@@ -33,11 +34,9 @@ import org.rocksdb.WriteBatch;
 import org.rocksdb.WriteOptions;
 
 public class RocksDBKeyValueStore implements LocalKeyValueStore {
-  @VisibleForTesting
-  static final RocksDB ROCKS_DB = initRocksDB();
+  private static final RocksDB ROCKS_DB = initRocksDB();
 
-  @VisibleForTesting
-  final ColumnFamilyHandle _columnFamilyHandle;
+  private final ColumnFamilyHandle _columnFamilyHandle;
 
   private static RocksDB initRocksDB() {
       RocksDB.loadLibrary();

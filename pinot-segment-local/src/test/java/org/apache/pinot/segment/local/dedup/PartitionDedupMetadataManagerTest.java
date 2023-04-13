@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -44,8 +45,9 @@ public class PartitionDedupMetadataManagerTest {
   @Test
   public void verifyAddRemoveSegment() throws Exception {
     HashFunction hashFunction = HashFunction.NONE;
+    DedupConfig dedupConfig = new DedupConfig(true, hashFunction);
     TestMetadataManager metadataManager =
-        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), hashFunction);
+        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), dedupConfig);
 
     // Add the first segment
     List<PrimaryKey> pkList1 = new ArrayList<>();
@@ -71,8 +73,9 @@ public class PartitionDedupMetadataManagerTest {
   @Test
   public void verifyReloadSegment() throws Exception {
     HashFunction hashFunction = HashFunction.NONE;
+    DedupConfig dedupConfig = new DedupConfig(true, hashFunction);
     TestMetadataManager metadataManager =
-        new TestMetadataManager(REALTIME_TABLE_NAME, null, 1, mock(ServerMetrics.class), hashFunction);
+        new TestMetadataManager(REALTIME_TABLE_NAME, null, 1, mock(ServerMetrics.class), dedupConfig);
 
     // Add the first segment
     List<PrimaryKey> pkList1 = new ArrayList<>();
@@ -102,8 +105,9 @@ public class PartitionDedupMetadataManagerTest {
   @Test
   public void verifyAddRow() throws Exception {
     HashFunction hashFunction = HashFunction.NONE;
+    DedupConfig dedupConfig = new DedupConfig(true, hashFunction);
     TestMetadataManager metadataManager =
-        new TestMetadataManager(REALTIME_TABLE_NAME, null, 2, mock(ServerMetrics.class), hashFunction);
+        new TestMetadataManager(REALTIME_TABLE_NAME, null, 2, mock(ServerMetrics.class), dedupConfig);
 
     // Add the first segment
     List<PrimaryKey> pkList1 = new ArrayList<>();
@@ -163,8 +167,8 @@ public class PartitionDedupMetadataManagerTest {
     Iterator<PrimaryKey> _primaryKeyIterator;
 
     TestMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,
-        ServerMetrics serverMetrics, HashFunction hashFunction) {
-      super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction);
+        ServerMetrics serverMetrics, DedupConfig dedupConfig) {
+      super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, dedupConfig);
     }
 
     @Override

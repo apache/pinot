@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
 
     Licensed to the Apache Software Foundation (ASF) under one
@@ -24,26 +24,27 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-plugins</artifactId>
+    <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.13.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-stream-ingestion</artifactId>
-  <packaging>pom</packaging>
-  <name>Pinot Stream Ingestion</name>
+
+  <artifactId>pinot-dedup-rocksdb</artifactId>
+  <name>Pinot RocksDB Deduplication</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-stream-ingestion</plugin.type>
+    <pinot.root>${basedir}/../../..</pinot.root>
+    <phase.prop>package</phase.prop>
   </properties>
-
-  <modules>
-    <module>pinot-kafka-base</module>
-    <module>pinot-kafka-2.0</module>
-    <module>pinot-kinesis</module>
-    <module>pinot-pulsar</module>
-    <module>pinot-dedup-rocksdb</module>
-  </modules>
-
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.rocksdb</groupId>
+      <artifactId>rocksdbjni</artifactId>
+    </dependency>
+  </dependencies>
 </project>

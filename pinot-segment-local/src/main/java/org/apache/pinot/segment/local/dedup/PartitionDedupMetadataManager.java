@@ -25,14 +25,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -41,17 +44,28 @@ public class PartitionDedupMetadataManager {
   private final List<String> _primaryKeyColumns;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
+  private final DedupConfig _dedupConfig;
   @VisibleForTesting final LocalKeyValueStore _keyValueStore;
 
   public PartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,
-      ServerMetrics serverMetrics, HashFunction hashFunction) {
+      ServerMetrics serverMetrics, DedupConfig dedupConfig) {
     _tableNameWithType = tableNameWithType;
     _primaryKeyColumns = primaryKeyColumns;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
-    _keyValueStore = new RocksDBKeyValueStore((tableNameWithType + "@" + partitionId).getBytes());
+    _dedupConfig = dedupConfig;
+    try {
+      byte[] id = (tableNameWithType + "@" + partitionId).getBytes();
+      _keyValueStore = StringUtils.isEmpty(dedupConfig.getKeyStore()) ?
+              new ConcurrentHashMapKeyValueStore(id) :
+              PluginManager.get().createInstance(
+                      dedupConfig.getKeyStore(),
+                      new Class[]{byte[].class},
+                      new Object[]{id}
+              );
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void addSegment(IndexSegment segment) {
@@ -60,7 +74,7 @@ public class PartitionDedupMetadataManager {
     List<Pair<byte[], byte[]>> keyValues = new ArrayList<>();
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
-      byte[] serializedPrimaryKey = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _hashFunction));
+      byte[] serializedPrimaryKey = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _dedupConfig.getHashFunction()));
       keyValues.add(Pair.of(serializedPrimaryKey, serializedSegment));
     }
     _keyValueStore.putBatch(keyValues);
@@ -132,7 +146,7 @@ public class PartitionDedupMetadataManager {
   }
 
   public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    byte[] keyBytes = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _hashFunction));
+    byte[] keyBytes = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _dedupConfig.getHashFunction()));
     if (Objects.isNull(_keyValueStore.get(keyBytes))) {
         _keyValueStore.put(keyBytes, serializeSegment(indexSegment));
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,

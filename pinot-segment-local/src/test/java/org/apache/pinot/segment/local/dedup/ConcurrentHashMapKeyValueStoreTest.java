@@ -22,17 +22,18 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-public class RocksDBKeyValueStoreTest {
+public class ConcurrentHashMapKeyValueStoreTest {
 
-    LocalKeyValueStore _keyValueStore = new RocksDBKeyValueStore("test".getBytes(StandardCharsets.UTF_8));
+    LocalKeyValueStore _keyValueStore = new ConcurrentHashMapKeyValueStore("test".getBytes(StandardCharsets.UTF_8));
     byte[] _nonExistingKey = "non-existing".getBytes();
     byte[] _key = "someKey".getBytes();
-    byte[] _key2 = "someKey".getBytes();
+    byte[] _key2 = "someKey2".getBytes();
 
     @BeforeMethod
     public void setUp() throws Exception {
@@ -40,7 +41,7 @@ public class RocksDBKeyValueStoreTest {
     }
 
     private void cleanup() throws Exception {
-        List<byte[]> allKeys = Arrays.asList(_key, _key, _nonExistingKey);
+        List<byte[]> allKeys = Arrays.asList(_key, _key2, _nonExistingKey);
         allKeys.forEach(aKey -> _keyValueStore.delete(aKey));
         _keyValueStore.compact();
     }

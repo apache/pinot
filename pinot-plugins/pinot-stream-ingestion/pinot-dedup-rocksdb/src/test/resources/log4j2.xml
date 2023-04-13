@@ -26,15 +26,11 @@
     </Console>
   </Appenders>
   <Loggers>
-    <Logger name="org.apache.pinot" level="debug" additivity="false">
+    <Logger name="org.apache.pinot" level="warn" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
     <Root level="error">
       <AppenderRef ref="console"/>
     </Root>
-    <Logger name="org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig" additivity="false"
-            level="error">
-      <AppenderRef ref="console"/>
-    </Logger>
   </Loggers>
 </Configuration>
