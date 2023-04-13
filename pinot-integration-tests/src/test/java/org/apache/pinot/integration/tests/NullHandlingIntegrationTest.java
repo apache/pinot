@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.util.TestUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -298,5 +299,124 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asText(), "null");
+  }
+
+  @Test
+  public void testNullSelectionOnlyTransform()
+      throws Exception {
+    RoaringBitmap nullSalary = new RoaringBitmap();
+    String sqlQuery = "SELECT salary FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (rows.get(i).get(0).asText().equals("null")) {
+        nullSalary.add(i);
+      }
+    }
+    // AdditionTransformFunction
+    sqlQuery = "SELECT add(salary, add(null, 1)) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asText(), "null");
+      }
+    }
+    sqlQuery = "SELECT add(salary, '1.23456789101112') FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asText(), "null");
+      } else {
+        assertTrue(!rows.get(i).get(0).asText().equals("null"));
+      }
+    }
+    // Cast
+    sqlQuery = "SELECT cast(salary AS INT) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asText(), "null");
+      } else {
+        assertTrue(!rows.get(i).get(0).asText().equals("null"));
+      }
+    }
+
+    sqlQuery = "SELECT COALESCE(salary, add(1, null)) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asText(), "null");
+      } else {
+        assertTrue(!rows.get(i).get(0).asText().equals("null"));
+      }
+    }
+
+    sqlQuery = "SELECT salary IS DISTINCT FROM salary FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      assertEquals(rows.get(i).get(0).asBoolean(), false);
+    }
+
+    sqlQuery = "SELECT salary IS DISTINCT FROM null FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asBoolean(), false);
+      } else {
+        assertEquals(rows.get(i).get(0).asBoolean(), true);
+      }
+    }
+
+    sqlQuery = "SELECT salary IS NOT DISTINCT FROM null FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asBoolean(), true);
+      } else {
+        assertEquals(rows.get(i).get(0).asBoolean(), false);
+      }
+    }
+
+    sqlQuery = "SELECT isNotNull(salary) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asBoolean(), false);
+      } else {
+        assertEquals(rows.get(i).get(0).asBoolean(), true);
+      }
+    }
+
+    // Case when
+    sqlQuery = "SELECT CASE WHEN salary IS NULL THEN null ELSE 1 END FROM " + getTableName()
+        + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asText(), "null");
+      } else {
+        assertEquals(rows.get(i).get(0).asInt(), 1);
+      }
+    }
+    sqlQuery = "SELECT CASE WHEN salary IS NOT NULL THEN null ELSE 6 END FROM " + getTableName()
+        + " OPTION(enableNullHandling=true);";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < 10; i++) {
+      if (nullSalary.contains(i)) {
+        assertEquals(rows.get(i).get(0).asInt(), 6);
+      } else {
+        assertEquals(rows.get(i).get(0).asText(), "null");
+      }
+    }
   }
 }

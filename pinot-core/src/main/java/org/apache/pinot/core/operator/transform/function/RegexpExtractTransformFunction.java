@@ -58,6 +58,8 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    // TODO: Proper support for null in groovy functions.
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() >= 2 && arguments.size() <= 4,
         "REGEXP_EXTRACT takes between 2 to 4 arguments. See usage: "
             + "REGEXP_EXTRACT(`value`, `regexp`[, `group`[, `default_value`]]");

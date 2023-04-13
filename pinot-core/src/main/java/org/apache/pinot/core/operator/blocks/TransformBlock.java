@@ -33,9 +33,13 @@ public class TransformBlock implements ValueBlock {
   protected final ValueBlock _sourceBlock;
   protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
 
-  public TransformBlock(ValueBlock sourceBlock, Map<ExpressionContext, TransformFunction> transformFunctionMap) {
+  private final boolean _isNullHandlingEnabled;
+
+  public TransformBlock(ValueBlock sourceBlock, Map<ExpressionContext, TransformFunction> transformFunctionMap,
+      boolean isNullHandlingEnabled) {
     _sourceBlock = sourceBlock;
     _transformFunctionMap = transformFunctionMap;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   @Override
@@ -54,7 +58,8 @@ public class TransformBlock implements ValueBlock {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return _sourceBlock.getBlockValueSet(expression);
     } else {
-      return new TransformBlockValSet(_sourceBlock, _transformFunctionMap.get(expression), expression);
+      return new TransformBlockValSet(_sourceBlock, _transformFunctionMap.get(expression), expression,
+          _isNullHandlingEnabled);
     }
   }
 

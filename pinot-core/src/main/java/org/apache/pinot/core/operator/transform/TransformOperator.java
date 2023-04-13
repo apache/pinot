@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -46,6 +47,7 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
 
   private final BaseProjectOperator<?> _projectOperator;
   private final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
+  private final boolean _isNullHandlingEnabled;
 
   public TransformOperator(QueryContext queryContext, BaseProjectOperator<?> projectOperator,
       Collection<ExpressionContext> expressions) {
@@ -56,6 +58,7 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
           TransformFunctionFactory.get(expression, projectOperator.getSourceColumnContextMap(), queryContext);
       _transformFunctionMap.put(expression, transformFunction);
     }
+    _isNullHandlingEnabled = QueryOptionsUtils.isNullHandlingEnabled(queryContext.getQueryOptions());
   }
 
   @Override
@@ -75,7 +78,7 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
       return null;
     }
     Tracing.activeRecording().setNumChildren(_transformFunctionMap.size());
-    return new TransformBlock(sourceBlock, _transformFunctionMap);
+    return new TransformBlock(sourceBlock, _transformFunctionMap, _isNullHandlingEnabled);
   }
 
   @Override

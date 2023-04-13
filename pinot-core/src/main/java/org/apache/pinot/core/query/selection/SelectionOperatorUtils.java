@@ -315,8 +315,7 @@ public class SelectionOperatorUtils {
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
             break;
-
-          // Multi-value column
+            // Multi-value column
           case INT_ARRAY:
             dataTableBuilder.setColumn(i, (int[]) columnValue);
             break;
@@ -332,7 +331,9 @@ public class SelectionOperatorUtils {
           case STRING_ARRAY:
             dataTableBuilder.setColumn(i, (String[]) columnValue);
             break;
-
+          case UNKNOWN:
+            dataTableBuilder.setColumn(i, (Object) null);
+            break;
           default:
             throw new IllegalStateException(
                 String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
@@ -404,7 +405,9 @@ public class SelectionOperatorUtils {
         case STRING_ARRAY:
           row[i] = dataTable.getStringArray(rowId, i);
           break;
-
+        case UNKNOWN:
+          row[i] = null;
+          break;
         default:
           throw new IllegalStateException(
               String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
