@@ -38,11 +38,12 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
   public static Object[][] testCases() {
     return new Object[][]{
         //@formatter:off
-        {"year", (LongToIntFunction) DateTimeFunctions::year}, {"month",
-        (LongToIntFunction) DateTimeFunctions::monthOfYear}, {"day",
-        (LongToIntFunction) DateTimeFunctions::dayOfMonth}, {"hour", (LongToIntFunction) DateTimeFunctions::hour}, {
-          "minute", (LongToIntFunction) DateTimeFunctions::minute}, {"second",
-        (LongToIntFunction) DateTimeFunctions::second},
+        {"year", (LongToIntFunction) DateTimeFunctions::year},
+        {"month", (LongToIntFunction) DateTimeFunctions::monthOfYear},
+        {"day", (LongToIntFunction) DateTimeFunctions::dayOfMonth},
+        {"hour", (LongToIntFunction) DateTimeFunctions::hour},
+        {"minute", (LongToIntFunction) DateTimeFunctions::minute},
+        {"second", (LongToIntFunction) DateTimeFunctions::second},
         // TODO: Need to add timezone_hour and timezone_minute
 //      "timezone_hour",
 //      "timezone_minute",
