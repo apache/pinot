@@ -107,8 +107,8 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
 
     _dateTimeTransformer = DateTimeTransformerFactory.getDateTimeTransformer(
         ((LiteralTransformFunction) arguments.get(1)).getStringLiteral(),
-            ((LiteralTransformFunction) arguments.get(2)).getStringLiteral(),
-            ((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
+        ((LiteralTransformFunction) arguments.get(2)).getStringLiteral(),
+        ((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
     if (_dateTimeTransformer instanceof EpochToEpochTransformer
         || _dateTimeTransformer instanceof SDFToEpochTransformer) {
       _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
@@ -131,8 +131,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     initLongValuesSV(length);
     if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
       EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV,
-          length);
+      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV, length);
     } else {
       SDFToEpochTransformer dateTimeTransformer = (SDFToEpochTransformer) _dateTimeTransformer;
       dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(valueBlock), _longValuesSV,
@@ -161,7 +160,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock){
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }

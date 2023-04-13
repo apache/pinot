@@ -262,7 +262,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock){
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     return _timestampsFunction.getNullBitmap(valueBlock);
   }
 }

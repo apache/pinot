@@ -141,7 +141,7 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock){
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }
