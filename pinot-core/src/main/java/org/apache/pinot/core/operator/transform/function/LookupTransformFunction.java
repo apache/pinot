@@ -92,8 +92,6 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // TODO: Proper support of null
-    super.init(arguments, columnContextMap);
     // Check that there are correct number of arguments
     Preconditions.checkArgument(arguments.size() >= 4,
         "At least 4 arguments are required for LOOKUP transform function: "
