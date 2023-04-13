@@ -33,34 +33,34 @@ public class IndexConfigTest {
     String confStr = "{}";
     IndexConfig config = JsonUtils.stringToObject(confStr, IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     IndexConfig config = JsonUtils.stringToObject(confStr, IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     IndexConfig config = JsonUtils.stringToObject(confStr, IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     IndexConfig config = JsonUtils.stringToObject(confStr, IndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
   }
 
   @Test
@@ -71,6 +71,6 @@ public class IndexConfigTest {
         + "}";
     IndexConfig config = JsonUtils.stringToObject(confStr, IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
   }
 }

@@ -34,37 +34,37 @@ public class FstIndexConfigTest {
     String confStr = "{}";
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected type");
   }
 
@@ -76,7 +76,7 @@ public class FstIndexConfigTest {
         + "}";
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected type");
   }
 }

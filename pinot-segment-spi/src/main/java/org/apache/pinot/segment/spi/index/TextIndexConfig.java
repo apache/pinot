@@ -31,7 +31,7 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class TextIndexConfig extends IndexConfig {
-  public static final TextIndexConfig DISABLED = new TextIndexConfig(false, null, null, false, false,
+  public static final TextIndexConfig DISABLED = new TextIndexConfig(true, null, null, false, false,
       Collections.emptyList(), Collections.emptyList());
   private final FSTType _fstType;
   @Nullable
@@ -43,14 +43,14 @@ public class TextIndexConfig extends IndexConfig {
 
   @JsonCreator
   public TextIndexConfig(
-      @JsonProperty("enabled") Boolean enabled,
+      @JsonProperty("disabled") Boolean disabled,
       @JsonProperty("fst") FSTType fstType,
       @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
       @JsonProperty("queryCache") boolean enableQueryCache,
       @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
       @JsonProperty("stopWordsInclude") List<String> stopWordsInclude,
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude) {
-    super(enabled);
+    super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
@@ -112,7 +112,7 @@ public class TextIndexConfig extends IndexConfig {
     }
 
     public TextIndexConfig build() {
-      return new TextIndexConfig(true, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
+      return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
           _stopWordsInclude, _stopWordsExclude);
     }
 

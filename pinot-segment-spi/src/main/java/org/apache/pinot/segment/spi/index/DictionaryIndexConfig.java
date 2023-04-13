@@ -28,21 +28,21 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 public class DictionaryIndexConfig extends IndexConfig {
 
-  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(true, false, false);
-  public static final DictionaryIndexConfig DEFAULT_OFFHEAP = new DictionaryIndexConfig(true, true, false);
-  public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(false, false, false);
+  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false, false, false);
+  public static final DictionaryIndexConfig DEFAULT_OFFHEAP = new DictionaryIndexConfig(false, true, false);
+  public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(true, false, false);
 
   private final boolean _onHeap;
   private final boolean _useVarLengthDictionary;
 
   public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
-    this(true, onHeap, useVarLengthDictionary);
+    this(false, onHeap, useVarLengthDictionary);
   }
 
   @JsonCreator
-  public DictionaryIndexConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty("onHeap") Boolean onHeap,
+  public DictionaryIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("onHeap") Boolean onHeap,
       @JsonProperty("useVarLengthDictionary") @Nullable Boolean useVarLengthDictionary) {
-    super(enabled);
+    super(disabled);
     _onHeap = onHeap != null && onHeap;
     _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);
   }
@@ -82,7 +82,7 @@ public class DictionaryIndexConfig extends IndexConfig {
       return "DictionaryIndexConfig{" + "\"onHeap\":" + _onHeap + ", \"useVarLengthDictionary\":"
           + _useVarLengthDictionary + "}";
     } else {
-      return "DictionaryIndexConfig{" + "\"enabled\": false}";
+      return "DictionaryIndexConfig{" + "\"disabled\": true}";
     }
   }
 }

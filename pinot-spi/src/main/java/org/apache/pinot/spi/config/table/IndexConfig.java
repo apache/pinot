@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -31,20 +32,24 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * Indexes that do not require extra configuration can directly use this class.
  */
 public class IndexConfig extends BaseJsonConfig {
-  public static final IndexConfig ENABLED = new IndexConfig(true);
-  public static final IndexConfig DISABLED = new IndexConfig(false);
-  private final boolean _enabled;
+  public static final IndexConfig ENABLED = new IndexConfig(false);
+  public static final IndexConfig DISABLED = new IndexConfig(true);
+  private final boolean _disabled;
 
   /**
-   * This is used as the default constructor for subclasses. The attribute {@link #_enabled} will be initialized to
-   * {@code enabled == null || enabled}, so it will be false if and only if {@code Boolean.FALSE.equals(enabled)}.
+   * @param disabled whether the config is disabled. Null is considered enabled.
    */
   @JsonCreator
-  public IndexConfig(@JsonProperty("enabled") Boolean enabled) {
-    _enabled = enabled == null || enabled;
+  public IndexConfig(@JsonProperty("disabled") Boolean disabled) {
+    _disabled = Boolean.TRUE.equals(disabled);
   }
 
+  public boolean isDisabled() {
+    return _disabled;
+  }
+
+  @JsonIgnore
   public boolean isEnabled() {
-    return _enabled;
+    return !_disabled;
   }
 }

@@ -36,37 +36,37 @@ public class H3IndexConfigTest {
     String confStr = "{}";
     H3IndexConfig config = JsonUtils.stringToObject(confStr, H3IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getResolution(), "Unexpected resolution");
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     H3IndexConfig config = JsonUtils.stringToObject(confStr, H3IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getResolution(), "Unexpected resolution");
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     H3IndexConfig config = JsonUtils.stringToObject(confStr, H3IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getResolution(), "Unexpected resolution");
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDissabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     H3IndexConfig config = JsonUtils.stringToObject(confStr, H3IndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getResolution(), "Unexpected resolution");
   }
 
@@ -78,7 +78,7 @@ public class H3IndexConfigTest {
         + "}";
     H3IndexConfig config = JsonUtils.stringToObject(confStr, H3IndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     H3IndexResolution resolution = config.getResolution();
     Assert.assertEquals(resolution.size(), 3);
     Assert.assertEquals(resolution.getLowestResolution(), 5);
