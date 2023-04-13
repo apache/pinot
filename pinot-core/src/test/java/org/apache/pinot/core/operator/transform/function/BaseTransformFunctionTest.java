@@ -160,10 +160,10 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
       map.put(INT_SV_COLUMN, _intSVValues[i]);
-      if (i % 2 == 0) {
-        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         map.put(INT_SV_NULL_COLUMN, null);
+      } else {
+        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
       }
       map.put(LONG_SV_COLUMN, _longSVValues[i]);
       map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
@@ -234,6 +234,10 @@ public abstract class BaseTransformFunctionTest {
 
     _projectionBlock = new ProjectionOperator(_dataSourceMap,
         new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+  }
+
+  protected boolean isNullRow(int i) {
+    return i % 2 != 0;
   }
 
   private void testNullBitmap(TransformFunction transformFunction, RoaringBitmap expectedNull) {
