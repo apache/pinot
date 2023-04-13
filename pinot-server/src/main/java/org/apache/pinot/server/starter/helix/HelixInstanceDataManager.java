@@ -184,6 +184,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public synchronized void shutDown() {
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      tableDataManager.preShutDown();
       tableDataManager.shutDown();
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
@@ -235,6 +236,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws Exception {
     // Wait externalview to converge
     long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
+    _tableDataManagerMap.compute(tableNameWithType, (k, v) -> {
+      if (v != null) {
+        v.preShutDown();
+        LOGGER.info("Completed pre shutdown routine for table: {}", tableNameWithType);
+      } else {
+        LOGGER.warn("Failed to find table data manager for table: {}, skip shutting down the table", tableNameWithType);
+      }
+      return null;
+    });
     do {
       ExternalView externalView = _helixManager.getHelixDataAccessor()
           .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));

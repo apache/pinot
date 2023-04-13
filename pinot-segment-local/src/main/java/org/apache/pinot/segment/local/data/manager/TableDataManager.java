@@ -57,6 +57,12 @@ public interface TableDataManager {
   void start();
 
   /**
+   * Should be called only once before shutting down the table data manager.
+   * We can use this method to do some pre-shutdown work, e.g. stop the upsert metadata manager
+   */
+  void preShutDown();
+
+  /**
    * Shuts down the table data manager. Should be called only once. After calling shut down, no other method should be
    * called.
    */

@@ -37,6 +37,10 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   }
 
   @Override
+  protected void doPreShutDown() {
+  }
+
+  @Override
   protected void doShutdown() {
   }
 }
