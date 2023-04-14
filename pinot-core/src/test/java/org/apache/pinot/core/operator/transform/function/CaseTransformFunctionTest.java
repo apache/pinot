@@ -125,6 +125,15 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
+  public void testCaseTransformFunctionWithNullLiterals() {
+    long[] expectedValues = new long[NUM_ROWS];
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, NUM_ROWS);
+    testCaseQueryWithLongResultsAllNull(String.format("greater_than(%s, 0)", INT_SV_NULL_COLUMN), expectedValues,
+        bitmap);
+  }
+
+  @Test
   public void testCaseTransformFunctionWithDoubleResults() {
     double[] expectedFloatResults = new double[NUM_ROWS];
     Arrays.fill(expectedFloatResults, 100);
@@ -235,6 +244,16 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  private void testCaseQueryWithLongResultsAllNull(String predicate, long[] expectedValues, RoaringBitmap bitmap) {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("CASE WHEN %s THEN NULL END", predicate));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+    assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.UNKNOWN);
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 

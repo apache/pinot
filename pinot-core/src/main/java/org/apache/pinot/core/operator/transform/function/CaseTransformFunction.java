@@ -163,6 +163,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
       // - FLOAT & DOUBLE -> DOUBLE
       // - Any numeric data type with BIG_DECIMAL -> BIG_DECIMAL
       // Use STRING to handle non-numeric types
+      // UNKNOWN data type is ignored unless all data types are unknown, we return unknown types.
       if (thenStatementDataType == dataType) {
         continue;
       }
@@ -189,6 +190,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
         case LONG:
           switch (thenStatementDataType) {
             case INT:
+            case UNKNOWN:
               break;
             case FLOAT:
             case DOUBLE:
@@ -196,8 +198,6 @@ public class CaseTransformFunction extends BaseTransformFunction {
               break;
             case BIG_DECIMAL:
               dataType = DataType.BIG_DECIMAL;
-              break;
-            case UNKNOWN:
               break;
             default:
               dataType = DataType.STRING;
