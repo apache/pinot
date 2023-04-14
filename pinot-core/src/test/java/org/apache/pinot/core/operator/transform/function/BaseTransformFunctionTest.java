@@ -392,41 +392,6 @@ public abstract class BaseTransformFunctionTest {
     testNullBitmap(transformFunction, expectedNull);
   }
 
-  protected void testTransformFunctionWithNull(TransformFunction transformFunction, double[] expectedValues,
-      RoaringBitmap expectedNull) {
-    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
-    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
-    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
-    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues = null;
-    try {
-      // 1- Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
-      // 2- NumberFormatException is thrown when converting double.NaN, Double.POSITIVE_INFINITY,
-      // or Double.NEGATIVE_INFINITY.
-      bigDecimalValues = transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
-    } catch (UnsupportedOperationException | NumberFormatException ignored) {
-    }
-    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(intValues.getLeft()[i], (int) expectedValues[i]);
-      assertEquals(longValues.getLeft()[i], (long) expectedValues[i]);
-      assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
-      assertEquals(doubleValues.getLeft()[i], expectedValues[i]);
-      if (bigDecimalValues != null) {
-        assertEquals(bigDecimalValues.getLeft()[i].doubleValue(), expectedValues[i]);
-      }
-      assertEquals(stringValues.getLeft()[i], Double.toString(expectedValues[i]));
-    }
-    assertEquals(intValues.getRight(), expectedNull);
-    assertEquals(longValues.getRight(), expectedNull);
-    assertEquals(floatValues.getRight(), expectedNull);
-    assertEquals(doubleValues.getRight(), expectedNull);
-    if (bigDecimalValues != null) {
-      assertEquals(bigDecimalValues.getRight(), expectedNull);
-    }
-    assertEquals(stringValues.getRight(), expectedNull);
-  }
-
   protected void testTransformFunction(TransformFunction transformFunction, BigDecimal[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
