@@ -49,7 +49,7 @@ public class UpsertConfig extends BaseJsonConfig {
   private Map<String, Strategy> _partialUpsertStrategies;
 
   @JsonPropertyDescription("default upsert strategy for partial mode")
-  private Strategy _defaultPartialUpsertStrategy;
+  private Strategy _defaultPartialUpsertStrategy = Strategy.OVERWRITE;
 
   @JsonPropertyDescription("Columns for upsert comparison, default to time column")
   private List<String> _comparisonColumns;
