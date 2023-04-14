@@ -141,7 +141,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   private TransformResultMetadata calculateResultMetadata() {
-    TransformFunction elseStatement = _thenStatements.get(0);
+    TransformFunction elseStatement = _elseStatement;
     TransformResultMetadata elseStatementResultMetadata = elseStatement.getResultMetadata();
     DataType dataType = elseStatementResultMetadata.getDataType();
     Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
@@ -179,6 +179,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case BIG_DECIMAL:
               dataType = DataType.BIG_DECIMAL;
               break;
+            case UNKNOWN:
+              break;
             default:
               dataType = DataType.STRING;
               break;
@@ -195,6 +197,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case BIG_DECIMAL:
               dataType = DataType.BIG_DECIMAL;
               break;
+            case UNKNOWN:
+              break;
             default:
               dataType = DataType.STRING;
               break;
@@ -210,6 +214,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case BIG_DECIMAL:
               dataType = DataType.BIG_DECIMAL;
               break;
+            case UNKNOWN:
+              break;
             default:
               dataType = DataType.STRING;
               break;
@@ -220,6 +226,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case INT:
             case FLOAT:
             case LONG:
+            case UNKNOWN:
               break;
             case BIG_DECIMAL:
               dataType = DataType.BIG_DECIMAL;
@@ -235,11 +242,15 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case FLOAT:
             case LONG:
             case DOUBLE:
+            case UNKNOWN:
               break;
             default:
               dataType = DataType.STRING;
               break;
           }
+          break;
+        case UNKNOWN:
+          dataType = thenStatementDataType;
           break;
         default:
           dataType = DataType.STRING;
