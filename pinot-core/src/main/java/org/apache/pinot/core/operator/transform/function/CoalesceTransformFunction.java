@@ -393,13 +393,15 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     RoaringBitmap bitmap = nullBitMaps[0];
+    if (bitmap == null || bitmap.isEmpty()) {
+      return null;
+    }
     for (int i = 1; i < nullBitMaps.length; i++) {
       RoaringBitmap curBitmap = nullBitMaps[i];
-      if (bitmap != null && curBitmap != null) {
-        bitmap.and(curBitmap);
-      } else {
-        bitmap = null;
+      if (curBitmap == null || curBitmap.isEmpty()) {
+        return null;
       }
+      bitmap.and(curBitmap);
     }
     if (bitmap == null || bitmap.isEmpty()) {
       return null;
