@@ -90,16 +90,18 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     RoaringBitmap bitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    if (bitmap == null || bitmap.isEmpty()) {
+      return bitmap;
+    }
     for (int i = 1; i < _arguments.size(); i++) {
       RoaringBitmap curBitmap = _arguments.get(i).getNullBitmap(valueBlock);
-      if (bitmap != null && curBitmap != null) {
-        bitmap.and(curBitmap);
-      } else {
-        bitmap = null;
+      if (curBitmap == null || curBitmap.isEmpty()) {
+        return curBitmap;
       }
-    }
-    if (bitmap == null || bitmap.isEmpty()) {
-      return null;
+      bitmap.and(curBitmap);
+      if (bitmap.isEmpty()) {
+        return null;
+      }
     }
     return bitmap;
   }
