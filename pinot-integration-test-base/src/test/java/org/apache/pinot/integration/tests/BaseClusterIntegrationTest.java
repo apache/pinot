@@ -607,7 +607,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(new Function<>() {
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
