@@ -398,6 +398,9 @@ public class InTransformFunction extends BaseTransformFunction {
     RoaringBitmap mainFunctionNullBitmap = _mainFunction.getNullBitmap(valueBlock);
     if (mainFunctionNullBitmap != null) {
       result.or(mainFunctionNullBitmap);
+      if (result.getCardinality() == length) {
+        return result;
+      }
     }
     int[] intValuesSV = transformToIntValuesSV(valueBlock);
     if (_valueSet == null) {
