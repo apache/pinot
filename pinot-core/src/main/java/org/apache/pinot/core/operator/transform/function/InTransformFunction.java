@@ -390,6 +390,8 @@ public class InTransformFunction extends BaseTransformFunction {
     return _intValuesSV;
   }
 
+  // TODO: override transformToIntValuesSVWithNull after https://github.com/apache/pinot/issues/10618.
+
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
