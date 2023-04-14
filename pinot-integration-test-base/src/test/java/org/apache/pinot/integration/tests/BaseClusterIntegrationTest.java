@@ -277,11 +277,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * The following methods are based on the getters. Override the getters for non-default settings before calling these
-   * methods.
-   */
-
-  /**
    * Creates a new schema.
    */
   protected Schema createSchema()
@@ -612,7 +607,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+    TestUtils.waitForCondition(new Function<>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
@@ -649,22 +644,5 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
         getH2Connection());
-  }
-
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
-  protected void testQueryViaController(String query)
-      throws Exception {
-    testQueryViaController(query, query);
-  }
-
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
-  protected void testQueryViaController(String pinotQuery, String h2Query)
-      throws Exception {
-    ClusterIntegrationTestUtils.testQueryViaController(pinotQuery, _controllerBaseApiUrl, getPinotConnection(), h2Query,
-        getH2Connection(), null, null);
   }
 }
