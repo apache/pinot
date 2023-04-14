@@ -55,7 +55,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -163,7 +163,7 @@ public class ClusterIntegrationTestUtils {
       params.append(",?");
     }
     PreparedStatement h2Statement =
-        h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");;
+        h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
@@ -900,7 +900,7 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static String removeTrailingZeroForNumber(String value, String type) {
-    String upperCaseType = StringUtils.toUpperCase(type);
+    String upperCaseType = StringUtils.upperCase(type);
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
     if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT")
         || upperCaseType.equals("DOUBLE") || upperCaseType.equals("DOUBLE PRECISION")) {
