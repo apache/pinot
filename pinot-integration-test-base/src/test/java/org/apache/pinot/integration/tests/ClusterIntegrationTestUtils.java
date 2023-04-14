@@ -158,10 +158,12 @@ public class ClusterIntegrationTestUtils {
     }
 
     // Insert Avro records into H2 table
+    StringBuilder params = new StringBuilder("?");
+    for (int i = 0; i < h2FieldNameAndTypes.size() - 1; i++) {
+      params.append(",?");
+    }
     PreparedStatement h2Statement =
-        h2Connection.prepareStatement(
-            "INSERT INTO " + tableName + " VALUES (" + "?" + ",?".repeat(Math.max(0, h2FieldNameAndTypes.size() - 1))
-                + ")");
+        h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");;
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
