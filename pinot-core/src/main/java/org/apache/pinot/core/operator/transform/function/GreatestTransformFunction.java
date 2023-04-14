@@ -26,7 +26,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.roaringbitmap.RoaringBitmap;
 
 /**
- * The <code>GreatestTransformFunction</code> implements the Least operator.
+ * The <code>GreatestTransformFunction</code> implements the Greatest operator.
  *
  * Return the greatest results for the arguments
  *
@@ -67,8 +67,9 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       values = _arguments.get(i).transformToIntValuesSVWithNull(valueBlock);
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
-        // Ignore null values.
+        // If current value is not null, we process the data.
         if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
           if (nullBitmap != null && nullBitmap.contains(j)) {
             _intValuesSV[j] = values.getLeft()[j];
           } else {
@@ -111,8 +112,9 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       values = _arguments.get(i).transformToLongValuesSVWithNull(valueBlock);
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
-        // Ignore null values.
+        // If current value is not null, we process the data.
         if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
           if (nullBitmap != null && nullBitmap.contains(j)) {
             _longValuesSV[j] = values.getLeft()[j];
           } else {
@@ -155,8 +157,9 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       values = _arguments.get(i).transformToFloatValuesSVWithNull(valueBlock);
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
-        // Ignore null values.
+        // If current value is not null, we process the data.
         if (curNull != null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
           if (nullBitmap != null && nullBitmap.contains(j)) {
             _floatValuesSV[j] = values.getLeft()[j];
           } else {
@@ -199,8 +202,9 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       values = _arguments.get(i).transformToDoubleValuesSVWithNull(valueBlock);
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
-        // Ignore null values.
+        // If current value is not null, we process the data.
         if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
           if (nullBitmap != null && nullBitmap.contains(j)) {
             _doubleValuesSV[j] = values.getLeft()[j];
           } else {
@@ -243,8 +247,9 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       values = _arguments.get(i).transformToBigDecimalValuesSVWithNull(valueBlock);
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
-        // Ignore null values.
+        // If current value is not null, we process the data.
         if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
           if (nullBitmap != null && nullBitmap.contains(j)) {
             _bigDecimalValuesSV[j] = values.getLeft()[j];
           } else {
@@ -289,8 +294,9 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
       values = _arguments.get(i).transformToStringValuesSVWithNull(valueBlock);
       RoaringBitmap curNull = values.getRight();
       for (int j = 0; j < numDocs & j < values.getLeft().length; j++) {
-        // Ignore null values.
+        // If current value is not null, we process the data.
         if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
           if (nullBitmap != null && nullBitmap.contains(j)) {
             _stringValuesSV[j] = values.getLeft()[j];
           } else if (_stringValuesSV[j].compareTo(values.getLeft()[j]) < 0) {
