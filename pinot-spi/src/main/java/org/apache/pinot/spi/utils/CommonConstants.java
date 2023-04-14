@@ -243,6 +243,20 @@ public class CommonConstants {
         Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
     // Same logic as CombineOperatorUtils
 
+    // Config for Jersey ThreadPoolExecutorProvider.
+    // By default, Jersey uses the default unbounded thread pool to process queries.
+    // By enabling it, BrokerManagedAsyncExecutorProvider will be used to create a bounded thread pool.
+    public static final String CONFIG_OF_ENABLE_BOUNDED_THREAD_POOL = "pinot.broker.enable.bounded.threadPool";
+    public static final boolean DEFAULT_ENABLE_BOUNDED_THREAD_POOL = false;
+    // Default capacities for the bounded thread pool
+    public static final String CONFIG_OF_MAX_POOL_SIZE = "pinot.broker.max.pool.size";
+    public static final int DEFAULT_MAX_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_CORE_POOL_SIZE = "pinot.broker.core.pool.size";
+    public static final int DEFAULT_CORE_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_QUEUE_SIZE = "pinot.broker.queue.size";
+    public static final int DEFAULT_QUEUE_SIZE = Runtime.getRuntime().availableProcessors() * 2;
+
+
     // used for SQL GROUP BY during broker reduce
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;

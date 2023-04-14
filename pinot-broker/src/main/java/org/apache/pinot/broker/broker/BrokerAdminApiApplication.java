@@ -105,6 +105,18 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(accessFactory).to(AccessControlFactory.class);
       }
     });
+    boolean enableBoundedThreadPool = brokerConf
+            .getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_THREAD_POOL,
+                    CommonConstants.Broker.DEFAULT_ENABLE_BOUNDED_THREAD_POOL);
+    if (enableBoundedThreadPool) {
+      int maximumPoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_POOL_SIZE,
+              CommonConstants.Broker.DEFAULT_MAX_POOL_SIZE);
+      int corePoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_CORE_POOL_SIZE,
+              CommonConstants.Broker.DEFAULT_CORE_POOL_SIZE);
+      int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_QUEUE_SIZE,
+              CommonConstants.Broker.DEFAULT_QUEUE_SIZE);
+      register(new BrokerManagedAsyncExecutorProvider(brokerMetrics, maximumPoolSize, corePoolSize, queueSize));
+    }
     register(JacksonFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
