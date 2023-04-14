@@ -239,6 +239,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
     _helixResourceManager.addTable(offlineTableConfig);
     checkBrokerResource(taggedBrokers);
 
@@ -279,7 +280,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
     assertTrue(brokerResource.getPartitionSet().isEmpty());
 
-    waitForEVToDisappear(OFFLINE_TABLE_NAME);
     resetBrokerTags();
   }
 
@@ -297,6 +297,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     _helixResourceManager.addTable(tableConfig);
 
     // Untag all Brokers assigned to broker tenant
@@ -323,7 +324,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Delete the table
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
-    waitForEVToDisappear(OFFLINE_TABLE_NAME);
 
     // Reset the brokers
     resetBrokerTags();
@@ -336,6 +336,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     _helixResourceManager.addTable(tableConfig);
     waitForTableOnlineInBrokerResourceEV(OFFLINE_TABLE_NAME);
 
@@ -364,6 +365,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs().getStreamConfigsMap()).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     _helixResourceManager.addTable(tableConfig);
     waitForTableOnlineInBrokerResourceEV(REALTIME_TABLE_NAME);
 
@@ -397,9 +399,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       return externalView.getStateMap(OFFLINE_TABLE_NAME) == null
           && externalView.getStateMap(REALTIME_TABLE_NAME) == null;
     }, 60_000L, "Failed to get all brokers DROPPED");
-
-    waitForEVToDisappear(REALTIME_TABLE_NAME);
-    waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   private void waitForTableOnlineInBrokerResourceEV(String tableNameWithType) {
@@ -736,6 +735,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     _helixResourceManager.addTable(tableConfig);
 
     // Add 5 segments
@@ -993,7 +993,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
-    waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   @Test
@@ -1005,6 +1004,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).setIngestionConfig(ingestionConfig).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     _helixResourceManager.addTable(tableConfig);
 
     // Add 3 segments
@@ -1263,7 +1263,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
-    waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   private static void assertSetEquals(Collection<String> actual, String... expected) {

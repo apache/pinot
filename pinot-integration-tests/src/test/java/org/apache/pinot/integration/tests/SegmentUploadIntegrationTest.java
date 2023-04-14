@@ -115,6 +115,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfig();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
     addTableConfig(offlineTableConfig);
 
     List<File> avroFiles = getAllAvroFiles();
@@ -214,6 +215,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfigWithConsistentPush();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
     addTableConfig(offlineTableConfig);
 
     List<File> avroFiles = getAllAvroFiles();
@@ -365,7 +367,6 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
       throws IOException {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     dropOfflineTable(offlineTableName);
-    waitForEVToDisappear(offlineTableName);
   }
 
   @AfterClass
