@@ -48,15 +48,15 @@ public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvid
     private final int _queueSize;
 
     public BrokerManagedAsyncExecutorProvider(
-            BrokerMetrics brokerMetrics,
-            int maximumPoolSize,
             int corePoolSize,
-            int queueSize) {
+            int maximumPoolSize,
+            int queueSize,
+            BrokerMetrics brokerMetrics) {
         super(NAME);
-        _brokerMetrics = brokerMetrics;
-        _maximumPoolSize = maximumPoolSize;
         _corePoolSize = corePoolSize;
+        _maximumPoolSize = maximumPoolSize;
         _queueSize = queueSize;
+        _brokerMetrics = brokerMetrics;
     }
 
     @Override

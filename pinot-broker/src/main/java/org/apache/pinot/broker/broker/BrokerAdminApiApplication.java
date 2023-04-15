@@ -109,13 +109,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
             .getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_THREAD_POOL,
                     CommonConstants.Broker.DEFAULT_ENABLE_BOUNDED_THREAD_POOL);
     if (enableBoundedThreadPool) {
-      int maximumPoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_POOL_SIZE,
-              CommonConstants.Broker.DEFAULT_MAX_POOL_SIZE);
-      int corePoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_CORE_POOL_SIZE,
-              CommonConstants.Broker.DEFAULT_CORE_POOL_SIZE);
-      int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_QUEUE_SIZE,
-              CommonConstants.Broker.DEFAULT_QUEUE_SIZE);
-      register(new BrokerManagedAsyncExecutorProvider(brokerMetrics, maximumPoolSize, corePoolSize, queueSize));
+      register(buildBrokerManagedAsyncExecutorProvider(brokerConf, brokerMetrics));
     }
     register(JacksonFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
@@ -163,6 +157,17 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         BrokerAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+  }
+
+  private BrokerManagedAsyncExecutorProvider buildBrokerManagedAsyncExecutorProvider(
+          PinotConfiguration brokerConf, BrokerMetrics brokerMetrics) {
+    int corePoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_CORE_POOL_SIZE,
+            CommonConstants.Broker.DEFAULT_CORE_POOL_SIZE);
+    int maximumPoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_POOL_SIZE,
+            CommonConstants.Broker.DEFAULT_MAX_POOL_SIZE);
+    int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_QUEUE_SIZE,
+            CommonConstants.Broker.DEFAULT_QUEUE_SIZE);
+    return new BrokerManagedAsyncExecutorProvider(corePoolSize, maximumPoolSize, queueSize, brokerMetrics);
   }
 
   public void stop() {

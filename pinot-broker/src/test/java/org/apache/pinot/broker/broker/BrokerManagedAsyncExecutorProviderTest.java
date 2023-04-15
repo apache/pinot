@@ -21,6 +21,7 @@ package org.apache.pinot.broker.broker;
 import java.util.Collections;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -30,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.ws.rs.ServiceUnavailableException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeClass;
@@ -47,7 +49,7 @@ public class BrokerManagedAsyncExecutorProviderTest {
     public void setUp() {
         _brokerMetrics = new BrokerMetrics(
                 CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
-                PinotMetricUtils.getPinotMetricsRegistry(null),
+                PinotMetricUtils.getPinotMetricsRegistry(new PinotConfiguration()),
                 CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS,
                 Collections.emptyList());
     }
@@ -55,7 +57,7 @@ public class BrokerManagedAsyncExecutorProviderTest {
     @Test
     public void testExecutorService() throws InterruptedException, ExecutionException {
         // create a new instance of the executor provider
-        BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(_brokerMetrics, 2, 2, 2);
+        BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(2, 2, 2, _brokerMetrics);
 
         // get the executor service
         ThreadPoolExecutor executor = (ThreadPoolExecutor) provider.getExecutorService();
@@ -74,8 +76,8 @@ public class BrokerManagedAsyncExecutorProviderTest {
     }
 
     @Test
-    public void testGet() {
-        BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(_brokerMetrics, 1, 1, 1);
+    public void testGet() throws InterruptedException {
+        BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(1, 1, 1, _brokerMetrics);
         ExecutorService executorService = provider.getExecutorService();
 
         // verify that the executor has the expected properties
@@ -100,21 +102,31 @@ public class BrokerManagedAsyncExecutorProviderTest {
 
         // test that the executor actually executes tasks
         AtomicInteger counter = new AtomicInteger();
+        CountDownLatch latch = new CountDownLatch(1);
         for (int i = 0; i < 1; i++) {
-            threadPoolExecutor.execute(() -> counter.incrementAndGet());
+            threadPoolExecutor.execute(() -> {
+                counter.incrementAndGet();
+                latch.countDown();
+            });
         }
-        assertEquals(counter.get(), 0);
+        latch.await();
+        assertEquals(counter.get(), 1);
     }
 
     @Test(expectedExceptions = ServiceUnavailableException.class)
-    public void testRejectHandler() {
-        BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(_brokerMetrics, 1, 1, 1);
+    public void testRejectHandler() throws InterruptedException {
+        BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(1, 1, 1, _brokerMetrics);
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) provider.getExecutorService();
 
         // test the rejection policy
         AtomicInteger counter = new AtomicInteger();
+        CountDownLatch latch = new CountDownLatch(10);
         for (int i = 0; i < 10; i++) {
-            threadPoolExecutor.execute(() -> counter.incrementAndGet());
+            threadPoolExecutor.execute(() -> {
+                counter.incrementAndGet();
+                latch.countDown();
+            });
         }
+        latch.await();
     }
 }
