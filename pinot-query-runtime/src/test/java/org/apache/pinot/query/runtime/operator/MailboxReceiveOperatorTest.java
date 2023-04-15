@@ -86,7 +86,7 @@ public class MailboxReceiveOperatorTest {
     // shorter timeoutMs should result in error.
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 10L, 10L,
-            new HashMap<>());
+            new HashMap<>(), false);
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 10L);
     Thread.sleep(200L);
@@ -97,13 +97,13 @@ public class MailboxReceiveOperatorTest {
 
     // longer timeout or default timeout (10s) doesn't result in error.
     context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 2000L, 2000L,
-        new HashMap<>());
+        new HashMap<>(), false);
     receiveOp = new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, 2000L);
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
     Assert.assertFalse(mailbox.isErrorBlock());
     context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-        Long.MAX_VALUE, new HashMap<>());
+        Long.MAX_VALUE, new HashMap<>(), false);
     receiveOp = new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, 456, 789, null);
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
@@ -125,7 +125,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
             456, 789, null);
@@ -144,7 +144,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.RANGE_DISTRIBUTED, 456, 789, null);
   }
@@ -172,7 +172,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -210,7 +210,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -251,7 +251,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -290,7 +290,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -332,7 +332,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -378,7 +378,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
@@ -424,7 +424,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
@@ -474,7 +474,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
@@ -526,7 +526,7 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
@@ -585,7 +585,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,
@@ -632,7 +632,7 @@ public class MailboxReceiveOperatorTest {
 
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>());
+            Long.MAX_VALUE, new HashMap<>(), false);
 
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED,

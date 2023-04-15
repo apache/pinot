@@ -55,10 +55,10 @@ import org.slf4j.LoggerFactory;
 
 public class BrokerAdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerAdminApiApplication.class);
-  private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
 
+  private final String _brokerResourcePackages;
   private final boolean _useHttps;
   private final boolean _swaggerBrokerEnabled;
   private final ExecutorService _executorService;
@@ -68,7 +68,10 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory) {
-    packages(RESOURCE_PACKAGE);
+    _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
+        CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
+    String[] pkgs = _brokerResourcePackages.split(",");
+    packages(pkgs);
     property(PINOT_CONFIGURATION, brokerConf);
     _useHttps = Boolean.parseBoolean(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_USE_HTTPS));
     _swaggerBrokerEnabled = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED,
@@ -137,7 +140,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     }
     beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(RESOURCE_PACKAGE);
+    beanConfig.setResourcePackage(_brokerResourcePackages);
     beanConfig.setScan(true);
 
     HttpHandler httpHandler = new CLStaticHttpHandler(BrokerAdminApiApplication.class.getClassLoader(), "/api/");

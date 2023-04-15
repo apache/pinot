@@ -97,6 +97,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16)
         + (stagePlan.getStageId() << 8) + (tableType == TableType.REALTIME ? 1 : 0);
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
+    boolean traceEnabled = Boolean.parseBoolean(requestMetadataMap.get(CommonConstants.Broker.Request.TRACE));
     PinotQuery pinotQuery = new PinotQuery();
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap);
     if (leafNodeLimit != null) {
@@ -109,7 +110,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
             new VirtualServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
-            timeBoundaryInfo);
+            timeBoundaryInfo, traceEnabled);
 
     // visit the plan and create query physical plan.
     ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);

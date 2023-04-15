@@ -246,6 +246,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
 
       Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
+      int numTables = 0;
       for (Integer stageId : stageIdStats.keySet()) {
         // check stats only for leaf stage
         BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
@@ -256,7 +257,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         String tableName = brokerResponseStats.getTableNames().get(0);
         Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-
+        numTables++;
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
         if (tableType == null) {
           tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -275,6 +276,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
         }
       }
+
+      Assert.assertTrue(numTables > 0);
     });
   }
 

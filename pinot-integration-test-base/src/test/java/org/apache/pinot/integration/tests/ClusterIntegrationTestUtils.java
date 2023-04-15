@@ -31,7 +31,9 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -137,10 +139,8 @@ public class ClusterIntegrationTestUtils {
           case ARRAY:
             Schema.Type type = field.schema().getElementType().getType();
             Assert.assertTrue(isSingleValueAvroFieldType(type));
-            // Split multi-value field into MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE single-value fields
-            for (int i = 0; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName + "__MV" + i, type, true));
-            }
+            // create Array data type based column.
+            h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true, true));
             break;
           default:
             if (isSingleValueAvroFieldType(fieldType)) {
@@ -172,17 +172,19 @@ public class ClusterIntegrationTestUtils {
             Object value = record.get(avroIndex);
             if (value instanceof GenericData.Array) {
               GenericData.Array array = (GenericData.Array) value;
+              Object[] arrayValue = new Object[MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE];
               for (int i = 0; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
                 if (i < array.size()) {
-                  value = array.get(i);
-                  if (value instanceof Utf8) {
-                    value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
+                  arrayValue[i] = array.get(i);
+                  if (arrayValue[i] instanceof Utf8) {
+                    arrayValue[i] =
+                        StringUtil.sanitizeStringValue(arrayValue[i].toString(), FieldSpec.DEFAULT_MAX_LENGTH);
                   }
                 } else {
-                  value = null;
+                  arrayValue[i] = null;
                 }
-                h2Statement.setObject(h2Index++, value);
               }
+              h2Statement.setObject(h2Index++, arrayValue);
             } else {
               if (value instanceof Utf8) {
                 value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
@@ -217,6 +219,20 @@ public class ClusterIntegrationTestUtils {
    * @return H2 field name and type
    */
   private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable) {
+    return buildH2FieldNameAndType(fieldName, avroFieldType, nullable, false);
+  }
+
+  /**
+   * Helper method to build H2 field name and type.
+   *
+   * @param fieldName Field name
+   * @param avroFieldType Avro field type
+   * @param nullable Whether the column is nullable
+   * @param arrayType Whether the column is array data type or not
+   * @return H2 field name and type
+   */
+  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable,
+      boolean arrayType) {
     String avroFieldTypeName = avroFieldType.getName();
     String h2FieldType;
     switch (avroFieldTypeName) {
@@ -229,6 +245,10 @@ public class ClusterIntegrationTestUtils {
       default:
         h2FieldType = avroFieldTypeName;
         break;
+    }
+    // if column is array data type, add Array with size.
+    if (arrayType) {
+      h2FieldType = h2FieldType + " ARRAY[" + MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE + "]";
     }
     if (nullable) {
       return String.format("`%s` %s", fieldName, h2FieldType);
@@ -759,18 +779,16 @@ public class ClusterIntegrationTestUtils {
         }
 
         // Handle multi-value columns
-        int length = columnName.length();
-        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName.substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH,
-            length - 1).equals("__MV")) {
+        int columnType = h2MetaData.getColumnType(columnIndex);
+        if (columnType == Types.ARRAY) {
           // Multi-value column
-          String multiValueColumnName = columnName.substring(0, length - H2_MULTI_VALUE_SUFFIX_LENGTH);
-          List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
-          if (multiValue == null) {
-            multiValue = new ArrayList<>();
-            reusableMultiValuesMap.put(multiValueColumnName, multiValue);
-            reusableColumnOrder.add(multiValueColumnName);
+          reusableColumnOrder.add(columnName);
+          if (columnValue.contains(",")) {
+            columnValue = Arrays.toString(
+                Arrays.stream(columnValue.substring(1, columnValue.length() - 1).split(",")).map(String::trim).sorted()
+                    .toArray());
           }
-          multiValue.add(columnValue);
+          reusableExpectedValueMap.put(columnName, columnValue);
         } else {
           // Single-value column
           String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
@@ -778,14 +796,6 @@ public class ClusterIntegrationTestUtils {
           reusableExpectedValueMap.put(columnName, columnValue);
           reusableColumnOrder.add(columnName);
         }
-      }
-
-      // Add multi-value column results to the expected values
-      // The reason for this step is that Pinot does not maintain order of elements in multi-value columns
-      for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
-        List<String> multiValue = entry.getValue();
-        Collections.sort(multiValue);
-        reusableExpectedValueMap.put(entry.getKey(), multiValue.toString());
       }
 
       // Build expected value String

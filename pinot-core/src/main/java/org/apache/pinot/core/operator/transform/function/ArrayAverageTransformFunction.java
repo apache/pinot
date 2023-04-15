@@ -45,6 +45,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 argument is required for ArrayAverage transform function");

@@ -74,6 +74,11 @@ public class AuthQuickstart extends Quickstart {
     properties.put("segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
     properties.put("task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
+    // loggers
+    properties.put("pinot.controller.logger.root.dir", "logs");
+    properties.put("pinot.broker.logger.root.dir", "logs");
+    properties.put("pinot.server.logger.root.dir", "logs");
+    properties.put("pinot.minion.logger.root.dir", "logs");
     return properties;
   }
 
