@@ -82,7 +82,7 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
               fieldConfigFound.set(true);
               ObjectNode currentIndexes = fc.getIndexes().isNull()
                   ? new ObjectMapper().createObjectNode()
-                  : (ObjectNode)fc.getIndexes();
+                  : (ObjectNode) fc.getIndexes();
               JsonNode indexes = currentIndexes.set(getPrettyName(), entry.getValue().toJsonNode());
               FieldConfig.Builder builder = new FieldConfig.Builder(fc);
               builder.withIndexes(indexes);

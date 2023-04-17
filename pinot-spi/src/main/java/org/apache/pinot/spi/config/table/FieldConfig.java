@@ -211,9 +211,8 @@ public class FieldConfig extends BaseJsonConfig {
     }
 
     public FieldConfig build() {
-      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig, _indexes, _properties);
+      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig,
+          _indexes, _properties);
     }
   }
-
-
 }
