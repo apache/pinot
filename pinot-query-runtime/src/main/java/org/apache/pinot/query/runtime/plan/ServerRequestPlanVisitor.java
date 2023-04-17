@@ -184,8 +184,9 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   }
 
   @Override
-  public Void visitSetOp(SetOpNode setOpNode, ServerPlanRequestContext context) {
-    throw new UnsupportedOperationException("SetOp not yet supported!");
+  public Void visitSetOp(SetOpNode node, ServerPlanRequestContext context) {
+    visitChildren(node, context);
+    return _aVoid;
   }
 
   @Override

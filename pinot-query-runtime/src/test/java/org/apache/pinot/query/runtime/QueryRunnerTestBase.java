@@ -234,31 +234,60 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return ((Timestamp) l).compareTo((Timestamp) r);
       } else if (l instanceof int[]) {
         int[] larray = (int[]) l;
-        Object[] rarray;
         try {
-          rarray = (Object[]) ((JdbcArray) r).getArray();
+          if (r instanceof JdbcArray) {
+            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+            for (int idx = 0; idx < larray.length; idx++) {
+              Number relement = (Number) rarray[idx];
+              if (larray[idx] != relement.intValue()) {
+                return -1;
+              }
+            }
+          } else {
+            int[] rarray = (int[]) r;
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (larray[idx] != rarray[idx]) {
+                return -1;
+              }
+            }
+          }
         } catch (SQLException e) {
           throw new RuntimeException(e);
-        }
-        for (int idx = 0; idx < larray.length; idx++) {
-          Number relement = (Number) rarray[idx];
-          if (larray[idx] != relement.intValue()) {
-            return -1;
-          }
         }
         return 0;
       } else if (l instanceof String[]) {
         String[] larray = (String[]) l;
-        Object[] rarray;
         try {
-          rarray = (Object[]) ((JdbcArray) r).getArray();
+          if (r instanceof JdbcArray) {
+            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (!larray[idx].equals(rarray[idx])) {
+                return -1;
+              }
+            }
+          } else {
+            String[] rarray = (String[]) r;
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (!larray[idx].equals(rarray[idx])) {
+                return -1;
+              }
+            }
+          }
         } catch (SQLException e) {
           throw new RuntimeException(e);
         }
-        for (int idx = 0; idx < larray.length; idx++) {
-          if (!larray[idx].equals(rarray[idx])) {
-            return -1;
+        return 0;
+      } else if (l instanceof JdbcArray) {
+        try {
+          Object[] larray = (Object[]) ((JdbcArray) l).getArray();
+          Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+          for (int idx = 0; idx < larray.length; idx++) {
+            if (!larray[idx].equals(rarray[idx])) {
+              return -1;
+            }
           }
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
         }
         return 0;
       } else {

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -42,6 +44,7 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
+import org.apache.pinot.query.runtime.operator.UnionOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
@@ -105,8 +108,20 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   @Override
   public MultiStageOperator visitSetOp(SetOpNode setOpNode, PlanRequestContext context) {
-    throw new UnsupportedOperationException(
-        "Stage node of type SetOpNode: " + setOpNode.getSetOpType() + " is not supported!");
+    List<MultiStageOperator> inputs = new ArrayList<>();
+    for (StageNode input : setOpNode.getInputs()) {
+      MultiStageOperator visited = input.visit(this, context);
+      inputs.add(visited);
+    }
+    switch (setOpNode.getSetOpType()) {
+      case UNION:
+        return new UnionOperator(context.getOpChainExecutionContext(), inputs,
+            setOpNode.getInputs().get(0).getDataSchema(), setOpNode);
+      case INTERSECT:
+      case MINUS:
+      default:
+        throw new IllegalStateException();
+    }
   }
 
   @Override
