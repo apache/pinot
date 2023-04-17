@@ -124,6 +124,7 @@ public class TableConfigBuilder {
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
+  private boolean _segmentUploadToDeepStoreDisabled;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -414,6 +415,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setSegmentUploadToDeepStoreDisabled(boolean segmentUploadToDeepStoreDisabled) {
+    _segmentUploadToDeepStoreDisabled = segmentUploadToDeepStoreDisabled;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -430,6 +436,7 @@ public class TableConfigBuilder {
     validationConfig.setSchemaName(_schemaName);
     validationConfig.setReplication(_numReplicas);
     validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
+    validationConfig.setSegmentUploadToDeepStoreDisabled(_segmentUploadToDeepStoreDisabled);
     if (_isLLC) {
       validationConfig.setReplicasPerPartition(_numReplicas);
     }

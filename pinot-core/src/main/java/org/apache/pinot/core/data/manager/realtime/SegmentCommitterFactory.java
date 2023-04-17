@@ -71,7 +71,9 @@ public class SegmentCommitterFactory {
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
 
-    if (uploadToFs || peerSegmentDownloadScheme != null) {
+    if (_tableConfig.getValidationConfig().isSegmentUploadToDeepStoreDisabled()) {
+      segmentUploader = new NoOpSegmentUploader();
+    } else if (uploadToFs || peerSegmentDownloadScheme != null) {
       // TODO: peer scheme non-null check exists for backwards compatibility. remove check once users have migrated
       segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
           PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);

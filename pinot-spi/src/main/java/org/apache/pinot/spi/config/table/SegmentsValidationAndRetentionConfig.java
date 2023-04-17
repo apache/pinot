@@ -52,6 +52,10 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
   private String _replicasPerPartition;
 
+  // True if and only if the segment upload to deep store is disabled. This is usefully for Pinot cluster which does not
+  // have any deep store.
+  private boolean _segmentUploadToDeepStoreDisabled;
+
   public String getSegmentAssignmentStrategy() {
     return _segmentAssignmentStrategy;
   }
@@ -210,5 +214,13 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setMinimizeDataMovement(boolean minimizeDataMovement) {
     _minimizeDataMovement = minimizeDataMovement;
+  }
+
+  public boolean isSegmentUploadToDeepStoreDisabled() {
+    return _segmentUploadToDeepStoreDisabled;
+  }
+
+  public void setSegmentUploadToDeepStoreDisabled(boolean segmentUploadToDeepStoreDisabled) {
+    _segmentUploadToDeepStoreDisabled = segmentUploadToDeepStoreDisabled;
   }
 }
