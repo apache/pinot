@@ -66,6 +66,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -121,6 +122,23 @@ public class TableConfigsRestletResource {
         configsList.add(rawTableName);
       }
       return configsList.toString();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * Gets the metadata on the valid {@link org.apache.pinot.spi.data.FieldSpec.DataType} for each
+   * {@link org.apache.pinot.spi.data.FieldSpec.FieldType} and the default null values for each combination
+   */
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tableConfigs/metadata")
+  @Authenticate(AccessType.READ)
+  @ApiOperation(value = "Get TableConfig metadata", notes = "Get TableConfig metadata")
+  public String getFieldSpecMetadata() {
+    try {
+      return JsonUtils.objectToString(FieldSpec.fieldSpecMetadata);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
