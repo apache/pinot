@@ -138,6 +138,11 @@
       },
       {
         "psql": "7.2.1.3",
+        "description": "sub-query to multiple anti semi-join queries with star results, using NOT IN clause",
+        "sql": "SELECT * FROM {tbl1} WHERE (num > -10 and num < 10) AND (name NOT IN (SELECT val FROM {tbl2} WHERE num = 3)) AND (name NOT IN (SELECT val from {tbl2} WHERE num = 4))"
+      },
+      {
+        "psql": "7.2.1.3",
         "description": "sub-query to semi-join syntax with star results, using single val predicate clause",
         "sql": "SELECT * FROM {tbl1} WHERE num < (SELECT SUM(num) FROM {tbl2})"
       },
