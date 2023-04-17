@@ -277,11 +277,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * The following methods are based on the getters. Override the getters for non-default settings before calling these
-   * methods.
-   */
-
-  /**
    * Creates a new schema.
    */
   protected Schema createSchema()

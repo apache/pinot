@@ -33,7 +33,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 
 
 public class DefaultFetchPlanner implements FetchPlanner {
@@ -45,11 +46,11 @@ public class DefaultFetchPlanner implements FetchPlanner {
     // Extract columns in EQ/IN predicates.
     Set<String> eqInColumns = new HashSet<>();
     extractEqInColumns(Objects.requireNonNull(queryContext.getFilter()), eqInColumns);
-    Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
+    Map<String, List<IndexType<?, ?, ?>>> columnToIndexList = new HashMap<>();
     for (String column : eqInColumns) {
       DataSource dataSource = indexSegment.getDataSource(column);
       if (dataSource.getBloomFilter() != null) {
-        columnToIndexList.put(column, Collections.singletonList(ColumnIndexType.BLOOM_FILTER));
+        columnToIndexList.put(column, Collections.singletonList(StandardIndexes.bloomFilter()));
       }
     }
     return new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), columnToIndexList);

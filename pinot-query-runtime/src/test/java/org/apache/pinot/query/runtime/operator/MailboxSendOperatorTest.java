@@ -169,7 +169,7 @@ public class MailboxSendOperatorTest {
 
     // Then:
     Assert.assertTrue(block.isEndOfStreamBlock(), "expected EOS block to propagate");
-    Mockito.verify(_exchange).send(eosBlock);
+    Assert.assertEquals(block, eosBlock);
   }
 
   @Test
@@ -194,6 +194,11 @@ public class MailboxSendOperatorTest {
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
     Mockito.verify(_exchange).send(captor.capture());
     Assert.assertSame(captor.getValue().getType(), DataBlock.Type.ROW, "expected data block to propagate");
+
+    // EOS block should contain statistics
+    Assert.assertFalse(context.getStats().getOperatorStatsMap().isEmpty());
+    Assert.assertEquals(context.getStats().getOperatorStatsMap().size(), 1);
+    Assert.assertTrue(context.getStats().getOperatorStatsMap().containsKey(operator.getOperatorId()));
   }
 
   private static TransferableBlock block(DataSchema schema, Object[]... rows) {
@@ -206,7 +211,7 @@ public class MailboxSendOperatorTest {
     Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(DEFAULT_RECEIVER_STAGE_ID, stageMetadata);
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 1, DEFAULT_SENDER_STAGE_ID, new VirtualServerAddress(_server),
-            deadlineMs, deadlineMs, stageMetadataMap);
+            deadlineMs, deadlineMs, stageMetadataMap, false);
     return context;
   }
 }

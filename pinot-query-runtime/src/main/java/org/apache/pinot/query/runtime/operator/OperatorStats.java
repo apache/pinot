@@ -35,26 +35,25 @@ public class OperatorStats {
   // TODO: add a operatorId for better tracking purpose.
   private final int _stageId;
   private final long _requestId;
-  private final VirtualServerAddress _serverAddress;
 
-  private final String _operatorType;
+  private final VirtualServerAddress _serverAddress;
 
   private int _numBlock = 0;
   private int _numRows = 0;
   private long _startTimeMs = -1;
+  private long _endTimeMs = -1;
   private final Map<String, String> _executionStats;
   private boolean _processingStarted = false;
 
-  public OperatorStats(OpChainExecutionContext context, String operatorType) {
-    this(context.getRequestId(), context.getStageId(), context.getServer(), operatorType);
+  public OperatorStats(OpChainExecutionContext context) {
+    this(context.getRequestId(), context.getStageId(), context.getServer());
   }
 
   //TODO: remove this constructor after the context constructor can be used in serialization and deserialization
-  public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress, String operatorType) {
+  public OperatorStats(long requestId, int stageId, VirtualServerAddress serverAddress) {
     _stageId = stageId;
     _requestId = requestId;
     _serverAddress = serverAddress;
-    _operatorType = operatorType;
     _executionStats = new HashMap<>();
   }
 
@@ -68,9 +67,11 @@ public class OperatorStats {
   public void endTimer(TransferableBlock block) {
     if (_executeStopwatch.isRunning()) {
       _executeStopwatch.stop();
+      _endTimeMs = System.currentTimeMillis();
     }
     if (!_processingStarted && block.isNoOpBlock()) {
       _startTimeMs = -1;
+      _endTimeMs = -1;
       _executeStopwatch.reset();
     } else {
       _processingStarted = true;
@@ -96,10 +97,14 @@ public class OperatorStats {
     _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName(),
         String.valueOf(_executeStopwatch.elapsed(TimeUnit.MILLISECONDS)));
     // wall time are recorded slightly longer than actual execution but it is OK.
-    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName(),
-        String.valueOf(_startTimeMs));
-    _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName(),
-        String.valueOf(System.currentTimeMillis()));
+
+    if (_startTimeMs != -1) {
+      _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_START_TIME_MS.getName(),
+          String.valueOf(_startTimeMs));
+      long endTimeMs = _endTimeMs == -1 ? System.currentTimeMillis() : _endTimeMs;
+      _executionStats.putIfAbsent(DataTable.MetadataKey.OPERATOR_EXEC_END_TIME_MS.getName(),
+          String.valueOf(endTimeMs));
+    }
     return _executionStats;
   }
 
@@ -113,10 +118,6 @@ public class OperatorStats {
 
   public VirtualServerAddress getServerAddress() {
     return _serverAddress;
-  }
-
-  public String getOperatorType() {
-    return _operatorType;
   }
 
   @Override

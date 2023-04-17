@@ -255,6 +255,8 @@ public class PinotHelixResourceManager {
    * as PARTICIPANT,
    * which would be put to lead controller resource and mess up the leadership assignment. Those places should use
    * SPECTATOR other than PARTICIPANT.
+   * TODO:For the <a href="https://github.com/apache/pinot/pull/10451">backwards incompatible change</a>, this is a
+   * reminder to clean up old Zk nodes when the controller starts up.
    */
   public synchronized void start(HelixManager helixZkManager) {
     _helixZkManager = helixZkManager;
@@ -289,7 +291,6 @@ public class PinotHelixResourceManager {
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while adding InstanceConfigChangeListener");
     }
-
     // Initialize TableCache
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
@@ -741,36 +742,26 @@ public class PinotHelixResourceManager {
    * @return List of segment names
    */
   public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments) {
-    IdealState idealState = getTableIdealState(tableNameWithType);
-    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-    List<String> segments = new ArrayList<>(idealState.getPartitionSet());
-    return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
+    return getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
 
   /**
-   * Returns the segments for the given table from the property store. This API is useful to track the orphan segments
-   * that are removed from the ideal state but not the property store.
-   */
-  public List<String> getSegmentsFromPropertyStore(String tableNameWithType) {
-    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
-  }
-
-  /**
-   * Returns the segments for the given table based on the start and end timestamp from the ideal state.
+   * Returns the segments for the given table from the ideal state.
    *
-   * @param tableNameWithType  Table name with type suffix
+   * @param tableNameWithType Table name with type suffix
+   * @param shouldExcludeReplacedSegments whether to return the list of segments that doesn't contain replaced segments.
    * @param startTimestamp  start timestamp in milliseconds (inclusive)
    * @param endTimestamp  end timestamp in milliseconds (exclusive)
    * @param excludeOverlapping  whether to exclude the segments overlapping with the timestamps
+   * @return List of segment names
    */
-  public List<String> getSegmentsForTableWithTimestamps(String tableNameWithType, long startTimestamp,
-      long endTimestamp, boolean excludeOverlapping) {
+  public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments,
+      long startTimestamp, long endTimestamp, boolean excludeOverlapping) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-    Set<String> segments = idealState.getPartitionSet();
-    // If no start and end timestamp specified, just select all the segments.
+    List<String> segments = new ArrayList<>(idealState.getPartitionSet());
     if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
-      return excludeReplacedSegments(tableNameWithType, new ArrayList<>(segments));
+      return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
     } else {
       List<String> selectedSegments = new ArrayList<>();
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
@@ -781,8 +772,17 @@ public class PinotHelixResourceManager {
           selectedSegments.add(segmentName);
         }
       }
-      return excludeReplacedSegments(tableNameWithType, selectedSegments);
+      return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, selectedSegments)
+          : selectedSegments;
     }
+  }
+
+  /**
+   * Returns the segments for the given table from the property store. This API is useful to track the orphan segments
+   * that are removed from the ideal state but not the property store.
+   */
+  public List<String> getSegmentsFromPropertyStore(String tableNameWithType) {
+    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
   }
 
   /**
@@ -1384,18 +1384,27 @@ public class PinotHelixResourceManager {
    * @param schema The schema to be deleted.
    * @return True on success, false otherwise.
    */
+  @Deprecated
   public boolean deleteSchema(Schema schema) {
     if (schema != null) {
-      String schemaName = schema.getSchemaName();
-      LOGGER.info("Deleting schema: {}", schemaName);
-      String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
-      if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-        _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-        LOGGER.info("Deleted schema: {}", schemaName);
-        return true;
-      }
+      deleteSchema(schema.getSchemaName());
     }
     return false;
+  }
+
+  /**
+   * Deletes the given schema. Returns {@code true} when schema exists, {@code false} when schema does not exist.
+   */
+  public boolean deleteSchema(String schemaName) {
+    LOGGER.info("Deleting schema: {}", schemaName);
+    String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
+    if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+      LOGGER.info("Deleted schema: {}", schemaName);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   @Nullable
@@ -1471,6 +1480,12 @@ public class PinotHelixResourceManager {
       throw new TableAlreadyExistsException("Table config for " + tableNameWithType
           + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
           + " with it.");
+    }
+    if (_helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType) != null) {
+      throw new TableAlreadyExistsException("External view for " + tableNameWithType
+          + " still exists. If the table is just deleted, please wait for the clean up to finish before recreating it. "
+          + "If the external view is not removed after a long time, try restarting the servers showing up in the "
+          + "external view");
     }
 
     validateTableTenantConfig(tableConfig);
@@ -2162,11 +2177,11 @@ public class PinotHelixResourceManager {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_ALL_SEGMENTS.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
     return addControllerJobToZK(jobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_ALL_SEGMENTS));
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_SEGMENT));
   }
 
   public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath) {

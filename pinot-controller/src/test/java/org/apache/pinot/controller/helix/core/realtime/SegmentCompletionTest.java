@@ -660,6 +660,81 @@ public class SegmentCompletionTest {
   }
 
   @Test
+  public void testWinnerOnForceCommit()
+      throws Exception {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    // S1 comes to force commit
+    _segmentCompletionMgr._seconds = 10L;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    // Still need to wait since we haven't hit time limit or heard from all servers
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+
+    // S2 comes with a higher offset 1 second later
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    // Still need to wait since we haven't hit time limit or heard from all servers
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
+
+    // S3 comes with a lower offset than S2 3 seconds later
+    _segmentCompletionMgr._seconds += 3;
+    params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(_s3Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    // We've met winner criteria, but it should be S_2 with the highest offset. S_3 should catch up.
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.CATCH_UP);
+
+    // S1 comes back at the same offset
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    // We've met winner criteria, but it should be S2 with the highest offset. S1 should catch up.
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.CATCH_UP);
+
+    // S2 comes back at the same offset
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    // S2 is told to commit
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
+
+    // S2 comes back to commit the segment
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentCommitStart(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+    _segmentCompletionMgr._seconds += 5;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
+    response = _segmentCompletionMgr
+        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+
+    // S3 comes back at the latest offset
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    // S3 is told to keep since it caught up
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.KEEP);
+
+    // S1 comes back with a higher offset than before, but still not caught up
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s3Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    // S1 is told to discard since S2 already uploaded
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.DISCARD);
+  }
+
+  @Test
   public void testWinnerOnRowLimit()
       throws Exception {
     SegmentCompletionProtocol.Response response;

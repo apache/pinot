@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -33,6 +35,8 @@ public interface ImmutableSegment extends IndexSegment {
    * @return Dictionary for the given column, or null if the given column does not have one
    */
   Dictionary getDictionary(String column);
+
+  <I extends IndexReader> I getIndex(String column, IndexType<?, I, ?> type);
 
   /**
    * Returns the forward index for the given column.

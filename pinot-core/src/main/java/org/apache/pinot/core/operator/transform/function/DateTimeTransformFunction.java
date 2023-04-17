@@ -72,9 +72,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(numDocs);
     long[] timestamps = _timestampsFunction.transformToLongValuesSV(valueBlock);
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;

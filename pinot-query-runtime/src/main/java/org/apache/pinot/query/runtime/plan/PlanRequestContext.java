@@ -40,9 +40,11 @@ public class PlanRequestContext {
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
   private final OpChainExecutionContext _opChainExecutionContext;
+  private final boolean _traceEnabled;
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, long deadlineMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
+      long timeoutMs, long deadlineMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap,
+      boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
@@ -50,6 +52,7 @@ public class PlanRequestContext {
     _deadlineMs = deadlineMs;
     _server = server;
     _metadataMap = metadataMap;
+    _traceEnabled = traceEnabled;
     _opChainExecutionContext = new OpChainExecutionContext(this);
   }
 
@@ -91,5 +94,9 @@ public class PlanRequestContext {
 
   public OpChainExecutionContext getOpChainExecutionContext() {
     return _opChainExecutionContext;
+  }
+
+  public boolean isTraceEnabled() {
+    return _traceEnabled;
   }
 }

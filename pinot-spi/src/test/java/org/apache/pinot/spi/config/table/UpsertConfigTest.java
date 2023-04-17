@@ -46,4 +46,11 @@ public class UpsertConfigTest {
     upsertConfig2.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
   }
+
+  @Test
+  public void testUpsertConfigForDefaults() {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    assertEquals(upsertConfig.getHashFunction(), HashFunction.NONE);
+    assertEquals(upsertConfig.getDefaultPartialUpsertStrategy(), UpsertConfig.Strategy.OVERWRITE);
+  }
 }

@@ -39,6 +39,7 @@ public class TrigonometricTransformFunctions {
 
     @Override
     public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+      super.init(arguments, columnContextMap);
       // Check that there are more than 1 arguments
       if (arguments.size() != 2) {
         throw new IllegalArgumentException("Exactly 2 arguments are required for Atan2 transform function");
@@ -48,7 +49,9 @@ public class TrigonometricTransformFunctions {
       _rightTransformFunction = arguments.get(1);
       Preconditions.checkArgument(
           _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
-              .isSingleValue(), "Argument must be single-valued for transform function: %s", getName());
+              .isSingleValue() || _leftTransformFunction.getResultMetadata().getDataType().isUnknown()
+              || _rightTransformFunction.getResultMetadata().getDataType().isUnknown(),
+          "Argument must be single-valued for transform function: %s", getName());
     }
 
     @Override
@@ -59,17 +62,12 @@ public class TrigonometricTransformFunctions {
     @Override
     public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
       int length = valueBlock.getNumDocs();
-
-      if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
-        _doubleValuesSV = new double[length];
-      }
-
+      initDoubleValuesSV(length);
       double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
       double[] rightValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.atan2(leftValues[i], rightValues[i]);
       }
-
       return _doubleValuesSV;
     }
   }

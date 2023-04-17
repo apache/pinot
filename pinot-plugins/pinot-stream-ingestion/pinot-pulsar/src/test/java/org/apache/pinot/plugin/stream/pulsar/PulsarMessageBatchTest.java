@@ -69,6 +69,11 @@ public class PulsarMessageBatchTest {
     }
 
     @Override
+    public int size() {
+      return 0;
+    }
+
+    @Override
     public byte[] getValue() {
       return _valueData;
     }
@@ -156,6 +161,30 @@ public class PulsarMessageBatchTest {
     @Override
     public String getReplicatedFrom() {
       return null;
+    }
+
+    @Override
+    public void release() {
+    }
+
+    @Override
+    public boolean hasBrokerPublishTime() {
+      return false;
+    }
+
+    @Override
+    public Optional<Long> getBrokerPublishTime() {
+      return Optional.empty();
+    }
+
+    @Override
+    public boolean hasIndex() {
+      return false;
+    }
+
+    @Override
+    public Optional<Long> getIndex() {
+      return Optional.empty();
     }
   }
 

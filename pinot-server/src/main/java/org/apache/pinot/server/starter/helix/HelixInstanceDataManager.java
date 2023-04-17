@@ -23,6 +23,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,6 +53,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
@@ -78,9 +80,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
-  // TODO: Make this configurable
-  private static final long EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L; // 20 minutes
-  private static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
 
@@ -91,6 +90,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
   private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
+  private long _externalViewDroppedMaxWaitMs;
+  private long _externalViewDroppedCheckInternalMs;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -114,10 +115,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
 
+    _externalViewDroppedMaxWaitMs = _instanceDataManagerConfig.getExternalViewDroppedMaxWaitMs();
+    _externalViewDroppedCheckInternalMs = _instanceDataManagerConfig.getExternalViewDroppedCheckIntervalMs();
+
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-    if (!instanceDataDir.exists()) {
-      Preconditions.checkState(instanceDataDir.mkdirs());
-    }
+    initInstanceDataDir(instanceDataDir);
+
     File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
     if (!instanceSegmentTarDir.exists()) {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs());
@@ -139,6 +142,32 @@ public class HelixInstanceDataManager implements InstanceDataManager {
             return null;
           }
         });
+  }
+
+  private void initInstanceDataDir(File instanceDataDir) {
+    if (!instanceDataDir.exists()) {
+      Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
+    } else {
+      // Clean up the _tmp (consuming segments) dir and empty table data dir
+      File[] tableDataDirs = instanceDataDir.listFiles((dir, name) -> TableNameBuilder.isTableResource(name));
+      if (tableDataDirs != null) {
+        for (File tableDataDir : tableDataDirs) {
+          File resourceTempDir = new File(tableDataDir, RealtimeSegmentDataManager.RESOURCE_TEMP_DIR_NAME);
+          try {
+            FileUtils.deleteDirectory(resourceTempDir);
+          } catch (IOException e) {
+            LOGGER.error("Failed to delete temporary resource dir: {}, continue with error", resourceTempDir, e);
+          }
+          try {
+            if (FileUtils.isEmptyDirectory(tableDataDir)) {
+              FileUtils.deleteDirectory(tableDataDir);
+            }
+          } catch (IOException e) {
+            LOGGER.error("Failed to delete empty table data dir: {}, continue with error", tableDataDir, e);
+          }
+        }
+      }
+    }
   }
 
   @Override
@@ -205,7 +234,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteTable(String tableNameWithType)
       throws Exception {
     // Wait externalview to converge
-    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS;
+    long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
     do {
       ExternalView externalView = _helixManager.getHelixDataAccessor()
           .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
@@ -222,7 +251,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         });
         return;
       }
-      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+      Thread.sleep(_externalViewDroppedCheckInternalMs);
     } while (System.currentTimeMillis() < endTimeMs);
     throw new TimeoutException(
         "Timeout while waiting for ExternalView to converge for the table to delete: " + tableNameWithType);

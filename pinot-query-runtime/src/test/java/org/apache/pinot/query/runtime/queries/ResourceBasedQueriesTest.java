@@ -38,7 +38,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -75,8 +74,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-
     // Setting up mock server factories.
     // All test data are loaded upfront b/c the mock server and brokers needs to be in sync.
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
@@ -249,6 +246,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
 
       Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
+      int numTables = 0;
       for (Integer stageId : stageIdStats.keySet()) {
         // check stats only for leaf stage
         BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
@@ -259,7 +257,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         String tableName = brokerResponseStats.getTableNames().get(0);
         Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-
+        numTables++;
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
         if (tableType == null) {
           tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -278,6 +276,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
         }
       }
+
+      Assert.assertTrue(numTables > 0);
     });
   }
 

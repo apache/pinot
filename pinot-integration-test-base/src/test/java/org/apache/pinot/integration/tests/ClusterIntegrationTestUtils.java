@@ -31,7 +31,9 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,6 +55,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -86,7 +89,6 @@ public class ClusterIntegrationTestUtils {
   // Comparison limit
   public static final int MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE = 5;
   public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
-  public static final int H2_MULTI_VALUE_SUFFIX_LENGTH = 5;
 
   private static final Random RANDOM = new Random();
 
@@ -137,10 +139,8 @@ public class ClusterIntegrationTestUtils {
           case ARRAY:
             Schema.Type type = field.schema().getElementType().getType();
             Assert.assertTrue(isSingleValueAvroFieldType(type));
-            // Split multi-value field into MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE single-value fields
-            for (int i = 0; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName + "__MV" + i, type, true));
-            }
+            // create Array data type based column.
+            h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true, true));
             break;
           default:
             if (isSingleValueAvroFieldType(fieldType)) {
@@ -172,17 +172,19 @@ public class ClusterIntegrationTestUtils {
             Object value = record.get(avroIndex);
             if (value instanceof GenericData.Array) {
               GenericData.Array array = (GenericData.Array) value;
+              Object[] arrayValue = new Object[MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE];
               for (int i = 0; i < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
                 if (i < array.size()) {
-                  value = array.get(i);
-                  if (value instanceof Utf8) {
-                    value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
+                  arrayValue[i] = array.get(i);
+                  if (arrayValue[i] instanceof Utf8) {
+                    arrayValue[i] =
+                        StringUtil.sanitizeStringValue(arrayValue[i].toString(), FieldSpec.DEFAULT_MAX_LENGTH);
                   }
                 } else {
-                  value = null;
+                  arrayValue[i] = null;
                 }
-                h2Statement.setObject(h2Index++, value);
               }
+              h2Statement.setObject(h2Index++, arrayValue);
             } else {
               if (value instanceof Utf8) {
                 value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
@@ -217,6 +219,20 @@ public class ClusterIntegrationTestUtils {
    * @return H2 field name and type
    */
   private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable) {
+    return buildH2FieldNameAndType(fieldName, avroFieldType, nullable, false);
+  }
+
+  /**
+   * Helper method to build H2 field name and type.
+   *
+   * @param fieldName Field name
+   * @param avroFieldType Avro field type
+   * @param nullable Whether the column is nullable
+   * @param arrayType Whether the column is array data type or not
+   * @return H2 field name and type
+   */
+  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable,
+      boolean arrayType) {
     String avroFieldTypeName = avroFieldType.getName();
     String h2FieldType;
     switch (avroFieldTypeName) {
@@ -229,6 +245,10 @@ public class ClusterIntegrationTestUtils {
       default:
         h2FieldType = avroFieldTypeName;
         break;
+    }
+    // if column is array data type, add Array with size.
+    if (arrayType) {
+      h2FieldType = h2FieldType + " ARRAY[" + MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE + "]";
     }
     if (nullable) {
       return String.format("`%s` %s", fieldName, h2FieldType);
@@ -544,55 +564,71 @@ public class ClusterIntegrationTestUtils {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection)
       throws Exception {
-    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, null);
   }
 
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
-    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null);
   }
 
   /**
    * Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
    * query.
    */
-  static void testQueryWithMatchingRowCount(String pinotQuery, String brokerUrl,
+  static void testQueryWithMatchingRowCount(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
       throws Exception {
     try {
-      testQueryInternal(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, extraJsonProperties,
-          true);
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, true, false);
     } catch (Exception e) {
-      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+      failure(pinotQuery, h2Query, e);
     }
   }
 
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
       @Nullable Map<String, String> extraJsonProperties) {
     try {
-      testQueryInternal(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, extraJsonProperties,
-          false);
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, false, false);
     } catch (Exception e) {
-      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+      failure(pinotQuery, h2Query, e);
     }
   }
 
-  private static void testQueryInternal(String pinotQuery, String brokerUrl,
+  static void testQueryViaController(String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties) {
+    try {
+      testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
+          extraJsonProperties, false, true);
+    } catch (Exception e) {
+      failure(pinotQuery, h2Query, e);
+    }
+  }
+
+  private static void testQueryInternal(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
-      boolean matchingRowCount)
+      boolean matchingRowCount, boolean viaController)
       throws Exception {
     // broker response
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers, extraJsonProperties);
+    JsonNode pinotResponse;
+    if (viaController) {
+      pinotResponse = ClusterTest.postQueryToController(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+    } else {
+      pinotResponse = ClusterTest.postQuery(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+    }
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
@@ -634,7 +670,7 @@ public class ClusterIntegrationTestUtils {
         }
       }
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
-          pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
+          pinotQuery, h2NumRows, pinotNumRecordsSelected);
     } else {
       if (queryContext.getGroupByExpressions() == null && !QueryContextUtils.isDistinctQuery(queryContext)) {
         // aggregation only
@@ -649,7 +685,7 @@ public class ClusterIntegrationTestUtils {
           if (h2Value == null) {
             if (pinotNumRecordsSelected != 0) {
               throw new RuntimeException("No record selected in H2 but " + pinotNumRecordsSelected
-                  + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, brokerUrl, headers,
+                  + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, queryResourceUrl, headers,
                   extraJsonProperties));
             }
 
@@ -672,7 +708,7 @@ public class ClusterIntegrationTestUtils {
             throw new RuntimeException(
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                     + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                    brokerUrl, headers, extraJsonProperties));
+                    queryResourceUrl, headers, extraJsonProperties));
           }
         }
       } else {
@@ -696,7 +732,7 @@ public class ClusterIntegrationTestUtils {
                   throw new RuntimeException(
                       "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                           + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                          brokerUrl, headers, extraJsonProperties));
+                          queryResourceUrl, headers, extraJsonProperties));
                 }
               }
               if (!h2ResultSet.next()) {
@@ -721,14 +757,12 @@ public class ClusterIntegrationTestUtils {
       ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns)
       throws SQLException {
     Map<String, String> reusableExpectedValueMap = new HashMap<>();
-    Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
     List<String> reusableColumnOrder = new ArrayList<>();
     int h2NumRows;
     int numColumns = h2MetaData.getColumnCount();
 
     for (h2NumRows = 0; h2ResultSet.next() && h2NumRows < MAX_NUM_ROWS_TO_COMPARE; h2NumRows++) {
       reusableExpectedValueMap.clear();
-      reusableMultiValuesMap.clear();
       reusableColumnOrder.clear();
 
       for (int columnIndex = 1; columnIndex <= numColumns; columnIndex++) { // h2 result set is 1-based
@@ -743,18 +777,16 @@ public class ClusterIntegrationTestUtils {
         }
 
         // Handle multi-value columns
-        int length = columnName.length();
-        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName.substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH,
-            length - 1).equals("__MV")) {
+        int columnType = h2MetaData.getColumnType(columnIndex);
+        if (columnType == Types.ARRAY) {
           // Multi-value column
-          String multiValueColumnName = columnName.substring(0, length - H2_MULTI_VALUE_SUFFIX_LENGTH);
-          List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
-          if (multiValue == null) {
-            multiValue = new ArrayList<>();
-            reusableMultiValuesMap.put(multiValueColumnName, multiValue);
-            reusableColumnOrder.add(multiValueColumnName);
+          reusableColumnOrder.add(columnName);
+          if (columnValue.contains(",")) {
+            columnValue = Arrays.toString(
+                Arrays.stream(columnValue.substring(1, columnValue.length() - 1).split(",")).map(String::trim).sorted()
+                    .toArray());
           }
-          multiValue.add(columnValue);
+          reusableExpectedValueMap.put(columnName, columnValue);
         } else {
           // Single-value column
           String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
@@ -762,14 +794,6 @@ public class ClusterIntegrationTestUtils {
           reusableExpectedValueMap.put(columnName, columnValue);
           reusableColumnOrder.add(columnName);
         }
-      }
-
-      // Add multi-value column results to the expected values
-      // The reason for this step is that Pinot does not maintain order of elements in multi-value columns
-      for (Map.Entry<String, List<String>> entry : reusableMultiValuesMap.entrySet()) {
-        List<String> multiValue = entry.getValue();
-        Collections.sort(multiValue);
-        reusableExpectedValueMap.put(entry.getKey(), multiValue.toString());
       }
 
       // Build expected value String
@@ -790,7 +814,7 @@ public class ClusterIntegrationTestUtils {
 
   private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
       List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
-      Set<String> orderByColumns, String pinotQuery, String h2Query, int h2NumRows, long pinotNumRecordsSelected) {
+      Set<String> orderByColumns, String pinotQuery, int h2NumRows, long pinotNumRecordsSelected) {
 
     int pinotNumRows = connectionResultSet.getRowCount();
     // No record selected in H2
@@ -830,7 +854,7 @@ public class ClusterIntegrationTestUtils {
           JsonNode columnValues = null;
           try {
             columnValues = JsonUtils.stringToJsonNode(columnResult);
-          } catch (IOException e) {
+          } catch (IOException ignored) {
           }
 
           if (columnValues != null && columnValues.isArray()) {
@@ -844,16 +868,13 @@ public class ClusterIntegrationTestUtils {
               multiValue.add("null");
             }
             Collections.sort(multiValue);
-            actualValueBuilder.append(multiValue.toString()).append(' ');
-            if (orderByColumns.contains(columnName)) {
-              actualOrderByValueBuilder.append(columnResult).append(' ');
-            }
+            actualValueBuilder.append(multiValue).append(' ');
           } else {
             // Single-value column
             actualValueBuilder.append(columnResult).append(' ');
-            if (orderByColumns.contains(columnName)) {
-              actualOrderByValueBuilder.append(columnResult).append(' ');
-            }
+          }
+          if (orderByColumns.contains(columnName)) {
+            actualOrderByValueBuilder.append(columnResult).append(' ');
           }
         }
 
@@ -861,8 +882,10 @@ public class ClusterIntegrationTestUtils {
         String actualOrderByValue = actualOrderByValueBuilder.toString();
         // Check actual value in expected values set, skip comparison if query response is truncated by limit
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
-          throw new RuntimeException(
-              "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues);
+          throw new RuntimeException(String.format(
+              "Selection result differ in Pinot from H2: Pinot row: [ %s ] not found in H2 result set: [%s].",
+              actualValue, expectedValues)
+          );
         }
         if (!orderByColumns.isEmpty()) {
           // Check actual group value is the same as expected group value in the same order.
@@ -877,25 +900,21 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static String removeTrailingZeroForNumber(String value, String type) {
+    String upperCaseType = StringUtils.upperCase(type);
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT")
-        || type.toUpperCase().equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION") || type.toUpperCase()
-        .equals("BIGINT")) {
+    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT")
+        || upperCaseType.equals("DOUBLE") || upperCaseType.equals("DOUBLE PRECISION")) {
       try {
         String result = (new BigDecimal(value)).stripTrailingZeros().toPlainString();
-        if (type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT") || type.toUpperCase()
-            .equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION")) {
-          if (!result.contains("\\.")) {
-            return result + ".0";
-          }
-        }
-      } catch (NumberFormatException e) {
+        return result + ".0";
+      } catch (NumberFormatException ignored) {
+        // ignoring the exception
       }
     }
     return value;
   }
 
-  public static boolean isParsable(String input) {
+  public static boolean isParsableDouble(String input) {
     try {
       Double.parseDouble(input);
       return true;
@@ -907,7 +926,7 @@ public class ClusterIntegrationTestUtils {
   public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
     // Fuzzy compare expected value and actual value
     boolean error = false;
-    if (isParsable(h2Value)) {
+    if (isParsableDouble(h2Value)) {
       double expectedValue = Double.parseDouble(h2Value);
       double actualValueBroker = Double.parseDouble(brokerValue);
       double actualValueConnection = Double.parseDouble(connectionValue);
@@ -924,6 +943,10 @@ public class ClusterIntegrationTestUtils {
     return error;
   }
 
+  private static void failure(String pinotQuery, String h2Query, @Nullable Exception e) {
+    String failureMessage = "Caught exception while testing query!";
+    failure(pinotQuery, h2Query, failureMessage, e);
+  }
   /**
    * Helper method to report failures.
    *

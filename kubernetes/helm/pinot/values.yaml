@@ -76,6 +76,7 @@ controller:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartController"
 
   probes:
     endpoint: "/health"
@@ -185,6 +186,7 @@ broker:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartBroker"
 
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
 
@@ -284,6 +286,7 @@ server:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartServer"
 
   probes:
     endpoint: "/health"
@@ -372,6 +375,7 @@ minion:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartMinion"
 
   probes:
     endpoint: "/health"
@@ -454,6 +458,7 @@ minionStateless:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartMinion"
 
   probes:
     endpoint: "/health"

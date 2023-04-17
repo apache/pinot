@@ -30,11 +30,12 @@ import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -73,11 +74,11 @@ public final class Schema implements Serializable {
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
-  private final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
-  private transient final List<String> _dimensionNames = new ArrayList<>();
-  private transient final List<String> _metricNames = new ArrayList<>();
-  private transient final List<String> _dateTimeNames = new ArrayList<>();
-
+  // NOTE: Use TreeMap so that the columns are ordered alphabetically
+  private final TreeMap<String, FieldSpec> _fieldSpecMap = new TreeMap<>();
+  private final List<String> _dimensionNames = new ArrayList<>();
+  private final List<String> _metricNames = new ArrayList<>();
+  private final List<String> _dateTimeNames = new ArrayList<>();
   // Set to true if this schema has a JSON column (used to quickly decide whether to run JsonStatementOptimizer on
   // queries or not).
   private boolean _hasJSONColumn;
@@ -192,8 +193,8 @@ public final class Schema implements Serializable {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
     Preconditions.checkNotNull(columnName);
-    Preconditions
-        .checkState(!_fieldSpecMap.containsKey(columnName), "Field spec already exists for column: " + columnName);
+    Preconditions.checkState(!_fieldSpecMap.containsKey(columnName),
+        "Field spec already exists for column: " + columnName);
 
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
@@ -265,23 +266,24 @@ public final class Schema implements Serializable {
     return _fieldSpecMap.containsKey(columnName);
   }
 
+  @JsonIgnore
   public boolean hasJSONColumn() {
     return _hasJSONColumn;
   }
 
   @JsonIgnore
-  public Map<String, FieldSpec> getFieldSpecMap() {
+  public TreeMap<String, FieldSpec> getFieldSpecMap() {
     return _fieldSpecMap;
   }
 
   @JsonIgnore
-  public Set<String> getColumnNames() {
-    return _fieldSpecMap.keySet();
+  public NavigableSet<String> getColumnNames() {
+    return _fieldSpecMap.navigableKeySet();
   }
 
   @JsonIgnore
-  public Set<String> getPhysicalColumnNames() {
-    Set<String> physicalColumnNames = new HashSet<>();
+  public TreeSet<String> getPhysicalColumnNames() {
+    TreeSet<String> physicalColumnNames = new TreeSet<>();
     for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
       if (!fieldSpec.isVirtualColumn()) {
         physicalColumnNames.add(fieldSpec.getName());
@@ -290,6 +292,9 @@ public final class Schema implements Serializable {
     return physicalColumnNames;
   }
 
+  /**
+   * NOTE: The returned FieldSpecs are sorted with the column name alphabetically.
+   */
   @JsonIgnore
   public Collection<FieldSpec> getAllFieldSpecs() {
     return _fieldSpecMap.values();
@@ -496,7 +501,7 @@ public final class Schema implements Serializable {
   }
 
   public static class SchemaBuilder {
-    private Schema _schema;
+    private final Schema _schema;
 
     public SchemaBuilder() {
       _schema = new Schema();
@@ -528,8 +533,8 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
-      Preconditions
-          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
+      Preconditions.checkArgument(dataType == DataType.STRING,
+          "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
@@ -555,8 +560,8 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
-      Preconditions
-          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
+      Preconditions.checkArgument(dataType == DataType.STRING,
+          "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
@@ -650,22 +655,19 @@ public final class Schema implements Serializable {
     if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-
     if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
-
     Schema that = (Schema) o;
-
-    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils
-        .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
-        .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
-        .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
-        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
-        .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils
-        .isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
-        .isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils
-        .isEqual(_hasJSONColumn, that._hasJSONColumn);
+    //@formatter:off
+    return EqualityUtils.isEqual(_schemaName, that._schemaName)
+        && EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs)
+        && EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs)
+        && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
+        && EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs)
+        && EqualityUtils.isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs)
+        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns);
+    //@formatter:on
   }
 
   /**
@@ -722,9 +724,7 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _complexFieldSpecs);
-    result = EqualityUtils.hashCodeOf(result, _fieldSpecMap);
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
-    result = EqualityUtils.hashCodeOf(result, _hasJSONColumn);
     return result;
   }
 

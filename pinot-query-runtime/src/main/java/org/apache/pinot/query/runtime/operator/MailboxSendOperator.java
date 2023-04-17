@@ -40,6 +40,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,10 +152,19 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       transferableBlock = _dataTableBlockBaseOperator.nextBlock();
       while (!transferableBlock.isNoOpBlock()) {
-        _exchange.send(transferableBlock);
         if (transferableBlock.isEndOfStreamBlock()) {
+          if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
+            //Stats need to be populated here because the block is being sent to the mailbox
+            // and the receiving opChain will not be able to access the stats from the previous opChain
+            TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
+                OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+            _exchange.send(eosBlockWithStats);
+          } else {
+            _exchange.send(transferableBlock);
+          }
           return transferableBlock;
         }
+        _exchange.send(transferableBlock);
         transferableBlock = _dataTableBlockBaseOperator.nextBlock();
       }
     } catch (final Exception e) {
@@ -166,6 +176,15 @@ public class MailboxSendOperator extends MultiStageOperator {
       }
     }
     return transferableBlock;
+  }
+
+  /**
+   * This method is overridden to return true because this operator is last in the chain and needs to collect
+   * execution time stats
+   */
+  @Override
+  protected boolean shouldCollectStats() {
+    return true;
   }
 
   @Override

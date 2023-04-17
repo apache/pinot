@@ -81,7 +81,6 @@ public class OperatorUtils {
       jsonOut.put("requestId", operatorStats.getRequestId());
       jsonOut.put("stageId", operatorStats.getStageId());
       jsonOut.put("serverAddress", operatorStats.getServerAddress().toString());
-      jsonOut.put("operatorType", operatorStats.getOperatorType());
       jsonOut.put("executionStats", operatorStats.getExecutionStats());
       return JsonUtils.objectToString(jsonOut);
     } catch (Exception e) {
@@ -97,10 +96,9 @@ public class OperatorUtils {
       int stageId = operatorStatsNode.get("stageId").asInt();
       String serverAddressStr = operatorStatsNode.get("serverAddress").asText();
       VirtualServerAddress serverAddress = VirtualServerAddress.parse(serverAddressStr);
-      String operatorType = operatorStatsNode.get("operatorType").asText();
 
       OperatorStats operatorStats =
-          new OperatorStats(requestId, stageId, serverAddress, operatorType);
+          new OperatorStats(requestId, stageId, serverAddress);
       operatorStats.recordExecutionStats(
           JsonUtils.jsonNodeToObject(operatorStatsNode.get("executionStats"), new TypeReference<Map<String, String>>() {
           }));

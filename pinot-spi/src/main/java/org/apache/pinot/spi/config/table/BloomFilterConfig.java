@@ -27,7 +27,7 @@ import java.util.Objects;
 public class BloomFilterConfig extends IndexConfig {
   public static final double DEFAULT_FPP = 0.05;
   public static final BloomFilterConfig DEFAULT = new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false);
-  public static final BloomFilterConfig DISABLED = new BloomFilterConfig(false, BloomFilterConfig.DEFAULT_FPP, 0,
+  public static final BloomFilterConfig DISABLED = new BloomFilterConfig(true, BloomFilterConfig.DEFAULT_FPP, 0,
       false);
 
   private final double _fpp;
@@ -35,13 +35,14 @@ public class BloomFilterConfig extends IndexConfig {
   private final boolean _loadOnHeap;
 
   public BloomFilterConfig(double fpp, int maxSizeInBytes, boolean loadOnHeap) {
-    this(true, fpp, maxSizeInBytes, loadOnHeap);
+    this(false, fpp, maxSizeInBytes, loadOnHeap);
   }
+
   @JsonCreator
-  public BloomFilterConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty(value = "fpp") double fpp,
+  public BloomFilterConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty(value = "fpp") double fpp,
       @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,
       @JsonProperty(value = "loadOnHeap") boolean loadOnHeap) {
-    super(enabled != null && enabled);
+    super(disabled);
     if (fpp != 0.0) {
       Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);
       _fpp = fpp;

@@ -22,15 +22,22 @@ package org.apache.pinot.segment.local.segment.index.bloom;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
+import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.AbstractIndexType;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -39,12 +46,13 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
-public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator> {
-  public static final BloomIndexType INSTANCE = new BloomIndexType();
 
-  @Override
-  public String getId() {
-    return "bloom_filter";
+public class BloomIndexType
+    extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>
+    implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
+
+  protected BloomIndexType() {
+    super(StandardIndexes.BLOOM_FILTER_ID);
   }
 
   @Override
@@ -53,13 +61,27 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
   }
 
   @Override
+  public Map<String, BloomFilterConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+    return indexLoadingConfig.getBloomFilterConfigs();
+  }
+
+  @Override
   public BloomFilterConfig getDefaultConfig() {
     return BloomFilterConfig.DISABLED;
   }
 
   @Override
-  public BloomFilterConfig getConfig(TableConfig tableConfig, Schema schema) {
-    throw new UnsupportedOperationException("To be implemented in a future PR");
+  public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes("bloom", getIndexConfigClass())
+        .withExclusiveAlternative(
+            IndexConfigDeserializer.ifIndexingConfig(// reads tableConfig.indexingConfig.bloomFilterConfigs
+                IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())
+                  .withFallbackAlternative(// reads tableConfig.indexingConfig.bloomFilterColumns
+                      IndexConfigDeserializer.fromCollection(
+                          tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
+                          (accum, column) -> accum.put(column, BloomFilterConfig.DEFAULT)))
+            )
+        );
   }
 
   @Override
@@ -84,16 +106,17 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    throw new UnsupportedOperationException("To be implemented in a future PR");
+    return new BloomFilterHandler(segmentDirectory, configsByCol, tableConfig);
   }
 
   @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     return V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
   }
+
   @Override
-  public String toString() {
-    return getId();
+  protected IndexReaderFactory<BloomFilterReader> createReaderFactory() {
+    return ReaderFactory.INSTANCE;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<BloomFilterConfig, BloomFilterReader> {
@@ -101,7 +124,7 @@ public class BloomIndexType implements IndexType<BloomFilterConfig, BloomFilterR
 
     @Override
     protected IndexType<BloomFilterConfig, BloomFilterReader, ?> getIndexType() {
-      return BloomIndexType.INSTANCE;
+      return StandardIndexes.bloomFilter();
     }
 
     @Override

@@ -394,13 +394,6 @@ public final class TableConfigUtils {
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
-          if (schema != null) {
-            Preconditions.checkState(
-                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
-                "The destination column '" + columnName
-                    + "' of the transform function must be present in the schema or as a source column for "
-                    + "aggregations");
-          }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
             throw new IllegalStateException(
@@ -408,6 +401,13 @@ public final class TableConfigUtils {
           }
           if (!transformColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
+          }
+          if (schema != null) {
+            Preconditions.checkState(
+                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
+                "The destination column '" + columnName
+                    + "' of the transform function must be present in the schema or as a source column for "
+                    + "aggregations");
           }
           FunctionEvaluator expressionEvaluator;
           if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
@@ -434,8 +434,8 @@ public final class TableConfigUtils {
       ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
       if (complexTypeConfig != null && schema != null) {
         Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
-        Set<String> fieldNames = schema.getFieldSpecMap().keySet();
         if (MapUtils.isNotEmpty(prefixesToRename)) {
+          Set<String> fieldNames = schema.getColumnNames();
           for (String prefix : prefixesToRename.keySet()) {
             for (String field : fieldNames) {
               Preconditions.checkState(!field.startsWith(prefix),
@@ -966,6 +966,11 @@ public final class TableConfigUtils {
               + "forward index for column %s. Either disable range index or create range index with"
               + " version >= 2 to use this feature", columnName));
     }
+
+    Preconditions.checkState(
+        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(),
+        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+            + " not supported with forward index for column: %s, disabled", columnName));
 
     boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
         || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);

@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -83,6 +84,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are exact 2 arguments
     Preconditions.checkArgument(arguments.size() == 2,
         "Exact 2 arguments are required for binary operator transform function");
@@ -112,9 +114,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultArray(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     switch (_leftStoredType) {
       case INT:
         fillResultInt(valueBlock, length);
@@ -136,6 +136,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         break;
       case BYTES:
         fillResultBytes(valueBlock, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       // NOTE: Multi-value columns are not comparable, so we should not reach here
       default:
@@ -164,6 +167,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case STRING:
         fillStringResultArray(valueBlock, leftIntValues, length);
         break;
+      case UNKNOWN:
+        fillResultUnknown(length);
+        break;
       default:
         throw illegalState();
     }
@@ -189,6 +195,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         break;
       case STRING:
         fillStringResultArray(valueBlock, leftLongValues, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       default:
         throw illegalState();
@@ -216,6 +225,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case STRING:
         fillStringResultArray(valueBlock, leftFloatValues, length);
         break;
+      case UNKNOWN:
+        fillResultUnknown(length);
+        break;
       default:
         throw illegalState();
     }
@@ -241,6 +253,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         break;
       case STRING:
         fillStringResultArray(valueBlock, leftDoubleValues, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       default:
         throw illegalState();
@@ -268,8 +283,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case BIG_DECIMAL:
         fillBigDecimalResultArray(valueBlock, leftBigDecimalValues, length);
         break;
+      case UNKNOWN:
+        fillResultUnknown(length);
+        break;
       default:
         throw illegalState();
+    }
+  }
+
+  private void fillResultUnknown(int length) {
+    for (int i = 0; i < length; i++) {
+      _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
     }
   }
 

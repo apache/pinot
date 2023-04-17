@@ -25,11 +25,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServer;
 
 
@@ -68,32 +63,12 @@ public class StageMetadata implements Serializable {
     _requiresSingletonInstance = false;
   }
 
-  public void attach(StageNode stageNode) {
-    if (stageNode instanceof TableScanNode) {
-      _scannedTables.add(((TableScanNode) stageNode).getTableName());
-    }
-    if (stageNode instanceof AggregateNode) {
-      AggregateNode aggNode = (AggregateNode) stageNode;
-      _requiresSingletonInstance = _requiresSingletonInstance || (aggNode.getGroupSet().size() == 0
-          && AggregateNode.isFinalStage(aggNode));
-    }
-    if (stageNode instanceof SortNode) {
-      SortNode sortNode = (SortNode) stageNode;
-      _requiresSingletonInstance = _requiresSingletonInstance || (sortNode.getCollationKeys().size() > 0
-          && sortNode.getOffset() != -1);
-    }
-    if (stageNode instanceof WindowNode) {
-      WindowNode windowNode = (WindowNode) stageNode;
-      // TODO: Figure out a way to parallelize Empty OVER() and OVER(ORDER BY) so the computation can be done across
-      //       multiple nodes.
-      // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
-      // distributed as no global ordering is required across partitions.
-      _requiresSingletonInstance = _requiresSingletonInstance || (windowNode.getGroupSet().size() == 0);
-    }
-  }
-
   public List<String> getScannedTables() {
     return _scannedTables;
+  }
+
+  public void addScannedTable(String tableName) {
+    _scannedTables.add(tableName);
   }
 
   // -----------------------------------------------
@@ -121,12 +96,16 @@ public class StageMetadata implements Serializable {
     return _timeBoundaryInfo;
   }
 
+  public void setTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
+    _timeBoundaryInfo = timeBoundaryInfo;
+  }
+
   public boolean isRequiresSingletonInstance() {
     return _requiresSingletonInstance;
   }
 
-  public void setTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
-    _timeBoundaryInfo = timeBoundaryInfo;
+  public void setRequireSingleton(boolean newRequireInstance) {
+    _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
   }
 
   @Override

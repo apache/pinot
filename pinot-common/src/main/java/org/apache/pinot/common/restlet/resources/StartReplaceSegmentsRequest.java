@@ -37,11 +37,11 @@ public class StartReplaceSegmentsRequest {
   private final List<String> _segmentsTo;
 
   public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
-      @JsonProperty("segmentsTo") List<String> segmentsTo) {
+      @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo) {
     _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
-    _segmentsTo = segmentsTo;
-    Preconditions
-        .checkArgument(segmentsTo != null && !segmentsTo.isEmpty(), "'segmentsTo' should not be null or empty");
+    _segmentsTo = (segmentsTo == null) ? Collections.emptyList() : segmentsTo;
+    Preconditions.checkArgument(!_segmentsFrom.isEmpty() || !_segmentsTo.isEmpty(),
+        "'segmentsFrom' and 'segmentsTo' cannot both be empty");
   }
 
   public List<String> getSegmentsFrom() {

@@ -48,6 +48,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 argument is required for ArrayMax transform function");
@@ -74,9 +75,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       return super.transformToIntValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     int[][] intValuesMV = _argument.transformToIntValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       int maxRes = Integer.MIN_VALUE;
@@ -94,9 +93,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       return super.transformToLongValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     long[][] longValuesMV = _argument.transformToLongValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       long maxRes = Long.MIN_VALUE;
@@ -114,9 +111,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       return super.transformToFloatValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[length];
-    }
+    initFloatValuesSV(length);
     float[][] floatValuesMV = _argument.transformToFloatValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       float maxRes = Float.NEGATIVE_INFINITY;
@@ -134,9 +129,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       return super.transformToDoubleValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       double maxRes = Double.NEGATIVE_INFINITY;
@@ -154,9 +147,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
       return super.transformToStringValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     String[][] stringValuesMV = _argument.transformToStringValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       String maxRes = null;

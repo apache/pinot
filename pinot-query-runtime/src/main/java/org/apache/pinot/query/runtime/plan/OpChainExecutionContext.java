@@ -23,6 +23,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.operator.OpChainStats;
 
 
 /**
@@ -38,9 +40,13 @@ public class OpChainExecutionContext {
   private final long _timeoutMs;
   private final long _deadlineMs;
   private final Map<Integer, StageMetadata> _metadataMap;
+  private final OpChainId _id;
+  private final OpChainStats _stats;
+  private final boolean _traceEnabled;
 
   public OpChainExecutionContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long timeoutMs, long deadlineMs, Map<Integer, StageMetadata> metadataMap) {
+      VirtualServerAddress server, long timeoutMs, long deadlineMs, Map<Integer, StageMetadata> metadataMap,
+      boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
@@ -48,12 +54,15 @@ public class OpChainExecutionContext {
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
     _metadataMap = metadataMap;
+    _id = new OpChainId(requestId, server.virtualId(), stageId);
+    _stats = new OpChainStats(_id.toString());
+    _traceEnabled = traceEnabled;
   }
 
   public OpChainExecutionContext(PlanRequestContext planRequestContext) {
     this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
         planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
-        planRequestContext.getMetadataMap());
+        planRequestContext.getMetadataMap(), planRequestContext.isTraceEnabled());
   }
 
   public MailboxService<TransferableBlock> getMailboxService() {
@@ -82,5 +91,17 @@ public class OpChainExecutionContext {
 
   public Map<Integer, StageMetadata> getMetadataMap() {
     return _metadataMap;
+  }
+
+  public OpChainId getId() {
+    return _id;
+  }
+
+  public OpChainStats getStats() {
+    return _stats;
+  }
+
+  public boolean isTraceEnabled() {
+    return _traceEnabled;
   }
 }

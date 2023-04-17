@@ -118,13 +118,7 @@ public class ZKMetadataProvider {
   }
 
   public static String constructPropertyStorePathForControllerJob(ControllerJobType jobType) {
-    if (jobType == ControllerJobType.TABLE_REBALANCE) {
-      return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX, jobType.name());
-    } else {
-      // For other types, we will continue to use the root path until we migrate
-      // other types to use separate nodes based on jobType like TABLE_REBALANCE
-      return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX);
-    }
+    return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX, jobType.name());
   }
 
   public static String constructPropertyStorePathForResourceConfig(String resourceName) {

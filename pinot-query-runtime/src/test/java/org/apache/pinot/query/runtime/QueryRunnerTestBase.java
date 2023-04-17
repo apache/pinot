@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -59,6 +58,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.h2.jdbc.JdbcArray;
@@ -87,10 +87,15 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId),
-            QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
-            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    Map<String, String> requestMetadataMap = new HashMap<>();
+    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
+    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
+        String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+
+    if (executionStatsAggregatorMap != null) {
+      requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
+    }
+
     int reducerStageId = -1;
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
@@ -109,7 +114,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     Preconditions.checkState(reducerStageId != -1);
     ResultTable resultTable = QueryDispatcher.runReducer(requestId, queryPlan, reducerStageId,
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-        executionStatsAggregatorMap);
+        executionStatsAggregatorMap, true);
     return resultTable.getRows();
   }
 
@@ -181,6 +186,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         }
         return Double.compare(ld, rd);
       } else if (l instanceof String) {
+        if (r instanceof byte[]) {
+          return ((String) l).compareTo(BytesUtils.toHexString((byte[]) r));
+        }
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {
         return ((Boolean) l).compareTo((Boolean) r);
@@ -190,8 +198,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         } else {
           return ((BigDecimal) l).compareTo(new BigDecimal((String) r));
         }
+      } else if (l instanceof byte[]) {
+        if (r instanceof byte[]) {
+          return ByteArray.compare((byte[]) l, (byte[]) r);
+        } else {
+          return ByteArray.compare((byte[]) l, ((ByteArray) r).getBytes());
+        }
       } else if (l instanceof ByteArray) {
-        return ((ByteArray) l).compareTo(new ByteArray((byte[]) r));
+        if (r instanceof ByteArray) {
+          return ((ByteArray) l).compareTo((ByteArray) r);
+        } else {
+          return ByteArray.compare(((ByteArray) l).getBytes(), (byte[]) r);
+        }
       } else if (l instanceof Timestamp) {
         return ((Timestamp) l).compareTo((Timestamp) r);
       } else if (l instanceof int[]) {

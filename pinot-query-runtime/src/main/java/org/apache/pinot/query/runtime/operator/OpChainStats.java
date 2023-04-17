@@ -21,12 +21,13 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Suppliers;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 
@@ -50,7 +51,7 @@ public class OpChainStats {
   private final AtomicLong _queuedCount = new AtomicLong();
 
   private final String _id;
-  private Map<String, OperatorStats> _operatorStatsMap = new HashMap<>();
+  private final ConcurrentHashMap<String, OperatorStats> _operatorStatsMap = new ConcurrentHashMap<>();
 
   public OpChainStats(String id) {
     _id = id;
@@ -73,12 +74,18 @@ public class OpChainStats {
     }
   }
 
-  public Map<String, OperatorStats> getOperatorStatsMap() {
+  public ConcurrentHashMap<String, OperatorStats> getOperatorStatsMap() {
     return _operatorStatsMap;
   }
 
-  public void setOperatorStatsMap(Map<String, OperatorStats> operatorStatsMap) {
-    _operatorStatsMap = operatorStatsMap;
+  public OperatorStats getOperatorStats(OpChainExecutionContext context, String operatorId) {
+      return _operatorStatsMap.computeIfAbsent(operatorId, (id) -> {
+        OperatorStats operatorStats = new OperatorStats(context);
+        if (context.isTraceEnabled()) {
+          operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), operatorId);
+        }
+        return operatorStats;
+      });
   }
 
   private void startExecutionTimer() {
@@ -87,6 +94,10 @@ public class OpChainStats {
     if (!_executeStopwatch.isRunning()) {
       _executeStopwatch.start();
     }
+  }
+
+  public long getExecutionTime() {
+    return _executeStopwatch.elapsed(TimeUnit.MILLISECONDS);
   }
 
   @Override

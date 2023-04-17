@@ -384,7 +384,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       setShowReloadStatusModal(true);
       const [reloadStatusData, tableJobsData] = await Promise.all([
         PinotMethodUtils.reloadStatusOp(tableName, tableType),
-        PinotMethodUtils.fetchTableJobs(tableName, "RELOAD_SEGMENT,RELOAD_ALL_SEGMENTS"),
+        PinotMethodUtils.fetchTableJobs(tableName, "RELOAD_SEGMENT"),
       ]);
 
       if(reloadStatusData.error || tableJobsData.error) {

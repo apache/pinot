@@ -282,9 +282,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock);
     int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
@@ -311,9 +309,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock);
     int numDocs = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[numDocs];
-    }
+    initLongValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
@@ -340,9 +336,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock);
     int numDocs = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[numDocs];
-    }
+    initFloatValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
@@ -369,9 +363,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock);
     int numDocs = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[numDocs];
-    }
+    initDoubleValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
@@ -398,9 +390,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock);
     int numDocs = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[numDocs];
-    }
+    initBigDecimalValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
@@ -427,9 +417,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock);
     int numDocs = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[numDocs];
-    }
+    initStringValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {
@@ -456,9 +444,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int[] selected = getSelectedArray(valueBlock);
     int numDocs = valueBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
-      _bytesValuesSV = new byte[numDocs][];
-    }
+    initBytesValuesSV(numDocs);
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
       if (_selections[i]) {

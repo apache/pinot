@@ -75,7 +75,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
     for (InstanceResponseBlock instanceResponseBlock : baseResultBlock) {
-      _operatorStats.recordExecutionStats(instanceResponseBlock.getResponseMetadata());
+      OperatorStats operatorStats = _opChainStats.getOperatorStats(context, getOperatorId());
+      operatorStats.recordExecutionStats(instanceResponseBlock.getResponseMetadata());
     }
   }
 
@@ -111,6 +112,15 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
       }
     }
+  }
+
+  /**
+   * Leaf stage operators should always collect stats for the tables used in queries
+   * Otherwise the Broker response will just contain zeros for every stat value
+   */
+  @Override
+  protected boolean shouldCollectStats() {
+    return true;
   }
 
   /**

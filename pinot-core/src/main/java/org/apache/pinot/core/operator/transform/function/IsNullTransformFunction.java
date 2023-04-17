@@ -64,10 +64,7 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
-    Arrays.fill(_intValuesSV, 0);
+    initZeroFillingIntValuesSV(length);
     int[] docIds = valueBlock.getDocIds();
     assert docIds != null;
     if (_nullValueVectorIterator != null) {
