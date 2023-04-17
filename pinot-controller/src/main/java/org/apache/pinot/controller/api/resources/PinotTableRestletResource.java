@@ -425,43 +425,58 @@ public class PinotTableRestletResource {
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
+  //TODO: Add an optional `async` parameter, new flow is triggered only when `async` is set to `true`
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
-          + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod) {
+          + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod,
+      @ApiParam(value = "Delete table in background. Should be used for large tables.")
+      @QueryParam("async") @DefaultValue("false") boolean async) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
-    List<String> tablesDeleted = new LinkedList<>();
-    try {
-      boolean tableExist = false;
-      if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
-        tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
-        // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
-        // did not complete.
-        _pinotHelixResourceManager.deleteOfflineTable(tableName, retentionPeriod);
-        if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    if (async) {
+      String messageId = _pinotHelixResourceManager.deleteTableAsync(tableName, tableType, retentionPeriod);
+
+      //TODO: change this error message for correct exception handling
+      if (messageId == null) {
+        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
+            Response.Status.BAD_REQUEST);
+      }
+
+      return new SuccessResponse("Tables deletion triggered for table: " + tableName + ", job id: " + messageId);
+    } else {
+      List<String> tablesDeleted = new LinkedList<>();
+      try {
+        boolean tableExist = false;
+        if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
+          tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
+          // Even the table name does not exist, still go on to delete remaining table metadata
+          // in case a previous delete did not complete.
+          _pinotHelixResourceManager.deleteOfflineTable(tableName, retentionPeriod);
+          if (tableExist) {
+            tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+          }
         }
-      }
-      if (verifyTableType(tableName, tableType, TableType.REALTIME)) {
-        tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
-        // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
-        // did not complete.
-        _pinotHelixResourceManager.deleteRealtimeTable(tableName, retentionPeriod);
-        if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+        if (verifyTableType(tableName, tableType, TableType.REALTIME)) {
+          tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
+          // Even the table name does not exist, still go on to delete remaining table metadata
+          // in case a previous delete did not complete.
+          _pinotHelixResourceManager.deleteRealtimeTable(tableName, retentionPeriod);
+          if (tableExist) {
+            tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+          }
         }
+        if (!tablesDeleted.isEmpty()) {
+          return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
+        }
+      } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
       }
-      if (!tablesDeleted.isEmpty()) {
-        return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
-      }
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER,
+          "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
     }
-    throw new ControllerApplicationException(LOGGER,
-        "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
   }
 
   //   Return true iff the table is of the expectedType based on the given tableName and tableType. The truth table:
