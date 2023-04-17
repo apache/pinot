@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -40,20 +39,15 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   private final int _mailboxPort;
   private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
 
-  private final Cache<String, InMemoryReceivingMailbox> _receivingMailboxCache =
+  private final Cache<MailboxIdentifier, InMemoryReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY.toMinutes(), TimeUnit.MINUTES)
-          .removalListener(new RemovalListener<String, InMemoryReceivingMailbox>() {
-            @Override
-            public void onRemoval(RemovalNotification<String, InMemoryReceivingMailbox> notification) {
-              if (notification.wasEvicted()) {
-                LOGGER.info("Evicting dangling InMemoryReceivingMailbox: {}", notification.getKey());
-                // TODO: This should be tied to the query deadline. Unlike GrpcMailboxService, the change here is
-                //  simpler.
-                notification.getValue().cancel();
-              }
+          .removalListener((RemovalListener<MailboxIdentifier, InMemoryReceivingMailbox>) notification -> {
+            if (notification.wasEvicted()) {
+              LOGGER.info("Evicting dangling InMemoryReceivingMailbox: {}", notification.getKey());
+              // TODO: This should be tied to the query deadline. Unlike GrpcMailboxService, the change here is simpler.
+              notification.getValue().cancel();
             }
-          })
-          .build();
+          }).build();
 
   public InMemoryMailboxService(String hostname, int mailboxPort,
       Consumer<MailboxIdentifier> receivedMailContentCallback) {
@@ -87,17 +81,15 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   @Override
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    return new InMemorySendingMailbox(mailboxId.toString(),
-        () -> new InMemoryTransferStream(mailboxId, this, deadlineMs),
+    return new InMemorySendingMailbox(mailboxId, () -> new InMemoryTransferStream(mailboxId, this, deadlineMs),
         getReceivedMailContentCallback());
   }
 
   @Override
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    String mId = mailboxId.toString();
     try {
-      return _receivingMailboxCache.get(mId, () -> new InMemoryReceivingMailbox(mId));
+      return _receivingMailboxCache.get(mailboxId, InMemoryReceivingMailbox::new);
     } catch (ExecutionException e) {
       LOGGER.error(String.format("Error getting in-memory receiving mailbox=%s", mailboxId), e);
       throw new RuntimeException(e);
@@ -106,10 +98,10 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
 
   @Override
   public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
-    InMemoryReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
+    InMemoryReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId);
     if (receivingMailbox != null) {
       receivingMailbox.cancel();
-      _receivingMailboxCache.invalidate(mailboxId.toString());
+      _receivingMailboxCache.invalidate(mailboxId);
     }
   }
 }

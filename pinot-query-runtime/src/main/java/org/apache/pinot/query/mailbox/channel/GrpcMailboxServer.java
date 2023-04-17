@@ -45,14 +45,14 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final GrpcMailboxService _mailboxService;
   private final Server _server;
 
-  public GrpcMailboxServer(GrpcMailboxService mailboxService, int port, PinotConfiguration extraConfig) {
+  public GrpcMailboxServer(GrpcMailboxService mailboxService, PinotConfiguration extraConfig) {
     _mailboxService = mailboxService;
-    _server = ServerBuilder.forPort(port)
+    _server = ServerBuilder.forPort(mailboxService.getMailboxPort())
         .addService(this)
         .maxInboundMessageSize(extraConfig.getProperty(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
             QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES))
         .build();
-    LOGGER.info("Initialized GrpcMailboxServer on port: {}", port);
+    LOGGER.info("Initialized GrpcMailboxServer on port: {}", mailboxService.getMailboxPort());
   }
 
   public void start() {

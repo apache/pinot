@@ -25,22 +25,17 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
+  private final MailboxIdentifier _mailboxId;
+  private final Supplier<InMemoryTransferStream> _transferStreamProvider;
   private final Consumer<MailboxIdentifier> _gotMailCallback;
-  private final JsonMailboxIdentifier _mailboxId;
 
-  private Supplier<InMemoryTransferStream> _transferStreamProvider;
   private InMemoryTransferStream _transferStream;
 
-  public InMemorySendingMailbox(String mailboxId, Supplier<InMemoryTransferStream> transferStreamProvider,
+  public InMemorySendingMailbox(MailboxIdentifier mailboxId, Supplier<InMemoryTransferStream> transferStreamProvider,
       Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxId = JsonMailboxIdentifier.parse(mailboxId);
+    _mailboxId = mailboxId;
     _transferStreamProvider = transferStreamProvider;
     _gotMailCallback = gotMailCallback;
-  }
-
-  @Override
-  public String getMailboxId() {
-    return _mailboxId.toString();
   }
 
   @Override
@@ -54,7 +49,8 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   }
 
   @Override
-  public void complete() throws Exception {
+  public void complete()
+      throws Exception {
     _transferStream.complete();
   }
 
