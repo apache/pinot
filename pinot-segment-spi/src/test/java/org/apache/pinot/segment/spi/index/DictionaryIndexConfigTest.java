@@ -61,7 +61,7 @@ public class DictionaryIndexConfigTest {
   }
 
   @Test
-  public void withDissabledTrue()
+  public void withDisabledTrue()
       throws JsonProcessingException {
     String confStr = "{\"disabled\": true}";
     DictionaryIndexConfig config = JsonUtils.stringToObject(confStr, DictionaryIndexConfig.class);

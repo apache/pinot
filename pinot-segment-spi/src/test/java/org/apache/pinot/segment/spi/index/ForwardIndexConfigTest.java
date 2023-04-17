@@ -68,7 +68,7 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
-  public void withDissabledTrue()
+  public void withDisabledTrue()
       throws JsonProcessingException {
     String confStr = "{\"disabled\": true}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
