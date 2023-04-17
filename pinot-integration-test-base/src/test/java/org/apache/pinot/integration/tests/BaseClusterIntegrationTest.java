@@ -598,11 +598,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true);
-  }
-
-  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
-    waitForDocsLoaded(timeoutMs, raiseError, getTableName());
+    waitForDocsLoaded(timeoutMs, true, getTableName());
   }
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
