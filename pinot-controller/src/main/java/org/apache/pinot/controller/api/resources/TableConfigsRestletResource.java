@@ -64,6 +64,7 @@ import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -138,12 +139,21 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
       notes = "Get the TableConfigs for a given raw tableName")
   public String getConfig(
-      @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Flag to get the table config in new format") @QueryParam("newFormat") Boolean inNewFormat) {
 
     try {
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+      if (inNewFormat != null && inNewFormat) {
+        if (offlineTableConfig != null) {
+          offlineTableConfig = FieldIndexConfigsUtil.createTableConfigFromOldFormat(offlineTableConfig, schema);
+        }
+        if (realtimeTableConfig != null) {
+          realtimeTableConfig = FieldIndexConfigsUtil.createTableConfigFromOldFormat(realtimeTableConfig, schema);
+        }
+      }
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
     } catch (Exception e) {
