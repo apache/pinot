@@ -54,10 +54,8 @@ import org.testng.annotations.Test;
 
 
 /**
- * all legacy tests.
- *
- * @deprecated do not add to this test set. this class will be broken down and clean up.
- * add your test to appropraite files in {@link org.apache.pinot.query.runtime.queries} instead.
+ * all special tests that doesn't fit into {@link org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest}
+ * pattern goes here.
  */
 public class QueryRunnerTest extends QueryRunnerTestBase {
   public static final Object[][] ROWS = new Object[][]{
@@ -156,13 +154,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-  @Test(dataProvider = "testDataWithSqlToFinalRowCount")
+
+  /**
+   * Test compares with expected row count only.
+   */
+   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
       throws Exception {
     List<Object[]> resultRows = queryRunner(sql, null);
     Assert.assertEquals(resultRows.size(), expectedRows);
   }
 
+  /**
+   * Test automatically compares against H2.
+   *
+   * @deprecated do not add to this test set. this class will be broken down and clean up.
+   *   add your test to the appropriate files in {@link org.apache.pinot.query.runtime.queries} instead.
+   */
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
@@ -172,6 +180,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     compareRowEquals(resultRows, expectedRows);
   }
 
+  /**
+   * Test compares against its desired exceptions.
+   */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
@@ -235,6 +246,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT round_decimal(col3) FROM a", 15},
         new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
         new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+
+        // test queries with special query options attached
+        //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
+        new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
     };
   }
 
