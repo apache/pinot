@@ -57,6 +57,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.datasketches.kll.KllDoublesSketch;
+import org.apache.datasketches.kll.KllSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.CustomObject;
@@ -127,7 +129,8 @@ public class ObjectSerDeUtils {
     StringLongPair(31),
     CovarianceTuple(32),
     VarianceTuple(33),
-    PinotFourthMoment(34);
+    PinotFourthMoment(34),
+    KllDataSketch(35);
 
     private final int _value;
 
@@ -176,6 +179,8 @@ public class ObjectSerDeUtils {
         return ObjectType.DistinctTable;
       } else if (value instanceof Sketch) {
         return ObjectType.DataSketch;
+      } else if (value instanceof KllSketch) {
+        return ObjectType.KllDataSketch;
       } else if (value instanceof Geometry) {
         return ObjectType.Geometry;
       } else if (value instanceof RoaringBitmap) {
@@ -918,6 +923,26 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<KllSketch> KLL_SKETCH_SER_DE = new ObjectSerDe<KllSketch>() {
+
+    @Override
+    public byte[] serialize(KllSketch value) {
+      return value.toByteArray();
+    }
+
+    @Override
+    public KllSketch deserialize(byte[] bytes) {
+      return KllDoublesSketch.wrap(Memory.wrap(bytes));
+    }
+
+    @Override
+    public KllDoublesSketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return KllDoublesSketch.wrap(Memory.wrap(bytes));
+    }
+  };
+
   public static final ObjectSerDe<Geometry> GEOMETRY_SER_DE = new ObjectSerDe<Geometry>() {
 
     @Override
@@ -1236,7 +1261,8 @@ public class ObjectSerDeUtils {
       STRING_LONG_PAIR_SER_DE,
       COVARIANCE_TUPLE_OBJECT_SER_DE,
       VARIANCE_TUPLE_OBJECT_SER_DE,
-      PINOT_FOURTH_MOMENT_OBJECT_SER_DE
+      PINOT_FOURTH_MOMENT_OBJECT_SER_DE,
+      KLL_SKETCH_SER_DE
   };
   //@formatter:on
 
