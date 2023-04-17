@@ -91,8 +91,13 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
+  public String getPrettyName() {
+    return "text";
+  }
+
+  @Override
   public ColumnConfigDeserializer<TextIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("text", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
           if (fieldConfigList == null) {

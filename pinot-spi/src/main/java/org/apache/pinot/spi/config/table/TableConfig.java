@@ -174,6 +174,30 @@ public class TableConfig extends BaseJsonConfig {
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
   }
 
+  public TableConfig(TableConfig tableConfig) {
+    _tableType = tableConfig.getTableType();
+    _tableName = tableConfig.getTableName();
+    _validationConfig = tableConfig.getValidationConfig();
+    _tenantConfig = tableConfig.getTenantConfig();
+    _indexingConfig = tableConfig.getIndexingConfig();
+    _customConfig = tableConfig.getCustomConfig();
+    _quotaConfig = tableConfig.getQuotaConfig();
+    _taskConfig = tableConfig.getTaskConfig();
+    _routingConfig = tableConfig.getRoutingConfig();
+    _queryConfig = tableConfig.getQueryConfig();
+    _instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    _fieldConfigList = tableConfig.getFieldConfigList();
+    _upsertConfig = tableConfig.getUpsertConfig();
+    _dedupConfig = tableConfig.getDedupConfig();
+    _dimensionTableConfig = tableConfig.getDimensionTableConfig();
+    _ingestionConfig = tableConfig.getIngestionConfig();
+    _tierConfigsList = tableConfig.getTierConfigsList();
+    _dimTable = tableConfig.isDimTable();
+    _tunerConfigList = tableConfig.getTunerConfigsList();
+    _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
+    _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+  }
+
   @JsonProperty(TABLE_NAME_KEY)
   public String getTableName() {
     return _tableName;

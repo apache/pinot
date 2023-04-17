@@ -91,8 +91,13 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   @Override
+  public String getPrettyName() {
+    return "fst";
+  }
+
+  @Override
   public ColumnConfigDeserializer<FstIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("fst", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.FST,
             (tableConfig, fieldConfig) -> {
@@ -166,5 +171,11 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }
+  }
+
+  @Override
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+    super.convertToNewFormat(tableConfig, schema);
+    tableConfig.getIndexingConfig().setFSTIndexType(null);
   }
 }

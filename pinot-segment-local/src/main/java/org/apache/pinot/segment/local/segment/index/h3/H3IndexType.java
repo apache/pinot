@@ -76,8 +76,13 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
+  public String getPrettyName() {
+    return "h3";
+  }
+
+  @Override
   public ColumnConfigDeserializer<H3IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("h3", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.H3,
             ((tableConfig, fieldConfig) -> new H3IndexConfig(fieldConfig.getProperties()))));

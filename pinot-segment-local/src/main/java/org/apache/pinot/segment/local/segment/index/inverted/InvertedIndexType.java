@@ -79,11 +79,16 @@ public class InvertedIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return "inverted";
+  }
+
+  @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
     ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
         tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
         (acum, column) -> acum.put(column, IndexConfig.ENABLED));
-    return IndexConfigDeserializer.fromIndexes("inverted", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.ifIndexingConfig(fromInvertedCols));
   }
 
@@ -181,5 +186,11 @@ public class InvertedIndexType
       PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
       return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
     }
+  }
+
+  @Override
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+    super.convertToNewFormat(tableConfig, schema);
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(null);
   }
 }

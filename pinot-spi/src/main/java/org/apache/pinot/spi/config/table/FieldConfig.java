@@ -152,4 +152,68 @@ public class FieldConfig extends BaseJsonConfig {
   public Map<String, String> getProperties() {
     return _properties;
   }
+
+  public static class Builder {
+    private String _name;
+    private EncodingType _encodingType;
+    private List<IndexType> _indexTypes;
+    private JsonNode _indexes;
+    private CompressionCodec _compressionCodec;
+    private Map<String, String> _properties;
+    private TimestampConfig _timestampConfig;
+
+    public Builder() {
+    }
+
+    public Builder(FieldConfig other) {
+      _name = other._name;
+      _encodingType = other._encodingType;
+      _indexTypes = other._indexTypes;
+      _indexes = other._indexes;
+      _compressionCodec = other._compressionCodec;
+      _properties = other._properties;
+      _timestampConfig = other._timestampConfig;
+    }
+
+    public Builder withIndexes(JsonNode indexes) {
+      _indexes = indexes;
+      return this;
+    }
+
+    public Builder withName(String name) {
+      _name = name;
+      return this;
+    }
+
+    public Builder withEncodingType(EncodingType encodingType) {
+      _encodingType = encodingType;
+      return this;
+    }
+
+    public Builder withIndexTypes(List<IndexType> indexTypes) {
+      _indexTypes = indexTypes;
+      return this;
+    }
+
+    public Builder withCompressionCodec(CompressionCodec compressionCodec) {
+      _compressionCodec = compressionCodec;
+      return this;
+    }
+
+    public Builder withProperties(Map<String, String> properties) {
+      _properties = properties;
+      return this;
+    }
+
+    public Builder withTimestampConfig(TimestampConfig timestampConfig) {
+      _timestampConfig = timestampConfig;
+      return this;
+    }
+
+    public FieldConfig build() {
+      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig, _indexes, _properties);
+    }
+  }
+
+
 }

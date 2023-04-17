@@ -19,8 +19,16 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -60,6 +68,38 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
       _readerFactory = createReaderFactory();
     }
     return _readerFactory;
+  }
+
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+    Map<String, C> deserialize = getConfig(tableConfig, schema);
+    for (Map.Entry<String, C> entry : deserialize.entrySet()) {
+      AtomicBoolean fieldConfigFound = new AtomicBoolean(false);
+      List<FieldConfig> fieldConfigList = Optional.ofNullable(tableConfig.getFieldConfigList())
+          .orElse(List.of())
+          .stream()
+          .map(fc -> {
+            if (fc.getName().equals(entry.getKey())) {
+              fieldConfigFound.set(true);
+              ObjectNode currentIndexes = fc.getIndexes().isNull()
+                  ? new ObjectMapper().createObjectNode()
+                  : (ObjectNode)fc.getIndexes();
+              JsonNode indexes = currentIndexes.set(getPrettyName(), entry.getValue().toJsonNode());
+              FieldConfig.Builder builder = new FieldConfig.Builder(fc);
+              builder.withIndexes(indexes);
+              return builder.build();
+            }
+            return fc;
+          })
+          .collect(Collectors.toList());
+      if (!fieldConfigFound.get()) {
+        JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), entry.getValue().toJsonNode());
+        FieldConfig.Builder builder = new FieldConfig.Builder();
+        builder.withName(entry.getKey());
+        builder.withIndexes(indexes);
+        fieldConfigList.add(builder.build());
+      }
+      tableConfig.setFieldConfigList(fieldConfigList);
+    }
   }
 
   @Override

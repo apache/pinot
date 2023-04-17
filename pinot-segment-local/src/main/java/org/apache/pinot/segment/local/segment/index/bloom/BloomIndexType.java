@@ -71,8 +71,13 @@ public class BloomIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return "bloom";
+  }
+
+  @Override
   public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("bloom", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(// reads tableConfig.indexingConfig.bloomFilterConfigs
                 IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())
@@ -132,5 +137,12 @@ public class BloomIndexType
         BloomFilterConfig indexConfig) {
       return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
     }
+  }
+
+  @Override
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+    super.convertToNewFormat(tableConfig, schema);
+    tableConfig.getIndexingConfig().setBloomFilterColumns(null);
+    tableConfig.getIndexingConfig().setBloomFilterConfigs(null);
   }
 }

@@ -21,9 +21,12 @@ package org.apache.pinot.segment.spi.index;
 
 import com.google.common.collect.Sets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -102,5 +105,23 @@ public class FieldIndexConfigsUtil {
     public <C extends IndexConfig> ColumnConfigDeserializer<C> get(IndexType<C, ?, ?> indexType) {
       return indexType::getConfig;
     }
+  }
+
+  public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
+    TableConfig clone = new TableConfig(tableConfig);
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      // get all the index data in new format
+      indexType.convertToNewFormat(clone, schema);
+    }
+    // cleanup the indexTypes field from all FieldConfig items
+    List<FieldConfig> fieldConfigList = Optional.ofNullable(clone.getFieldConfigList()).orElse(List.of())
+        .stream()
+        .map(fieldConfig ->
+          new FieldConfig.Builder(fieldConfig)
+              .withIndexTypes(null)
+              .build()
+        ).collect(Collectors.toList());
+    clone.setFieldConfigList(fieldConfigList);
+    return clone;
   }
 }

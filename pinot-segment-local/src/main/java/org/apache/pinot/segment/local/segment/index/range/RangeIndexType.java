@@ -83,8 +83,13 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   @Override
+  public String getPrettyName() {
+    return "range";
+  }
+
+  @Override
   public ColumnConfigDeserializer<RangeIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("range", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           if (tableConfig.getIndexingConfig() == null) {
             return Collections.emptyMap();
@@ -172,5 +177,11 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
       throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.range(),
           "Unknown range index version " + version);
     }
+  }
+
+  @Override
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+    super.convertToNewFormat(tableConfig, schema);
+    tableConfig.getIndexingConfig().setRangeIndexColumns(null);
   }
 }

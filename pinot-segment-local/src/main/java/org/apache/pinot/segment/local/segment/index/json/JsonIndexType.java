@@ -74,6 +74,11 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   }
 
   @Override
+  public String getPrettyName() {
+    return "json";
+  }
+
+  @Override
   public ColumnConfigDeserializer<JsonIndexConfig> createDeserializer() {
     // reads tableConfig.indexingConfig.jsonIndexConfigs
     ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexConf =
@@ -83,7 +88,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
         IndexConfigDeserializer.fromCollection(
             tableConfig -> tableConfig.getIndexingConfig().getJsonIndexColumns(),
             (accum, column) -> accum.put(column, new JsonIndexConfig()));
-    return IndexConfigDeserializer.fromIndexes("json", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(fromJsonIndexCols.withExclusiveAlternative(fromJsonIndexConf)));
   }
@@ -151,5 +156,12 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
       }
       return new ImmutableJsonIndexReader(dataBuffer, metadata.getTotalDocs());
     }
+  }
+
+  @Override
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+    super.convertToNewFormat(tableConfig, schema);
+    tableConfig.getIndexingConfig().setJsonIndexColumns(null);
+    tableConfig.getIndexingConfig().setJsonIndexConfigs(null);
   }
 }

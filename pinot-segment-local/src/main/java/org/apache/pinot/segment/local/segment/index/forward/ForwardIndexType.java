@@ -126,6 +126,11 @@ public class ForwardIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return "forward";
+  }
+
+  @Override
   public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
     ColumnConfigDeserializer<ForwardIndexConfig> fromFieldConfig = IndexConfigDeserializer.fromCollection(
@@ -144,7 +149,7 @@ public class ForwardIndexType
           // the default `fromIndexes` deserializer.
         }
     );
-    return IndexConfigDeserializer.fromIndexes("forward", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(fromFieldConfig);
   }
 
