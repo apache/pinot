@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -71,7 +72,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
       @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
-      @Nullable String appId) {
+      @Nullable String appId, @Nullable String threadPoolName) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -80,6 +81,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     Builder builder = Dsl.config();
     if (sslContext != null) {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
+    }
+
+    if (threadPoolName != null) {
+      builder.setThreadPoolName(threadPoolName);
+    }
+
+    if (connectionTimeouts.getRequestTimeoutMs() != null) {
+      builder.setRequestTimeout(connectionTimeouts.getRequestTimeoutMs());
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
@@ -92,7 +101,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionStr,
       @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
-      @Nullable String appId) {
+      @Nullable String appId, @Nullable String threadPoolName) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -101,6 +110,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     Builder builder = Dsl.config();
     if (sslContext != null) {
       builder.setSslContext(sslContext);
+    }
+
+    if (threadPoolName != null) {
+      builder.setThreadPoolName(threadPoolName);
+    }
+
+    if (connectionTimeouts.getRequestTimeoutMs() != null) {
+      builder.setRequestTimeout(connectionTimeouts.getRequestTimeoutMs());
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
