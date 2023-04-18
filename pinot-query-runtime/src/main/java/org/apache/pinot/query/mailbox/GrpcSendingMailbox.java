@@ -42,18 +42,19 @@ import org.slf4j.LoggerFactory;
  */
 public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
-  private final String _mailboxId;
-  private final AtomicBoolean _initialized = new AtomicBoolean(false);
 
-  private StreamObserver<MailboxContent> _mailboxContentStreamObserver;
+  private final String _mailboxId;
   private final Function<Long, StreamObserver<MailboxContent>> _mailboxContentStreamObserverSupplier;
   private final MailboxStatusStreamObserver _statusObserver;
   private final long _deadlineMs;
+  private final AtomicBoolean _initialized = new AtomicBoolean(false);
+
+  private StreamObserver<MailboxContent> _mailboxContentStreamObserver;
   private TransferableBlock _errorBlock;
 
-  public GrpcSendingMailbox(String mailboxId, MailboxStatusStreamObserver statusObserver,
+  public GrpcSendingMailbox(MailboxIdentifier mailboxId, MailboxStatusStreamObserver statusObserver,
       Function<Long, StreamObserver<MailboxContent>> contentStreamObserverSupplier, long deadlineMs) {
-    _mailboxId = mailboxId;
+    _mailboxId = mailboxId.toString();
     _mailboxContentStreamObserverSupplier = contentStreamObserverSupplier;
     _statusObserver = statusObserver;
     _deadlineMs = deadlineMs;
@@ -67,7 +68,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
       open();
     }
     Preconditions.checkState(!_statusObserver.isFinished() || _errorBlock != null,
-        "Called send when stream is already closed for mailbox=" + _mailboxId);
+        "Called send when stream is already closed for mailbox=%s", _mailboxId);
     MailboxContent data = toMailboxContent(block.getDataBlock());
     _mailboxContentStreamObserver.onNext(data);
   }
@@ -99,11 +100,6 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
         LOGGER.info("Unexpected error issuing onError to MailboxContentStreamObserver: {}", e.getMessage());
       }
     }
-  }
-
-  @Override
-  public String getMailboxId() {
-    return _mailboxId;
   }
 
   private void open() {

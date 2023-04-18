@@ -20,12 +20,16 @@ package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -50,9 +54,13 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class TableConfigUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
+
   private TableConfigUtils() {
   }
 
@@ -329,6 +337,96 @@ public class TableConfigUtils {
     indexingConfig.setStreamConfigs(null);
     validationConfig.setSegmentPushFrequency(null);
     validationConfig.setSegmentPushType(null);
+  }
+
+  /**
+   * Helper method to create a new TableConfig by overwriting the original TableConfig with tier specific configs, so
+   * that the consumers of TableConfig don't have to handle tier overwrites themselves. To begin with, we only
+   * consider to overwrite the index configs in `tableIndexConfig` and `fieldConfigList`, e.g.
+   *
+   * {
+   *   "tableIndexConfig": {
+   *     ... // configs allowed in IndexingConfig, for default tier
+   *     "tierOverwrites": {
+   *       "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
+   *       "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
+   *     }
+   *   }
+   *   "fieldConfigList": [
+   *     {
+   *       ... // configs allowed in FieldConfig, for default tier
+   *       "tierOverwrites": {
+   *         "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
+   *         "coldTier": {...} // configs allowed in FieldConfig, for cold tier
+   *       }
+   *     },
+   *     ...
+   *   ]
+   * }
+   *
+   * Overwriting is to extract tier specific configs from those `tierOverwrites` sections and replace the
+   * corresponding configs set for default tier.
+   *
+   * TODO: Other tier specific configs like segment assignment policy may be handled in this helper method too, to
+   *       keep tier overwrites transparent to consumers of TableConfig.
+   *
+   * @param tableConfig the input table config which is kept intact
+   * @param tier        the target tier to overwrite the table config
+   * @return a new table config overwritten for the tier, or the original table if overwriting doesn't happen.
+   */
+  public static TableConfig overwriteTableConfigForTier(TableConfig tableConfig, @Nullable String tier) {
+    if (tier == null) {
+      return tableConfig;
+    }
+    try {
+      boolean updated = false;
+      JsonNode tblCfgJson = tableConfig.toJsonNode();
+      // Apply tier specific overwrites for `tableIndexConfig`
+      JsonNode tblIdxCfgJson = tblCfgJson.get(TableConfig.INDEXING_CONFIG_KEY);
+      if (tblIdxCfgJson != null && tblIdxCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
+        JsonNode tierCfgJson = tblIdxCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
+        if (tierCfgJson != null) {
+          LOGGER.debug("Got table index config overwrites: {} for tier: {}", tierCfgJson, tier);
+          overwriteConfig(tblIdxCfgJson, tierCfgJson);
+          updated = true;
+        }
+      }
+      // Apply tier specific overwrites for `fieldConfigList`
+      JsonNode fieldCfgListJson = tblCfgJson.get(TableConfig.FIELD_CONFIG_LIST_KEY);
+      if (fieldCfgListJson != null && fieldCfgListJson.isArray()) {
+        Iterator<JsonNode> fieldCfgListItr = fieldCfgListJson.elements();
+        while (fieldCfgListItr.hasNext()) {
+          JsonNode fieldCfgJson = fieldCfgListItr.next();
+          if (!fieldCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
+            continue;
+          }
+          JsonNode tierCfgJson = fieldCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
+          if (tierCfgJson != null) {
+            LOGGER.debug("Got field index config overwrites: {} for tier: {}", tierCfgJson, tier);
+            overwriteConfig(fieldCfgJson, tierCfgJson);
+            updated = true;
+          }
+        }
+      }
+      if (updated) {
+        LOGGER.debug("Got overwritten table config: {} for tier: {}", tblCfgJson, tier);
+        return JsonUtils.jsonNodeToObject(tblCfgJson, TableConfig.class);
+      } else {
+        LOGGER.debug("No table config overwrites for tier: {}", tier);
+        return tableConfig;
+      }
+    } catch (IOException e) {
+      LOGGER.warn("Failed to overwrite table config for tier: {} for table: {}", tier, tableConfig.getTableName(), e);
+      return tableConfig;
+    }
+  }
+
+  private static void overwriteConfig(JsonNode oldCfg, JsonNode newCfg) {
+    Iterator<Map.Entry<String, JsonNode>> cfgItr = newCfg.fields();
+    while (cfgItr.hasNext()) {
+      Map.Entry<String, JsonNode> cfgEntry = cfgItr.next();
+      ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
+    }
   }
 
   /**

@@ -226,7 +226,7 @@ public class ForwardIndexTypeTest {
               + "    \"name\": \"dimInt\",\n"
               + "    \"indexes\" : {\n"
               + "      \"forward\": {\n"
-              + "          \"enabled\": false\n"
+              + "          \"disabled\": true\n"
               + "       }\n"
               + "    }\n"
               + "  }"

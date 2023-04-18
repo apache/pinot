@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -86,6 +87,8 @@ public class IndexingConfig extends BaseJsonConfig {
    * other data types.
    */
   private List<String> _varLengthDictionaryColumns;
+
+  private JsonNode _tierOverwrites;
 
   @Nullable
   public List<String> getInvertedIndexColumns() {
@@ -270,6 +273,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs) {
     _starTreeIndexConfigs = starTreeIndexConfigs;
+  }
+
+  public JsonNode getTierOverwrites() {
+    return _tierOverwrites;
+  }
+
+  public void setTierOverwrites(JsonNode tierOverwrites) {
+    _tierOverwrites = tierOverwrites;
   }
 
   public boolean isEnableDynamicStarTreeCreation() {

@@ -19,9 +19,9 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -126,8 +126,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
 
     // 2. set pinot query options according to requestMetadataMap
-    pinotQuery.setQueryOptions(
-        ImmutableMap.of(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs)));
+    updateQueryOptions(pinotQuery, requestMetadataMap, timeoutMs, traceEnabled);
 
     // 3. wrapped around in broker request
     BrokerRequest brokerRequest = new BrokerRequest();
@@ -149,6 +148,19 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
 
     context.setInstanceRequest(instanceRequest);
     return context;
+  }
+
+  private static void updateQueryOptions(PinotQuery pinotQuery, Map<String, String> requestMetadataMap, long timeoutMs,
+      boolean traceEnabled) {
+    Map<String, String> queryOptions = new HashMap<>();
+    // put default timeout and trace options
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs));
+    if (traceEnabled) {
+      queryOptions.put(CommonConstants.Broker.Request.TRACE, "true");
+    }
+    // overwrite with requestMetadataMap to carry query options from request:
+    queryOptions.putAll(requestMetadataMap);
+    pinotQuery.setQueryOptions(queryOptions);
   }
 
   private static void walkStageNode(StageNode node, ServerPlanRequestContext context) {

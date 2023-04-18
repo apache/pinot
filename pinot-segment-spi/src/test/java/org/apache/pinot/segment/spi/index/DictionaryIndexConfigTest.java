@@ -33,40 +33,40 @@ public class DictionaryIndexConfigTest {
     String confStr = "{}";
     DictionaryIndexConfig config = JsonUtils.stringToObject(confStr, DictionaryIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
     assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     DictionaryIndexConfig config = JsonUtils.stringToObject(confStr, DictionaryIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
     assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     DictionaryIndexConfig config = JsonUtils.stringToObject(confStr, DictionaryIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
     assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     DictionaryIndexConfig config = JsonUtils.stringToObject(confStr, DictionaryIndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
     assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
@@ -80,7 +80,7 @@ public class DictionaryIndexConfigTest {
         + "}";
     DictionaryIndexConfig config = JsonUtils.stringToObject(confStr, DictionaryIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertTrue(config.isOnHeap(), "Unexpected onHeap");
     assertTrue(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }

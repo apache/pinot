@@ -107,6 +107,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
   public void testPinotSinkWrite()
       throws Exception {
     addSchema(_schema);
+    waitForEVToDisappear(_tableConfig.getTableName());
     addTableConfig(_tableConfig);
 
     StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -125,6 +126,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
   public void testPinotSinkParallelWrite()
       throws Exception {
     addSchema(_schema);
+    waitForEVToDisappear(_tableConfig.getTableName());
     addTableConfig(_tableConfig);
 
     StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();

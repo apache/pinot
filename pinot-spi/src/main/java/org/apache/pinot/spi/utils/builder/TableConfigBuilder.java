@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils.builder;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
@@ -124,6 +125,7 @@ public class TableConfigBuilder {
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
+  private JsonNode _tierOverwrites;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -414,6 +416,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setTierOverwrites(JsonNode tierOverwrites) {
+    _tierOverwrites = tierOverwrites;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -460,6 +467,7 @@ public class TableConfigBuilder {
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
+    indexingConfig.setTierOverwrites(_tierOverwrites);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

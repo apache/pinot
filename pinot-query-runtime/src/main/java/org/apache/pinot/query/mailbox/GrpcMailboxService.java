@@ -21,7 +21,6 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import io.grpc.ManagedChannel;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
@@ -30,6 +29,7 @@ import java.util.function.Consumer;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -59,20 +59,16 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
 
   // We use a cache to ensure that the receiving mailbox and the underlying gRPC stream are not leaked in the cases
   // where the corresponding OpChain is either never registered or died before the sender sent data for the first time.
-  private final Cache<String, GrpcReceivingMailbox> _receivingMailboxCache =
+  private final Cache<MailboxIdentifier, GrpcReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY.toMinutes(), TimeUnit.MINUTES)
-          .removalListener(new RemovalListener<String, GrpcReceivingMailbox>() {
-            @Override
-            public void onRemoval(RemovalNotification<String, GrpcReceivingMailbox> notification) {
-              if (notification.wasEvicted()) {
-                // TODO: This should be tied with query deadline, but for that we need to know the query deadline
-                //  when the GrpcReceivingMailbox is initialized in MailboxContentStreamObserver.
-                LOGGER.warn("Removing dangling GrpcReceivingMailbox: {}", notification.getKey());
-                notification.getValue().cancel();
-              }
+          .removalListener((RemovalListener<MailboxIdentifier, GrpcReceivingMailbox>) notification -> {
+            if (notification.wasEvicted()) {
+              LOGGER.warn("Evicting dangling GrpcReceivingMailbox: {}", notification.getKey());
+              // TODO: This should be tied with query deadline, but for that we need to know the query deadline when the
+              //  GrpcReceivingMailbox is initialized in MailboxContentStreamObserver.
+              notification.getValue().cancel();
             }
-          })
-          .build();
+          }).build();
   private final Consumer<MailboxIdentifier> _gotMailCallback;
 
   public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig,
@@ -109,15 +105,13 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   @Override
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineMs) {
     MailboxStatusStreamObserver statusStreamObserver = new MailboxStatusStreamObserver();
-
-    GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), statusStreamObserver, (deadline) -> {
-      ManagedChannel channel = getChannel(mailboxId.toString());
-      PinotMailboxGrpc.PinotMailboxStub stub =
-          PinotMailboxGrpc.newStub(channel)
-              .withDeadlineAfter(Math.max(0L, deadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
+    return new GrpcSendingMailbox(mailboxId, statusStreamObserver, (deadline) -> {
+      VirtualServerAddress dest = mailboxId.getToHost();
+      ManagedChannel channel = _channelManager.getChannel(dest.hostname(), dest.port());
+      PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel)
+          .withDeadlineAfter(Math.max(0L, deadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
       return stub.open(statusStreamObserver);
     }, deadlineMs);
-    return mailbox;
   }
 
   /**
@@ -126,8 +120,8 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   @Override
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     try {
-      return _receivingMailboxCache.get(mailboxId.toString(),
-          () -> new GrpcReceivingMailbox(mailboxId.toString(), _gotMailCallback));
+      return _receivingMailboxCache.get(mailboxId,
+          () -> new GrpcReceivingMailbox(_gotMailCallback));
     } catch (ExecutionException e) {
       LOGGER.error(String.format("Error getting receiving mailbox: %s", mailboxId), e);
       throw new RuntimeException(e);
@@ -147,15 +141,11 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    */
   @Override
   public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
-    GrpcReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId.toString());
+    GrpcReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId);
     if (receivingMailbox != null && !receivingMailbox.isClosed()) {
       receivingMailbox.cancel();
     }
-    _receivingMailboxCache.invalidate(mailboxId.toString());
-  }
-
-  private ManagedChannel getChannel(String mailboxId) {
-    return _channelManager.getChannel(Utils.constructChannelId(mailboxId));
+    _receivingMailboxCache.invalidate(mailboxId);
   }
 
   @Override

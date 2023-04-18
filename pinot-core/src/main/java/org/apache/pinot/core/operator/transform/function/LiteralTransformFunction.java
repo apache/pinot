@@ -68,24 +68,28 @@ public class LiteralTransformFunction implements TransformFunction {
     _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
-  public BigDecimal getBigDecimalLiteral() {
-    return _bigDecimalLiteral;
+  public boolean getBooleanLiteral() {
+    return BooleanUtils.toBoolean(_literal);
   }
 
   public int getIntLiteral() {
     return _intLiteral;
   }
 
+  public long getLongLiteral() {
+    return _longLiteral;
+  }
+
   public double getDoubleLiteral() {
     return _doubleLiteral;
   }
 
-  public String getStringLiteral() {
-    return String.valueOf(_literal);
+  public BigDecimal getBigDecimalLiteral() {
+    return _bigDecimalLiteral;
   }
 
-  public boolean getBooleanLiteral() {
-    return BooleanUtils.toBoolean(_literal);
+  public String getStringLiteral() {
+    return String.valueOf(_literal);
   }
 
   @Override

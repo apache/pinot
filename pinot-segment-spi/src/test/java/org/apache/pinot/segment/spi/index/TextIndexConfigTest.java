@@ -34,7 +34,7 @@ public class TextIndexConfigTest {
     String confStr = "{}";
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
@@ -44,12 +44,12 @@ public class TextIndexConfigTest {
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
@@ -59,12 +59,12 @@ public class TextIndexConfigTest {
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
@@ -74,12 +74,12 @@ public class TextIndexConfigTest {
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
@@ -101,7 +101,7 @@ public class TextIndexConfigTest {
         + "}";
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected fst");
     assertEquals(config.getRawValueForTextIndex(), "fakeValue", "Unexpected rawValue");
     assertTrue(config.isEnableQueryCache(), "Unexpected queryCache");

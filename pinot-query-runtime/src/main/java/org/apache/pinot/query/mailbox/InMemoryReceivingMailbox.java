@@ -23,12 +23,10 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
-  private final String _mailboxId;
   private InMemoryTransferStream _transferStream;
   private volatile boolean _closed = false;
 
-  public InMemoryReceivingMailbox(String mailboxId) {
-    _mailboxId = mailboxId;
+  public InMemoryReceivingMailbox() {
   }
 
   public void init(InMemoryTransferStream transferStream) {
@@ -69,10 +67,5 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
     if (_transferStream != null) {
       _transferStream.cancel();
     }
-  }
-
-  @Override
-  public String getMailboxId() {
-    return _mailboxId;
   }
 }

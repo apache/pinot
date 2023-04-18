@@ -27,12 +27,6 @@ import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
  * @param <T> unit of data sent in one {@link #send} call.
  */
 public interface SendingMailbox<T> {
-  /**
-   * get the unique identifier for the mailbox.
-   *
-   * @return Mailbox ID.
-   */
-  String getMailboxId();
 
   /**
    * Send a single unit of data to a receiver. Note that SendingMailbox are required to acquire resources lazily in

@@ -34,7 +34,7 @@ public class JsonIndexConfigTest {
     String confStr = "{}";
     JsonIndexConfig config = JsonUtils.stringToObject(confStr, JsonIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isExcludeArray(), "Unexpected excludeArray");
     assertFalse(config.isDisableCrossArrayUnnest(), "Unexpected disableCrossArrayUnnest");
     assertNull(config.getIncludePaths(), "Unexpected includePaths");
@@ -43,12 +43,12 @@ public class JsonIndexConfigTest {
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     JsonIndexConfig config = JsonUtils.stringToObject(confStr, JsonIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isExcludeArray(), "Unexpected excludeArray");
     assertFalse(config.isDisableCrossArrayUnnest(), "Unexpected disableCrossArrayUnnest");
     assertNull(config.getIncludePaths(), "Unexpected includePaths");
@@ -57,12 +57,12 @@ public class JsonIndexConfigTest {
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     JsonIndexConfig config = JsonUtils.stringToObject(confStr, JsonIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isExcludeArray(), "Unexpected excludeArray");
     assertFalse(config.isDisableCrossArrayUnnest(), "Unexpected disableCrossArrayUnnest");
     assertNull(config.getIncludePaths(), "Unexpected includePaths");
@@ -71,12 +71,12 @@ public class JsonIndexConfigTest {
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     JsonIndexConfig config = JsonUtils.stringToObject(confStr, JsonIndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isExcludeArray(), "Unexpected excludeArray");
     assertFalse(config.isDisableCrossArrayUnnest(), "Unexpected disableCrossArrayUnnest");
     assertNull(config.getIncludePaths(), "Unexpected includePaths");
@@ -97,7 +97,7 @@ public class JsonIndexConfigTest {
         + "}";
     JsonIndexConfig config = JsonUtils.stringToObject(confStr, JsonIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertTrue(config.isExcludeArray(), "Unexpected excludeArray");
     assertTrue(config.isDisableCrossArrayUnnest(), "Unexpected disableCrossArrayUnnest");
     assertEquals(config.getIncludePaths(), Lists.newArrayList("a"), "Unexpected includePaths");

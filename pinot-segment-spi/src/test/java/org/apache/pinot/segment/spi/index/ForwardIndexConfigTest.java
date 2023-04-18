@@ -34,7 +34,7 @@ public class ForwardIndexConfigTest {
     String confStr = "{}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
@@ -42,12 +42,12 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
-  public void withEnabledNull()
+  public void withDisabledNull()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": null}";
+    String confStr = "{\"disabled\": null}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
@@ -55,12 +55,12 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
-  public void withEnabledTrue()
+  public void withDisabledFalse()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": true}";
+    String confStr = "{\"disabled\": false}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
@@ -68,12 +68,12 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
-  public void withEnabledFalse()
+  public void withDisabledTrue()
       throws JsonProcessingException {
-    String confStr = "{\"enabled\": false}";
+    String confStr = "{\"disabled\": true}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
-    assertFalse(config.isEnabled(), "Unexpected enabled");
+    assertTrue(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
@@ -90,7 +90,7 @@ public class ForwardIndexConfigTest {
         + "}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
-    assertTrue(config.isEnabled(), "Unexpected enabled");
+    assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getChunkCompressionType(), ChunkCompressionType.SNAPPY, "Unexpected chunkCompressionType");
     assertTrue(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), 10, "Unexpected rawIndexWriterVersion");

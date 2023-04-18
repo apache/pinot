@@ -23,6 +23,33 @@
           "MONTH"
         ]
       }
+    },
+    {
+      "name": "ArrTimeBlk",
+      "encodingType": "DICTIONARY",
+      "indexes": {
+        "inverted": {
+          "enabled": "true"
+        }
+      },
+      "tierOverwrites": {
+        "hotTier": {
+          "encodingType": "DICTIONARY",
+          "indexes": {
+            "bloom": {
+              "enabled": "true"
+            }
+          }
+        },
+        "coldTier": {
+          "encodingType": "RAW",
+          "indexes": {
+            "text": {
+              "enabled": "true"
+            }
+          }
+        }
+      }
     }
   ],
   "tableIndexConfig": {
@@ -39,24 +66,33 @@
           "MAX__ArrDelay"
         ],
         "maxLeafRecords": 10
-      },
-      {
-        "dimensionsSplitOrder": [
-          "Carrier",
-          "CancellationCode",
-          "Origin",
-          "Dest"
-        ],
-        "skipStarNodeCreationForDimensions": [],
-        "functionColumnPairs": [
-          "MAX__CarrierDelay",
-          "AVG__CarrierDelay"
-        ],
-        "maxLeafRecords": 10
       }
     ],
     "enableDynamicStarTreeCreation": true,
-    "loadMode": "MMAP"
+    "loadMode": "MMAP",
+    "tierOverwrites": {
+      "hotTier": {
+        "starTreeIndexConfigs": [
+          {
+            "dimensionsSplitOrder": [
+              "Carrier",
+              "CancellationCode",
+              "Origin",
+              "Dest"
+            ],
+            "skipStarNodeCreationForDimensions": [],
+            "functionColumnPairs": [
+              "MAX__CarrierDelay",
+              "AVG__CarrierDelay"
+            ],
+            "maxLeafRecords": 10
+          }
+        ]
+      },
+      "coldTier": {
+        "starTreeIndexConfigs": []
+      }
+    }
   },
   "metadata": {
     "customConfigs": {}

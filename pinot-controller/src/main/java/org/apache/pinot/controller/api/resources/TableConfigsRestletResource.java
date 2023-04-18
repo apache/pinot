@@ -237,7 +237,7 @@ public class TableConfigsRestletResource {
         // Invoke delete on tables whether they exist or not, to account for metadata/segments etc.
         _pinotHelixResourceManager.deleteRealtimeTable(rawTableName);
         _pinotHelixResourceManager.deleteOfflineTable(rawTableName);
-        _pinotHelixResourceManager.deleteSchema(schema);
+        _pinotHelixResourceManager.deleteSchema(schema.getSchemaName());
         throw e;
       }
 
@@ -281,12 +281,9 @@ public class TableConfigsRestletResource {
       LOGGER.info("Deleted realtime table: {}", tableName);
       _pinotHelixResourceManager.deleteOfflineTable(tableName);
       LOGGER.info("Deleted offline table: {}", tableName);
-      Schema schema = _pinotHelixResourceManager.getSchema(tableName);
-      if (schema != null) {
-        _pinotHelixResourceManager.deleteSchema(schema);
-        LOGGER.info("Deleted schema: {}", tableName);
-      }
-      if (tableExists || schema != null) {
+      boolean schemaExists = _pinotHelixResourceManager.deleteSchema(tableName);
+      LOGGER.info("Deleted schema: {}", tableName);
+      if (tableExists || schemaExists) {
         return new SuccessResponse("Deleted TableConfigs: " + tableName);
       } else {
         return new SuccessResponse(
