@@ -260,8 +260,7 @@ public class CommonConstants {
             Runtime.getRuntime().availableProcessors() * 2;
     public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE =
             "pinot.broker.jersey.threadpool.executor.queue.size";
-    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE =
-        Runtime.getRuntime().availableProcessors() * 2;
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE = Integer.MAX_VALUE;
 
     // used for SQL GROUP BY during broker reduce
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";

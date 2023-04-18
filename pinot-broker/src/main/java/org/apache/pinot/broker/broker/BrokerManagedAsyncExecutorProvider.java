@@ -20,6 +20,7 @@ package org.apache.pinot.broker.broker;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import javax.ws.rs.ServiceUnavailableException;
@@ -68,6 +69,9 @@ public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvid
 
   @Override
   protected BlockingQueue<Runnable> getWorkQueue() {
+    if (_queueSize == Integer.MAX_VALUE) {
+      return new LinkedBlockingQueue();
+    }
     return new ArrayBlockingQueue(_queueSize);
   }
 
