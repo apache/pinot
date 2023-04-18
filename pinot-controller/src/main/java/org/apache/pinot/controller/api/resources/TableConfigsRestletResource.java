@@ -140,13 +140,13 @@ public class TableConfigsRestletResource {
       notes = "Get the TableConfigs for a given raw tableName")
   public String getConfig(
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Flag to get the table config in new format") @QueryParam("newFormat") Boolean inNewFormat) {
+      @ApiParam(value = "Flag to get the table config in updated format") @QueryParam("updatedFormat") Boolean inUpdatedFormat) {
 
     try {
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
-      if (inNewFormat != null && inNewFormat) {
+      if (inUpdatedFormat != null && inUpdatedFormat) {
         if (offlineTableConfig != null) {
           offlineTableConfig = createTableConfigFromOldFormat(offlineTableConfig, schema);
         }
