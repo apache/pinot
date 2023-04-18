@@ -98,6 +98,7 @@ public class TableCacheTest {
     // Add a table config
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSchemaName(SCHEMA_NAME).build();
+    TEST_INSTANCE.waitForEVToDisappear(tableConfig.getTableName());
     TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
     // Wait for at most 10 seconds for the callback to add the table config to the cache
     TestUtils.waitForCondition(
