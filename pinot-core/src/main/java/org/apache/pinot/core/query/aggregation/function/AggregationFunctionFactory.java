@@ -325,6 +325,14 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
+          case PINOTPARENTAGGREGATIONARGMAX:
+            return new ParentArgMinMaxAggregationFunction(arguments, true);
+          case PINOTPARENTAGGREGATIONARGMIN:
+            return new ParentArgMinMaxAggregationFunction(arguments, false);
+          case PINOTCHILDAGGREGATIONARGMAX:
+            return new ChildArgMinMaxAggregationFunction(arguments, true);
+          case PINOTCHILDAGGREGATIONARGMIN:
+            return new ChildArgMinMaxAggregationFunction(arguments, false);
           default:
             throw new IllegalArgumentException();
         }

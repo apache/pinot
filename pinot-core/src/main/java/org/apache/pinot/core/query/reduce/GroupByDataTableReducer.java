@@ -54,6 +54,8 @@ import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.rewriter.ResultRewriteUtils;
+import org.apache.pinot.core.query.utils.rewriter.RewriterResult;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -205,6 +207,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     // Calculate final result rows after post aggregation
     List<Object[]> resultRows = calculateFinalResultRows(postAggregationHandler, rows);
+
+    RewriterResult resultRewriterResult =
+        ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
+    resultRows = resultRewriterResult.getRows();
+    resultDataSchema = resultRewriterResult.getDataSchema();
 
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }
@@ -441,6 +448,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     // Calculate final result rows after post aggregation
     List<Object[]> resultRows = calculateFinalResultRows(postAggregationHandler, rows);
+
+    RewriterResult resultRewriterResult =
+        ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
+    resultRows = resultRewriterResult.getRows();
+    resultDataSchema = resultRewriterResult.getDataSchema();
 
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }

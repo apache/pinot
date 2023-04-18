@@ -60,6 +60,7 @@ import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -127,7 +128,8 @@ public class ObjectSerDeUtils {
     StringLongPair(31),
     CovarianceTuple(32),
     VarianceTuple(33),
-    PinotFourthMoment(34);
+    PinotFourthMoment(34),
+    ArgMinMaxObject(35);
 
     private final int _value;
 
@@ -213,6 +215,8 @@ public class ObjectSerDeUtils {
         return ObjectType.VarianceTuple;
       } else if (value instanceof PinotFourthMoment) {
         return ObjectType.PinotFourthMoment;
+      } else if (value instanceof org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxObject) {
+        return ObjectType.ArgMinMaxObject;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1199,6 +1203,37 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<ArgMinMaxObject> ARG_MIN_MAX_OBJECT_SER_DE =
+      new ObjectSerDe<ArgMinMaxObject>() {
+
+        @Override
+        public byte[] serialize(ArgMinMaxObject value) {
+          try {
+            return value.toBytes();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+
+        @Override
+        public ArgMinMaxObject deserialize(byte[] bytes) {
+          try {
+            return ArgMinMaxObject.fromBytes(bytes);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+
+        @Override
+        public ArgMinMaxObject deserialize(ByteBuffer byteBuffer) {
+          try {
+            return ArgMinMaxObject.fromByteBuffer(byteBuffer);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1236,7 +1271,8 @@ public class ObjectSerDeUtils {
       STRING_LONG_PAIR_SER_DE,
       COVARIANCE_TUPLE_OBJECT_SER_DE,
       VARIANCE_TUPLE_OBJECT_SER_DE,
-      PINOT_FOURTH_MOMENT_OBJECT_SER_DE
+      PINOT_FOURTH_MOMENT_OBJECT_SER_DE,
+      ARG_MIN_MAX_OBJECT_SER_DE,
   };
   //@formatter:on
 
