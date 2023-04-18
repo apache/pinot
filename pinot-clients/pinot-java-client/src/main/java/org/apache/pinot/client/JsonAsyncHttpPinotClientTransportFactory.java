@@ -112,9 +112,6 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
       _threadPoolName = properties.getProperty("threadPoolName");
     }
 
-    _handshakeTimeoutMs =
-        Integer.parseInt(properties.getProperty("brokerHandshakeTimeoutMs", DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS));
-
     _extraOptionString = properties.getProperty("queryOptions", "");
     return this;
   }
