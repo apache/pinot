@@ -20,10 +20,10 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.google.common.collect.Sets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -114,14 +114,15 @@ public class FieldIndexConfigsUtil {
       indexType.convertToNewFormat(clone, schema);
     }
     // cleanup the indexTypes field from all FieldConfig items
-    List<FieldConfig> fieldConfigList = Optional.ofNullable(clone.getFieldConfigList()).orElse(List.of())
-        .stream()
-        .map(fieldConfig ->
-          new FieldConfig.Builder(fieldConfig)
-              .withIndexTypes(null)
-              .build()
-        ).collect(Collectors.toList());
-    clone.setFieldConfigList(fieldConfigList);
+    if (clone.getFieldConfigList() != null) {
+      List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
+      for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
+            .withIndexTypes(null)
+            .build());
+      }
+      clone.setFieldConfigList(cleanFieldConfigList);
+    }
     return clone;
   }
 }
