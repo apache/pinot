@@ -12,6 +12,11 @@
     "replication": "1",
     "replicasPerPartition": "1"
   },
+  "routing": {
+    "segmentPrunerTypes": [
+      "time"
+    ]
+  },
   "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
