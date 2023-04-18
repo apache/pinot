@@ -64,7 +64,6 @@ import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -75,6 +74,7 @@ import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.config.TableConfigUtils.createTableConfigFromOldFormat;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -148,10 +148,10 @@ public class TableConfigsRestletResource {
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
       if (inNewFormat != null && inNewFormat) {
         if (offlineTableConfig != null) {
-          offlineTableConfig = FieldIndexConfigsUtil.createTableConfigFromOldFormat(offlineTableConfig, schema);
+          offlineTableConfig = createTableConfigFromOldFormat(offlineTableConfig, schema);
         }
         if (realtimeTableConfig != null) {
-          realtimeTableConfig = FieldIndexConfigsUtil.createTableConfigFromOldFormat(realtimeTableConfig, schema);
+          realtimeTableConfig = createTableConfigFromOldFormat(realtimeTableConfig, schema);
         }
       }
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);

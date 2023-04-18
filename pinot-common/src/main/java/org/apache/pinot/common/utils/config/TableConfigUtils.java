@@ -22,12 +22,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -49,6 +52,7 @@ import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -345,5 +349,31 @@ public class TableConfigUtils {
       InstancePartitionsType instancePartitionsType) {
     return hasPreConfiguredInstancePartitions(tableConfig)
         && tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType);
+  }
+
+  /**
+   * Helper method to extract TableConfig in updated syntax from current TableConfig.
+   * <ul>
+   *   <li>Moves all index configs to FieldConfig.indexes</li>
+   *   <li>Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes</li>
+   * </ul>
+   */
+  public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
+    TableConfig clone = new TableConfig(tableConfig);
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      // get all the index data in new format
+      indexType.convertToNewFormat(clone, schema);
+    }
+    // cleanup the indexTypes field from all FieldConfig items
+    if (clone.getFieldConfigList() != null) {
+      List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
+      for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
+            .withIndexTypes(null)
+            .build());
+      }
+      clone.setFieldConfigList(cleanFieldConfigList);
+    }
+    return clone;
   }
 }
