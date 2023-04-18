@@ -61,6 +61,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.h2.jdbc.JdbcArray;
 import org.testng.Assert;
 
@@ -84,14 +86,22 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
   // QUERY UTILS
   // --------------------------------------------------------------------------
+
+  /**
+   * Dispatch query to each pinot-server. The logic should mimic
+   * {@link QueryDispatcher#submit(long, QueryPlan, long, Map)} but does not actually make ser/de dispatches.
+   */
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId).getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
         String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
 
+    // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
     if (executionStatsAggregatorMap != null) {
       requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
     }
