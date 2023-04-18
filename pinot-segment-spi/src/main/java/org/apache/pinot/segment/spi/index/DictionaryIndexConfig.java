@@ -29,7 +29,6 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 public class DictionaryIndexConfig extends IndexConfig {
 
   public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false, false, false);
-  public static final DictionaryIndexConfig DEFAULT_OFFHEAP = new DictionaryIndexConfig(false, true, false);
   public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(true, false, false);
 
   private final boolean _onHeap;
