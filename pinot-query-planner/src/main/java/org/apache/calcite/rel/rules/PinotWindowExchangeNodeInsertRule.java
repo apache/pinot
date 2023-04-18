@@ -19,7 +19,6 @@
 package org.apache.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -222,13 +221,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     RexBuilder rexBuilder = cluster.getRexBuilder();
 
     // Construct the project that goes below the window (which projects a literal)
-    final List<RexNode> expsForProjectBelowWindow = new ArrayList<>();
-    final RelDataTypeFactory.Builder builder = cluster.getTypeFactory().builder();
-    expsForProjectBelowWindow.add(
+    final List<RexNode> expsForProjectBelowWindow = Collections.singletonList(
         rexBuilder.makeLiteral(0, cluster.getTypeFactory().createSqlType(SqlTypeName.INTEGER)));
-    builder.add("winLiteral", cluster.getTypeFactory().createSqlType(SqlTypeName.INTEGER));
-    Project projectBelowWindow = new LogicalProject(cluster, window.getTraitSet(), ImmutableList.of(),
-        project.getInput(), expsForProjectBelowWindow, builder.build());
+    final List<String> expsFieldNamesBelowWindow = Collections.singletonList("winLiteral");
+    Project projectBelowWindow = LogicalProject.create(project.getInput(), project.getHints(),
+        expsForProjectBelowWindow, expsFieldNamesBelowWindow);
 
     // Fix up the inputs to the Window to include the literal column and add an exchange
     final RelDataTypeFactory.Builder outputBuilder = cluster.getTypeFactory().builder();
@@ -243,7 +240,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
 
     // Create the LogicalProject above window to remove the literal column
     final List<RexNode> expsForProjectAboveWindow = new ArrayList<>();
-    final RelDataTypeFactory.Builder builderUpper = cluster.getTypeFactory().builder();
+    final List<String> expsFieldNamesAboveWindow = new ArrayList<>();
     final List<RelDataTypeField> rowTypeWindowInput = newWindow.getRowType().getFieldList();
 
     for (int index = 1; index < rowTypeWindowInput.size(); index++) {
@@ -251,10 +248,9 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       // project is the literal column added above.
       final RelDataTypeField relDataTypeField = rowTypeWindowInput.get(index);
       expsForProjectAboveWindow.add(new RexInputRef(index, relDataTypeField.getType()));
-      builderUpper.add(relDataTypeField);
+      expsFieldNamesAboveWindow.add(relDataTypeField.getName());
     }
 
-    return new LogicalProject(cluster, newWindow.getTraitSet(), ImmutableList.of(), newWindow,
-        expsForProjectAboveWindow, builderUpper.build());
+    return LogicalProject.create(newWindow, project.getHints(), expsForProjectAboveWindow, expsFieldNamesAboveWindow);
   }
 }
