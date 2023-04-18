@@ -82,6 +82,9 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
+
+  protected static final String STRING_ALPHANUM_NULL_SV_COLUMN = "stringAlphaNumSVNull";
+
   protected static final String INT_MV_COLUMN = "intMV";
   protected static final String INT_MV_NULL_COLUMN = "intMVNull";
 
@@ -171,6 +174,11 @@ public abstract class BaseTransformFunctionTest {
       map.put(BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
+      if (i % 2 == 0) {
+        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
+      } else {
+        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, null);
+      }
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       if (i % 2 == 0) {
@@ -201,6 +209,7 @@ public abstract class BaseTransformFunctionTest {
         .addMetric(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_ALPHANUM_NULL_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
@@ -481,6 +490,15 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValues[i], expectedValues[i]);
     }
     testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, String[] expectedValues,
+      RoaringBitmap expectedNulls) {
+    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(stringValues.getLeft()[i], expectedValues[i]);
+    }
+    assertEquals(stringValues.getRight(), expectedNulls);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
