@@ -75,7 +75,7 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
           ? new ArrayList<>()
           : tableConfig.getFieldConfigList();
-      for(FieldConfig fieldConfig : fieldConfigList) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
         if (fieldConfig.getName().equals(entry.getKey())) {
           fieldConfigFound = true;
           ObjectNode currentIndexes = fieldConfig.getIndexes().isNull()

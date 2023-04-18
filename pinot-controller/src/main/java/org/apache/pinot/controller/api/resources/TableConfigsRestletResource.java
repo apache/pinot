@@ -74,7 +74,6 @@ import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.config.TableConfigUtils.createTableConfigFromOldFormat;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -140,7 +139,8 @@ public class TableConfigsRestletResource {
       notes = "Get the TableConfigs for a given raw tableName")
   public String getConfig(
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Flag to get the table config in updated format") @QueryParam("updatedFormat") Boolean inUpdatedFormat) {
+      @ApiParam(value = "Flag to get the table config in updated format")
+      @QueryParam("updatedFormat") Boolean inUpdatedFormat) {
 
     try {
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
@@ -148,10 +148,10 @@ public class TableConfigsRestletResource {
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
       if (inUpdatedFormat != null && inUpdatedFormat) {
         if (offlineTableConfig != null) {
-          offlineTableConfig = createTableConfigFromOldFormat(offlineTableConfig, schema);
+          offlineTableConfig = TableConfigUtils.createTableConfigFromOldFormat(offlineTableConfig, schema);
         }
         if (realtimeTableConfig != null) {
-          realtimeTableConfig = createTableConfigFromOldFormat(realtimeTableConfig, schema);
+          realtimeTableConfig = TableConfigUtils.createTableConfigFromOldFormat(realtimeTableConfig, schema);
         }
       }
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
