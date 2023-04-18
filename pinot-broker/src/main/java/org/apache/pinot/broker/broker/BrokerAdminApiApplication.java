@@ -105,10 +105,10 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(accessFactory).to(AccessControlFactory.class);
       }
     });
-    boolean enableBoundedThreadPool = brokerConf
-            .getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_THREAD_POOL,
-                    CommonConstants.Broker.DEFAULT_ENABLE_BOUNDED_THREAD_POOL);
-    if (enableBoundedThreadPool) {
+    boolean enableBoundedJerseyThreadPoolExecutor = brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR,
+            CommonConstants.Broker.DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR);
+    if (enableBoundedJerseyThreadPoolExecutor) {
       register(buildBrokerManagedAsyncExecutorProvider(brokerConf, brokerMetrics));
     }
     register(JacksonFeature.class);
@@ -159,14 +159,16 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
-  private BrokerManagedAsyncExecutorProvider buildBrokerManagedAsyncExecutorProvider(
-          PinotConfiguration brokerConf, BrokerMetrics brokerMetrics) {
-    int corePoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_CORE_POOL_SIZE,
-            CommonConstants.Broker.DEFAULT_CORE_POOL_SIZE);
-    int maximumPoolSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_POOL_SIZE,
-            CommonConstants.Broker.DEFAULT_MAX_POOL_SIZE);
-    int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_QUEUE_SIZE,
-            CommonConstants.Broker.DEFAULT_QUEUE_SIZE);
+  private BrokerManagedAsyncExecutorProvider buildBrokerManagedAsyncExecutorProvider(PinotConfiguration brokerConf,
+      BrokerMetrics brokerMetrics) {
+    int corePoolSize = brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE,
+            CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE);
+    int maximumPoolSize = brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE,
+            CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE);
+    int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE,
+        CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE);
     return new BrokerManagedAsyncExecutorProvider(corePoolSize, maximumPoolSize, queueSize, brokerMetrics);
   }
 

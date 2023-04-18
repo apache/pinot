@@ -246,16 +246,22 @@ public class CommonConstants {
     // Config for Jersey ThreadPoolExecutorProvider.
     // By default, Jersey uses the default unbounded thread pool to process queries.
     // By enabling it, BrokerManagedAsyncExecutorProvider will be used to create a bounded thread pool.
-    public static final String CONFIG_OF_ENABLE_BOUNDED_THREAD_POOL = "pinot.broker.enable.bounded.threadPool";
-    public static final boolean DEFAULT_ENABLE_BOUNDED_THREAD_POOL = false;
+    public static final String CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR =
+            "pinot.broker.enable.bounded.jersey.threadpool.executor";
+    public static final boolean DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR = false;
     // Default capacities for the bounded thread pool
-    public static final String CONFIG_OF_MAX_POOL_SIZE = "pinot.broker.max.pool.size";
-    public static final int DEFAULT_MAX_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
-    public static final String CONFIG_OF_CORE_POOL_SIZE = "pinot.broker.core.pool.size";
-    public static final int DEFAULT_CORE_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
-    public static final String CONFIG_OF_QUEUE_SIZE = "pinot.broker.queue.size";
-    public static final int DEFAULT_QUEUE_SIZE = Runtime.getRuntime().availableProcessors() * 2;
-
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
+            "pinot.broker.jersey.threadpool.executor.max.pool.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
+            Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
+            "pinot.broker.jersey.threadpool.executor.core.pool.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
+            Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE =
+            "pinot.broker.jersey.threadpool.executor.queue.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE =
+        Runtime.getRuntime().availableProcessors() * 2;
 
     // used for SQL GROUP BY during broker reduce
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";

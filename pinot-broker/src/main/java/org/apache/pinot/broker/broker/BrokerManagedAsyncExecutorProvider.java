@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.broker;
 
-
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
@@ -32,78 +31,74 @@ import org.glassfish.jersey.spi.ThreadPoolExecutorProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * BrokerManagedAsyncExecutorProvider provides a bounded thread pool.
  */
 @ManagedAsyncExecutor
 public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvider {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BrokerManagedAsyncExecutorProvider.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerManagedAsyncExecutorProvider.class);
 
-    private static final String NAME = "broker-managed-async-executor";
+  private static final String NAME = "broker-managed-async-executor";
 
+  private final BrokerMetrics _brokerMetrics;
+
+  private final int _maximumPoolSize;
+  private final int _corePoolSize;
+  private final int _queueSize;
+
+  public BrokerManagedAsyncExecutorProvider(int corePoolSize, int maximumPoolSize, int queueSize,
+      BrokerMetrics brokerMetrics) {
+    super(NAME);
+    _corePoolSize = corePoolSize;
+    _maximumPoolSize = maximumPoolSize;
+    _queueSize = queueSize;
+    _brokerMetrics = brokerMetrics;
+  }
+
+  @Override
+  protected int getMaximumPoolSize() {
+    return _maximumPoolSize;
+  }
+
+  @Override
+  protected int getCorePoolSize() {
+    return _corePoolSize;
+  }
+
+  @Override
+  protected BlockingQueue<Runnable> getWorkQueue() {
+    return new ArrayBlockingQueue(_queueSize);
+  }
+
+  @Override
+  protected RejectedExecutionHandler getRejectedExecutionHandler() {
+    return new BrokerThreadPoolRejectExecutionHandler(_brokerMetrics);
+  }
+
+  static class BrokerThreadPoolRejectExecutionHandler implements RejectedExecutionHandler {
     private final BrokerMetrics _brokerMetrics;
 
-    private final int _maximumPoolSize;
-    private final int _corePoolSize;
-    private final int _queueSize;
-
-    public BrokerManagedAsyncExecutorProvider(
-            int corePoolSize,
-            int maximumPoolSize,
-            int queueSize,
-            BrokerMetrics brokerMetrics) {
-        super(NAME);
-        _corePoolSize = corePoolSize;
-        _maximumPoolSize = maximumPoolSize;
-        _queueSize = queueSize;
-        _brokerMetrics = brokerMetrics;
+    public BrokerThreadPoolRejectExecutionHandler(BrokerMetrics brokerMetrics) {
+      _brokerMetrics = brokerMetrics;
     }
 
+    /**
+     * Reject the runnable if it can’t be accommodated by the thread pool.
+     *
+     * <p> Response returned will have SERVICE_UNAVAILABLE(503) error code with error msg.
+     *
+     * @param r Runnable
+     * @param executor ThreadPoolExecutor
+     */
     @Override
-    protected int getMaximumPoolSize() {
-        return _maximumPoolSize;
+    public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_REJECTED_EXCEPTIONS, 1L);
+      LOGGER.error("Task " + r + " rejected from " + executor);
+
+      throw new ServiceUnavailableException(Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(
+          "Pinot Broker thread pool can not accommodate more requests now. " + "Request is rejected from " + executor)
+          .build());
     }
-
-    @Override
-    protected int getCorePoolSize() {
-        return _corePoolSize;
-    }
-
-    @Override
-    protected BlockingQueue<Runnable> getWorkQueue() {
-        return new ArrayBlockingQueue(_queueSize);
-    }
-
-    @Override
-    protected RejectedExecutionHandler getRejectedExecutionHandler() {
-        return new BrokerThreadPoolRejectExecutionHandler(_brokerMetrics);
-    }
-
-    static class BrokerThreadPoolRejectExecutionHandler implements RejectedExecutionHandler {
-        private final BrokerMetrics _brokerMetrics;
-
-        public BrokerThreadPoolRejectExecutionHandler(BrokerMetrics brokerMetrics) {
-            _brokerMetrics = brokerMetrics;
-        }
-
-        /**
-         * Reject the runnable if it can’t be accommodated by the thread pool.
-         *
-         * <p> Response returned will have SERVICE_UNAVAILABLE(503) error code with error msg.
-         *
-         * @param r Runnable
-         * @param executor ThreadPoolExecutor
-         */
-        @Override
-        public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_REJECTION_EXCEPTIONS, 1L);
-            LOGGER.error("Task " + r + " rejected from " + executor);
-
-            throw new ServiceUnavailableException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity("Pinot Broker thread pool can not accommodate more requests now. "
-                            + "Request is rejected from "
-                            + executor)
-                    .build());
-        }
-    }
+  }
 }
