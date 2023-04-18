@@ -15,6 +15,33 @@
         ]
       },
       {
+        "description": "single empty OVER() count(*) only",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(w0$o0=[$1])",
+          "\n  LogicalWindow(window#0=[window(aggs [COUNT()])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(winLiteral=[0])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single empty OVER() literal, count(*) only",
+        "sql": "EXPLAIN PLAN FOR SELECT 42, COUNT(*) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[42], EXPR$1=[$0])",
+          "\n  LogicalProject(w0$o0=[$1])",
+          "\n    LogicalWindow(window#0=[window(aggs [COUNT()])])",
+          "\n      LogicalExchange(distribution=[hash])",
+          "\n        LogicalProject(winLiteral=[0])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single empty OVER() only row_number",
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER() FROM a",
         "notes": "TODO: ROW_NUMBER() with empty OVER() and no other columns in select results in the leaf level LogicalProject not projecting any rows. This is incorrect since we need to project at least one column for assigning ROW_NUMBERS",
