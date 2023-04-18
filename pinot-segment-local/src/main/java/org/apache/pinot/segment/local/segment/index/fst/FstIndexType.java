@@ -60,6 +60,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "fst";
 
   protected FstIndexType() {
     super(StandardIndexes.FST_ID);
@@ -92,7 +93,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public String getPrettyName() {
-    return "fst";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

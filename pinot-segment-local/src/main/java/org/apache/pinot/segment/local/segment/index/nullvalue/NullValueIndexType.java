@@ -44,6 +44,7 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
+  public static final String INDEX_DISPLAY_NAME = "null";
 
   protected NullValueIndexType() {
     super(StandardIndexes.NULL_VALUE_VECTOR_ID);
@@ -67,7 +68,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public String getPrettyName() {
-    return "null";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

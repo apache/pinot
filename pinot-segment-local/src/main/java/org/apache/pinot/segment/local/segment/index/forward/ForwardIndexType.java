@@ -56,6 +56,7 @@ import org.apache.pinot.spi.data.Schema;
 public class ForwardIndexType
     extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "forward";
 
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
@@ -127,7 +128,7 @@ public class ForwardIndexType
 
   @Override
   public String getPrettyName() {
-    return "forward";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

@@ -55,6 +55,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<H3IndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "h3";
 
   protected H3IndexType() {
     super(StandardIndexes.H3_ID);
@@ -77,7 +78,7 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
 
   @Override
   public String getPrettyName() {
-    return "h3";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

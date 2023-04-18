@@ -65,6 +65,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     implements ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
   protected static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
 
+  public static final String INDEX_DISPLAY_NAME = "text";
+
   protected TextIndexType() {
     super(StandardIndexes.TEXT_ID);
   }
@@ -92,7 +94,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
 
   @Override
   public String getPrettyName() {
-    return "text";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

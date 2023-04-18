@@ -57,6 +57,7 @@ import org.apache.pinot.spi.data.Schema;
 public class InvertedIndexType
     extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<IndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "inverted";
 
   protected InvertedIndexType() {
     super(StandardIndexes.INVERTED_ID);
@@ -80,7 +81,7 @@ public class InvertedIndexType
 
   @Override
   public String getPrettyName() {
-    return "inverted";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

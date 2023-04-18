@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.Schema;
 public class BloomIndexType
     extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>
     implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
+  public static final String INDEX_DISPLAY_NAME = "bloom";
 
   protected BloomIndexType() {
     super(StandardIndexes.BLOOM_FILTER_ID);
@@ -72,7 +73,7 @@ public class BloomIndexType
 
   @Override
   public String getPrettyName() {
-    return "bloom";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

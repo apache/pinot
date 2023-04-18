@@ -53,6 +53,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<JsonIndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "json";
 
   protected JsonIndexType() {
     super(StandardIndexes.JSON_ID);
@@ -75,7 +76,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
   @Override
   public String getPrettyName() {
-    return "json";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override

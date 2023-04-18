@@ -58,6 +58,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<RangeIndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "range";
 
   protected RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
@@ -84,7 +85,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
 
   @Override
   public String getPrettyName() {
-    return "range";
+    return INDEX_DISPLAY_NAME;
   }
 
   @Override
