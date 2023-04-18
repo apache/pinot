@@ -21,10 +21,12 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -269,6 +271,22 @@ public class ForwardIndexTypeTest {
               .withRawIndexWriterVersion(10)
               .build()
       );
+    }
+
+    @Test
+    public void oldToNewConfConversion()
+        throws JsonProcessingException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\"\n"
+          + " }"
+      );
+      convertToUpdatedFormat();
+      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .collect(Collectors.toList()).get(0);
+      assertNotNull(fieldConfig.getIndexes().get(ForwardIndexType.INDEX_DISPLAY_NAME));
     }
   }
 

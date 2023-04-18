@@ -22,9 +22,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -218,6 +220,32 @@ public class DictionaryIndexTypeTest {
           + "    }\n"
           + " }");
       assertEquals(new DictionaryIndexConfig(false, true));
+    }
+
+    @Test
+    public void oldToNewConfConversion()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
+      );
+      _tableConfig.getIndexingConfig()
+          .setOnHeapDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      _tableConfig.getIndexingConfig()
+          .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      _tableConfig.getIndexingConfig().setNoDictionaryConfig(
+          JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
+              new TypeReference<Map<String, String>>() {
+              })
+      );
+      convertToUpdatedFormat();
+      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .collect(Collectors.toList()).get(0);
+      assertNotNull(fieldConfig.getIndexes().get(new DictionaryIndexType().getPrettyName()));
+      assertNull(_tableConfig.getIndexingConfig().getNoDictionaryColumns());
+      assertNull(_tableConfig.getIndexingConfig().getOnHeapDictionaryColumns());
+      assertNull(_tableConfig.getIndexingConfig().getVarLengthDictionaryColumns());
+      assertNull(_tableConfig.getIndexingConfig().getNoDictionaryConfig());
     }
   }
 
