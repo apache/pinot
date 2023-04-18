@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.auth;
 
+import org.apache.commons.lang3.StringUtils;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -47,7 +48,7 @@ public class BasicAuthPrincipal {
   }
 
   public boolean hasTable(String tableName) {
-    return _tables.isEmpty() || _tables.contains(tableName);
+    return StringUtils.isEmpty(tableName) || _tables.isEmpty() || _tables.contains(tableName);
   }
 
   public boolean hasPermission(String permission) {
