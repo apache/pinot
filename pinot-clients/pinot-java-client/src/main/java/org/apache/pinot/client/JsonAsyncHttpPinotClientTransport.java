@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
@@ -130,9 +131,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   @Override
   public BrokerResponse executeQuery(String brokerAddress, String query)
       throws PinotClientException {
+    Future<BrokerResponse> future = null;
     try {
-      return executeQueryAsync(brokerAddress, query).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
+      future = executeQueryAsync(brokerAddress, query);
+      return future.get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      if (e instanceof TimeoutException) {
+        future.cancel(true);
+      }
       throw new PinotClientException(e);
     }
   }
