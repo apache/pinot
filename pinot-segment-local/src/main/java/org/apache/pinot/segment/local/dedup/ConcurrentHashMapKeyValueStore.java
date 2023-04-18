@@ -65,10 +65,10 @@ public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
   }
 
   private static final class ByteArray {
-    private final byte[] bytes;
+    private final byte[] _bytes;
 
     public ByteArray(byte[] bytes) {
-      this.bytes = bytes;
+      _bytes = bytes;
     }
 
     @Override
@@ -80,12 +80,12 @@ public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
         return false;
       }
       ByteArray byteArray = (ByteArray) o;
-      return Arrays.equals(bytes, byteArray.bytes);
+      return Arrays.equals(_bytes, byteArray._bytes);
     }
 
     @Override
     public int hashCode() {
-      return Arrays.hashCode(bytes);
+      return Arrays.hashCode(_bytes);
     }
   }
 }

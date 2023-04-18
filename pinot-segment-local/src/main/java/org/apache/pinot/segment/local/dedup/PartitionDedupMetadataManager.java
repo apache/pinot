@@ -56,9 +56,9 @@ public class PartitionDedupMetadataManager {
     _dedupConfig = dedupConfig;
     try {
       byte[] id = (tableNameWithType + "@" + partitionId).getBytes();
-      _keyValueStore = StringUtils.isEmpty(dedupConfig.getKeyStore()) ?
-              new ConcurrentHashMapKeyValueStore(id) :
-              PluginManager.get().createInstance(
+      _keyValueStore = StringUtils.isEmpty(dedupConfig.getKeyStore())
+              ? new ConcurrentHashMapKeyValueStore(id)
+              : PluginManager.get().createInstance(
                       dedupConfig.getKeyStore(),
                       new Class[]{byte[].class},
                       new Object[]{id}
