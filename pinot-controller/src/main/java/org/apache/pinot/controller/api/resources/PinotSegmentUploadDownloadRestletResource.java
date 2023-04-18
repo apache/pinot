@@ -69,6 +69,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
@@ -645,8 +646,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   public Response endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Fields belonging to end replace segment request")
+        EndReplaceSegmentsRequest endReplaceSegmentsRequest,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
-      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId) {
+      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId
+      ) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -657,7 +661,8 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       // Check that the segment lineage entry id is valid
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-      _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId);
+      _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
+          endReplaceSegmentsRequest);
       return Response.ok().build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
