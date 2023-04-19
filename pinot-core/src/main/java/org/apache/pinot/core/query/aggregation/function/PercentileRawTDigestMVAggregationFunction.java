@@ -36,6 +36,12 @@ public class PercentileRawTDigestMVAggregationFunction extends PercentileRawTDig
     super(expressionContext, new PercentileTDigestMVAggregationFunction(expressionContext, percentile));
   }
 
+  public PercentileRawTDigestMVAggregationFunction(ExpressionContext expressionContext, double percentile,
+      double compresionFactor) {
+    super(expressionContext,
+        new PercentileTDigestMVAggregationFunction(expressionContext, percentile, compresionFactor));
+  }
+
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILERAWTDIGESTMV;

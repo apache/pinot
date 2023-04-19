@@ -489,6 +489,11 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     testPercentileRawTDigestMV(90);
     testPercentileRawTDigestMV(95);
     testPercentileRawTDigestMV(99);
+
+    testPercentileRawTDigestCustomCompressionMV(50, 150d);
+    testPercentileRawTDigestCustomCompressionMV(90, 500d);
+    testPercentileRawTDigestCustomCompressionMV(95, 200d);
+    testPercentileRawTDigestCustomCompressionMV(99, 1000d);
   }
 
   private void testPercentileRawTDigestMV(int percentile) {
@@ -498,6 +503,29 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
 
     String rawQuery = String.format("SELECT PERCENTILERAWTDIGEST%dMV(column6) AS value FROM testTable", percentile);
     String regularQuery = String.format("SELECT PERCENTILETDIGEST%dMV(column6) AS value FROM testTable", percentile);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),
+        quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER),
+        getBrokerResponse(regularQuery + FILTER), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + SV_GROUP_BY),
+        getBrokerResponse(regularQuery + SV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + SV_GROUP_BY),
+        getBrokerResponse(regularQuery + FILTER + SV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + MV_GROUP_BY),
+        getBrokerResponse(regularQuery + MV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + MV_GROUP_BY),
+        getBrokerResponse(regularQuery + FILTER + MV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+  }
+
+  private void testPercentileRawTDigestCustomCompressionMV(int percentile, double compressionFactor) {
+    Function<Object, Object> quantileExtractor =
+        value -> ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile(percentile / 100.0);
+
+    String rawQuery = String.format("SELECT PERCENTILERAWTDIGESTMV(column6, %d, %.2f) AS value FROM testTable",
+        percentile, compressionFactor);
+    String regularQuery = String.format("SELECT PERCENTILETDIGESTMV(column6, %d, %.2f) AS value FROM testTable",
+        percentile, compressionFactor);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),
         quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER),
