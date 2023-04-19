@@ -175,10 +175,6 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       relocate = true;
       LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
     }
-    if (_enableLocalTierMigration) {
-      relocate = true;
-      LOGGER.info("Migrating segment tiers on servers locally for table: {}", tableNameWithType);
-    }
     if (!relocate) {
       LOGGER.debug("No need to relocate segments of table: {}", tableNameWithType);
       return;
@@ -205,7 +201,9 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       // instead of using a separate task.
       // TODO: can add some sanity checks on the server side when reloading segments to be more defensive, e.g. only
       //       migrating segment to new tier when the hosting server is in the server pool configured for that tier.
-      updateTargetTier(tableNameWithType);
+      if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
+        updateTargetTier(tableNameWithType, tableConfig);
+      }
 
       RebalanceResult rebalance = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
       switch (rebalance.getStatus()) {
@@ -230,13 +228,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
    * Calculate the target tier the segment belongs to and set it in segment ZK metadata as goal state, which can be
    * checked by servers when loading the segment to put it onto the target storage tier.
    */
-  private void updateTargetTier(String tableNameWithType) {
-    if (!_enableLocalTierMigration) {
-      LOGGER.debug("Skipping updating target tier for segments of table: {}", tableNameWithType);
-      return;
-    }
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+  private void updateTargetTier(String tableNameWithType, TableConfig tableConfig) {
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
     List<Tier> sortedTiers = tierCfgs == null ? Collections.emptyList()
         : TierConfigUtils.getSortedTiers(tierCfgs, _pinotHelixResourceManager.getHelixZkManager());
