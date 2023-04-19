@@ -50,7 +50,7 @@ public class PercentileKLLMVQueriesTest extends PercentileKLLQueriesTest {
       GenericRow row = new GenericRow();
 
       int numMultiValues = RANDOM.nextInt(MAX_NUM_MULTI_VALUES) + 1;
-      double[] values = new double[numMultiValues];
+      Double[] values = new Double[numMultiValues];
       KllDoublesSketch sketch = KllDoublesSketch.newHeapInstance();
       for (int j = 0; j < numMultiValues; j++) {
         double value = RANDOM.nextDouble() * VALUE_RANGE;
