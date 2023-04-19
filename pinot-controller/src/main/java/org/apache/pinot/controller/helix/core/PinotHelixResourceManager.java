@@ -2016,6 +2016,8 @@ public class PinotHelixResourceManager {
       instancesForTable = getAllInstancesForTable(realtimeTableName);
       _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
       LOGGER.info("Deleting table {}: Removed helix table resource", realtimeTableName);
+    } else {
+      LOGGER.info("Deleting table {}: Table resource not found in helix", realtimeTableName);
     }
 
     // Wait for external view to converge
@@ -2264,6 +2266,17 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_SEGMENT));
   }
 
+  public boolean addTableDeleteJob(String tableNameWithType, String jobId, int numberOfMessagesSent) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_DELETE.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+    return addControllerJobToZK(jobId, jobMetadata,
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_DELETE));
+  }
+
   public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath) {
     Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS) != null,
         "Submission Time in JobMetadata record not set. Cannot expire these records");
@@ -2427,7 +2440,7 @@ public class PinotHelixResourceManager {
   /**
    * Delete the table on servers by sending table deletion message
    */
-  public String deleteTableAsync(String tableNameWithType, TableType tableType, String retentionPeriod) {
+  public Pair<Integer, String> deleteTableAsync(String tableNameWithType, TableType tableType, String retentionPeriod) {
     LOGGER.info("Sending delete table message for table: {}", tableNameWithType);
 
     Criteria recipientCriteria = new Criteria();
@@ -2440,13 +2453,6 @@ public class PinotHelixResourceManager {
         new TableDeletionControllerMessage(tableNameWithType, tableType, retentionPeriod);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
-    // Externalview can be null for newly created table, skip sending the message
-    if (_helixZkManager.getHelixDataAccessor()
-        .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType)) == null) {
-      LOGGER.warn("No delete table message sent for newly created table: {} as the externalview is null.",
-          tableNameWithType);
-      return null;
-    }
     // Infinite timeout on the recipient
     int timeoutMs = -1;
     int numMessagesSent = messagingService.send(recipientCriteria, tableDeletionMessage, null, timeoutMs);
@@ -2456,7 +2462,7 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No delete table message sent for table: {}", tableNameWithType);
     }
 
-    return tableDeletionMessage.getId();
+    return Pair.of(numMessagesSent, tableDeletionMessage.getId());
   }
 
   /**
@@ -2471,6 +2477,14 @@ public class PinotHelixResourceManager {
     recipientCriteria.setSessionSpecific(true);
     TableDeletionMessage tableDeletionMessage = new TableDeletionMessage(tableNameWithType);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+
+    ExternalView externalView = _helixZkManager.getHelixDataAccessor()
+        .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
+
+    if (externalView == null) {
+      LOGGER.warn("External view for table {} is null. Skip sending delete message to servers", tableNameWithType);
+      return;
+    }
 
     // Infinite timeout on the recipient
     int timeoutMs = -1;

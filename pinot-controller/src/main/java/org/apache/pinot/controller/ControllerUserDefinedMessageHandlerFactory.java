@@ -22,6 +22,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import javax.ws.rs.core.Response;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -29,6 +30,7 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.TableDeletionControllerMessage;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
@@ -174,6 +176,7 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
     public HelixTaskResult handleMessage() {
       LOGGER.info("Handling deletion for table {}: Start", _tableNameWithType);
 
+      //TODO: some of this validation logic is duplicate and can be removed
       List<String> tablesDeleted = new LinkedList<>();
       HelixTaskResult result = new HelixTaskResult();
       try {
@@ -206,9 +209,8 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
         return result;
       }
 
-      //TODO: fix this, should be warning or error
-      result.setSuccess(true);
-      result.setMessage("Following tables deleted: " + tablesDeleted);
+      result.setException(new ControllerApplicationException(LOGGER, "Table " + _tableNameWithType + " does not exist",
+          Response.Status.NOT_FOUND));
       return result;
     }
 
