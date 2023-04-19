@@ -35,6 +35,19 @@ public class RegexpLikePredicate extends BasePredicate {
     _value = value;
   }
 
+  public RegexpLikePredicate(ExpressionContext lhs, String value, String flag) {
+    super(lhs);
+    _value = value;
+    switch (flag) {
+      case "i":
+        _pattern = Pattern.compile(_value, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+        break;
+      default:
+        _pattern = Pattern.compile(_value);
+        break;
+    }
+  }
+
   @Override
   public Type getType() {
     return Type.REGEXP_LIKE;

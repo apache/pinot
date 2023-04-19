@@ -205,7 +205,7 @@ public class RequestContextUtils {
       case LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)),
-                RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+                RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), ""));
       case TEXT_CONTAINS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -336,7 +336,7 @@ public class RequestContextUtils {
             new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
       case LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null, new RegexpLikePredicate(operands.get(0),
-            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), ""));
       case TEXT_CONTAINS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
