@@ -151,7 +151,7 @@ public class AggregationFunctionFactory {
           // of 100.0 is used.
           // Have to use literal string because we need to cast int to double here.
           double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
-          double compressionFactor = parseCompressionFactorToDouble(arguments.get(2).getLiteral().getStringValue());
+          int compressionFactor = parseCompressionFactorToInt(arguments.get(2).getLiteral().getStringValue());
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
             return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
@@ -347,7 +347,9 @@ public class AggregationFunctionFactory {
     return percentile;
   }
 
-  private static double parseCompressionFactorToDouble(String compressionFactorString) {
-    return Double.parseDouble(compressionFactorString);
+  private static int parseCompressionFactorToInt(String compressionFactorString) {
+    int compressionFactor = Integer.parseInt(compressionFactorString);
+    Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
+    return compressionFactor;
   }
 }

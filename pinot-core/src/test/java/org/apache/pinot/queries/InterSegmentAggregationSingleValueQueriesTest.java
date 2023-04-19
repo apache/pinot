@@ -539,10 +539,10 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     testPercentileRawTDigest(95);
     testPercentileRawTDigest(99);
 
-    testPercentileRawTDigestCustomCompression(50, 150d);
-    testPercentileRawTDigestCustomCompression(90, 500d);
-    testPercentileRawTDigestCustomCompression(95, 200d);
-    testPercentileRawTDigestCustomCompression(99, 1000d);
+    testPercentileRawTDigestCustomCompression(50, 150);
+    testPercentileRawTDigestCustomCompression(90, 500);
+    testPercentileRawTDigestCustomCompression(95, 200);
+    testPercentileRawTDigestCustomCompression(99, 1000);
   }
 
   private void testPercentileRawTDigest(int percentile) {
@@ -566,17 +566,17 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         getBrokerResponse(regularQuery + FILTER + GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
   }
 
-  private void testPercentileRawTDigestCustomCompression(int percentile, double compressionFactor) {
+  private void testPercentileRawTDigestCustomCompression(int percentile, int compressionFactor) {
     Function<Object, Object> quantileExtractor =
         value -> ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
             .quantile(percentile / 100.0);
 
     String rawQuery = String.format(
-        "SELECT PERCENTILERAWTDIGEST(column1, %d, %.2f) AS v1, PERCENTILERAWTDIGEST(column3, %d, %.2f) AS v2 "
+        "SELECT PERCENTILERAWTDIGEST(column1, %d, %d) AS v1, PERCENTILERAWTDIGEST(column3, %d, %d) AS v2 "
             + "FROM testTable",
         percentile, compressionFactor, percentile, compressionFactor);
     String regularQuery =
-        String.format("SELECT PERCENTILETDIGEST(column1, %d, %.2f) AS v1, PERCENTILETDIGEST(column3, %d, %.2f) AS v2 "
+        String.format("SELECT PERCENTILETDIGEST(column1, %d, %d) AS v1, PERCENTILETDIGEST(column3, %d, %d) AS v2 "
                 + "FROM testTable",
             percentile, compressionFactor, percentile, compressionFactor);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),

@@ -113,7 +113,7 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
   protected String getAggregationQuery(int percentile) {
     return String.format("SELECT PERCENTILE%1$dMV(%2$s), PERCENTILETDIGEST%1$dMV(%2$s), PERCENTILETDIGEST%1$d(%3$s), "
             + "PERCENTILEMV(%2$s, %1$d), PERCENTILETDIGESTMV(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d), "
-            + "PERCENTILETDIGESTMV(%2$s, %1$d, %6$.2f), PERCENTILETDIGEST(%5$s, %1$d, %6$.2f) FROM %4$s",
+            + "PERCENTILETDIGESTMV(%2$s, %1$d, %6$d), PERCENTILETDIGEST(%5$s, %1$d, %6$d) FROM %4$s",
         percentile, DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME, TDIGEST_CUSTOM_COMPRESSION_COLUMN, CUSTOM_COMPRESSION);
   }
 

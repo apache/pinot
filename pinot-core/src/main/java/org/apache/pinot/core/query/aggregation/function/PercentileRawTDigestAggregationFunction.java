@@ -46,7 +46,7 @@ public class PercentileRawTDigestAggregationFunction
   }
 
   public PercentileRawTDigestAggregationFunction(ExpressionContext expressionContext, double percentile,
-      double compressionFactor) {
+      int compressionFactor) {
     this(expressionContext, new PercentileTDigestAggregationFunction(expressionContext, percentile, compressionFactor));
   }
 
@@ -64,12 +64,14 @@ public class PercentileRawTDigestAggregationFunction
   @Override
   public String getResultColumnName() {
     final double percentile = _percentileTDigestAggregationFunction._percentile;
-    final double compressionFactor = _percentileTDigestAggregationFunction._compressionFactor;
+    final int compressionFactor = _percentileTDigestAggregationFunction._compressionFactor;
     final int version = _percentileTDigestAggregationFunction._version;
     final String type = getType().getName().toLowerCase();
 
     return version == 0 ? type + (int) percentile + "(" + _expression + ")"
-        : type + "(" + _expression + ", " + percentile + ", " + compressionFactor + ")";
+        : (((compressionFactor == PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION))
+            ? (type + "(" + _expression + ", " + percentile + ")")
+            : (type + "(" + _expression + ", " + percentile + ", " + compressionFactor + ")"));
   }
 
   @Override

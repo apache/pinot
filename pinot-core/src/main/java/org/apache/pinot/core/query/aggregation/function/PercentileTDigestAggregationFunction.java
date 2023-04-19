@@ -43,10 +43,10 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   // version 0 functions specified in the of form PERCENTILETDIGEST<2-digits>(column). Uses default compression of 100
-  // version 1 functions of form PERCENTILETDIGEST(column, <2-digits>.<16-digits>, <2-digits>.<16-digits> [optional])
+  // version 1 functions of form PERCENTILETDIGEST(column, <2-digits>.<16-digits>, <n-digits> [optional])
   protected final int _version;
   protected final double _percentile;
-  protected final double _compressionFactor;
+  protected final int _compressionFactor;
 
   public PercentileTDigestAggregationFunction(ExpressionContext expression, int percentile) {
     super(expression);
@@ -63,7 +63,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
   }
 
   public PercentileTDigestAggregationFunction(ExpressionContext expression, double percentile,
-      double compressionFactor) {
+      int compressionFactor) {
     super(expression);
     _version = 1;
     _percentile = percentile;
@@ -79,8 +79,12 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
   public String getResultColumnName() {
     return _version == 0 ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "("
         + _expression + ")"
-        : AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "(" + _expression + ", " + _percentile
-            + ", " + _compressionFactor + ")";
+        : ((_compressionFactor == DEFAULT_TDIGEST_COMPRESSION)
+            ? (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "(" + _expression + ", "
+                + _percentile + ")")
+            : (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "(" + _expression + ", "
+                + _percentile + ", " + _compressionFactor + ")")
+            );
   }
 
   @Override
@@ -230,8 +234,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
    * @param compressionFactor Compression factor to use for the TDigest
    * @return TDigest from the result holder
    */
-  protected static TDigest getDefaultTDigest(AggregationResultHolder aggregationResultHolder,
-      double compressionFactor) {
+  protected static TDigest getDefaultTDigest(AggregationResultHolder aggregationResultHolder, int compressionFactor) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
       tDigest = TDigest.createMergingDigest(compressionFactor);
@@ -249,7 +252,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
    * @return TDigest for the group key
    */
   protected static TDigest getDefaultTDigest(GroupByResultHolder groupByResultHolder, int groupKey,
-      double compressionFactor) {
+      int compressionFactor) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
       tDigest = TDigest.createMergingDigest(compressionFactor);

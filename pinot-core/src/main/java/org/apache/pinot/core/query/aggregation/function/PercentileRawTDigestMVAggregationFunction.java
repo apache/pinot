@@ -37,9 +37,9 @@ public class PercentileRawTDigestMVAggregationFunction extends PercentileRawTDig
   }
 
   public PercentileRawTDigestMVAggregationFunction(ExpressionContext expressionContext, double percentile,
-      double compresionFactor) {
+      int compressionFactor) {
     super(expressionContext,
-        new PercentileTDigestMVAggregationFunction(expressionContext, percentile, compresionFactor));
+        new PercentileTDigestMVAggregationFunction(expressionContext, percentile, compressionFactor));
   }
 
   @Override

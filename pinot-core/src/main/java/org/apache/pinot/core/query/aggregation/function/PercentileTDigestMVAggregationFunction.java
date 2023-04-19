@@ -38,7 +38,7 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
   }
 
   public PercentileTDigestMVAggregationFunction(ExpressionContext expression, double percentile,
-      double compressionFactor) {
+      int compressionFactor) {
     super(expression, percentile, compressionFactor);
   }
 
@@ -51,8 +51,11 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
   public String getResultColumnName() {
     return _version == 0 ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "mv("
         + _expression + ")"
-        : AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", " + _percentile
-            + ", " + _compressionFactor + ")";
+        : ((_compressionFactor == PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION)
+            ? (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", "
+                + _percentile + ")")
+            : (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", "
+                + _percentile + ", " + _compressionFactor + ")"));
   }
 
   @Override

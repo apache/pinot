@@ -84,7 +84,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   protected static final int NUM_ROWS = 1000;
   protected static final double VALUE_RANGE = Integer.MAX_VALUE;
   protected static final double DELTA = 0.05 * VALUE_RANGE; // Allow 5% quantile error
-  protected static final double CUSTOM_COMPRESSION = 1000d;
+  protected static final int CUSTOM_COMPRESSION = 1000;
   protected static final String DOUBLE_COLUMN = "doubleColumn";
   protected static final String TDIGEST_COLUMN = "tDigestColumn";
   protected static final String TDIGEST_CUSTOM_COMPRESSION_COLUMN = "tDigestColumnCustom";
@@ -249,7 +249,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   protected String getAggregationQuery(int percentile) {
     return String.format("SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), "
             + "PERCENTILE(%2$s, %1$d), PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d), "
-            + "PERCENTILETDIGEST(%2$s, %1$d, %6$.2f), PERCENTILETDIGEST(%5$s, %1$d, %6$.2f) FROM %4$s",
+            + "PERCENTILETDIGEST(%2$s, %1$d, %6$d), PERCENTILETDIGEST(%5$s, %1$d, %6$d) FROM %4$s",
         percentile,
         DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME, TDIGEST_CUSTOM_COMPRESSION_COLUMN, CUSTOM_COMPRESSION);
   }
