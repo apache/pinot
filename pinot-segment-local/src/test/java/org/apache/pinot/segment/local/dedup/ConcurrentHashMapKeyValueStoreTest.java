@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
@@ -30,7 +29,7 @@ import org.testng.annotations.Test;
 
 public class ConcurrentHashMapKeyValueStoreTest {
 
-    LocalKeyValueStore _keyValueStore = new ConcurrentHashMapKeyValueStore("test".getBytes(StandardCharsets.UTF_8));
+    LocalKeyValueStore _keyValueStore = new ConcurrentHashMapKeyValueStore();
     byte[] _nonExistingKey = "non-existing".getBytes();
     byte[] _key = "someKey".getBytes();
     byte[] _key2 = "someKey2".getBytes();

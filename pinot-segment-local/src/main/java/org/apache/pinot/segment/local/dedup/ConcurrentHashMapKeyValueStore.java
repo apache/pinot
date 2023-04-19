@@ -30,7 +30,7 @@ public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
 
   private final Map<ByteArray, byte[]> _map;
 
-  public ConcurrentHashMapKeyValueStore(byte[] id) {
+  public ConcurrentHashMapKeyValueStore() {
     _map = new ConcurrentHashMap<>();
   }
 
