@@ -198,6 +198,8 @@ public class WorkerManager {
         CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType), requestId);
   }
 
+  // TODO: Find a better way to determine whether a stage is leaf stage or intermediary. We could have query plans that
+  //       process table data even in intermediary stages.
   private boolean isLeafStage(StageMetadata stageMetadata) {
     return stageMetadata.getScannedTables().size() == 1;
   }

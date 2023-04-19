@@ -294,6 +294,8 @@ public class QueryEnvironment {
     Set<String> tableNames = new HashSet<>();
     List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
     for (String qualifiedTableName : qualifiedTableNames) {
+      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
+      // statements, particularly to handle cases when they contain special characters or reserved keywords.
       String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
       tableNames.add(tableName);
     }

@@ -771,22 +771,19 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   private void buildTableTenantServerMap(String tableNameWithType, TableConfig tableConfig) {
-    LOGGER.info("buildTableTenantServerMap");
     String serverTag = getServerTagForTable(tableNameWithType, tableConfig);
     List<InstanceConfig> allInstanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
     List<InstanceConfig> instanceConfigsWithTag = HelixHelper.getInstancesConfigsWithTag(allInstanceConfigs, serverTag);
     Map<String, ServerInstance> serverInstances = new HashMap<>();
     for (InstanceConfig serverInstanceConfig : instanceConfigsWithTag) {
-      LOGGER.info("Building instances. table={}, host={}, instance={}", tableNameWithType,
-          serverInstanceConfig.getHostName(), serverInstanceConfig.getInstanceName());
       serverInstances.put(serverInstanceConfig.getInstanceName(), new ServerInstance(serverInstanceConfig));
     }
     _tableTenantServersMap.put(tableNameWithType, serverInstances);
+    LOGGER.info("Built map for table={} with {} server instances.", tableNameWithType, serverInstances.size());
   }
 
   private void addNewServerToTableTenantServerMap(String instanceId, ServerInstance serverInstance,
       InstanceConfig instanceConfig) {
-    LOGGER.info("addNewServerToTableTenantServerMap");
     List<String> tags = instanceConfig.getTags();
 
     for (Map.Entry<String, Map<String, ServerInstance>> entry : _tableTenantServersMap.entrySet()) {
@@ -796,11 +793,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
       Map<String, ServerInstance> tenantServerMap = entry.getValue();
 
-      LOGGER.info("Iterating for table={}, tag={}, server_instance_id={}, host={}", tableNameWithType, tableServerTag,
-          instanceId, serverInstance.getHostname());
-
-      if (tags.contains(tableServerTag) && !tenantServerMap.containsKey(instanceId)) {
-        LOGGER.info("Adding instance={}", instanceId);
+      if (!tenantServerMap.containsKey(instanceId) && tags.contains(tableServerTag)) {
         tenantServerMap.put(instanceId, serverInstance);
       }
     }
@@ -816,7 +809,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       serverTag = TagNameUtils.getRealtimeTagForTenant(serverTenantName);
     }
 
-    LOGGER.info("Server tag for table={}, tag={}, servertenant={}", tableNameWithType, serverTag, serverTenantName);
     return serverTag;
   }
 
