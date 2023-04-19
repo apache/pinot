@@ -86,7 +86,11 @@ public class GrpcMailboxServiceTest {
     SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId, deadlineMs);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
-    _mail2GotData.set(ignored -> gotData.countDown());
+    CountDownLatch timesCallbackCalled = new CountDownLatch(2);
+    _mail2GotData.set(ignored -> {
+      gotData.countDown();
+      timesCallbackCalled.countDown();
+    });
 
     // When:
     TransferableBlock testBlock = getTestTransferableBlock();
@@ -97,6 +101,8 @@ public class GrpcMailboxServiceTest {
     // Then:
     Assert.assertEquals(receivedBlock.getDataBlock().toBytes(), testBlock.getDataBlock().toBytes());
     sendingMailbox.complete();
+
+    Assert.assertTrue(timesCallbackCalled.await(1, TimeUnit.SECONDS));
 
     TestUtils.waitForCondition(aVoid -> {
       return receivingMailbox.isClosed();
