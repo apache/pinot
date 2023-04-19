@@ -61,7 +61,8 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     int numDocs = valueBlock.getNumDocs();
     initIntValuesSV(numDocs);
     Pair<int[], RoaringBitmap> values = _arguments.get(0).transformToIntValuesSVWithNull(valueBlock);
-    System.arraycopy(values.getLeft(), 0, _intValuesSV, 0, numDocs);
+    int[] curValues = values.getLeft();
+    System.arraycopy(curValues, 0, _intValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
       values = _arguments.get(i).transformToIntValuesSVWithNull(valueBlock);
@@ -106,7 +107,8 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     int numDocs = valueBlock.getNumDocs();
     initLongValuesSV(numDocs);
     Pair<long[], RoaringBitmap> values = _arguments.get(0).transformToLongValuesSVWithNull(valueBlock);
-    System.arraycopy(values.getLeft(), 0, _longValuesSV, 0, numDocs);
+    long[] curValues = values.getLeft();
+    System.arraycopy(curValues, 0, _longValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
       values = _arguments.get(i).transformToLongValuesSVWithNull(valueBlock);
@@ -151,7 +153,8 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesSV(numDocs);
     Pair<float[], RoaringBitmap> values = _arguments.get(0).transformToFloatValuesSVWithNull(valueBlock);
-    System.arraycopy(values.getLeft(), 0, _floatValuesSV, 0, numDocs);
+    float[] curValues = values.getLeft();
+    System.arraycopy(curValues, 0, _floatValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
       values = _arguments.get(i).transformToFloatValuesSVWithNull(valueBlock);
@@ -196,7 +199,8 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesSV(numDocs);
     Pair<double[], RoaringBitmap> values = _arguments.get(0).transformToDoubleValuesSVWithNull(valueBlock);
-    System.arraycopy(values.getLeft(), 0, _doubleValuesSV, 0, numDocs);
+    double[] curValues = values.getLeft();
+    System.arraycopy(curValues, 0, _doubleValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
       values = _arguments.get(i).transformToDoubleValuesSVWithNull(valueBlock);
@@ -241,7 +245,8 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     int numDocs = valueBlock.getNumDocs();
     initBigDecimalValuesSV(numDocs);
     Pair<BigDecimal[], RoaringBitmap> values = _arguments.get(0).transformToBigDecimalValuesSVWithNull(valueBlock);
-    System.arraycopy(values.getLeft(), 0, _bigDecimalValuesSV, 0, numDocs);
+    BigDecimal[] curValues = values.getLeft();
+    System.arraycopy(curValues, 0, _bigDecimalValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
       values = _arguments.get(i).transformToBigDecimalValuesSVWithNull(valueBlock);
@@ -288,7 +293,8 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     int numDocs = valueBlock.getNumDocs();
     initStringValuesSV(numDocs);
     Pair<String[], RoaringBitmap> values = _arguments.get(0).transformToStringValuesSVWithNull(valueBlock);
-    System.arraycopy(values.getLeft(), 0, _stringValuesSV, 0, numDocs);
+    String[] curValues = values.getLeft();
+    System.arraycopy(curValues, 0, _stringValuesSV, 0, numDocs);
     RoaringBitmap nullBitmap = values.getRight();
     for (int i = 1; i < _arguments.size(); i++) {
       values = _arguments.get(i).transformToStringValuesSVWithNull(valueBlock);
