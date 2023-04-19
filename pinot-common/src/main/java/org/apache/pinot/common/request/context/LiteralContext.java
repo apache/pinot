@@ -90,32 +90,55 @@ public class LiteralContext {
   public LiteralContext(Literal literal) {
     Preconditions.checkState(literal.getFieldValue() != null,
         "Field value cannot be null for field:" + literal.getSetField());
-    switch (literal.getSetField()){
+    switch (literal.getSetField()) {
       case BOOL_VALUE:
         _type = FieldSpec.DataType.BOOLEAN;
         _value = literal.getFieldValue();
+        _bigDecimalValue = PinotDataType.BOOLEAN.toBigDecimal(_value);
         break;
       case DOUBLE_VALUE:
-        _type = FieldSpec.DataType.DOUBLE;
-        _value = literal.getFieldValue();
+        Number floatingNumber = NumberUtils.createNumber(literal.getFieldValue().toString());
+        _bigDecimalValue = new BigDecimal(literal.getFieldValue().toString());
+        if (floatingNumber instanceof Float) {
+          _type = FieldSpec.DataType.FLOAT;
+          _value = _bigDecimalValue.floatValue();
+        } else {
+          _type = FieldSpec.DataType.DOUBLE;
+          _value = _bigDecimalValue.doubleValue();
+        }
         break;
       case LONG_VALUE:
-        _type = FieldSpec.DataType.LONG;
-        _value = literal.getFieldValue();
+        Number integerNumber = NumberUtils.createNumber(literal.getFieldValue().toString());
+        _bigDecimalValue = new BigDecimal(literal.getFieldValue().toString());
+        if (integerNumber instanceof Integer) {
+          _type = FieldSpec.DataType.INT;
+          _value = _bigDecimalValue.intValue();
+        } else {
+          _type = FieldSpec.DataType.LONG;
+          _value = _bigDecimalValue.longValue();
+        }
         break;
       case NULL_VALUE:
         _type = FieldSpec.DataType.UNKNOWN;
         _value = null;
+        _bigDecimalValue = BigDecimal.ZERO;
         break;
       case STRING_VALUE:
-        Pair<FieldSpec.DataType, Object> typeAndValue = inferLiteralDataTypeAndValue(literal.getFieldValue().toString());
+        Pair<FieldSpec.DataType, Object> typeAndValue =
+            inferLiteralDataTypeAndValue(literal.getFieldValue().toString());
         _type = typeAndValue.getLeft();
         _value = typeAndValue.getRight();
+        if (_type == FieldSpec.DataType.BIG_DECIMAL) {
+          _bigDecimalValue = (BigDecimal) _value;
+        } else if (_type == FieldSpec.DataType.TIMESTAMP) {
+          _bigDecimalValue = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_value.toString()));
+        } else {
+          _bigDecimalValue = BigDecimal.ZERO;
+        }
         break;
       default:
         throw new UnsupportedOperationException("Unsupported data type:" + literal.getSetField());
     }
-    _bigDecimalValue = getBigDecimalValue(_type, _value);
   }
 
   public FieldSpec.DataType getType() {

@@ -59,4 +59,40 @@ public class LiteralContextTest {
     Assert.assertEquals(LiteralContext.inferLiteralDataTypeAndValue("2020-02-02 20:20:20.20").getLeft(),
         FieldSpec.DataType.TIMESTAMP);
   }
+
+  @Test
+  public void testInferFloatDataType() {
+    Literal literalFloat = new Literal();
+    literalFloat.setDoubleValue(1.23);
+    LiteralContext floatContext = new LiteralContext(literalFloat);
+    Assert.assertEquals(floatContext.getType(), FieldSpec.DataType.FLOAT);
+    Assert.assertEquals(floatContext.getValue(), (float) literalFloat.getDoubleValue());
+  }
+
+  @Test
+  public void testInferDoubleDataType() {
+    Literal literalFloat = new Literal();
+    literalFloat.setDoubleValue(1.234567891011);
+    LiteralContext doubleContext = new LiteralContext(literalFloat);
+    Assert.assertEquals(doubleContext.getType(), FieldSpec.DataType.DOUBLE);
+    Assert.assertEquals(doubleContext.getValue(), literalFloat.getDoubleValue());
+  }
+
+  @Test
+  public void testInferIntDataType() {
+    Literal literalInt = new Literal();
+    literalInt.setLongValue(123);
+    LiteralContext floatContext = new LiteralContext(literalInt);
+    Assert.assertEquals(floatContext.getType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(floatContext.getValue(), (int) literalInt.getLongValue());
+  }
+
+  @Test
+  public void testInferLongDataType() {
+    Literal literalLong = new Literal();
+    literalLong.setLongValue(Integer.MAX_VALUE + 1L);
+    LiteralContext longContext = new LiteralContext(literalLong);
+    Assert.assertEquals(longContext.getType(), FieldSpec.DataType.LONG);
+    Assert.assertEquals(longContext.getValue(), literalLong.getLongValue());
+  }
 }
