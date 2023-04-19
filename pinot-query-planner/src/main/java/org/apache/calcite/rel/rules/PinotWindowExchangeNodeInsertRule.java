@@ -215,6 +215,10 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
    * This function modifies the empty LogicalProject below the LogicalWindow to add a literal and adds a LogicalProject
    * above LogicalWindow to remove the additional literal column from being projected any further. This also handles
    * the addition of the LogicalExchange under the LogicalWindow.
+   *
+   * TODO: Explore an option to handle empty LogicalProject by actually projecting empty rows for each entry. This way
+   *       there will no longer be a need to add a literal to the empty LogicalProject, but just traverse the number of
+   *       rows
    */
   private RelNode handleEmptyProjectBelowWindow(Window window, Project project) {
     RelOptCluster cluster = window.getCluster();
