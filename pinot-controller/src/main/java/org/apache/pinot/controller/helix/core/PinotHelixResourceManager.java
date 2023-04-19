@@ -111,6 +111,7 @@ import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
+import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
@@ -3504,7 +3505,8 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType
    * @param segmentLineageEntryId
    */
-  public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId) {
+  public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId,
+      @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         // Fetch the segment lineage and look up the lineage entry based on the entry id.
@@ -3530,9 +3532,20 @@ public class PinotHelixResourceManager {
           throw new RuntimeException(errorMsg);
         }
 
-        // Check that all the segments from 'segmentsTo' exist in the table
         Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
         List<String> segmentsTo = lineageEntry.getSegmentsTo();
+        if (endReplaceSegmentsRequest != null && !endReplaceSegmentsRequest.getSegmentsTo().isEmpty()) {
+          Set<String> segmentsToInSet = new HashSet<>(segmentsTo);
+          // Check that the segments generated is a subset of the original segmentsTo list.
+          for (String segment : endReplaceSegmentsRequest.getSegmentsTo()) {
+            Preconditions.checkState(segmentsToInSet.contains(segment),
+                "Segment: %s from EndReplaceSegmentsRequest does not exist in original segmentsTo list "
+                    + "used while starting segment replacement: %s", segment, tableNameWithType);
+          }
+          segmentsTo = endReplaceSegmentsRequest.getSegmentsTo();
+        }
+
+        // Check that all the segments from 'segmentsTo' exist in the table
         for (String segment : segmentsTo) {
           Preconditions.checkState(segmentsForTable.contains(segment),
               "Segment: %s from 'segmentsTo' does not exist in table: %s", segment, tableNameWithType);
