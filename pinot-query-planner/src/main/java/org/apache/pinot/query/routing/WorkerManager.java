@@ -21,11 +21,12 @@ package org.apache.pinot.query.routing;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -62,11 +63,11 @@ public class WorkerManager {
   }
 
   public void assignWorkerToStage(int stageId, StageMetadata stageMetadata, long requestId,
-      Map<String, String> options) {
-    List<String> scannedTables = stageMetadata.getScannedTables();
-    if (scannedTables.size() == 1) {
+      Map<String, String> options, Set<String> tableNames) {
+    if (isLeafStage(stageMetadata)) {
       // --- LEAF STAGE ---
       // table scan stage, need to attach server as well as segment info for each physical table type.
+      List<String> scannedTables = stageMetadata.getScannedTables();
       String logicalTableName = scannedTables.get(0);
       Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName, requestId);
       if (routingTableMap.size() == 0) {
@@ -112,13 +113,26 @@ public class WorkerManager {
           new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), 0)));
     } else {
       // --- INTERMEDIATE STAGES ---
+      // If the query has more than one table, it is possible that the tables could be hosted on different tenants.
+      // The intermediate stage will be processed on servers randomly picked from the tenants belonging to either or
+      // all of the tables in the query.
       // TODO: actually make assignment strategy decisions for intermediate stages
-      stageMetadata.setServerInstances(assignServers(_routingManager.getEnabledServerInstanceMap().values(),
-          stageMetadata.isRequiresSingletonInstance(), options));
+      Set<ServerInstance> serverInstances = new HashSet<>();
+      if (tableNames.size() == 0) {
+        // This could be the case from queries that don't actually fetch values from the tables. In such cases the
+        // routing need not be tenant aware.
+        // Eg: SELECT 1 AS one FROM select_having_expression_test_test_having HAVING 1 > 2;
+        serverInstances = _routingManager.getEnabledServerInstanceMap().values().stream().collect(Collectors.toSet());
+      } else {
+        serverInstances = fetchServersForIntermediateStage(tableNames);
+      }
+
+      stageMetadata.setServerInstances(
+          assignServers(serverInstances, stageMetadata.isRequiresSingletonInstance(), options));
     }
   }
 
-  private static List<VirtualServer> assignServers(Collection<ServerInstance> servers,
+  private static List<VirtualServer> assignServers(Set<ServerInstance> servers,
       boolean requiresSingletonInstance, Map<String, String> options) {
     int stageParallelism = Integer.parseInt(
         options.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.STAGE_PARALLELISM, "1"));
@@ -182,5 +196,37 @@ public class WorkerManager {
         TableNameBuilder.extractRawTableName(tableName));
     return _routingManager.getRoutingTable(
         CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType), requestId);
+  }
+
+  // TODO: Find a better way to determine whether a stage is leaf stage or intermediary. We could have query plans that
+  //       process table data even in intermediary stages.
+  private boolean isLeafStage(StageMetadata stageMetadata) {
+    return stageMetadata.getScannedTables().size() == 1;
+  }
+
+  private Set<ServerInstance> fetchServersForIntermediateStage(Set<String> tableNames) {
+    Set<ServerInstance> serverInstances = new HashSet<>();
+
+    for (String table : tableNames) {
+      String rawTableName = TableNameBuilder.extractRawTableName(table);
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(table);
+      if (tableType == null) {
+        String offlineTable = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+        String realtimeTable = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
+
+        // Servers in the offline table's tenant.
+        Map<String, ServerInstance> servers = _routingManager.getEnabledServersForTableTenant(offlineTable);
+        serverInstances.addAll(servers.values());
+
+        // Servers in the online table's tenant.
+        servers = _routingManager.getEnabledServersForTableTenant(realtimeTable);
+        serverInstances.addAll(servers.values());
+      } else {
+        Map<String, ServerInstance> servers = _routingManager.getEnabledServersForTableTenant(table);
+        serverInstances.addAll(servers.values());
+      }
+    }
+
+    return serverInstances;
   }
 }

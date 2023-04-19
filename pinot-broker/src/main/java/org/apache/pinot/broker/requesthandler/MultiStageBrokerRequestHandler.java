@@ -21,15 +21,12 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -163,8 +160,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         case EXPLAIN:
           queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
           String plan = queryPlanResult.getExplainPlan();
-          RelNode explainRelRoot = queryPlanResult.getRelRoot();
-          if (!hasTableAccess(requesterIdentity, getTableNamesFromRelRoot(explainRelRoot), requestId, requestContext)) {
+          Set<String> tableNames = queryPlanResult.getTableNames();
+          if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
             return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
           }
 
@@ -183,7 +180,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     QueryPlan queryPlan = queryPlanResult.getQueryPlan();
-    Set<String> tableNames = getTableNamesFromRelRoot(queryPlanResult.getRelRoot());
+    Set<String> tableNames = queryPlanResult.getTableNames();
 
     // Compilation Time. This includes the time taken for parsing, compiling, create stage plans and assigning workers.
     long compilationEndTimeNs = System.nanoTime();
@@ -286,10 +283,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
     }
     return false;
-  }
-
-  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    return new HashSet<>(RelOptUtil.findAllTableQualifiedNames(relRoot));
   }
 
   private void updatePhaseTimingForTables(Set<String> tableNames,

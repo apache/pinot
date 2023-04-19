@@ -185,9 +185,12 @@ public class PinotQueryResource {
           "Unable to find table in cluster")).toString();
     }
 
+    // When routing a query, there should be at least one common broker tenant for the table. However, the server
+    // tenants can be completely disjoint. The leaf stages which access segments will be processed on the respective
+    // server tenants for each table. The intermediate stages can be processed in either or all of the server tenants
+    // belonging to the tables.
     String brokerTenant = getCommonBrokerTenant(tableConfigList);
-    String serverTenant = getCommonServerTenant(tableConfigList);
-    if (brokerTenant == null || serverTenant == null) {
+    if (brokerTenant == null) {
       return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
           new Exception(String.format("Unable to dispatch multistage query with multiple tables : %s "
               + "on different tenant", tableNames))).toString();
@@ -275,18 +278,6 @@ public class PinotQueryResource {
       return null;
     }
     return (String) (tableBrokers.toArray()[0]);
-  }
-
-  // return the serverTenant if all table configs point to the same server, else returns null
-  private String getCommonServerTenant(List<TableConfig> tableConfigList) {
-    Set<String> tableServers = new HashSet<>();
-    for (TableConfig tableConfig : tableConfigList) {
-      tableServers.add(tableConfig.getTenantConfig().getServer());
-    }
-    if (tableServers.size() != 1) {
-      return null;
-    }
-    return (String) (tableServers.toArray()[0]);
   }
 
   private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,

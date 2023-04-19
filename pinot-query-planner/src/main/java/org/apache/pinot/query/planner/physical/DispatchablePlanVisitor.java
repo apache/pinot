@@ -59,7 +59,7 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   private void computeWorkerAssignment(StageNode node, DispatchablePlanContext context) {
     int stageId = node.getStageId();
     context.getWorkerManager().assignWorkerToStage(stageId, context.getQueryPlan().getStageMetadataMap().get(stageId),
-        context.getRequestId(), context.getPlannerContext().getOptions());
+        context.getRequestId(), context.getPlannerContext().getOptions(), context.getTableNames());
   }
 
   @Override
