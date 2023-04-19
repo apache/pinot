@@ -897,7 +897,7 @@ public class QueryGenerator {
       } else {
         boolean isItBetween = RANDOM.nextBoolean();
         if (isItBetween) {
-          return "BETWEEN " + generateRandomValue(generateInt) + " AND " + generateRandomValue(generateInt);
+          return String.format("BETWEEN %s AND %s", generateRandomValue(generateInt), generateRandomValue(generateInt));
         } else {
           int numValues = RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1;
           Set<String> values = new HashSet<>();
@@ -906,7 +906,7 @@ public class QueryGenerator {
           }
           String valuesString = StringUtils.join(values, ", ");
           boolean isItIn = RANDOM.nextBoolean();
-          return (isItIn ? "" : "NOT ") + "IN (" + valuesString + ")";
+          return String.format("%s IN (%s)", isItIn ? "" : "NOT " , valuesString);
         }
       }
     }
@@ -1025,7 +1025,7 @@ public class QueryGenerator {
       }
 
       return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue),
-          "(" + StringUtils.join(h2ComparisonClauses, " OR ") + ")");
+          generateH2QueryConditionPredicate(h2ComparisonClauses));
     }
   }
 
@@ -1049,11 +1049,11 @@ public class QueryGenerator {
       List<String> h2InClauses =
           new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
       for (int i = 1; i <= ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-        h2InClauses.add(columnName + "[" + i + "] IN (" + inValues + ")");
+        h2InClauses.add(String.format("%s[%d] IN (%s)", columnName, i, inValues));
       }
 
-      return new StringQueryFragment(columnName + " IN (" + inValues + ")",
-          "(" + StringUtils.join(h2InClauses, " OR ") + ")");
+      return new StringQueryFragment(String.format("%s IN (%s)", columnName, inValues),
+          generateH2QueryConditionPredicate(h2InClauses));
     }
   }
 
@@ -1071,11 +1071,17 @@ public class QueryGenerator {
       List<String> h2ComparisonClauses =
           new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
       for (int i = 1; i <= ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
-        h2ComparisonClauses.add(columnName + "[" + i + "] BETWEEN " + leftValue + " AND " + rightValue);
+        h2ComparisonClauses.add(String.format("%s[%d] BETWEEN %s AND %s", columnName, i, leftValue, rightValue));
       }
 
-      return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue,
-          "(" + StringUtils.join(h2ComparisonClauses, " OR ") + ")");
+      return new StringQueryFragment(String.format("%s BETWEEN %s AND %s", columnName, leftValue, rightValue),
+          generateH2QueryConditionPredicate(h2ComparisonClauses));
     }
+  }
+  private static String generateH2QueryConditionPredicate(List<String> conditionList) {
+    return generateH2QueryConditionPredicate(conditionList, " OR ");
+  }
+  private static String generateH2QueryConditionPredicate(List<String> conditionList, String separator) {
+    return String.format("( %s )", StringUtils.join(conditionList, separator));
   }
 }

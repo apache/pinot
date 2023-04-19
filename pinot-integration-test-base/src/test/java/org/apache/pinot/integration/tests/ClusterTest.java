@@ -360,7 +360,7 @@ public abstract class ClusterTest extends ControllerTest {
       throws IOException, HttpErrorStatusException {
     List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
         "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder.encode(segmentTarFile.getName(),
-            StandardCharsets.UTF_8.toString())), new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+            StandardCharsets.UTF_8)), new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
         FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name and table type as request parameters
     NameValuePair tableNameValuePair =
