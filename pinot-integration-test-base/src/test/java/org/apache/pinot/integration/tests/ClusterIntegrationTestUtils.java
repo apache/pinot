@@ -154,14 +154,14 @@ public class ClusterIntegrationTestUtils {
       }
 
       h2Connection.prepareCall(String.format("DROP TABLE IF EXISTS %s", tableName)).execute();
-      String columnsStr  = StringUtil.join(",", h2FieldNameAndTypes.toArray(new String[0]));
-      h2Connection.prepareCall(String.format("CREATE TABLE %s (%s)",tableName, columnsStr)).execute();
+      String columnsStr = StringUtil.join(",", h2FieldNameAndTypes.toArray(new String[0]));
+      h2Connection.prepareCall(String.format("CREATE TABLE %s (%s)", tableName, columnsStr)).execute();
     }
 
     // Insert Avro records into H2 table
     String params = "?" + StringUtils.repeat(",?", h2FieldNameAndTypes.size() - 1);
     PreparedStatement h2Statement =
-        h2Connection.prepareStatement( String.format("INSERT INTO %s VALUES (%s)", tableName, params));
+        h2Connection.prepareStatement(String.format("INSERT INTO %s VALUES (%s)", tableName, params));
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {

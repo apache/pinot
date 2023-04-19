@@ -906,7 +906,7 @@ public class QueryGenerator {
           }
           String valuesString = StringUtils.join(values, ", ");
           boolean isItIn = RANDOM.nextBoolean();
-          return String.format("%s IN (%s)", isItIn ? "" : "NOT " , valuesString);
+          return String.format("%s IN (%s)", isItIn ? "" : "NOT ", valuesString);
         }
       }
     }
