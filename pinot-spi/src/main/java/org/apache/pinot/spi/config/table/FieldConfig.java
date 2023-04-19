@@ -168,6 +168,7 @@ public class FieldConfig extends BaseJsonConfig {
     private CompressionCodec _compressionCodec;
     private Map<String, String> _properties;
     private TimestampConfig _timestampConfig;
+    private JsonNode _tierOverwrites;
 
     public Builder() {
     }
@@ -180,6 +181,7 @@ public class FieldConfig extends BaseJsonConfig {
       _compressionCodec = other._compressionCodec;
       _properties = other._properties;
       _timestampConfig = other._timestampConfig;
+      _tierOverwrites = other._tierOverwrites;
     }
 
     public Builder withIndexes(JsonNode indexes) {
@@ -217,9 +219,14 @@ public class FieldConfig extends BaseJsonConfig {
       return this;
     }
 
+    public Builder withTierOverwrites(JsonNode tierOverwrites) {
+      _tierOverwrites = tierOverwrites;
+      return this;
+    }
+
     public FieldConfig build() {
       return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig,
-          _indexes, _properties);
+          _indexes, _properties, _tierOverwrites);
     }
   }
 }
