@@ -34,7 +34,7 @@ import static org.testng.Assert.*;
 
 public class FstIndexTypeTest {
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(FstIndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimStr", StandardIndexes.fst()), expected);
@@ -164,6 +164,8 @@ public class FstIndexTypeTest {
           + " }");
       _tableConfig.getIndexingConfig().setFSTIndexType(FSTType.NATIVE);
       convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimStr"))
           .collect(Collectors.toList()).get(0);

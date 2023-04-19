@@ -53,7 +53,7 @@ public class BloomIndexTypeTest {
     };
   }
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(BloomFilterConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.bloomFilter()), expected);
@@ -173,6 +173,8 @@ public class BloomIndexTypeTest {
           JsonUtils.stringToObject(confStr, BloomFilterConfig.class);
       _tableConfig.getIndexingConfig().setBloomFilterConfigs(Collections.singletonMap("dimInt", config));
       convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimInt"))
           .collect(Collectors.toList()).get(0);

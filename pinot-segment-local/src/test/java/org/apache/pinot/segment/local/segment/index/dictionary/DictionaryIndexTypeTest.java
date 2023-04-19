@@ -35,7 +35,7 @@ import static org.testng.Assert.*;
 
 public class DictionaryIndexTypeTest {
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(DictionaryIndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.dictionary()), expected);
@@ -77,7 +77,8 @@ public class DictionaryIndexTypeTest {
       assertEquals(DictionaryIndexConfig.DISABLED);
     }
 
-    public void oldRawEncondingType()
+    @Test
+    public void oldRawEncodingType()
         throws IOException {
       _tableConfig.getIndexingConfig().setNoDictionaryConfig(
           JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
@@ -238,6 +239,8 @@ public class DictionaryIndexTypeTest {
               })
       );
       convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimInt"))
           .collect(Collectors.toList()).get(0);

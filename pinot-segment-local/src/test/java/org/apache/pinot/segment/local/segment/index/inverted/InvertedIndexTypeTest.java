@@ -34,7 +34,7 @@ import static org.testng.Assert.*;
 public class InvertedIndexTypeTest {
 
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(IndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.inverted()), expected);
@@ -119,6 +119,8 @@ public class InvertedIndexTypeTest {
       _tableConfig.getIndexingConfig()
           .setInvertedIndexColumns(parseStringList("[\"dimInt\"]"));
       convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimInt"))
           .collect(Collectors.toList()).get(0);

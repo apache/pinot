@@ -48,7 +48,7 @@ public class ForwardIndexTypeTest {
     };
   }
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(ForwardIndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.forward()), expected);
@@ -283,6 +283,8 @@ public class ForwardIndexTypeTest {
           + " }"
       );
       convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimInt"))
           .collect(Collectors.toList()).get(0);
