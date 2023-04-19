@@ -34,6 +34,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 /**
  * TDigest based Percentile aggregation function.
+ *
+ * TODO: Decided not to support custom compression for version 0 queries as it seems to be the older syntax and requires
+ *       extra handling for two argument PERCENTILE functions to assess if v0 or v1. This can be revisited later if the
+ *       need arises
  */
 public class PercentileTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
