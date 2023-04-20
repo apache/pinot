@@ -211,6 +211,7 @@ public class InTransformFunction extends BaseTransformFunction {
             }
             break;
           case UNKNOWN:
+            fillResultUnknown(length);
             break;
           default:
             throw new IllegalStateException();
@@ -278,6 +279,7 @@ public class InTransformFunction extends BaseTransformFunction {
             }
             break;
           case UNKNOWN:
+            fillResultUnknown(length);
             break;
           default:
             throw new IllegalStateException();
@@ -381,6 +383,7 @@ public class InTransformFunction extends BaseTransformFunction {
           }
           break;
         case UNKNOWN:
+          fillResultUnknown(length);
           break;
         default:
           throw new IllegalStateException();

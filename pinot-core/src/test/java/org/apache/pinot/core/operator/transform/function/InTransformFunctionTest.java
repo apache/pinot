@@ -26,6 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.roaringbitmap.RoaringBitmap;
@@ -234,6 +235,17 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     expectedNullBitmap.add((long) 0, (long) NUM_ROWS);
 
     testTransformFunctionWithNull(transformFunction, expectedIntValues, expectedNullBitmap);
+  }
+
+  @Test
+  public void testInTransformFunctionFillsNullWithPlaceholder() {
+    String expressionStr = String.format("%s IN (%s)", "NULL", INT_SV_NULL_COLUMN);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[] expectedIntValues = new int[NUM_ROWS];
+    Arrays.fill(expectedIntValues, (int) DataSchema.ColumnDataType.INT.getNullPlaceholder());
+
+    assertEquals(transformFunction.transformToIntValuesSV(_projectionBlock), expectedIntValues);
   }
 
   @Test
