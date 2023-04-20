@@ -138,7 +138,7 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Get TableConfig metadata", notes = "Get TableConfig metadata")
   public String getFieldSpecMetadata() {
     try {
-      return JsonUtils.objectToString(FieldSpec.fieldSpecMetadata);
+      return JsonUtils.objectToString(FieldSpec.FIELD_SPEC_METADATA);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

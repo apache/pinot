@@ -68,7 +68,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
-  public static final FieldSpecMetadata fieldSpecMetadata = getSpecMetaData();
+  public static final FieldSpecMetadata FIELD_SPEC_METADATA = getSpecMetaData();
 
   protected String _name;
   protected DataType _dataType;
@@ -575,12 +575,20 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    */
   public static FieldSpecMetadata getSpecMetaData() {
     FieldSpecMetadata metadata = new FieldSpecMetadata();
-    for(FieldType fieldType : FieldType.values()) {
+    for (FieldType fieldType : FieldType.values()) {
       FieldTypeMetadata fieldTypeMetadata = new FieldTypeMetadata();
-      for(DataType dataType : DataType.values()) {
+      for (DataType dataType : DataType.values()) {
         try {
-          fieldTypeMetadata.add(new DataTypeMetadata(dataType, getDefaultNullValue(fieldType, dataType, null)));
+          Schema.validate(fieldType, dataType);
+          try {
+            fieldTypeMetadata.add(new DataTypeMetadata(dataType, getDefaultNullValue(fieldType, dataType, null)));
+          } catch (IllegalStateException ignored) {
+            // default null value not defined for the (DataType, FieldType) combination
+            // defaulting to null in such cases
+            fieldTypeMetadata.add(new DataTypeMetadata(dataType, null));
+          }
         } catch (IllegalStateException ignored) {
+          // invalid DataType for the given FieldType
         }
       }
       metadata.put(fieldType, fieldTypeMetadata);
@@ -589,28 +597,28 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public static class FieldSpecMetadata {
-    public Map<FieldType, FieldTypeMetadata> fieldTypes = new HashMap<>();
+    public Map<FieldType, FieldTypeMetadata> _fieldTypes = new HashMap<>();
 
     void put(FieldType type, FieldTypeMetadata metadata) {
-      fieldTypes.put(type, metadata);
+      _fieldTypes.put(type, metadata);
     }
   }
 
   public static class FieldTypeMetadata {
-    public List<DataTypeMetadata> allowedDataTypes = new ArrayList<>();
+    public List<DataTypeMetadata> _allowedDataTypes = new ArrayList<>();
 
-    void add(DataTypeMetadata metadata){
-      allowedDataTypes.add(metadata);
+    void add(DataTypeMetadata metadata) {
+      _allowedDataTypes.add(metadata);
     }
   }
 
   public static class DataTypeMetadata {
-    public FieldSpec.DataType name;
-    public Object nullDefault;
+    public FieldSpec.DataType _name;
+    public Object _nullDefault;
 
     public DataTypeMetadata(DataType name, Object nullDefault) {
-      this.name = name;
-      this.nullDefault = nullDefault;
+      _name = name;
+      _nullDefault = nullDefault;
     }
   }
 }
