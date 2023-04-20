@@ -94,8 +94,7 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
       }
       if (!fieldConfigFound) {
         JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), entry.getValue().toJsonNode());
-        FieldConfig.Builder builder = new FieldConfig.Builder();
-        builder.withName(entry.getKey());
+        FieldConfig.Builder builder = new FieldConfig.Builder(entry.getKey());
         builder.withIndexes(indexes);
         fieldConfigList.add(builder.build());
       }
