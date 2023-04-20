@@ -73,11 +73,11 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
 
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
     Map<String, C> deserialize = getConfig(tableConfig, schema);
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
+        ? new ArrayList<>()
+        : tableConfig.getFieldConfigList();
     for (Map.Entry<String, C> entry : deserialize.entrySet()) {
       boolean fieldConfigFound = false;
-      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
-          ? new ArrayList<>()
-          : tableConfig.getFieldConfigList();
       for (FieldConfig fieldConfig : fieldConfigList) {
         if (fieldConfig.getName().equals(entry.getKey())) {
           fieldConfigFound = true;
@@ -98,8 +98,8 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
         builder.withIndexes(indexes);
         fieldConfigList.add(builder.build());
       }
-      tableConfig.setFieldConfigList(fieldConfigList);
     }
+    tableConfig.setFieldConfigList(fieldConfigList);
     handleIndexSpecificCleanup(tableConfig);
   }
 
