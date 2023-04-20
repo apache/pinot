@@ -24,6 +24,7 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
@@ -103,10 +104,16 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   }
 
   @Override
+  public MultiStageOperator visitSetOp(SetOpNode setOpNode, PlanRequestContext context) {
+    throw new UnsupportedOperationException(
+        "Stage node of type SetOpNode: " + setOpNode.getSetOpType() + " is not supported!");
+  }
+
+  @Override
   public MultiStageOperator visitFilter(FilterNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new FilterOperator(context.getOpChainExecutionContext(),
-        nextOperator, node.getDataSchema(), node.getCondition());
+    return new FilterOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
+        node.getCondition());
   }
 
   @Override

@@ -43,6 +43,7 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
@@ -183,6 +184,11 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   @Override
   public Void visitWindow(WindowNode node, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Window not yet supported!");
+  }
+
+  @Override
+  public Void visitSetOp(SetOpNode setOpNode, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("SetOp not yet supported!");
   }
 
   @Override

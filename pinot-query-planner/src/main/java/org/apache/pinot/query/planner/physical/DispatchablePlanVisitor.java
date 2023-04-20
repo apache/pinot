@@ -25,6 +25,7 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
@@ -79,6 +80,13 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
     // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
     // distributed as no global ordering is required across partitions.
     stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
+    return null;
+  }
+
+  @Override
+  public Void visitSetOp(SetOpNode setOpNode, DispatchablePlanContext context) {
+    setOpNode.getInputs().forEach(input -> input.visit(this, context));
+    getStageMetadata(setOpNode, context);
     return null;
   }
 

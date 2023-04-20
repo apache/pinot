@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
@@ -116,6 +117,15 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   @Override
   public StringBuilder visitWindow(WindowNode node, Context context) {
     return visitSimpleNode(node, context);
+  }
+
+  @Override
+  public StringBuilder visitSetOp(SetOpNode setOpNode, Context context) {
+    appendInfo(setOpNode, context).append('\n');
+    for (StageNode input : setOpNode.getInputs()) {
+      input.visit(this, context.next(false, context._host));
+    }
+    return context._builder;
   }
 
   @Override

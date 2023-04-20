@@ -158,6 +158,9 @@ public class CalciteSqlParser {
         } else {
           tableNames.addAll(extractTableNamesFromNode(right));
         }
+      } else if ((fromNode instanceof SqlBasicCall)
+          && (((SqlBasicCall) fromNode).getOperator() instanceof SqlAsOperator)) {
+        tableNames.addAll(extractTableNamesFromNode(((SqlBasicCall) fromNode).getOperandList().get(0)));
       } else {
         tableNames.addAll(((SqlIdentifier) fromNode).names);
         tableNames.addAll(extractTableNamesFromNode(((SqlSelect) sqlNode).getWhere()));
@@ -178,12 +181,16 @@ public class CalciteSqlParser {
     } else if (sqlNode instanceof SqlWith) {
       List<SqlNode> withList = ((SqlWith) sqlNode).withList;
       Set<String> aliases = new HashSet<>();
-      for (SqlNode withItem: withList) {
+      for (SqlNode withItem : withList) {
         aliases.addAll(((SqlWithItem) withItem).name.names);
         tableNames.addAll(extractTableNamesFromNode(((SqlWithItem) withItem).query));
       }
       tableNames.addAll(extractTableNamesFromNode(((SqlWith) sqlNode).body));
       tableNames.removeAll(aliases);
+    } else if (sqlNode instanceof SqlSetOption) {
+      for (SqlNode node : ((SqlSetOption) sqlNode).getOperandList()) {
+        tableNames.addAll(extractTableNamesFromNode(node));
+      }
     } else if (sqlNode instanceof SqlExplain) {
       SqlExplain explain = (SqlExplain) sqlNode;
       tableNames.addAll(extractTableNamesFromNode(explain.getExplicandum()));
