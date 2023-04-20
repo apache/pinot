@@ -92,7 +92,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       }
       FIELD_SPEC_METADATA.put(fieldType, fieldTypeMetadata);
     }
-    System.out.println(FIELD_SPEC_METADATA);
   }
 
   protected String _name;
