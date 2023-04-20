@@ -22,7 +22,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -96,6 +98,11 @@ public class SegmentPrunerService {
    *                 undefined way. Therefore, this list should not be used after calling this method.
    */
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats) {
+    return prune(segments, query, stats, null);
+  }
+
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats,
+      @Nullable ExecutorService executorService) {
     try (InvocationScope scope = Tracing.getTracer().createScope(SegmentPrunerService.class)) {
       segments = removeInvalidSegments(segments, query, stats);
       int invokedPrunersCount = 0;
@@ -105,7 +112,7 @@ public class SegmentPrunerService {
           try (InvocationScope prunerScope = Tracing.getTracer().createScope(segmentPruner.getClass())) {
             int originalSegmentsSize = segments.size();
             prunerScope.setNumSegments(originalSegmentsSize);
-            segments = segmentPruner.prune(segments, query);
+            segments = segmentPruner.prune(segments, query, executorService);
             _prunerStatsUpdaters.get(segmentPruner).accept(stats, originalSegmentsSize - segments.size());
           }
         }
