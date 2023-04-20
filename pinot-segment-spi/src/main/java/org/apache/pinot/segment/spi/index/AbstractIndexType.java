@@ -43,7 +43,7 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
 
   protected abstract IndexReaderFactory<IR> createReaderFactory();
 
-  protected void handleIndexSpecificCleanup(TableConfig tableConfig){
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
   }
 
   public AbstractIndexType(String id) {
