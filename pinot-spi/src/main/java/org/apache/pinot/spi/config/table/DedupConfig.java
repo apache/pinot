@@ -49,6 +49,11 @@ public class DedupConfig extends BaseJsonConfig {
     return _dedupEnabled;
   }
 
+  /**
+   * Get the specified keystore to use for deduplication.
+   * If unspecified {@link org.apache.pinot.segment.local.dedup.ConcurrentHashMapKeyValueStore} is picked up.
+   * @return the keystore
+   */
   public String getKeyStore() {
     return _keyStore;
   }

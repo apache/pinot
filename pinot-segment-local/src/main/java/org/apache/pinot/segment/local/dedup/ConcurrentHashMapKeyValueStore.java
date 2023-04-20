@@ -19,12 +19,12 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
+import org.apache.pinot.spi.utils.ByteArray;
 
 public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
 
@@ -62,30 +62,5 @@ public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
   @Override
   @VisibleForTesting
   public void compact() {
-  }
-
-  private static final class ByteArray {
-    private final byte[] _bytes;
-
-    public ByteArray(byte[] bytes) {
-      _bytes = bytes;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      ByteArray byteArray = (ByteArray) o;
-      return Arrays.equals(_bytes, byteArray._bytes);
-    }
-
-    @Override
-    public int hashCode() {
-      return Arrays.hashCode(_bytes);
-    }
   }
 }
