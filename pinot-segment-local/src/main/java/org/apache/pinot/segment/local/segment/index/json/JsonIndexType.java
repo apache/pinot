@@ -160,8 +160,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   }
 
   @Override
-  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
-    super.convertToNewFormat(tableConfig, schema);
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     tableConfig.getIndexingConfig().setJsonIndexColumns(null);
     tableConfig.getIndexingConfig().setJsonIndexConfigs(null);
   }

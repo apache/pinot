@@ -141,8 +141,7 @@ public class BloomIndexType
   }
 
   @Override
-  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
-    super.convertToNewFormat(tableConfig, schema);
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     tableConfig.getIndexingConfig().setBloomFilterColumns(null);
     tableConfig.getIndexingConfig().setBloomFilterConfigs(null);
   }

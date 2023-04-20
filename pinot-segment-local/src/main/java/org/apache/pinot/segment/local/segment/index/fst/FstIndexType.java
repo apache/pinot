@@ -175,8 +175,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   @Override
-  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
-    super.convertToNewFormat(tableConfig, schema);
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     tableConfig.getIndexingConfig().setFSTIndexType(null);
   }
 }

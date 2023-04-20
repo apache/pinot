@@ -346,8 +346,7 @@ public class DictionaryIndexType
   }
 
   @Override
-  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
-    super.convertToNewFormat(tableConfig, schema);
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setNoDictionaryConfig(null);
     indexingConfig.setNoDictionaryColumns(null);

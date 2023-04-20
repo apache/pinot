@@ -181,8 +181,7 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   @Override
-  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
-    super.convertToNewFormat(tableConfig, schema);
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     tableConfig.getIndexingConfig().setRangeIndexColumns(null);
   }
 }
