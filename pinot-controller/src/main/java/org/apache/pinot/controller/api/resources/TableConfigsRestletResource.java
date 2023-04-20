@@ -138,22 +138,12 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
       notes = "Get the TableConfigs for a given raw tableName")
   public String getConfig(
-      @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Flag to get the table config in updated format")
-      @QueryParam("updatedFormat") Boolean inUpdatedFormat) {
+      @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName) {
 
     try {
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
-      if (inUpdatedFormat != null && inUpdatedFormat) {
-        if (offlineTableConfig != null) {
-          offlineTableConfig = TableConfigUtils.createTableConfigFromOldFormat(offlineTableConfig, schema);
-        }
-        if (realtimeTableConfig != null) {
-          realtimeTableConfig = TableConfigUtils.createTableConfigFromOldFormat(realtimeTableConfig, schema);
-        }
-      }
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
     } catch (Exception e) {
