@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -76,23 +78,20 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
         ? new ArrayList<>()
         : tableConfig.getFieldConfigList();
+    Map<String, FieldConfig> fieldConfigMap = fieldConfigList.stream()
+        .collect(Collectors.toMap(FieldConfig::getName, Function.identity()));
     for (Map.Entry<String, C> entry : deserialize.entrySet()) {
-      boolean fieldConfigFound = false;
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getName().equals(entry.getKey())) {
-          fieldConfigFound = true;
-          ObjectNode currentIndexes = fieldConfig.getIndexes().isNull()
-              ? new ObjectMapper().createObjectNode()
-              : new ObjectMapper().valueToTree(fieldConfig.getIndexes());
-          JsonNode indexes = currentIndexes.set(getPrettyName(), entry.getValue().toJsonNode());
-          FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
-          builder.withIndexes(indexes);
-          fieldConfigList.remove(fieldConfig);
-          fieldConfigList.add(builder.build());
-          break;
-        }
-      }
-      if (!fieldConfigFound) {
+      FieldConfig fieldConfig = fieldConfigMap.get(entry.getKey());
+      if (fieldConfig != null) {
+        ObjectNode currentIndexes = fieldConfig.getIndexes().isNull()
+            ? new ObjectMapper().createObjectNode()
+            : new ObjectMapper().valueToTree(fieldConfig.getIndexes());
+        JsonNode indexes = currentIndexes.set(getPrettyName(), entry.getValue().toJsonNode());
+        FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
+        builder.withIndexes(indexes);
+        fieldConfigList.remove(fieldConfig);
+        fieldConfigList.add(builder.build());
+      } else {
         JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), entry.getValue().toJsonNode());
         FieldConfig.Builder builder = new FieldConfig.Builder(entry.getKey());
         builder.withIndexes(indexes);
