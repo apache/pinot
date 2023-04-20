@@ -133,8 +133,7 @@ public class TableConfigsRestletResource {
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tableConfigs/metadata")
-  @Authenticate(AccessType.READ)
+  @Path("/tableConfigs/specMetadata")
   @ApiOperation(value = "Get TableConfig metadata", notes = "Get TableConfig metadata")
   public String getFieldSpecMetadata() {
     try {
