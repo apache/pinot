@@ -68,7 +68,32 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
-  public static final FieldSpecMetadata FIELD_SPEC_METADATA = getSpecMetaData();
+  public static final FieldSpecMetadata FIELD_SPEC_METADATA;
+
+  static {
+    // The metadata on the valid list of {@link DataType} for each {@link FieldType}
+    // and the default null values for each combination
+    FIELD_SPEC_METADATA = new FieldSpecMetadata();
+    for (FieldType fieldType : FieldType.values()) {
+      FieldTypeMetadata fieldTypeMetadata = new FieldTypeMetadata();
+      for (DataType dataType : DataType.values()) {
+        try {
+          Schema.validate(fieldType, dataType);
+          try {
+            fieldTypeMetadata.add(new DataTypeMetadata(dataType, getDefaultNullValue(fieldType, dataType, null)));
+          } catch (IllegalStateException ignored) {
+            // default null value not defined for the (DataType, FieldType) combination
+            // defaulting to null in such cases
+            fieldTypeMetadata.add(new DataTypeMetadata(dataType, null));
+          }
+        } catch (IllegalStateException ignored) {
+          // invalid DataType for the given FieldType
+        }
+      }
+      FIELD_SPEC_METADATA.put(fieldType, fieldTypeMetadata);
+    }
+    System.out.println(FIELD_SPEC_METADATA);
+  }
 
   protected String _name;
   protected DataType _dataType;
@@ -567,33 +592,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return EqualityUtils.isEqual(_name, oldFieldSpec._name)
             && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
             && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
-  }
-
-  /**
-   * Returns the metadata on the valid list {@link DataType} for each {@link FieldType}
-   * and the default null values for each combination
-   */
-  public static FieldSpecMetadata getSpecMetaData() {
-    FieldSpecMetadata metadata = new FieldSpecMetadata();
-    for (FieldType fieldType : FieldType.values()) {
-      FieldTypeMetadata fieldTypeMetadata = new FieldTypeMetadata();
-      for (DataType dataType : DataType.values()) {
-        try {
-          Schema.validate(fieldType, dataType);
-          try {
-            fieldTypeMetadata.add(new DataTypeMetadata(dataType, getDefaultNullValue(fieldType, dataType, null)));
-          } catch (IllegalStateException ignored) {
-            // default null value not defined for the (DataType, FieldType) combination
-            // defaulting to null in such cases
-            fieldTypeMetadata.add(new DataTypeMetadata(dataType, null));
-          }
-        } catch (IllegalStateException ignored) {
-          // invalid DataType for the given FieldType
-        }
-      }
-      metadata.put(fieldType, fieldTypeMetadata);
-    }
-    return metadata;
   }
 
   public static class FieldSpecMetadata {
