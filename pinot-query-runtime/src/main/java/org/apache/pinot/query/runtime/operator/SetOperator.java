@@ -18,22 +18,54 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.query.planner.stage.SetOpNode;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
+/**
+ * Set operator, which supports UNION, INTERSECT and EXCEPT.
+ * This has two child operators, and the left child operator is the one that is used to construct the result.
+ * The right child operator is used to construct a set of rows that are used to filter the left child operator.
+ * The right child operator is consumed in a blocking manner, and the left child operator is consumed in a non-blocking
+ * UnionOperator: The right child operator is consumed in a blocking manner.
+ */
 public abstract class SetOperator extends MultiStageOperator {
+  protected final Set<Record> _rightRowSet;
+
   private final List<MultiStageOperator> _upstreamOperators;
+  private final MultiStageOperator _leftChildOperator;
+  private final MultiStageOperator _rightChildOperator;
+
+  private final List<Object[]> _resultRowBlock;
+
+  private final DataSchema _dataSchema;
+  private TransferableBlock _currentLeftBlock;
+  private Iterator<Object[]> _currentLeftIterator;
+
+  private boolean _isRightBlockConsumed;
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
-      DataSchema dataSchema, SetOpNode setOpNode) {
+      DataSchema dataSchema) {
     super(opChainExecutionContext);
+    _dataSchema = dataSchema;
     _upstreamOperators = upstreamOperators;
+    _leftChildOperator = getChildOperators().get(0);
+    _rightChildOperator = getChildOperators().get(1);
+    _rightRowSet = new HashSet<>();
+    _resultRowBlock = new ArrayList<>();
   }
 
   @Override
@@ -60,4 +92,63 @@ public abstract class SetOperator extends MultiStageOperator {
   public ExecutionStatistics getExecutionStatistics() {
     return super.getExecutionStatistics();
   }
+
+  @Override
+  protected TransferableBlock getNextBlock() {
+    // A blocking call to construct a set with all the right side rows.
+    if (!_isRightBlockConsumed) {
+      constructRightBlockSet();
+    }
+    return constructResultBlockSet();
+  }
+
+  protected void constructRightBlockSet() {
+    TransferableBlock block = _rightChildOperator.nextBlock();
+    while (!block.isEndOfStreamBlock()) {
+      if (block.getType() != DataBlock.Type.METADATA) {
+        for (Object[] row : block.getContainer()) {
+          _rightRowSet.add(new Record(row));
+        }
+      }
+      block = _rightChildOperator.nextBlock();
+    }
+    _isRightBlockConsumed = true;
+  }
+
+  protected TransferableBlock constructResultBlockSet() {
+    _resultRowBlock.clear();
+    // First time initialization.
+    if (_currentLeftBlock == null) {
+      _currentLeftBlock = _leftChildOperator.nextBlock();
+    }
+    while (!_currentLeftBlock.isEndOfStreamBlock()) {
+      if (_currentLeftBlock.getType() == DataBlock.Type.METADATA) {
+        _currentLeftBlock = _leftChildOperator.nextBlock();
+        continue;
+      }
+      _currentLeftIterator = _currentLeftBlock.getContainer().iterator();
+      while (_currentLeftIterator.hasNext()) {
+        Object[] row = _currentLeftIterator.next();
+        if (handleRowMatched(row)) {
+          _resultRowBlock.add(row);
+          if (_resultRowBlock.size() == SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY) {
+            return new TransferableBlock(_resultRowBlock, _dataSchema, DataBlock.Type.ROW);
+          }
+        }
+      }
+      _currentLeftBlock = _leftChildOperator.nextBlock();
+    }
+    if (!_resultRowBlock.isEmpty()) {
+      return new TransferableBlock(_resultRowBlock, _dataSchema, DataBlock.Type.ROW);
+    }
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+  }
+
+  /**
+   * Returns true if the row is matched.
+   * Also updates the right row set based on the Operator.
+   * @param row
+   * @return true if the row is matched.
+   */
+  protected abstract boolean handleRowMatched(Object[] row);
 }

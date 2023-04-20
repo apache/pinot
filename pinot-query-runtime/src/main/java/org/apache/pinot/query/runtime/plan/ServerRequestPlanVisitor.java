@@ -186,7 +186,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   @Override
   public Void visitSetOp(SetOpNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    return _aVoid;
+    return null;
   }
 
   @Override

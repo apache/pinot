@@ -36,9 +36,11 @@ import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
+import org.apache.pinot.query.runtime.operator.IntersectOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MinusOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
@@ -116,9 +118,13 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     switch (setOpNode.getSetOpType()) {
       case UNION:
         return new UnionOperator(context.getOpChainExecutionContext(), inputs,
-            setOpNode.getInputs().get(0).getDataSchema(), setOpNode);
+            setOpNode.getInputs().get(0).getDataSchema());
       case INTERSECT:
+        return new IntersectOperator(context.getOpChainExecutionContext(), inputs,
+            setOpNode.getInputs().get(0).getDataSchema());
       case MINUS:
+        return new MinusOperator(context.getOpChainExecutionContext(), inputs,
+            setOpNode.getInputs().get(0).getDataSchema());
       default:
         throw new IllegalStateException();
     }

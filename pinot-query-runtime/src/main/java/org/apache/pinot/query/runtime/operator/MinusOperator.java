@@ -21,18 +21,17 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
 /**
- * Union operator for UNION ALL queries.
+ * Minus/Except operator.
  */
-public class UnionOperator extends SetOperator {
-  private static final String EXPLAIN_NAME = "UNION";
+public class MinusOperator extends SetOperator {
+  private static final String EXPLAIN_NAME = "MINUS";
 
-  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
   }
@@ -44,18 +43,7 @@ public class UnionOperator extends SetOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    for (MultiStageOperator upstreamOperator : getChildOperators()) {
-      TransferableBlock block = upstreamOperator.nextBlock();
-      if (!block.isEndOfStreamBlock()) {
-        return block;
-      }
-    }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-  }
-
-  @Override
   protected boolean handleRowMatched(Object[] row) {
-    throw new UnsupportedOperationException("Union operator does not support row matching");
+    return _rightRowSet.add(new Record(row));
   }
 }

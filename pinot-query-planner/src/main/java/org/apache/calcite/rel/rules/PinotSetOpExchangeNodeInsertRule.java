@@ -18,9 +18,10 @@
  */
 package org.apache.calcite.rel.rules;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
@@ -65,8 +66,10 @@ public class PinotSetOpExchangeNodeInsertRule extends RelOptRule {
   public void onMatch(RelOptRuleCall call) {
     SetOp setOp = call.rel(0);
     List<RelNode> newInputs = new ArrayList<>();
+    List<Integer> hashFields =
+        IntStream.range(0, setOp.getRowType().getFieldCount()).boxed().collect(Collectors.toCollection(ArrayList::new));
     for (RelNode input : setOp.getInputs()) {
-      RelNode exchange = LogicalExchange.create(input, RelDistributions.hash(ImmutableList.of(0)));
+      RelNode exchange = LogicalExchange.create(input, RelDistributions.hash(hashFields));
       newInputs.add(exchange);
     }
     SetOp newSetOpNode;

@@ -59,6 +59,23 @@ public class SortUtils {
       }
     }
 
+    /**
+     * Sort comparator for use with priority queues
+     * @param dataSchema data schema to use
+     */
+    public SortComparator(DataSchema dataSchema) {
+      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+      _size = columnDataTypes.length;
+      _valueIndices = new int[_size];
+      _multipliers = new int[_size];
+      _useDoubleComparison = new boolean[_size];
+      for (int i = 0; i < _size; i++) {
+        _valueIndices[i] = i;
+        _multipliers[i] = 1;
+        _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
+      }
+    }
+
     @Override
     public int compare(Object[] o1, Object[] o2) {
       for (int i = 0; i < _size; i++) {

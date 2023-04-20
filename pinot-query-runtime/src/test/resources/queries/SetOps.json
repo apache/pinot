@@ -39,6 +39,9 @@
       }
     },
     "queries": [
+      { "sql": "SELECT intCol FROM {tbl1} INTERSECT SELECT intCol FROM {tbl1}"},
+      { "sql": "SELECT intCol FROM {tbl1} WHERE floatCol > 2.5 MINUS SELECT intCol FROM {tbl1} WHERE floatCol <2.5 "},
+      { "sql": "SELECT intCol FROM {tbl1} WHERE floatCol > 2.5 EXCEPT SELECT intCol FROM {tbl1} WHERE floatCol <2.5 "},
       { "sql": "SELECT intCol, longCol, doubleCol, strCol FROM {tbl1} UNION ALL SELECT intCol, longCol, doubleCol, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, longCol, doubleCol, strCol FROM {tbl1} WHERE strCol = 'monster' UNION ALL SELECT intCol, longCol, doubleCol, strCol FROM {tbl1} WHERE strCol = 'baby' "},
       { "sql": "SELECT * FROM {tbl2} UNION ALL SELECT * FROM {tbl2}"},
