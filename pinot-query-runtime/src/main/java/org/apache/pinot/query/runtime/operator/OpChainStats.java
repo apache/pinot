@@ -21,12 +21,17 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Suppliers;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
@@ -51,7 +56,7 @@ public class OpChainStats {
   private final AtomicLong _queuedCount = new AtomicLong();
 
   private final String _id;
-  private final ConcurrentHashMap<String, OperatorStats> _operatorStatsMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<OperatorId, OperatorStats> _operatorStatsMap = new ConcurrentHashMap<>();
 
   public OpChainStats(String id) {
     _id = id;
@@ -74,15 +79,34 @@ public class OpChainStats {
     }
   }
 
-  public ConcurrentHashMap<String, OperatorStats> getOperatorStatsMap() {
+  public Map<OperatorId, OperatorStats> getOperatorStatsMap() {
     return _operatorStatsMap;
   }
 
-  public OperatorStats getOperatorStats(OpChainExecutionContext context, String operatorId) {
+  public void initializeStats(OpChainExecutionContext context, MultiStageOperator root) {
+    Queue<MultiStageOperator> queue = new ArrayDeque<>();
+    int level = 0;
+    Map<MultiStageOperator, Integer> levelMap = new HashMap<>();
+    levelMap.put(root, level);
+    queue.add(root);
+    while (!queue.isEmpty()) {
+      MultiStageOperator operator = queue.poll();
+      int currentLevel = levelMap.get(operator);
+      operator.getOperatorId().setOperatorIndex(currentLevel);
+      for (MultiStageOperator child : operator.getChildOperators()) {
+        //TODO: Bug where the same operator on same server should not have same operator id, e.g. two project operators
+        // One solution can be to add hashCode along with operator name
+        levelMap.put(child, currentLevel + 1);
+        queue.add(child);
+      }
+    }
+  }
+
+  public OperatorStats getOperatorStats(OpChainExecutionContext context, OperatorId operatorId) {
       return _operatorStatsMap.computeIfAbsent(operatorId, (id) -> {
         OperatorStats operatorStats = new OperatorStats(context);
         if (context.isTraceEnabled()) {
-          operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), operatorId);
+          operatorStats.recordSingleStat(DataTable.MetadataKey.OPERATOR_ID.getName(), operatorId.toString());
         }
         return operatorStats;
       });

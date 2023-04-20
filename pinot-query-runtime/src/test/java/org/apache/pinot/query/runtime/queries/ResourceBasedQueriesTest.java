@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +41,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -251,6 +253,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         // check stats only for leaf stage
         BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
 
+        Assert.assertEquals(brokerResponseStats.getOperatorStats().keySet(),
+            brokerResponseStats.getOperatorStats().keySet().stream().sorted().collect(
+                Collectors.toCollection(LinkedHashSet::new)));
         if (brokerResponseStats.getTableNames().isEmpty()) {
           continue;
         }
@@ -267,9 +272,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
 
         Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
-        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
-        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
-          if (entry.getKey().contains("LEAF_STAGE")) {
+        Map<OperatorId, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
+        for (Map.Entry<OperatorId, Map<String, String>> entry : operatorStats.entrySet()) {
+          if (entry.getKey().getOperatorName().contains("LEAF_STAGE")) {
             Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
           } else {
             Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));

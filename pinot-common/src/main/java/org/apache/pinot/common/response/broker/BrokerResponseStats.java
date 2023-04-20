@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -49,7 +50,7 @@ public class BrokerResponseStats extends BrokerResponseNative {
   private long _stageExecutionTimeMs = 0;
   private int _stageExecutionUnit = 0;
   private long _stageExecWallTimeMs = -1;
-  private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
+  private Map<OperatorId, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
   @Override
@@ -113,12 +114,12 @@ public class BrokerResponseStats extends BrokerResponseNative {
   }
 
   @JsonProperty("operatorStats")
-  public Map<String, Map<String, String>> getOperatorStats() {
+  public Map<OperatorId, Map<String, String>> getOperatorStats() {
     return _operatorStats;
   }
 
   @JsonProperty("operatorStats")
-  public void setOperatorStats(Map<String, Map<String, String>> operatorStats) {
+  public void setOperatorStats(Map<OperatorId, Map<String, String>> operatorStats) {
     _operatorStats = operatorStats;
   }
 

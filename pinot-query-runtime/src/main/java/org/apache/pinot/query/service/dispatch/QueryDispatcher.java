@@ -41,6 +41,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
@@ -217,9 +218,7 @@ public class QueryDispatcher {
         continue;
       } else if (transferableBlock.isEndOfStreamBlock()) {
         if (executionStatsAggregatorMap != null) {
-          for (Map.Entry<String, OperatorStats> entry : stats.getOperatorStatsMap().entrySet()) {
-            LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
-                OperatorUtils.operatorStatsToJson(entry.getValue()));
+          for (Map.Entry<OperatorId, OperatorStats> entry : stats.getOperatorStatsMap().entrySet()) {
             OperatorStats operatorStats = entry.getValue();
             ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
             ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());

@@ -30,6 +30,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -142,7 +143,7 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
                 _priorityQueue.addAll(container);
               } else {
                 if (_opChainStats != null && !block.getResultMetadata().isEmpty()) {
-                  for (Map.Entry<String, OperatorStats> entry : block.getResultMetadata().entrySet()) {
+                  for (Map.Entry<OperatorId, OperatorStats> entry : block.getResultMetadata().entrySet()) {
                     _opChainStats.getOperatorStatsMap().compute(entry.getKey(), (_key, _value) -> entry.getValue());
                   }
                 }

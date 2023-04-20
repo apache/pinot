@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
@@ -110,11 +111,11 @@ public class OperatorUtils {
     return null;
   }
 
-  public static Map<String, OperatorStats> getOperatorStatsFromMetadata(MetadataBlock metadataBlock) {
-    Map<String, OperatorStats> operatorStatsMap = new HashMap<>();
+  public static Map<OperatorId, OperatorStats> getOperatorStatsFromMetadata(MetadataBlock metadataBlock) {
+    Map<OperatorId, OperatorStats> operatorStatsMap = new HashMap<>();
     for (Map.Entry<String, String> entry : metadataBlock.getStats().entrySet()) {
       try {
-        operatorStatsMap.put(entry.getKey(), operatorStatsFromJson(entry.getValue()));
+        operatorStatsMap.put(OperatorId.fromString(entry.getKey()), operatorStatsFromJson(entry.getValue()));
       } catch (Exception e) {
         LOGGER.warn("Error occurred while fetching operator stats from metadata", e);
       }
@@ -122,11 +123,11 @@ public class OperatorUtils {
     return operatorStatsMap;
   }
 
-  public static Map<String, String> getMetadataFromOperatorStats(Map<String, OperatorStats> operatorStatsMap) {
+  public static Map<String, String> getMetadataFromOperatorStats(Map<OperatorId, OperatorStats> operatorStatsMap) {
     Map<String, String> metadataStats = new HashMap<>();
-    for (Map.Entry<String, OperatorStats> entry : operatorStatsMap.entrySet()) {
+    for (Map.Entry<OperatorId, OperatorStats> entry : operatorStatsMap.entrySet()) {
       try {
-        metadataStats.put(entry.getKey(), operatorStatsToJson(entry.getValue()));
+        metadataStats.put(entry.getKey().toString(), operatorStatsToJson(entry.getValue()));
       } catch (Exception e) {
         LOGGER.warn("Error occurred while fetching metadata from operator stats", e);
       }

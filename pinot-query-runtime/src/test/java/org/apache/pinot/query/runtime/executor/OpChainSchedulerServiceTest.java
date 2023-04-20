@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
@@ -66,6 +67,8 @@ public class OpChainSchedulerServiceTest {
     _scheduler = Mockito.mock(OpChainScheduler.class);
     clearInvocations(_scheduler);
     clearInvocations(_operatorA);
+
+    Mockito.when(_operatorA.getOperatorId()).thenReturn(new OperatorId(1L, 1, "", "operatorA", 0));
   }
 
   private void initExecutor(int numThreads) {

@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.collect.ImmutableList;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.request.OperatorId;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -27,6 +28,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -62,6 +64,7 @@ public class RoundRobinSchedulerTest {
   @BeforeClass
   public void beforeClass() {
     _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_operator.getOperatorId()).thenReturn(new OperatorId(1L, 1, "", "operator", 0));
   }
 
   @AfterClass

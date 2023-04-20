@@ -164,8 +164,7 @@ public class QueryRunner {
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
-    boolean isTraceEnabled =
-        Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
+    boolean isTraceEnabled = isTraceFlagSet(requestMetadataMap);
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     if (isLeafStage(distributedStagePlan)) {
       runLeafStage(distributedStagePlan, requestMetadataMap, deadlineMs, requestId);
@@ -198,8 +197,7 @@ public class QueryRunner {
     // server executor.
     MailboxSendOperator mailboxSendOperator = null;
     try {
-      boolean isTraceEnabled =
-          Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
+      boolean isTraceEnabled = isTraceFlagSet(requestMetadataMap);
       long leafStageStartMillis = System.currentTimeMillis();
       List<ServerPlanRequestContext> serverQueryRequests =
           constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService,
@@ -221,10 +219,12 @@ public class QueryRunner {
               deadlineMs, distributedStagePlan.getMetadataMap(), isTraceEnabled);
       MultiStageOperator leafStageOperator =
           new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
+      leafStageOperator.getOperatorId().setOperatorIndex(1);
       mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext, leafStageOperator,
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(),
           sendNode.getCollationDirections(), sendNode.isSortOnSender(), sendNode.getStageId(),
           sendNode.getReceiverStageId());
+      mailboxSendOperator.getOperatorId().setOperatorIndex(0);
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
@@ -236,6 +236,10 @@ public class QueryRunner {
         mailboxSendOperator.cancel(e);
       }
     }
+  }
+
+  private boolean isTraceFlagSet(Map<String, String> requestMetadataMap) {
+    return Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
   }
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
