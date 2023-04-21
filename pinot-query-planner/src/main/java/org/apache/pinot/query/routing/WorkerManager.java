@@ -99,11 +99,12 @@ public class WorkerManager {
               "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
         }
       }
-      stageMetadata.setServerInstances(new ArrayList<>(
-          serverInstanceToSegmentsMap.keySet()
-              .stream()
-              .map(server -> new VirtualServer(server, 0)) // the leaf stage only has one server, so always use 0 here
-              .collect(Collectors.toList())));
+      int globalIdx = 0;
+      List<VirtualServer> serverInstanceList = new ArrayList<>();
+      for (ServerInstance serverInstance : serverInstanceToSegmentsMap.keySet()) {
+        serverInstanceList.add(new VirtualServer(serverInstance, globalIdx++));
+      }
+      stageMetadata.setServerInstances(serverInstanceList);
       stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);
     } else if (PlannerUtils.isRootStage(stageId)) {
       // --- ROOT STAGE / BROKER REDUCE STAGE ---
@@ -136,30 +137,27 @@ public class WorkerManager {
       boolean requiresSingletonInstance, Map<String, String> options) {
     int stageParallelism = Integer.parseInt(
         options.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.STAGE_PARALLELISM, "1"));
-
-    List<VirtualServer> serverInstances = new ArrayList<>();
-    int idx = 0;
-    int matchingIdx = -1;
+    List<ServerInstance> serverInstances = new ArrayList<>(servers);
+    List<VirtualServer> virtualServerList = new ArrayList<>();
     if (requiresSingletonInstance) {
-      matchingIdx = RANDOM.nextInt(servers.size());
-    }
-    for (ServerInstance server : servers) {
-      if (matchingIdx == -1 || idx == matchingIdx) {
+      // require singleton should return a single global worker ID with 0;
+      ServerInstance serverInstance = serverInstances.get(RANDOM.nextInt(serverInstances.size()));
+      virtualServerList.add(new VirtualServer(serverInstance, 0));
+    } else {
+      int globalIdx = 0;
+      for (ServerInstance server : servers) {
         String hostname = server.getHostname();
         if (server.getQueryServicePort() > 0 && server.getQueryMailboxPort() > 0
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
             && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
           for (int virtualId = 0; virtualId < stageParallelism; virtualId++) {
-            if (matchingIdx == -1 || virtualId == 0) {
-              serverInstances.add(new VirtualServer(server, virtualId));
+              virtualServerList.add(new VirtualServer(server, globalIdx++));
             }
           }
         }
-      }
-      idx++;
     }
-    return serverInstances;
+    return virtualServerList;
   }
 
   /**

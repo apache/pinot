@@ -39,7 +39,7 @@ public class RoundRobinSchedulerTest {
   private static final int DEFAULT_SENDER_STAGE_ID = 0;
   private static final int DEFAULT_RECEIVER_STAGE_ID = 1;
   private static final int DEFAULT_VIRTUAL_SERVER_ID = 1;
-  private static final int DEFAULT_POLL_TIMEOUT_MS = 0;
+  private static final int DEFAULT_POLL_TIMEOUT_MS = 1;
   private static final int DEFAULT_RELEASE_TIMEOUT_MS = 10;
   private static final long DEFAULT_REQUEST_ID = 123;
   private static final String DEFAULT_SENDER_SERIALIZED = "0@foo:2";
