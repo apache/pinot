@@ -168,7 +168,7 @@ public class QueryRunner {
         Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     if (isLeafStage(distributedStagePlan)) {
-      runLeafStage(distributedStagePlan, requestMetadataMap, deadlineMs, requestId);
+      runLeafStage(distributedStagePlan, requestMetadataMap, timeoutMs, deadlineMs, requestId);
     } else {
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
@@ -192,7 +192,7 @@ public class QueryRunner {
   }
 
   private void runLeafStage(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap,
-      long deadlineMs, long requestId) {
+      long timeoutMs, long deadlineMs, long requestId) {
     // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
     // and package it here for return. But we should really use a MailboxSendOperator directly put into the
     // server executor.
@@ -217,8 +217,9 @@ public class QueryRunner {
               + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       OpChainExecutionContext opChainExecutionContext =
-          new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(), _rootServer, deadlineMs,
-              deadlineMs, distributedStagePlan.getMetadataMap(), isTraceEnabled);
+          new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(),
+              new VirtualServerAddress(distributedStagePlan.getServer()), timeoutMs, deadlineMs,
+              distributedStagePlan.getMetadataMap(), isTraceEnabled);
       MultiStageOperator leafStageOperator =
           new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
       mailboxSendOperator = new MailboxSendOperator(opChainExecutionContext, leafStageOperator,
