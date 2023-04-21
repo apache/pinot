@@ -48,6 +48,9 @@ public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
   public void put(byte[] key, byte[] value) {
     _map.put(new ByteArray(key), value);
   }
+  public byte[] putIfAbsent(byte[] key, byte[] value) {
+    return _map.putIfAbsent(new ByteArray(key), value);
+  }
 
   @Override
   public void putBatch(List<Pair<byte[], byte[]>> keyValues) {

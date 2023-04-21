@@ -147,12 +147,11 @@ public class PartitionDedupMetadataManager {
 
   public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
     byte[] keyBytes = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _dedupConfig.getHashFunction()));
-    if (Objects.isNull(_keyValueStore.get(keyBytes))) {
-        _keyValueStore.put(keyBytes, serializeSegment(indexSegment));
+    boolean present = _keyValueStore.putIfAbsent(keyBytes, serializeSegment(indexSegment)) != null;
+    if (!present) {
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
           _keyValueStore.getKeyCount());
-      return false;
     }
-    return true;
+    return present;
   }
 }
