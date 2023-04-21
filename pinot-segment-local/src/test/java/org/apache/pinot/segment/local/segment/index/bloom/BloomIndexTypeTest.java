@@ -23,9 +23,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -51,7 +53,7 @@ public class BloomIndexTypeTest {
     };
   }
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(BloomFilterConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.bloomFilter()), expected);
@@ -159,6 +161,26 @@ public class BloomIndexTypeTest {
           + "}");
 
       assertEquals(config);
+    }
+
+    @Test(dataProvider = "allConfigs", dataProviderClass = BloomIndexTypeTest.class)
+    public void oldToNewConfConversion(String confStr)
+        throws IOException {
+      _tableConfig.getIndexingConfig().setBloomFilterColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
+      );
+      BloomFilterConfig config =
+          JsonUtils.stringToObject(confStr, BloomFilterConfig.class);
+      _tableConfig.getIndexingConfig().setBloomFilterConfigs(Collections.singletonMap("dimInt", config));
+      convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
+      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .collect(Collectors.toList()).get(0);
+      assertNotNull(fieldConfig.getIndexes().get(BloomIndexType.INDEX_DISPLAY_NAME));
+      assertNull(_tableConfig.getIndexingConfig().getBloomFilterColumns());
+      assertNull(_tableConfig.getIndexingConfig().getBloomFilterConfigs());
     }
   }
 

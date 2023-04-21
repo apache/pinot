@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.Schema;
 public class BloomIndexType
     extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>
     implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
+  public static final String INDEX_DISPLAY_NAME = "bloom";
 
   protected BloomIndexType() {
     super(StandardIndexes.BLOOM_FILTER_ID);
@@ -71,8 +72,13 @@ public class BloomIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("bloom", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(
             IndexConfigDeserializer.ifIndexingConfig(// reads tableConfig.indexingConfig.bloomFilterConfigs
                 IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())
@@ -132,5 +138,11 @@ public class BloomIndexType
         BloomFilterConfig indexConfig) {
       return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
     }
+  }
+
+  @Override
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+    tableConfig.getIndexingConfig().setBloomFilterColumns(null);
+    tableConfig.getIndexingConfig().setBloomFilterConfigs(null);
   }
 }

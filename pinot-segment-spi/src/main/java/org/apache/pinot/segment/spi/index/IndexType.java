@@ -61,6 +61,8 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
 
   Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
 
+  String getPrettyName();
+
   /**
    * Returns the {@link IndexCreator} that can should be used to create an index of this type with the given context
    * and configuration.
@@ -93,4 +95,14 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
 
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig);
+
+  /**
+   * This method is used to perform in place conversion of provided {@link TableConfig} to newer format
+   * related to the IndexType that implements it.
+   *
+   * {@link AbstractIndexType#convertToNewFormat(TableConfig, Schema)} ensures all the index information from old format
+   * is made available in the new format while it depends on the individual index types to handle the data cleanup from
+   * old format.
+   */
+  void convertToNewFormat(TableConfig tableConfig, Schema schema);
 }

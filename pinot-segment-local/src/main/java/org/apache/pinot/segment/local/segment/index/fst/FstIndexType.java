@@ -60,6 +60,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "fst";
 
   protected FstIndexType() {
     super(StandardIndexes.FST_ID);
@@ -91,8 +92,13 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<FstIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("fst", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.FST,
             (tableConfig, fieldConfig) -> {
@@ -166,5 +172,10 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }
+  }
+
+  @Override
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+    tableConfig.getIndexingConfig().setFSTIndexType(null);
   }
 }

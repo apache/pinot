@@ -56,6 +56,7 @@ import org.apache.pinot.spi.data.Schema;
 public class ForwardIndexType
     extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "forward";
 
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
@@ -126,6 +127,11 @@ public class ForwardIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
     ColumnConfigDeserializer<ForwardIndexConfig> fromFieldConfig = IndexConfigDeserializer.fromCollection(
@@ -144,7 +150,7 @@ public class ForwardIndexType
           // the default `fromIndexes` deserializer.
         }
     );
-    return IndexConfigDeserializer.fromIndexes("forward", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(fromFieldConfig);
   }
 

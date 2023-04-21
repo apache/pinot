@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -158,5 +159,77 @@ public class FieldConfig extends BaseJsonConfig {
   @Nullable
   public Map<String, String> getProperties() {
     return _properties;
+  }
+
+  public static class Builder {
+    @Nonnull
+    private String _name;
+    private EncodingType _encodingType;
+    private List<IndexType> _indexTypes;
+    private JsonNode _indexes;
+    private CompressionCodec _compressionCodec;
+    private Map<String, String> _properties;
+    private TimestampConfig _timestampConfig;
+    private JsonNode _tierOverwrites;
+
+    public Builder(@Nonnull String name) {
+      _name = name;
+    }
+
+    public Builder(FieldConfig other) {
+      _name = other._name;
+      _encodingType = other._encodingType;
+      _indexTypes = other._indexTypes;
+      _indexes = other._indexes;
+      _compressionCodec = other._compressionCodec;
+      _properties = other._properties;
+      _timestampConfig = other._timestampConfig;
+      _tierOverwrites = other._tierOverwrites;
+    }
+
+    public Builder withIndexes(JsonNode indexes) {
+      _indexes = indexes;
+      return this;
+    }
+
+    public Builder withName(String name) {
+      _name = name;
+      return this;
+    }
+
+    public Builder withEncodingType(EncodingType encodingType) {
+      _encodingType = encodingType;
+      return this;
+    }
+
+    public Builder withIndexTypes(List<IndexType> indexTypes) {
+      _indexTypes = indexTypes;
+      return this;
+    }
+
+    public Builder withCompressionCodec(CompressionCodec compressionCodec) {
+      _compressionCodec = compressionCodec;
+      return this;
+    }
+
+    public Builder withProperties(Map<String, String> properties) {
+      _properties = properties;
+      return this;
+    }
+
+    public Builder withTimestampConfig(TimestampConfig timestampConfig) {
+      _timestampConfig = timestampConfig;
+      return this;
+    }
+
+    public Builder withTierOverwrites(JsonNode tierOverwrites) {
+      _tierOverwrites = tierOverwrites;
+      return this;
+    }
+
+    public FieldConfig build() {
+      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig,
+          _indexes, _properties, _tierOverwrites);
+    }
   }
 }

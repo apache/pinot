@@ -111,6 +111,11 @@ public class DictionaryIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return getId();
+  }
+
+  @Override
   public ColumnConfigDeserializer<DictionaryIndexConfig> createDeserializer() {
     // reads tableConfig.indexingConfig.noDictionaryConfig
     ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictConf = IndexConfigDeserializer.fromMap(
@@ -155,7 +160,7 @@ public class DictionaryIndexType
         .withFallbackAlternative(fromNoDictCol)
         .withFallbackAlternative(fromFieldConfigList)
         .withFallbackAlternative(fromIndexingConfig)
-        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass()));
+        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()));
   }
 
   @Override
@@ -338,5 +343,14 @@ public class DictionaryIndexType
           throws IOException, IndexReaderConstraintException {
       return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
     }
+  }
+
+  @Override
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setNoDictionaryConfig(null);
+    indexingConfig.setNoDictionaryColumns(null);
+    indexingConfig.setOnHeapDictionaryColumns(null);
+    indexingConfig.setVarLengthDictionaryColumns(null);
   }
 }

@@ -65,6 +65,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     implements ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
   protected static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
 
+  public static final String INDEX_DISPLAY_NAME = "text";
+
   protected TextIndexType() {
     super(StandardIndexes.TEXT_ID);
   }
@@ -91,8 +93,13 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<TextIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("text", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
           if (fieldConfigList == null) {

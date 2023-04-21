@@ -19,8 +19,16 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -36,6 +44,9 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
   protected abstract ColumnConfigDeserializer<C> createDeserializer();
 
   protected abstract IndexReaderFactory<IR> createReaderFactory();
+
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+  }
 
   public AbstractIndexType(String id) {
     _id = id;
@@ -60,6 +71,35 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
       _readerFactory = createReaderFactory();
     }
     return _readerFactory;
+  }
+
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+    Map<String, C> deserialize = getConfig(tableConfig, schema);
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
+        ? new ArrayList<>()
+        : tableConfig.getFieldConfigList();
+    Map<String, FieldConfig> fieldConfigMap = fieldConfigList.stream()
+        .collect(Collectors.toMap(FieldConfig::getName, Function.identity()));
+    for (Map.Entry<String, C> entry : deserialize.entrySet()) {
+      FieldConfig fieldConfig = fieldConfigMap.get(entry.getKey());
+      if (fieldConfig != null) {
+        ObjectNode currentIndexes = fieldConfig.getIndexes().isNull()
+            ? new ObjectMapper().createObjectNode()
+            : new ObjectMapper().valueToTree(fieldConfig.getIndexes());
+        JsonNode indexes = currentIndexes.set(getPrettyName(), entry.getValue().toJsonNode());
+        FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
+        builder.withIndexes(indexes);
+        fieldConfigList.remove(fieldConfig);
+        fieldConfigList.add(builder.build());
+      } else {
+        JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), entry.getValue().toJsonNode());
+        FieldConfig.Builder builder = new FieldConfig.Builder(entry.getKey());
+        builder.withIndexes(indexes);
+        fieldConfigList.add(builder.build());
+      }
+    }
+    tableConfig.setFieldConfigList(fieldConfigList);
+    handleIndexSpecificCleanup(tableConfig);
   }
 
   @Override
