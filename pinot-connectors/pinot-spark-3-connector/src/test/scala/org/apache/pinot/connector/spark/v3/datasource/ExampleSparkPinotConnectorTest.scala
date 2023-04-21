@@ -36,28 +36,31 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .master("local")
       .getOrCreate()
 
-    readOffline()
-    readHybrid()
-    readHybridWithSpecificSchema()
-    readHybridWithFilters()
-    readHybridViaGrpc()
-    readRealtimeViaGrpc()
-    readRealtimeWithFilterViaGrpc()
-    readHybridWithFiltersViaGrpc()
-    readRealtimeWithSelectionColumns()
-    applyJustSomeFilters()
+//    readOffline()
+//    readHybrid()
+//    readHybridWithSpecificSchema()
+//    readHybridWithFilters()
+//    readHybridViaGrpc()
+//    readRealtimeViaGrpc()
+//    readRealtimeWithFilterViaGrpc()
+//    readHybridWithFiltersViaGrpc()
+//    readRealtimeWithSelectionColumns()
+//    applyJustSomeFilters()
   }
 
-  def readOffline()(implicit spark: SparkSession): Unit = {
-    log.info("## Reading `airlineStats_OFFLINE` table... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "offline")
-      .load()
-
-    data.show()
-  }
+//  def readOffline()(implicit spark: SparkSession): Unit = {
+//    import spark.implicits._
+//    log.info("## Reading `airlineStats_OFFLINE` table... ##")
+//    val data = spark.read
+//      .format("pinot")
+//      .option("table", "airlineStats")
+//      .option("tableType", "offline")
+//      .load()
+//      .filter($ "DestStateName" === "Florida")
+//      .select($"FlightNum", $"Origin", $"DestStateName")
+//
+//    data.show()
+//  }
 
   def readHybrid()(implicit spark: SparkSession): Unit = {
     log.info("## Reading `airlineStats_OFFLINE and airlineStats_REALTIME` tables... ##")

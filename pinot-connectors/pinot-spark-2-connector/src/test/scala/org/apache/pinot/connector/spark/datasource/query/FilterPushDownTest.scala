@@ -61,15 +61,22 @@ class FilterPushDownTest extends BaseTest {
   test("SQL query should be created from spark filters") {
     val whereClause = FilterPushDown.compileFiltersToSqlWhereClause(filters)
     val expectedOutput =
-      s"(attr1 = 1) AND (attr2 IN ('1', '2', '''5''')) AND (attr3 < 1) AND (attr4 <= 3) AND (attr5 > 10) AND " +
-        s"(attr6 >= 15) AND (NOT (attr7 = '1')) AND ((attr8 < 10) AND (attr9 <= 3)) AND " +
-        s"((attr10 = 'hello') OR (attr11 >= 13)) AND (attr12 LIKE '%pinot%') AND (attr13 IN (10, 20)) AND " +
-        s"(NOT (attr20 != '123' OR attr20 IS NULL OR '123' IS NULL) OR (attr20 IS NULL AND '123' IS NULL)) AND " +
-        s"(attr14 IS NULL) AND (attr15 IS NOT NULL) AND (attr16 LIKE 'pinot1%') AND (attr17 LIKE '%pinot2') AND " +
-        s"(attr18 = '2020-01-01 00:00:15.0') AND (attr19 < '2020-01-01') AND (attr21 = List(1, 2)) AND " +
-        s"(attr22 = 10.5)"
+      s"""("attr1" = 1) AND ("attr2" IN ('1', '2', '''5''')) AND ("attr3" < 1) AND ("attr4" <= 3) AND ("attr5" > 10) AND """ +
+        s"""("attr6" >= 15) AND (NOT ("attr7" = '1')) AND (("attr8" < 10) AND ("attr9" <= 3)) AND """ +
+        s"""(("attr10" = 'hello') OR ("attr11" >= 13)) AND ("attr12" LIKE '%pinot%') AND ("attr13" IN (10, 20)) AND """ +
+        s"""(NOT ("attr20" != '123' OR "attr20" IS NULL OR '123' IS NULL) OR ("attr20" IS NULL AND '123' IS NULL)) AND """ +
+        s"""("attr14" IS NULL) AND ("attr15" IS NOT NULL) AND ("attr16" LIKE 'pinot1%') AND ("attr17" LIKE '%pinot2') AND """ +
+        s"""("attr18" = '2020-01-01 00:00:15.0') AND ("attr19" < '2020-01-01') AND ("attr21" = List(1, 2)) AND """ +
+        s"""("attr22" = 10.5)"""
 
     whereClause.get shouldEqual expectedOutput
   }
 
+  test("Shouldn't escape column names which are already escaped") {
+    val whereClause = FilterPushDown.compileFiltersToSqlWhereClause(
+      Array(EqualTo("\"some\".\"nested\".\"column\"", 1)))
+    val expectedOutput = "(\"some\".\"nested\".\"column\" = 1)"
+
+    whereClause.get shouldEqual expectedOutput
+  }
 }
