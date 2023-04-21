@@ -121,11 +121,10 @@
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
-      {
-        "ignored": true,
-        "comment": "fails with IllegalStateException... not sure why!",
-        "sql": "SELECT * FROM {tbl} WHERE i1 >= i2"
-      }
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 <= i2" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 <> i2 and i2 <> i1" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 <> i2 and i2 <> i1 and (i1 != i2 or i2 != i1)" }
     ]
   },
   "strings_comp": {
