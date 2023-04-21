@@ -23,9 +23,9 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
