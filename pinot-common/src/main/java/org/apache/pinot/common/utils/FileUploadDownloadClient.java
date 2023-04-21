@@ -1075,7 +1075,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
     String jsonBody = (endReplaceSegmentsRequest == null) ? null
-        : JsonUtils.objectToString(endReplaceSegmentsRequest.getSegmentsTo());
+        : JsonUtils.objectToString(endReplaceSegmentsRequest);
     return HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, jsonBody, socketTimeoutMs, authProvider)));
   }
