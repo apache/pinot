@@ -87,7 +87,7 @@ private[pinot] object FilterPushDown {
 
   private def compileFilter(filter: Filter): Option[String] = {
     val whereCondition = filter match {
-      case EqualTo(attr, value) =>    s"${escapeAttr(attr)} = ${compileValue(value)}"
+      case EqualTo(attr, value) => s"${escapeAttr(attr)} = ${compileValue(value)}"
       case EqualNullSafe(attr, value) =>
         s"NOT (${escapeAttr(attr)} != ${compileValue(value)} OR ${escapeAttr(attr)} IS NULL OR " +
           s"${compileValue(value)} IS NULL) OR " +
