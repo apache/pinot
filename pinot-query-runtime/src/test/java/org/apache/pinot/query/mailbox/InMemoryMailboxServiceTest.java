@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -49,7 +50,10 @@ public class InMemoryMailboxServiceTest {
   public void testHappyPath()
       throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
-    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
+    AtomicInteger timesCallbackCalled = new AtomicInteger(0);
+    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> {
+      timesCallbackCalled.incrementAndGet();
+    });
     InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
         MAILBOX_ID);
     InMemorySendingMailbox sendingMailbox =
@@ -60,6 +64,8 @@ public class InMemoryMailboxServiceTest {
       sendingMailbox.send(getTestTransferableBlock(i, i + 1 == NUM_ENTRIES));
     }
     sendingMailbox.complete();
+    // The callback should be called for each send and complete call
+    Assert.assertEquals(NUM_ENTRIES + 1, timesCallbackCalled.get());
 
     // Iterate 1 less time than the loop above
     for (int i = 0; i + 1 < NUM_ENTRIES; i++) {
@@ -141,7 +147,10 @@ public class InMemoryMailboxServiceTest {
   public void testInMemoryStreamCancellationBySender()
       throws Exception {
     long deadlineMs = System.currentTimeMillis() + 10_000;
-    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
+    AtomicInteger timesCallbackCalled = new AtomicInteger(0);
+    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> {
+      timesCallbackCalled.incrementAndGet();
+    });
 
     SendingMailbox<TransferableBlock> sendingMailbox = mailboxService.getSendingMailbox(MAILBOX_ID, deadlineMs);
     ReceivingMailbox<TransferableBlock> receivingMailbox = mailboxService.getReceivingMailbox(MAILBOX_ID);
@@ -154,6 +163,8 @@ public class InMemoryMailboxServiceTest {
 
     sendingMailbox.cancel(new RuntimeException("foo"));
 
+    // If the sender cancels the stream, the receiver should get a callback
+    Assert.assertEquals(2, timesCallbackCalled.get());
     // After the stream is cancelled, receiver will get error-blocks
     receivedBlock = receivingMailbox.receive();
     Assert.assertNotNull(receivedBlock);
