@@ -213,9 +213,9 @@ private[pinot] object PinotClusterClient extends Logging {
 
 private[pinot] case class TimeBoundaryInfo(timeColumn: String, timeValue: String) {
 
-  def getOfflinePredicate: String = s"$timeColumn < $timeValue"
+  def getOfflinePredicate: String = s""""$timeColumn" < $timeValue"""
 
-  def getRealtimePredicate: String = s"$timeColumn >= $timeValue"
+  def getRealtimePredicate: String = s""""$timeColumn" >= $timeValue"""
 }
 
 private[pinot] case class InstanceInfo(instanceName: String,

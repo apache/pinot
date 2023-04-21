@@ -11,7 +11,7 @@
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * "AS Is""" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
@@ -25,19 +25,19 @@ import org.apache.pinot.spi.config.table.TableType
  * Test SQL query generation from spark push down filters, selection columns etc.
  */
 class ScanQueryGeneratorTest extends BaseTest {
-  private val columns = Array("c1, c2")
+  private val columns = Array("c1","c2")
   private val tableName = "tbl"
   private val tableType = Some(TableType.OFFLINE)
   private val whereClause = Some("c1 = 5 OR c2 = 'hello'")
-  private val limit = s"LIMIT ${Int.MaxValue}"
+  private val limit = s"""LIMIT ${Int.MaxValue}"""
 
   test("Queries should be created with given filters") {
     val pinotQueries =
       ScanQueryGenerator.generate(tableName, tableType, None, columns, whereClause, Set())
     val expectedRealtimeQuery =
-      s"SELECT c1, c2 FROM ${tableName}_REALTIME WHERE ${whereClause.get} $limit"
+      s"""SELECT "c1","c2" FROM ${tableName}_REALTIME WHERE ${whereClause.get} $limit"""
     val expectedOfflineQuery =
-      s"SELECT c1, c2 FROM ${tableName}_OFFLINE WHERE ${whereClause.get} $limit"
+      s"""SELECT "c1","c2" FROM ${tableName}_OFFLINE WHERE ${whereClause.get} $limit"""
 
     pinotQueries.realtimeSelectQuery shouldEqual expectedRealtimeQuery
     pinotQueries.offlineSelectQuery shouldEqual expectedOfflineQuery
@@ -48,12 +48,12 @@ class ScanQueryGeneratorTest extends BaseTest {
     val pinotQueries = ScanQueryGenerator
       .generate(tableName, tableType, Some(timeBoundaryInfo), columns, whereClause, Set())
 
-    val realtimeWhereClause = s"${whereClause.get} AND timeCol >= 12345"
-    val offlineWhereClause = s"${whereClause.get} AND timeCol < 12345"
+    val realtimeWhereClause = s"""${whereClause.get} AND "timeCol" >= 12345"""
+    val offlineWhereClause = s"""${whereClause.get} AND "timeCol" < 12345"""
     val expectedRealtimeQuery =
-      s"SELECT c1, c2 FROM ${tableName}_REALTIME WHERE $realtimeWhereClause $limit"
+      s"""SELECT "c1","c2" FROM ${tableName}_REALTIME WHERE $realtimeWhereClause $limit"""
     val expectedOfflineQuery =
-      s"SELECT c1, c2 FROM ${tableName}_OFFLINE WHERE $offlineWhereClause $limit"
+      s"""SELECT "c1","c2" FROM ${tableName}_OFFLINE WHERE $offlineWhereClause $limit"""
 
     pinotQueries.realtimeSelectQuery shouldEqual expectedRealtimeQuery
     pinotQueries.offlineSelectQuery shouldEqual expectedOfflineQuery
@@ -64,12 +64,12 @@ class ScanQueryGeneratorTest extends BaseTest {
     val pinotQueries = ScanQueryGenerator
       .generate(tableName, tableType, Some(timeBoundaryInfo), columns, None, Set())
 
-    val realtimeWhereClause = s"timeCol >= 12345"
-    val offlineWhereClause = s"timeCol < 12345"
+    val realtimeWhereClause = s""""timeCol" >= 12345"""
+    val offlineWhereClause = s""""timeCol" < 12345"""
     val expectedRealtimeQuery =
-      s"SELECT c1, c2 FROM ${tableName}_REALTIME WHERE $realtimeWhereClause $limit"
+      s"""SELECT "c1","c2" FROM ${tableName}_REALTIME WHERE $realtimeWhereClause $limit"""
     val expectedOfflineQuery =
-      s"SELECT c1, c2 FROM ${tableName}_OFFLINE WHERE $offlineWhereClause $limit"
+      s"""SELECT "c1","c2" FROM ${tableName}_OFFLINE WHERE $offlineWhereClause $limit"""
 
     pinotQueries.realtimeSelectQuery shouldEqual expectedRealtimeQuery
     pinotQueries.offlineSelectQuery shouldEqual expectedOfflineQuery
