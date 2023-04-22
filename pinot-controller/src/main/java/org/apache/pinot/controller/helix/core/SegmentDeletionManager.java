@@ -37,7 +37,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -85,7 +84,7 @@ public class SegmentDeletionManager {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
 
-  private static class SegmentDeletionEventDetails implements SegmentLifecycleEventDetails {
+  public static class SegmentDeletionEventDetails implements SegmentLifecycleEventDetails {
     private final List<String> _segmentsDeleted;
     private final String _tableName;
 
@@ -136,7 +135,8 @@ public class SegmentDeletionManager {
     deleteSegments(tableName, segmentIds, (Long) null);
   }
 
-  public void deleteSegments(String tableName, Collection<String> segmentIds, @Nullable TableConfig tableConfig) {
+  public void deleteSegments(String tableName, Collection<String> segmentIds,
+      @Nullable TableConfig tableConfig) {
     deleteSegments(tableName, segmentIds, getRetentionMsFromTableConfig(tableConfig));
   }
 
@@ -150,7 +150,8 @@ public class SegmentDeletionManager {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
-        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletedSegmentsRetentionMs, deletionDelaySeconds);
+        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletedSegmentsRetentionMs,
+            deletionDelaySeconds);
       }
     }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
@@ -250,8 +251,8 @@ public class SegmentDeletionManager {
       return;
     }
     if (_dataDir != null) {
-      long retentionMs =
-          deletedSegmentsRetentionMs == null ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
+      long retentionMs = deletedSegmentsRetentionMs == null
+          ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
@@ -358,8 +359,8 @@ public class SegmentDeletionManager {
   }
 
   private String getDeletedSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
-    return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(
-        new Date(System.currentTimeMillis() + deletedSegmentsRetentionMs));
+    return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(new Date(
+        System.currentTimeMillis() + deletedSegmentsRetentionMs));
   }
 
   private long getDeletionTimeMsFromFile(String targetFile, long lastModifiedTime) {

@@ -23,7 +23,6 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -307,15 +306,15 @@ public class SegmentDeletionManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     File tempDir = Files.createTempDir();
     tempDir.deleteOnExit();
-    SegmentDeletionManager deletionManager =
-        new SegmentDeletionManager(tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
+    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+        tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
 
     // create table segment files.
     Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
     createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted());
     final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
-    final File deletedTableDir =
-        new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments" + File.separator + TABLE_NAME);
+    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
+        + File.separator + TABLE_NAME);
 
     // delete the segments instantly.
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);

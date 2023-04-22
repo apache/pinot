@@ -31,7 +31,8 @@ import org.slf4j.LoggerFactory;
 
 public class PinotSegmentLifecycleEventListenerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentLifecycleEventListenerManager.class);
-  private static final PinotSegmentLifecycleEventListenerManager INSTANCE = new PinotSegmentLifecycleEventListenerManager();
+  private static final PinotSegmentLifecycleEventListenerManager INSTANCE =
+      new PinotSegmentLifecycleEventListenerManager();
   private Map<SegmentLifecycleEventType, List<PinotSegmentLifecycleEventListener>> _eventTypeToListenersMap;
   private boolean _initialized = false;
 
@@ -42,7 +43,7 @@ public class PinotSegmentLifecycleEventListenerManager {
     return INSTANCE;
   }
 
-  public synchronized void init(HelixManager _helixZkManager) {
+  public synchronized void init(HelixManager helixZkManager) {
     if (_initialized) {
       LOGGER.warn("Segment lifecycle event listener manager already initialized, skipping it");
       return;
@@ -57,7 +58,7 @@ public class PinotSegmentLifecycleEventListenerManager {
         try {
           PinotSegmentLifecycleEventListener pinotSegmentLifecycleEventListener =
               (PinotSegmentLifecycleEventListener) clazz.newInstance();
-          pinotSegmentLifecycleEventListener.init(_helixZkManager);
+          pinotSegmentLifecycleEventListener.init(helixZkManager);
           _eventTypeToListenersMap.putIfAbsent(pinotSegmentLifecycleEventListener.getType(), new ArrayList<>())
               .add(pinotSegmentLifecycleEventListener);
         } catch (Exception e) {

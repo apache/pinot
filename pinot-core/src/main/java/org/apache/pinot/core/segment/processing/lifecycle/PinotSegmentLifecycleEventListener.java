@@ -23,6 +23,8 @@ import org.apache.helix.HelixManager;
 
 public interface PinotSegmentLifecycleEventListener {
   SegmentLifecycleEventType getType();
+
   void init(HelixManager helixManager);
+
   void onEvent(SegmentLifecycleEventDetails event);
 }
