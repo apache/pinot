@@ -89,7 +89,7 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     try {
-      return _receivingMailboxCache.get(mailboxId, InMemoryReceivingMailbox::new);
+      return _receivingMailboxCache.get(mailboxId, () -> new InMemoryReceivingMailbox(mailboxId));
     } catch (ExecutionException e) {
       LOGGER.error(String.format("Error getting in-memory receiving mailbox=%s", mailboxId), e);
       throw new RuntimeException(e);
@@ -97,11 +97,10 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   }
 
   @Override
-  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
-    InMemoryReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId);
-    if (receivingMailbox != null) {
-      receivingMailbox.cancel();
-      _receivingMailboxCache.invalidate(mailboxId);
+  public void releaseReceivingMailbox(ReceivingMailbox<TransferableBlock> mailbox) {
+    if (!mailbox.isClosed()) {
+      mailbox.cancel();
     }
+    _receivingMailboxCache.invalidate(mailbox.getId());
   }
 }

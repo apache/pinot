@@ -182,8 +182,8 @@ public class QueryDispatcher {
     VirtualServerAddress server =
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs, timeoutMs,
-            queryPlan.getStageMetadataMap(), traceEnabled);
+        new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs,
+            System.currentTimeMillis() + timeoutMs, queryPlan.getStageMetadataMap(), traceEnabled);
     MailboxReceiveOperator mailboxReceiveOperator =
         createReduceStageOperator(reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(), context);
     List<DataBlock> resultDataBlocks =

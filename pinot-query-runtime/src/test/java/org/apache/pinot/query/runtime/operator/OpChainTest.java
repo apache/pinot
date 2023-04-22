@@ -77,12 +77,10 @@ public class OpChainTest {
   @Mock
   private ReceivingMailbox<TransferableBlock> _mailbox;
 
-
   @Mock
   private MailboxService<TransferableBlock> _mailboxService2;
   @Mock
   private ReceivingMailbox<TransferableBlock> _mailbox2;
-
 
   @BeforeMethod
   public void setUp() {
@@ -198,8 +196,8 @@ public class OpChainTest {
     stageMetadata.setServerInstances(ImmutableList.of(_server));
     Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(receivedStageId, stageMetadata);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, senderStageId, new VirtualServerAddress(_server), 1000, 1000,
-            stageMetadataMap, true);
+        new OpChainExecutionContext(_mailboxService, 1, senderStageId, new VirtualServerAddress(_server), 1000,
+            System.currentTimeMillis() + 1000, stageMetadataMap, true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -213,11 +211,11 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, new VirtualServerAddress(_server), 1000,
-            1000, stageMetadataMap, true);
+            System.currentTimeMillis() + 1000, stageMetadataMap, true);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, ImmutableList.of(_server),
-            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1, null);
+            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1);
 
     Assert.assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
     int numOperators = operators.size();
@@ -242,8 +240,8 @@ public class OpChainTest {
     stageMetadata.setServerInstances(ImmutableList.of(_server));
     Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(receivedStageId, stageMetadata);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, senderStageId, new VirtualServerAddress(_server), 1000, 1000,
-            stageMetadataMap, false);
+        new OpChainExecutionContext(_mailboxService, 1, senderStageId, new VirtualServerAddress(_server), 1000,
+            System.currentTimeMillis() + 1000, stageMetadataMap, false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -255,11 +253,11 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, new VirtualServerAddress(_server), 1000,
-            1000, stageMetadataMap, false);
+            System.currentTimeMillis() + 1000, stageMetadataMap, false);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, ImmutableList.of(_server),
-            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1, null);
+            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1);
 
     Assert.assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
     Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 2);
@@ -323,7 +321,6 @@ public class OpChainTest {
     operators.push(sendOperator);
     return operators;
   }
-
 
   static class DummyMultiStageOperator extends MultiStageOperator {
 

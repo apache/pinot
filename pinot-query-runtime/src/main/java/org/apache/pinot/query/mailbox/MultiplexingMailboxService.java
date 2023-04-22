@@ -80,12 +80,12 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   @Override
-  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
-    if (mailboxId.isLocal()) {
-      _inMemoryMailboxService.releaseReceivingMailbox(mailboxId);
-      return;
+  public void releaseReceivingMailbox(ReceivingMailbox<TransferableBlock> mailbox) {
+    if (mailbox instanceof InMemoryReceivingMailbox) {
+      _inMemoryMailboxService.releaseReceivingMailbox(mailbox);
+    } else {
+      _grpcMailboxService.releaseReceivingMailbox(mailbox);
     }
-    _grpcMailboxService.releaseReceivingMailbox(mailboxId);
   }
 
   public static MultiplexingMailboxService newInstance(String hostname, int port,

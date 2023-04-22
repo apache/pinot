@@ -92,7 +92,6 @@ public interface MailboxService<T> {
    *     the {@link MailboxService} to use this method. It can use any internal method it needs to do the clean-up.
    *   </li>
    * </ol>
-   * @param mailboxId
    */
-  void releaseReceivingMailbox(MailboxIdentifier mailboxId);
+  void releaseReceivingMailbox(ReceivingMailbox<T> mailbox);
 }

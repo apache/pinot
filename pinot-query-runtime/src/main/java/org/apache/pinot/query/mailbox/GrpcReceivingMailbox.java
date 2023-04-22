@@ -47,13 +47,16 @@ import org.slf4j.LoggerFactory;
 public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcReceivingMailbox.class);
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
+
+  private final MailboxIdentifier _id;
   private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
 
   private MailboxContentStreamObserver _contentStreamObserver;
   private StreamObserver<Mailbox.MailboxStatus> _statusStreamObserver;
 
-  public GrpcReceivingMailbox(Consumer<MailboxIdentifier> gotMailCallback) {
+  public GrpcReceivingMailbox(MailboxIdentifier id, Consumer<MailboxIdentifier> gotMailCallback) {
+    _id = id;
     _gotMailCallback = gotMailCallback;
     _initializationLatch = new CountDownLatch(1);
   }
@@ -66,6 +69,11 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
       _initializationLatch.countDown();
     }
     return _gotMailCallback;
+  }
+
+  @Override
+  public MailboxIdentifier getId() {
+    return _id;
   }
 
   /**
