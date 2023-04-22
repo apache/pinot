@@ -46,6 +46,9 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
+import org.apache.pinot.core.segment.processing.lifecycle.SegmentLifecycleEventDetails;
+import org.apache.pinot.core.segment.processing.lifecycle.SegmentLifecycleEventType;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -81,26 +84,39 @@ public class SegmentDeletionManager {
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
-  private final List<PinotSegmentDeletionListener> _pinotSegmentDeletionListeners;
 
-  /**
-   * Interface for segment deletion listener. Invoked when a segment is deleted via the SegmentDeletionManager.
-   */
-  public interface PinotSegmentDeletionListener {
-    void init(HelixManager helixManager);
+  private static class SegmentDeletionEventDetails implements SegmentLifecycleEventDetails {
+    private final List<String> _segmentsDeleted;
+    private final String _tableName;
 
-    void onSegmentDeletion(String tableName, Collection<String> segmentsToDelete);
+    public SegmentDeletionEventDetails(String tableName, List<String> segmentsDeleted) {
+      _tableName = tableName;
+      _segmentsDeleted = segmentsDeleted;
+    }
+
+    @Override
+    public SegmentLifecycleEventType getType() {
+      return SegmentLifecycleEventType.DELETION;
+    }
+
+    @Override
+    public List<String> getSegments() {
+      return _segmentsDeleted;
+    }
+
+    @Override
+    public String getTableNameWithType() {
+      return _tableName;
+    }
   }
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays,
-      List<PinotSegmentDeletionListener> pinotSegmentDeletionListeners) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
     _dataDir = dataDir;
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
     _defaultDeletedSegmentsRetentionMs = TimeUnit.DAYS.toMillis(deletedSegmentsRetentionInDays);
-    _pinotSegmentDeletionListeners = pinotSegmentDeletionListeners;
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -120,8 +136,7 @@ public class SegmentDeletionManager {
     deleteSegments(tableName, segmentIds, (Long) null);
   }
 
-  public void deleteSegments(String tableName, Collection<String> segmentIds,
-      @Nullable TableConfig tableConfig) {
+  public void deleteSegments(String tableName, Collection<String> segmentIds, @Nullable TableConfig tableConfig) {
     deleteSegments(tableName, segmentIds, getRetentionMsFromTableConfig(tableConfig));
   }
 
@@ -135,8 +150,7 @@ public class SegmentDeletionManager {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
-        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletedSegmentsRetentionMs,
-            deletionDelaySeconds);
+        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletedSegmentsRetentionMs, deletionDelaySeconds);
       }
     }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
@@ -179,13 +193,9 @@ public class SegmentDeletionManager {
         propStorePathList.add(segmentPropertyStorePath);
       }
 
-      for (PinotSegmentDeletionListener pinotSegmentDeletionListener : _pinotSegmentDeletionListeners) {
-        try {
-          pinotSegmentDeletionListener.onSegmentDeletion(tableName, segmentsToDelete);
-        } catch (Exception e) {
-          LOGGER.error("Failed to process segment deletion listener: {}", pinotSegmentDeletionListener, e);
-        }
-      }
+      // Notify all active listeners here
+      PinotSegmentLifecycleEventListenerManager.getInstance()
+          .notifyListeners(getSegmentDeletionEvent(tableName, segmentsToDelete));
 
       boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
       List<String> propStoreFailedSegs = new ArrayList<>(segmentsToDelete.size());
@@ -218,6 +228,10 @@ public class SegmentDeletionManager {
     }
   }
 
+  private SegmentDeletionEventDetails getSegmentDeletionEvent(String tableName, List<String> segmentsToDelete) {
+    return new SegmentDeletionEventDetails(tableName, segmentsToDelete);
+  }
+
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
     removeSegmentsFromStore(tableNameWithType, segments, null);
   }
@@ -236,8 +250,8 @@ public class SegmentDeletionManager {
       return;
     }
     if (_dataDir != null) {
-      long retentionMs = deletedSegmentsRetentionMs == null
-          ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
+      long retentionMs =
+          deletedSegmentsRetentionMs == null ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
@@ -344,8 +358,8 @@ public class SegmentDeletionManager {
   }
 
   private String getDeletedSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
-    return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(new Date(
-        System.currentTimeMillis() + deletedSegmentsRetentionMs));
+    return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(
+        new Date(System.currentTimeMillis() + deletedSegmentsRetentionMs));
   }
 
   private long getDeletionTimeMsFromFile(String targetFile, long lastModifiedTime) {

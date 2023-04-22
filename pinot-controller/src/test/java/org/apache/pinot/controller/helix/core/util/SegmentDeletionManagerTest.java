@@ -308,8 +308,7 @@ public class SegmentDeletionManagerTest {
     File tempDir = Files.createTempDir();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager =
-        new SegmentDeletionManager(tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7,
-            Collections.emptyList());
+        new SegmentDeletionManager(tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
 
     // create table segment files.
     Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
@@ -382,13 +381,12 @@ public class SegmentDeletionManagerTest {
     public Set<String> _segmentsToRetry = new HashSet<>();
 
     FakeDeletionManager(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-      super(null, helixAdmin, CLUSTER_NAME, propertyStore, 0, Collections.emptyList());
+      super(null, helixAdmin, CLUSTER_NAME, propertyStore, 0);
     }
 
     FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, int
         deletedSegmentsRetentionInDays) {
-      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays,
-          Collections.emptyList());
+      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays);
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {

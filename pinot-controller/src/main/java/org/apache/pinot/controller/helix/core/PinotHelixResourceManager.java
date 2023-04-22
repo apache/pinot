@@ -138,7 +138,7 @@ import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObs
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.annotations.segment.lifecycle.SegmentDeletionListener;
+import org.apache.pinot.core.segment.processing.lifecycle.SegmentLifecycleEventListener;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -267,7 +267,7 @@ public class PinotHelixResourceManager {
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
-        _deletedSegmentsRetentionInDays, getSegmentDeletionListeners());
+        _deletedSegmentsRetentionInDays);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
 
     // Add listener on instance config changes to invalidate _instanceAdminEndpointCache
@@ -302,27 +302,6 @@ public class PinotHelixResourceManager {
         Boolean.parseBoolean(configs.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean.parseBoolean(
             configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
     _tableCache = new TableCache(_propertyStore, caseInsensitive);
-  }
-
-  private List<SegmentDeletionManager.PinotSegmentDeletionListener> getSegmentDeletionListeners() {
-    List<SegmentDeletionManager.PinotSegmentDeletionListener> pinotSegmentDeletionListeners = new ArrayList<>();
-    Set<Class<?>> classes = PinotReflectionUtils.getClassesThroughReflection(".*\\.plugin\\.segment\\.deletion\\..*",
-        SegmentDeletionListener.class);
-    for (Class<?> clazz : classes) {
-      SegmentDeletionListener annotation = clazz.getAnnotation(SegmentDeletionListener.class);
-      if (annotation.enabled()) {
-        try {
-          SegmentDeletionManager.PinotSegmentDeletionListener pinotSegmentDeletionListener =
-              (SegmentDeletionManager.PinotSegmentDeletionListener) clazz.newInstance();
-          pinotSegmentDeletionListener.init(_helixZkManager);
-          pinotSegmentDeletionListeners.add(pinotSegmentDeletionListener);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while initializing segment deletion listener : {}, skipping it", clazz, e);
-        }
-      }
-    }
-
-    return pinotSegmentDeletionListeners;
   }
 
   /**
@@ -3421,9 +3400,9 @@ public class PinotHelixResourceManager {
 
               // Add segments for proactive clean-up.
               segmentsToCleanUp.addAll(segmentsToForEntryToRevert);
-            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED
-                && "REFRESH".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))
-                && CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsTo())) {
+            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && "REFRESH".equalsIgnoreCase(
+                IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)) && CollectionUtils.isEqualCollection(
+                segmentsFrom, lineageEntry.getSegmentsTo())) {
               // This part of code assumes that we only allow at most 2 data snapshots at a time by proactively
               // deleting the older snapshots (for REFRESH tables).
               //

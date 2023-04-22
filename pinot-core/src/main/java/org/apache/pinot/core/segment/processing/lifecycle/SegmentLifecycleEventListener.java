@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.annotations.segment.lifecycle;
+package org.apache.pinot.core.segment.processing.lifecycle;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -25,6 +25,6 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface SegmentDeletionListener {
+public @interface SegmentLifecycleEventListener {
   boolean enabled() default true;
 }
