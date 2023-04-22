@@ -30,7 +30,7 @@ import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AbstractStageNode;
 import org.apache.pinot.query.planner.stage.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.VirtualServer;
-import org.apache.pinot.query.routing.WorkerInstance;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 
 
@@ -72,9 +72,10 @@ public class QueryPlanSerDeUtils {
     }
 
     // Skipped netty and grpc port as they are not used in worker instance.
-    return new VirtualServer(new WorkerInstance(matcher.group("host"), Integer.parseInt(matcher.group("port")),
-        Integer.parseInt(matcher.group("grpc")), Integer.parseInt(matcher.group("service")),
-        Integer.parseInt(matcher.group("mailbox"))), Integer.parseInt(matcher.group("virtualid")));
+    return new VirtualServer(WorkerManager.getServerInstance(matcher.group("host"),
+        Integer.parseInt(matcher.group("port")), Integer.parseInt(matcher.group("grpc")),
+        Integer.parseInt(matcher.group("service")), Integer.parseInt(matcher.group("mailbox"))),
+        Integer.parseInt(matcher.group("virtualid")));
   }
 
   public static String instanceToString(VirtualServer serverInstance) {

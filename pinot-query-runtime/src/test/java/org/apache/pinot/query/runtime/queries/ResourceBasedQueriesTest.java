@@ -45,7 +45,7 @@ import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.routing.WorkerInstance;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -191,8 +191,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // this is only use for test identifier purpose.
     int port1 = server1.getPort();
     int port2 = server2.getPort();
-    _servers.put(new WorkerInstance("localhost", port1, port1, port1, port1), server1);
-    _servers.put(new WorkerInstance("localhost", port2, port2, port2, port2), server2);
+    _servers.put(WorkerManager.getServerInstance("localhost", port1, port1, port1, port1), server1);
+    _servers.put(WorkerManager.getServerInstance("localhost", port2, port2, port2, port2), server2);
   }
 
   @AfterClass

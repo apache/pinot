@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.routing;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
@@ -28,6 +29,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -111,7 +114,7 @@ public class WorkerManager {
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
       stageMetadata.setServerInstances(Lists.newArrayList(
-          new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), 0)));
+          new VirtualServer(getServerInstance(_hostName, _port, _port, _port, _port), 0)));
     } else {
       // --- INTERMEDIATE STAGES ---
       // If the query has more than one table, it is possible that the tables could be hosted on different tenants.
@@ -131,6 +134,26 @@ public class WorkerManager {
       stageMetadata.setServerInstances(
           assignServers(serverInstances, stageMetadata.isRequiresSingletonInstance(), options));
     }
+  }
+
+  /**
+   * Construct a {@link ServerInstance} b/c its public constructor is not directly accessible in this format
+   * TODO: we should not be using ServerInstance as a wrap-around object during both dispatch and runtime.
+   * TODO: decouple and do not use ServerInstance which tights up with Helix/ZK
+   */
+  @VisibleForTesting
+  public static ServerInstance getServerInstance(String hostname, int nettyPort, int grpcPort, int servicePort,
+      int mailboxPort) {
+    String server = String.format("%s%s_%d", CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE, hostname, nettyPort);
+    InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(server);
+    ZNRecord znRecord = instanceConfig.getRecord();
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
+    simpleFields.put(CommonConstants.Helix.Instance.GRPC_PORT_KEY, String.valueOf(grpcPort));
+    simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY,
+        String.valueOf(servicePort));
+    simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
+        String.valueOf(mailboxPort));
+    return new ServerInstance(instanceConfig);
   }
 
   private static List<VirtualServer> assignServers(Set<ServerInstance> servers,

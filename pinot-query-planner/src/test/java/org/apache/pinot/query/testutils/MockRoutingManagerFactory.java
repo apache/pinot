@@ -30,7 +30,7 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.routing.WorkerInstance;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -65,7 +65,7 @@ public class MockRoutingManagerFactory {
 
     _tableServerSegmentMap = new HashMap<>();
     for (int port : ports) {
-      _serverInstances.put(toHostname(port), new WorkerInstance(HOST_NAME, port, port, port, port));
+      _serverInstances.put(toHostname(port), WorkerManager.getServerInstance(HOST_NAME, port, port, port, port));
     }
   }
 
