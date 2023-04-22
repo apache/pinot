@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
@@ -38,16 +39,13 @@ import org.apache.pinot.query.routing.VirtualServer;
  *   <li>the server instances to which this stage should be execute on</li>
  * </ul>
  */
-public class StageMetadata implements Serializable {
+public class StageMetadata {
   private List<String> _scannedTables;
 
   // used for assigning server/worker nodes.
-  private List<VirtualServer> _serverInstances;
+  private Map<ServerInstance, List<Integer>> _serverToWorkerIdsMap;
 
-  // used for table scan stage - we use ServerInstance instead of VirtualServer
-  // here because all virtual servers that share a server instance will have the
-  // same segments on them
-  private Map<ServerInstance, Map<String, List<String>>> _serverInstanceToSegmentsMap;
+  private List<WorkerMetadata> _workerMetadataList;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -57,8 +55,8 @@ public class StageMetadata implements Serializable {
 
   public StageMetadata() {
     _scannedTables = new ArrayList<>();
-    _serverInstances = new ArrayList<>();
-    _serverInstanceToSegmentsMap = new HashMap<>();
+    _serverToWorkerIdsMap = new HashMap<>();
+    _workerMetadataList = new ArrayList<>();
     _timeBoundaryInfo = null;
     _requiresSingletonInstance = false;
   }
@@ -75,43 +73,21 @@ public class StageMetadata implements Serializable {
   // attached physical plan context.
   // -----------------------------------------------
 
-  public Map<ServerInstance, Map<String, List<String>>> getServerInstanceToSegmentsMap() {
-    return _serverInstanceToSegmentsMap;
-  }
-
-  public void setServerInstanceToSegmentsMap(
-      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap) {
-    _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
-  }
-
-  public List<VirtualServer> getServerInstances() {
-    return _serverInstances;
-  }
-
-  public void setServerInstances(List<VirtualServer> serverInstances) {
-    _serverInstances = serverInstances;
+  public Map<ServerInstance, List<Integer>> getServerInstanceToSegmentsMap() {
+    return _serverToWorkerIdsMap;
   }
 
   public TimeBoundaryInfo getTimeBoundaryInfo() {
     return _timeBoundaryInfo;
   }
 
-  public void setTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
-    _timeBoundaryInfo = timeBoundaryInfo;
-  }
-
   public boolean isRequiresSingletonInstance() {
     return _requiresSingletonInstance;
   }
 
-  public void setRequireSingleton(boolean newRequireInstance) {
-    _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
-  }
-
   @Override
   public String toString() {
-    return "StageMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstances=" + _serverInstances
-        + ", _serverInstanceToSegmentsMap=" + _serverInstanceToSegmentsMap + ", _timeBoundaryInfo=" + _timeBoundaryInfo
-        + '}';
+    return "StageMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstances=" + _serverToWorkerIdsMap
+        + ", _workerMetadata=" + _workerMetadataList + ", _timeBoundaryInfo=" + _timeBoundaryInfo + '}';
   }
 }
