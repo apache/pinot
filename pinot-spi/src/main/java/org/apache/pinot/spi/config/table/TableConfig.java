@@ -379,7 +379,7 @@ public class TableConfig extends BaseJsonConfig {
     return _segmentAssignmentConfigMap;
   }
 
-  public void setSegmentAssignmentConfigMap(Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
+    public void setSegmentAssignmentConfigMap(Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
   }
 

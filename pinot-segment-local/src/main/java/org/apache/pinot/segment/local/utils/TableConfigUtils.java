@@ -57,6 +57,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -138,6 +139,7 @@ public final class TableConfigUtils {
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
       validateInstancePartitionsTypeMapConfig(tableConfig);
+      validatePartitionedReplicaGroupInstance(tableConfig);
       if (!skipTypes.contains(ValidationType.UPSERT)) {
         validateUpsertAndDedupConfig(tableConfig, schema);
         validatePartialUpsertStrategies(tableConfig, schema);
@@ -599,6 +601,24 @@ public final class TableConfigUtils {
           !tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString()),
           String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
               instancePartitionsType));
+    }
+  }
+
+  /**
+   * Detects whether both replicaGroupStrategyConfig and replicaGroupPartitionConfig are set for a given
+   * table. Validation fails because the table would ignore replicaGroupStrategyConfig
+   * when the replicaGroupPartitionConfig is already set.
+   */
+  @VisibleForTesting
+  static void validatePartitionedReplicaGroupInstance(TableConfig tableConfig) {
+    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null
+        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+      return;
+    }
+    for (Map.Entry<String, InstanceAssignmentConfig> entry: tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+      boolean isNullReplicaGroupPartitionConfig = entry.getValue().getReplicaGroupPartitionConfig() == null;
+      Preconditions.checkState(isNullReplicaGroupPartitionConfig,
+          "Both replicaGroupStrategyConfig and replicaGroupPartitionConfig is provided");
     }
   }
 

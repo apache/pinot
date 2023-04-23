@@ -32,6 +32,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -42,6 +43,7 @@ import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -1745,6 +1747,46 @@ public class TableConfigUtilsTest {
       // Call validate with instance partitions and config set for the same type
       TableConfigUtils.validateInstancePartitionsTypeMapConfig(invalidTableConfig);
       Assert.fail("Validation should have failed since both instancePartitionsMap and config are set");
+    } catch (IllegalStateException ignored) {
+    }
+  }
+
+  @Test
+  public void testValidatePartitionedReplicaGroupInstance() {
+    String partitionColumn = "testPartitionCol";
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        new ReplicaGroupStrategyConfig(partitionColumn, 2);
+
+    TableConfig tableConfigWithoutReplicaGroupStrategyConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+            .build();
+    // Call validate with a table-config without replicaGroupStrategyConfig or replicaGroupPartitionConfig.
+    TableConfigUtils.validatePartitionedReplicaGroupInstance(tableConfigWithoutReplicaGroupStrategyConfig);
+
+    TableConfig tableConfigWithReplicaGroupStrategyConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfigWithReplicaGroupStrategyConfig.getValidationConfig()
+        .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+
+    // Call validate with a table-config with replicaGroupStrategyConfig and without replicaGroupPartitionConfig.
+    TableConfigUtils.validatePartitionedReplicaGroupInstance(tableConfigWithReplicaGroupStrategyConfig);
+
+    InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 2, 0, false, partitionColumn);
+    Mockito.doReturn(instanceReplicaGroupPartitionConfig)
+        .when(instanceAssignmentConfig).getReplicaGroupPartitionConfig();
+
+    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).setInstanceAssignmentConfigMap(
+            ImmutableMap.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig)).build();
+    invalidTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+
+    try {
+      // Call validate with a table-config with replicaGroupStrategyConfig and replicaGroupPartitionConfig.
+      TableConfigUtils.validatePartitionedReplicaGroupInstance(invalidTableConfig);
+      Assert.fail("Validation should have failed since both replicaGroupStrategyConfig "
+          + "and replicaGroupPartitionConfig are set");
     } catch (IllegalStateException ignored) {
     }
   }

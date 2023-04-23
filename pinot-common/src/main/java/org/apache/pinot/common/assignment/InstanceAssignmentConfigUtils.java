@@ -109,18 +109,16 @@ public class InstanceAssignmentConfigUtils {
     Preconditions.checkState(replicaGroupStrategyConfig != null, "Failed to find the replica-group strategy config");
     String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
     boolean minimizeDataMovement = segmentConfig.isMinimizeDataMovement();
+    int numPartitions = 0;
     if (partitionColumn != null) {
-      int numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
+      numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
       Preconditions.checkState(numPartitions > 0, "Number of partitions for column: %s is not properly configured",
           partitionColumn);
-      replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions,
-          replicaGroupStrategyConfig.getNumInstancesPerPartition(), minimizeDataMovement);
-    } else {
-      // If partition column is not configured, use replicaGroupStrategyConfig.getNumInstancesPerPartition() as
-      // number of instances per replica-group for backward-compatibility
-      replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups,
-          replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0, minimizeDataMovement);
     }
+    // If partition column is not configured, use replicaGroupStrategyConfig.getNumInstancesPerPartition() as
+    // number of instances per replica-group for backward-compatibility
+    replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions,
+        replicaGroupStrategyConfig.getNumInstancesPerPartition(), minimizeDataMovement, partitionColumn);
 
     return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);
   }
