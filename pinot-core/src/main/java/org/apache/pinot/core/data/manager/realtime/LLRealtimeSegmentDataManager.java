@@ -1224,6 +1224,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         // to do PK cleanup and persist snapshots for stable segments.
         // (2) During states changes from CONSUMING to ONLINE, no new segment will start consuming. We need to block
         // the consumption until the keys are cleaned up.
+
+        // TODO: Currently it doesn't handle blocking the consumption before keys are cleaned up. The side effect is we
+        //  might get inconsistent view from different replica.
+        //  Ideally we want to handle the key cleanup when the current segment is sealed and loaded, but before the new
+        //  segment start consuming.
+        //  LLRealtimeSegmentDataManager.closeStreamConsumers() will release the lock for the consumer, so if we do the
+        //  cleanup just before closing the stream consumer it should get what we want.
+
         _realtimeTableDataManager.handleUpsertTTL(_segmentNameStr, segmentZKMetadata,
             _tableConfig.getUpsertConfig().getUpsertTTLConfig());
       }
