@@ -33,6 +33,8 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
  */
 public interface ReceivingMailbox<T> {
 
+  MailboxIdentifier getId();
+
   /**
    * Returns a unit of data. Implementations are allowed to return null, in which case {@link MailboxReceiveOperator}
    * will assume that this mailbox doesn't have any data to return and it will instead poll the other mailbox (if any).

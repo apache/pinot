@@ -121,7 +121,7 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     try {
       return _receivingMailboxCache.get(mailboxId,
-          () -> new GrpcReceivingMailbox(_gotMailCallback));
+          () -> new GrpcReceivingMailbox(mailboxId, _gotMailCallback));
     } catch (ExecutionException e) {
       LOGGER.error(String.format("Error getting receiving mailbox: %s", mailboxId), e);
       throw new RuntimeException(e);
@@ -140,12 +140,11 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * </p>
    */
   @Override
-  public void releaseReceivingMailbox(MailboxIdentifier mailboxId) {
-    GrpcReceivingMailbox receivingMailbox = _receivingMailboxCache.getIfPresent(mailboxId);
-    if (receivingMailbox != null && !receivingMailbox.isClosed()) {
-      receivingMailbox.cancel();
+  public void releaseReceivingMailbox(ReceivingMailbox<TransferableBlock> mailbox) {
+    if (!mailbox.isClosed()) {
+      mailbox.cancel();
     }
-    _receivingMailboxCache.invalidate(mailboxId);
+    _receivingMailboxCache.invalidate(mailbox.getId());
   }
 
   @Override

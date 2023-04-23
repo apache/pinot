@@ -23,14 +23,23 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
+
+  private final MailboxIdentifier _id;
+
   private InMemoryTransferStream _transferStream;
   private volatile boolean _closed = false;
 
-  public InMemoryReceivingMailbox() {
+  public InMemoryReceivingMailbox(MailboxIdentifier id) {
+    _id = id;
   }
 
   public void init(InMemoryTransferStream transferStream) {
     _transferStream = transferStream;
+  }
+
+  @Override
+  public MailboxIdentifier getId() {
+    return _id;
   }
 
   @Override
