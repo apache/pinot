@@ -46,8 +46,7 @@ import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
-import org.apache.pinot.core.segment.processing.lifecycle.SegmentLifecycleEventDetails;
-import org.apache.pinot.core.segment.processing.lifecycle.SegmentLifecycleEventType;
+import org.apache.pinot.core.segment.processing.lifecycle.impl.SegmentDeletionEventDetails;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -83,31 +82,6 @@ public class SegmentDeletionManager {
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
-
-  public static class SegmentDeletionEventDetails implements SegmentLifecycleEventDetails {
-    private final List<String> _segmentsDeleted;
-    private final String _tableName;
-
-    public SegmentDeletionEventDetails(String tableName, List<String> segmentsDeleted) {
-      _tableName = tableName;
-      _segmentsDeleted = segmentsDeleted;
-    }
-
-    @Override
-    public SegmentLifecycleEventType getType() {
-      return SegmentLifecycleEventType.DELETION;
-    }
-
-    @Override
-    public List<String> getSegments() {
-      return _segmentsDeleted;
-    }
-
-    @Override
-    public String getTableNameWithType() {
-      return _tableName;
-    }
-  }
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -196,7 +170,7 @@ public class SegmentDeletionManager {
 
       // Notify all active listeners here
       PinotSegmentLifecycleEventListenerManager.getInstance()
-          .notifyListeners(getSegmentDeletionEvent(tableName, segmentsToDelete));
+          .notifyListeners(new SegmentDeletionEventDetails(tableName, segmentsToDelete));
 
       boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
       List<String> propStoreFailedSegs = new ArrayList<>(segmentsToDelete.size());
@@ -227,10 +201,6 @@ public class SegmentDeletionManager {
       LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
       deleteSegmentsWithDelay(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, effectiveDeletionDelay);
     }
-  }
-
-  private SegmentDeletionEventDetails getSegmentDeletionEvent(String tableName, List<String> segmentsToDelete) {
-    return new SegmentDeletionEventDetails(tableName, segmentsToDelete);
   }
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {

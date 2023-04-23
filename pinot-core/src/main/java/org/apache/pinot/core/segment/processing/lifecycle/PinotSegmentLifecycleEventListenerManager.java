@@ -59,10 +59,16 @@ public class PinotSegmentLifecycleEventListenerManager {
           PinotSegmentLifecycleEventListener pinotSegmentLifecycleEventListener =
               (PinotSegmentLifecycleEventListener) clazz.newInstance();
           pinotSegmentLifecycleEventListener.init(helixZkManager);
-          _eventTypeToListenersMap.putIfAbsent(pinotSegmentLifecycleEventListener.getType(), new ArrayList<>())
-              .add(pinotSegmentLifecycleEventListener);
+          _eventTypeToListenersMap.compute(pinotSegmentLifecycleEventListener.getType(), (key, list) -> {
+            if (list == null) {
+              list = new ArrayList<>();
+            }
+            list.add(pinotSegmentLifecycleEventListener);
+            return list;
+          });
         } catch (Exception e) {
-          LOGGER.error("Caught exception while initializing segment deletion listener : {}, skipping it", clazz, e);
+          LOGGER.error("Caught exception while initializing segment lifecyle event listener : {}, skipping it", clazz,
+              e);
         }
       }
     }
@@ -79,7 +85,11 @@ public class PinotSegmentLifecycleEventListenerManager {
     List<PinotSegmentLifecycleEventListener> listeners = _eventTypeToListenersMap.get(event.getType());
     if (listeners != null) {
       for (PinotSegmentLifecycleEventListener listener : listeners) {
-        listener.onEvent(event);
+        try {
+          listener.onEvent(event);
+        } catch (Exception e) {
+          LOGGER.error("Segment lifecycle listener call failed : ", e);
+        }
       }
     }
   }
