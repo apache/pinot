@@ -118,6 +118,9 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
   @Override
   public void submit(ServerRequest request, StreamObserver<ServerResponse> responseObserver) {
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_QUERIES, 1);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_RECEIVED, request.getSerializedSize());
+
     // Deserialize the request
     ServerQueryRequest queryRequest;
     try {
@@ -168,6 +171,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       return;
     }
     responseObserver.onNext(serverResponse);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, serverResponse.getSerializedSize());
     responseObserver.onCompleted();
   }
 }
