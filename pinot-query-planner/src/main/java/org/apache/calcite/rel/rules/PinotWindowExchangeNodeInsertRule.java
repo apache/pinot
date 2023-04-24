@@ -204,9 +204,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   }
 
   /**
-   * Only empty OVER() type queries can result in a situation where the LogicalProject below the LogicalWindow is an
-   * empty LogicalProject (i.e. no columns are projected). This can only occur for window functions that don't take
-   * an input column. Some example queries where this can occur are:
+   * Only empty OVER() type queries using window functions that take no columns as arguments can result in a situation
+   * where the LogicalProject below the LogicalWindow is an empty LogicalProject (i.e. no columns are projected).
+   * The 'ProjectWindowTransposeRule' looks at the columns present in the LogicalProject above the LogicalWindow and
+   * LogicalWindow to decide what to add to the lower LogicalProject when it does the transpose and for such queries
+   * if nothing is referenced an empty LogicalProject gets created. Some example queries where this can occur are:
    *
    * SELECT COUNT(*) OVER() from tableName
    * SELECT 42, COUNT(*) OVER() from tableName
@@ -236,7 +238,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     outputBuilder.addAll(projectBelowWindow.getRowType().getFieldList());
     outputBuilder.addAll(window.getRowType().getFieldList());
 
-    // This scenario is only possible for empty OVER(), add a LogicalExchange with empty hash distribution list
+    // This scenario is only possible for empty OVER() which uses functions that have no arguments such as COUNT(*) or
+    // ROW_NUMBER(). Add a LogicalExchange with empty hash distribution list
     LogicalExchange exchange =
         LogicalExchange.create(projectBelowWindow, RelDistributions.hash(Collections.emptyList()));
     Window newWindow = new LogicalWindow(window.getCluster(), window.getTraitSet(), exchange,
@@ -247,12 +250,13 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     final List<String> expsFieldNamesAboveWindow = new ArrayList<>();
     final List<RelDataTypeField> rowTypeWindowInput = newWindow.getRowType().getFieldList();
 
+    int count = 0;
     for (int index = 1; index < rowTypeWindowInput.size(); index++) {
       // Keep only the non-literal fields. We can start from index = 1 since the first and only column from the lower
       // project is the literal column added above.
       final RelDataTypeField relDataTypeField = rowTypeWindowInput.get(index);
       expsForProjectAboveWindow.add(new RexInputRef(index, relDataTypeField.getType()));
-      expsFieldNamesAboveWindow.add(relDataTypeField.getName());
+      expsFieldNamesAboveWindow.add(String.format("$%d", count));
     }
 
     return LogicalProject.create(newWindow, project.getHints(), expsForProjectAboveWindow, expsFieldNamesAboveWindow);

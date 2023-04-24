@@ -19,7 +19,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(w0$o0=[$1])",
+          "\nLogicalProject($0=[$1])",
           "\n  LogicalWindow(window#0=[window(aggs [COUNT()])])",
           "\n    LogicalExchange(distribution=[hash])",
           "\n      LogicalProject(winLiteral=[0])",
@@ -33,7 +33,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[42], EXPR$1=[$0])",
-          "\n  LogicalProject(w0$o0=[$1])",
+          "\n  LogicalProject($0=[$1])",
           "\n    LogicalWindow(window#0=[window(aggs [COUNT()])])",
           "\n      LogicalExchange(distribution=[hash])",
           "\n        LogicalProject(winLiteral=[0])",
