@@ -98,8 +98,6 @@
       {
         "description": "Single empty OVER() row_number",
         "sql": "SELECT ROW_NUMBER() OVER() FROM {tbl}",
-        "comments": "ROW_NUMBER() window function without any other columns in select or OVER or filter clauses fails as nothing is projected from the leaf",
-        "expectedException": "(?s)Received error query execution result block:.*",
         "outputs": [
           [1],
           [2],
