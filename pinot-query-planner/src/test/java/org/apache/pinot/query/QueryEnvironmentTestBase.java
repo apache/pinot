@@ -104,6 +104,8 @@ public class QueryEnvironmentTestBase {
             + " WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND"
             + " b.col2 NOT IN ('alice', 'charlie')"},
+        new Object[]{"SELECT COUNT(*) OVER() FROM a"},
+        new Object[]{"SELECT 42, COUNT(*) OVER() FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER () FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2) FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2 ORDER BY a.col2) FROM a"},
