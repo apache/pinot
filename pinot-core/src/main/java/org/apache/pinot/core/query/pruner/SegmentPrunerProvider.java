@@ -26,8 +26,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 /**
  * A static SegmentPrunerProvider will give SegmentPruner instance based on prunerClassName and configuration.
- *
- *
  */
 public class SegmentPrunerProvider {
   private SegmentPrunerProvider() {
@@ -36,10 +34,12 @@ public class SegmentPrunerProvider {
   private static final Map<String, Class<? extends SegmentPruner>> PRUNER_MAP = new HashMap<>();
 
   public static final String COLUMN_VALUE_SEGMENT_PRUNER_NAME = "columnvaluesegmentpruner";
+  public static final String BLOOM_FILTER_SEGMENT_PRUNER_NAME = "bloomfiltersegmentpruner";
   public static final String SELECTION_QUERY_SEGMENT_PRUNER_NAME = "selectionquerysegmentpruner";
 
   static {
     PRUNER_MAP.put(COLUMN_VALUE_SEGMENT_PRUNER_NAME, ColumnValueSegmentPruner.class);
+    PRUNER_MAP.put(BLOOM_FILTER_SEGMENT_PRUNER_NAME, BloomFilterSegmentPruner.class);
     PRUNER_MAP.put(SELECTION_QUERY_SEGMENT_PRUNER_NAME, SelectionQuerySegmentPruner.class);
   }
 

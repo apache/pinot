@@ -559,8 +559,10 @@ public class CommonConstants {
         "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
         "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
+    // The order of the pruners matters. Pruning with segment metadata ahead of those using segment data like bloom
+    // filters to reduce the required data access.
     public static final List<String> DEFAULT_QUERY_EXECUTOR_PRUNER_CLASS =
-        ImmutableList.of("ColumnValueSegmentPruner", "SelectionQuerySegmentPruner");
+        ImmutableList.of("ColumnValueSegmentPruner", "BloomFilterSegmentPruner", "SelectionQuerySegmentPruner");
     public static final String DEFAULT_QUERY_EXECUTOR_PLAN_MAKER_CLASS =
         "org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2";
     public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000L;

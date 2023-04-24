@@ -61,6 +61,7 @@ public class SegmentPrunerService {
             _prunerStatsUpdaters.put(pruner, SegmentPrunerStatistics::setLimitPruned);
             break;
           case SegmentPrunerProvider.COLUMN_VALUE_SEGMENT_PRUNER_NAME:
+          case SegmentPrunerProvider.BLOOM_FILTER_SEGMENT_PRUNER_NAME:
             _prunerStatsUpdaters.put(pruner, SegmentPrunerStatistics::setValuePruned);
             break;
           default:

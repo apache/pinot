@@ -19,53 +19,35 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
-import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
-import org.apache.pinot.core.query.prefetch.FetchPlanner;
-import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.trace.TraceCallable;
-import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
-import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
 /**
  * The {@code ColumnValueSegmentPruner} is the segment pruner that prunes segments based on the value inside the filter.
+ * This pruner is supposed to use segment metadata like min/max or partition id only. Pruners that need to access
+ * segment data like bloom filter is implemented separately and called after this one to reduce required data access.
  * <ul>
  *   <li>
  *     For EQUALITY filter, prune the segment based on:
  *     <ul>
  *       <li>Column min/max value</li>
  *       <li>Column partition</li>
- *       <li>Column bloom filter</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -77,225 +59,19 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
  * </ul>
  */
 @SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
-public class ColumnValueSegmentPruner implements SegmentPruner {
-
-  public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
-
-  private int _inPredicateThreshold;
-  private FetchPlanner _fetchPlanner;
-
+public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   @Override
-  public void init(PinotConfiguration config) {
-    _inPredicateThreshold =
-        config.getProperty(IN_PREDICATE_THRESHOLD, Server.DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD);
-    _fetchPlanner = FetchPlannerRegistry.getPlanner();
-  }
-
-  @Override
-  public boolean isApplicableTo(QueryContext query) {
-    return query.getFilter() != null;
-  }
-
-  @Override
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
-    if (segments.isEmpty()) {
-      return segments;
-    }
-    FilterContext filter = Objects.requireNonNull(query.getFilter());
-    ValueCache cachedValues = new ValueCache();
-    Map<String, DataSource> dataSourceCache = new HashMap<>();
-    int numSegments = segments.size();
-    List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
-    if (!query.isEnablePrefetch()) {
-      for (IndexSegment segment : segments) {
-        dataSourceCache.clear();
-        if (!pruneSegment(segment, filter, dataSourceCache, cachedValues)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
-    }
-    FetchContext[] fetchContexts = new FetchContext[numSegments];
-    try {
-      // Prefetch bloom filter for columns within the EQ/IN predicate if exists
-      for (int i = 0; i < numSegments; i++) {
-        IndexSegment segment = segments.get(i);
-        FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
-        if (!fetchContext.isEmpty()) {
-          segment.prefetch(fetchContext);
-          fetchContexts[i] = fetchContext;
-        }
-      }
-      // Prune segments
-      for (int i = 0; i < numSegments; i++) {
-        dataSourceCache.clear();
-        IndexSegment segment = segments.get(i);
-        if (!pruneSegmentWithFetchContext(segment, fetchContexts[i], filter, dataSourceCache, cachedValues)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
-    } finally {
-      // Release the prefetched bloom filters
-      for (int i = 0; i < numSegments; i++) {
-        FetchContext fetchContext = fetchContexts[i];
-        if (fetchContext != null) {
-          segments.get(i).release(fetchContext);
-        }
-      }
-    }
-  }
-
-  @Override
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
-      @Nullable ExecutorService executorService) {
-    if (segments.isEmpty()) {
-      return segments;
-    }
-    if (executorService == null) {
-      return prune(segments, query);
-    }
-    // With executor service, the pruning is done in parallel.
-    if (!query.isEnablePrefetch()) {
-      return parallelPrune(segments, query, executorService, null);
-    }
-    int numSegments = segments.size();
-    FetchContext[] fetchContexts = new FetchContext[numSegments];
-    try {
-      // Prefetch bloom filter for columns within the EQ/IN predicate if exists
-      for (int i = 0; i < numSegments; i++) {
-        IndexSegment segment = segments.get(i);
-        FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
-        if (!fetchContext.isEmpty()) {
-          segment.prefetch(fetchContext);
-          fetchContexts[i] = fetchContext;
-        }
-      }
-      return parallelPrune(segments, query, executorService, fetchContexts);
-    } finally {
-      // Release the prefetched bloom filters
-      for (int i = 0; i < numSegments; i++) {
-        FetchContext fetchContext = fetchContexts[i];
-        if (fetchContext != null) {
-          segments.get(i).release(fetchContext);
-        }
-      }
-    }
-  }
-
-  private List<IndexSegment> parallelPrune(List<IndexSegment> segments, QueryContext queryContext,
-      ExecutorService executorService, FetchContext[] fetchContexts) {
-    int numSegments = segments.size();
-    int numTasks = CombineOperatorUtils.getNumTasksForQuery(numSegments, queryContext.getMaxExecutionThreads());
-    // Use a Phaser to ensure all the Futures are fully done before the main thread returns.
-    Phaser phaser = new Phaser(1);
-    Future[] futures = new Future[numTasks];
-    for (int i = 0; i < numTasks; i++) {
-      int index = i;
-      futures[i] = executorService.submit(new TraceCallable<List<IndexSegment>>() {
-        @Override
-        public List<IndexSegment> callJob() {
-          try {
-            // Register the thread to the phaser for main thread to wait for it to complete.
-            if (phaser.register() < 0) {
-              return Collections.emptyList();
-            }
-            FilterContext filter = Objects.requireNonNull(queryContext.getFilter());
-            ValueCache cachedValues = new ValueCache();
-            Map<String, DataSource> dataSourceCache = new HashMap<>();
-            List<IndexSegment> selectedSegments = new ArrayList<>();
-            for (int i = index; i < numSegments; i += numTasks) {
-              dataSourceCache.clear();
-              IndexSegment segment = segments.get(i);
-              FetchContext fetchContext = fetchContexts == null ? null : fetchContexts[i];
-              if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues)) {
-                selectedSegments.add(segment);
-              }
-            }
-            return selectedSegments;
-          } finally {
-            phaser.arriveAndDeregister();
-          }
-        }
-      });
-    }
-    List<IndexSegment> allSelectedSegments = new ArrayList<>();
-    try {
-      // Check the query timeout while waiting for the pruning results.
-      for (Future future : futures) {
-        List<IndexSegment> selectedSegments =
-            (List<IndexSegment>) future.get(queryContext.getEndTimeMs() - System.currentTimeMillis(),
-                TimeUnit.MILLISECONDS);
-        allSelectedSegments.addAll(selectedSegments);
-      }
-      return allSelectedSegments;
-    } catch (InterruptedException e) {
-      throw new QueryCancelledException("Cancelled while running ColumnValueSegmentPruner", e);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while running ColumnValueSegmentPruner.", e);
-    } finally {
-      // Cancel all ongoing jobs
-      for (Future future : futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
-      }
-      // Deregister the main thread and wait for all threads done
-      phaser.awaitAdvance(phaser.arriveAndDeregister());
-    }
-  }
-
-  private boolean pruneSegmentWithFetchContext(IndexSegment segment, FetchContext fetchContext, FilterContext filter,
-      Map<String, DataSource> dataSourceCache, ValueCache cachedValues) {
-    if (fetchContext == null) {
-      return pruneSegment(segment, filter, dataSourceCache, cachedValues);
-    }
-    try {
-      segment.acquire(fetchContext);
-      return pruneSegment(segment, filter, dataSourceCache, cachedValues);
-    } finally {
-      segment.release(fetchContext);
-    }
-  }
-
-  private boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,
+  boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate, Map<String, DataSource> dataSourceCache,
       ValueCache cachedValues) {
-    switch (filter.getType()) {
-      case AND:
-        for (FilterContext child : filter.getChildren()) {
-          if (pruneSegment(segment, child, dataSourceCache, cachedValues)) {
-            return true;
-          }
-        }
-        return false;
-      case OR:
-        for (FilterContext child : filter.getChildren()) {
-          if (!pruneSegment(segment, child, dataSourceCache, cachedValues)) {
-            return false;
-          }
-        }
-        return true;
-      case NOT:
-        // Do not prune NOT filter
-        return false;
-      case PREDICATE:
-        Predicate predicate = filter.getPredicate();
-        // Only prune columns
-        if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
-          return false;
-        }
-        Predicate.Type predicateType = predicate.getType();
-        if (predicateType == Predicate.Type.EQ) {
-          return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
-        } else if (predicateType == Predicate.Type.IN) {
-          return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
-        } else if (predicateType == Predicate.Type.RANGE) {
-          return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
-        } else {
-          return false;
-        }
-      default:
-        throw new IllegalStateException();
+    Predicate.Type predicateType = predicate.getType();
+    if (predicateType == Predicate.Type.EQ) {
+      return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
+    } else if (predicateType == Predicate.Type.IN) {
+      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
+    } else if (predicateType == Predicate.Type.RANGE) {
+      return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
+    } else {
+      return false;
     }
   }
 
@@ -304,27 +80,22 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
    * <ul>
    *   <li>Column min/max value</li>
    *   <li>Column partition</li>
-   *   <li>Column bloom filter</li>
    * </ul>
    */
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
     String column = eqPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment
-        ? segment.getDataSource(column)
+    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
         : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
-
     Comparable value = cachedValue.getComparableValue();
-
     // Check min/max value
     if (!checkMinMaxRange(dataSourceMetadata, value)) {
       return true;
     }
-
     // Check column partition
     PartitionFunction partitionFunction = dataSourceMetadata.getPartitionFunction();
     if (partitionFunction != null) {
@@ -334,15 +105,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         return true;
       }
     }
-
-    // Check bloom filter
-    BloomFilterReader bloomFilter = dataSource.getBloomFilter();
-    if (bloomFilter != null) {
-      if (!cachedValue.mightBeContained(bloomFilter)) {
-        return true;
-      }
-    }
-
     return false;
   }
 
@@ -350,15 +112,13 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
    * For IN predicate, prune the segments based on:
    * <ul>
    *   <li>Column min/max value</li>
-   *   <li>Column bloom filter</li>
    * </ul>
    * <p>NOTE: segments will not be pruned if the number of values is greater than the threshold.
    */
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
     String column = inPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment
-        ? segment.getDataSource(column)
+    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
         : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
@@ -369,47 +129,10 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     if (values.size() > _inPredicateThreshold) {
       return false;
     }
-
     List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
-
     // Check min/max value
-    boolean someInRange = false;
     for (ValueCache.CachedValue value : cachedValues) {
       if (checkMinMaxRange(dataSourceMetadata, value.getComparableValue())) {
-        someInRange = true;
-        break;
-      }
-    }
-    if (!someInRange) {
-      return true;
-    }
-
-    // Check bloom filter
-    BloomFilterReader bloomFilter = dataSource.getBloomFilter();
-    if (bloomFilter == null) {
-      return false;
-    }
-    for (ValueCache.CachedValue value : cachedValues) {
-      if (value.mightBeContained(bloomFilter)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Returns {@code true} if the value is within the column's min/max value range, {@code false} otherwise.
-   */
-  private boolean checkMinMaxRange(DataSourceMetadata dataSourceMetadata, Comparable value) {
-    Comparable minValue = dataSourceMetadata.getMinValue();
-    if (minValue != null) {
-      if (value.compareTo(minValue) < 0) {
-        return false;
-      }
-    }
-    Comparable maxValue = dataSourceMetadata.getMaxValue();
-    if (maxValue != null) {
-      if (value.compareTo(maxValue) > 0) {
         return false;
       }
     }
@@ -425,8 +148,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   private boolean pruneRangePredicate(IndexSegment segment, RangePredicate rangePredicate,
       Map<String, DataSource> dataSourceCache) {
     String column = rangePredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment
-        ? segment.getDataSource(column)
+    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
         : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
@@ -490,95 +212,25 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         }
       }
     }
-
     return false;
   }
 
-  private static Comparable convertValue(String stringValue, DataType dataType) {
-    try {
-      return dataType.convertInternal(stringValue);
-    } catch (Exception e) {
-      throw new BadQueryRequestException(e);
-    }
-  }
-
-  private static class ValueCache {
-    // As Predicates are recursive structures, their hashCode is quite expensive.
-    // By using an IdentityHashMap here we don't need to iterate over the recursive
-    // structure. This is specially useful in the IN expression.
-    private final Map<Predicate, Object> _cache = new IdentityHashMap<>();
-
-    private CachedValue add(EqPredicate pred) {
-      CachedValue val = new CachedValue(pred.getValue());
-      _cache.put(pred, val);
-      return val;
-    }
-
-    private List<CachedValue> add(InPredicate pred) {
-      List<CachedValue> vals = new ArrayList<>(pred.getValues().size());
-      for (String value : pred.getValues()) {
-        vals.add(new CachedValue(value));
-      }
-      _cache.put(pred, vals);
-      return vals;
-    }
-
-    public CachedValue get(EqPredicate pred, DataType dt) {
-      CachedValue cachedValue = (CachedValue) _cache.get(pred);
-      if (cachedValue == null) {
-        cachedValue = add(pred);
-      }
-      cachedValue.ensureDataType(dt);
-      return cachedValue;
-    }
-
-    public List<CachedValue> get(InPredicate pred, DataType dt) {
-      List<CachedValue> cachedValues = (List<CachedValue>) _cache.get(pred);
-      if (cachedValues == null) {
-        cachedValues = add(pred);
-      }
-      for (CachedValue cachedValue : cachedValues) {
-        cachedValue.ensureDataType(dt);
-      }
-      return cachedValues;
-    }
-
-    public static class CachedValue {
-      private final Object _value;
-      private boolean _hashed = false;
-      private long _hash1;
-      private long _hash2;
-      private DataType _dt;
-      private Comparable _comparableValue;
-
-      private CachedValue(Object value) {
-        _value = value;
-      }
-
-      private Comparable getComparableValue() {
-        assert _dt != null;
-        return _comparableValue;
-      }
-
-      private void ensureDataType(DataType dt) {
-        if (dt != _dt) {
-          String strValue = _value.toString();
-          _dt = dt;
-          _comparableValue = convertValue(strValue, dt);
-          _hashed = false;
-        }
-      }
-
-      private boolean mightBeContained(BloomFilterReader bloomFilter) {
-        if (!_hashed) {
-          GuavaBloomFilterReaderUtils.Hash128AsLongs hash128AsLongs =
-              GuavaBloomFilterReaderUtils.hashAsLongs(_comparableValue.toString());
-          _hash1 = hash128AsLongs.getHash1();
-          _hash2 = hash128AsLongs.getHash2();
-          _hashed = true;
-        }
-        return bloomFilter.mightContain(_hash1, _hash2);
+  /**
+   * Returns {@code true} if the value is within the column's min/max value range, {@code false} otherwise.
+   */
+  private boolean checkMinMaxRange(DataSourceMetadata dataSourceMetadata, Comparable value) {
+    Comparable minValue = dataSourceMetadata.getMinValue();
+    if (minValue != null) {
+      if (value.compareTo(minValue) < 0) {
+        return false;
       }
     }
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
+    if (maxValue != null) {
+      if (value.compareTo(maxValue) > 0) {
+        return false;
+      }
+    }
+    return true;
   }
 }
