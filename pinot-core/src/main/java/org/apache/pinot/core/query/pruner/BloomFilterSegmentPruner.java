@@ -19,25 +19,20 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.trace.TraceCallable;
+import org.apache.pinot.core.util.TaskUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -54,6 +49,8 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
  */
 @SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
 public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
+  // Try to schedule 10 segments for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
+  private static final int TARGET_NUM_SEGMENTS_PER_THREAD = 10;
 
   private FetchPlanner _fetchPlanner;
 
@@ -113,12 +110,14 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     if (segments.isEmpty()) {
       return segments;
     }
-    if (executorService == null) {
+    int numTasks = TaskUtils.getNumTasksWithTarget(segments.size(), TARGET_NUM_SEGMENTS_PER_THREAD,
+        query.getMaxExecutionThreads());
+    if (executorService == null || numTasks == 1) {
       return prune(segments, query);
     }
     // With executor service, the pruning is done in parallel.
     if (!query.isEnablePrefetch()) {
-      return parallelPrune(segments, query, executorService, null);
+      return parallelPrune(numTasks, segments, query, executorService, null);
     }
     int numSegments = segments.size();
     FetchContext[] fetchContexts = new FetchContext[numSegments];
@@ -132,7 +131,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
           fetchContexts[i] = fetchContext;
         }
       }
-      return parallelPrune(segments, query, executorService, fetchContexts);
+      return parallelPrune(numTasks, segments, query, executorService, fetchContexts);
     } finally {
       // Release the prefetched bloom filters
       for (int i = 0; i < numSegments; i++) {
@@ -144,66 +143,35 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     }
   }
 
-  private List<IndexSegment> parallelPrune(List<IndexSegment> segments, QueryContext queryContext,
+  private List<IndexSegment> parallelPrune(int numTasks, List<IndexSegment> segments, QueryContext queryContext,
       ExecutorService executorService, FetchContext[] fetchContexts) {
     int numSegments = segments.size();
-    int numTasks = CombineOperatorUtils.getNumTasksForQuery(numSegments, queryContext.getMaxExecutionThreads());
-    // Use a Phaser to ensure all the Futures are fully done before the main thread returns.
-    Phaser phaser = new Phaser(1);
-    Future[] futures = new Future[numTasks];
-    for (int i = 0; i < numTasks; i++) {
-      int index = i;
-      futures[i] = executorService.submit(new TraceCallable<List<IndexSegment>>() {
-        @Override
-        public List<IndexSegment> callJob() {
-          try {
-            // Register the thread to the phaser for main thread to wait for it to complete.
-            if (phaser.register() < 0) {
-              return Collections.emptyList();
-            }
-            FilterContext filter = Objects.requireNonNull(queryContext.getFilter());
-            ValueCache cachedValues = new ValueCache();
-            Map<String, DataSource> dataSourceCache = new HashMap<>();
-            List<IndexSegment> selectedSegments = new ArrayList<>();
-            for (int i = index; i < numSegments; i += numTasks) {
-              dataSourceCache.clear();
-              IndexSegment segment = segments.get(i);
-              FetchContext fetchContext = fetchContexts == null ? null : fetchContexts[i];
-              if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues)) {
-                selectedSegments.add(segment);
-              }
-            }
-            return selectedSegments;
-          } finally {
-            phaser.arriveAndDeregister();
-          }
-        }
-      });
-    }
     List<IndexSegment> allSelectedSegments = new ArrayList<>();
-    try {
-      // Check the query timeout while waiting for the pruning results.
-      for (Future future : futures) {
-        List<IndexSegment> selectedSegments =
-            (List<IndexSegment>) future.get(queryContext.getEndTimeMs() - System.currentTimeMillis(),
-                TimeUnit.MILLISECONDS);
-        allSelectedSegments.addAll(selectedSegments);
-      }
-      return allSelectedSegments;
-    } catch (InterruptedException e) {
-      throw new QueryCancelledException("Cancelled while running ColumnValueSegmentPruner", e);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while running ColumnValueSegmentPruner.", e);
-    } finally {
-      // Cancel all ongoing jobs
-      for (Future future : futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
+    TaskUtils.runTasksWithDeadline(numTasks, index -> {
+      FilterContext filter = Objects.requireNonNull(queryContext.getFilter());
+      ValueCache cachedValues = new ValueCache();
+      Map<String, DataSource> dataSourceCache = new HashMap<>();
+      List<IndexSegment> selectedSegments = new ArrayList<>();
+      for (int i = index; i < numSegments; i += numTasks) {
+        dataSourceCache.clear();
+        IndexSegment segment = segments.get(i);
+        FetchContext fetchContext = fetchContexts == null ? null : fetchContexts[i];
+        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues)) {
+          selectedSegments.add(segment);
         }
       }
-      // Deregister the main thread and wait for all threads done
-      phaser.awaitAdvance(phaser.arriveAndDeregister());
-    }
+      return selectedSegments;
+    }, taskRes -> {
+      if (taskRes != null && !taskRes.isEmpty()) {
+        allSelectedSegments.addAll(taskRes);
+      }
+    }, e -> {
+      if (e instanceof InterruptedException) {
+        throw new QueryCancelledException("Cancelled while running BloomFilterSegmentPruner", e);
+      }
+      throw new RuntimeException("Caught exception while running BloomFilterSegmentPruner", e);
+    }, executorService, queryContext.getEndTimeMs());
+    return allSelectedSegments;
   }
 
   private boolean pruneSegmentWithFetchContext(IndexSegment segment, FetchContext fetchContext, FilterContext filter,

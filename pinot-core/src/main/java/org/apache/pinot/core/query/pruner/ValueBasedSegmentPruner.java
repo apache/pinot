@@ -45,7 +45,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
  */
 @SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
 abstract public class ValueBasedSegmentPruner implements SegmentPruner {
-
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
   protected int _inPredicateThreshold;
 
