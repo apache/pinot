@@ -258,6 +258,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
+  public static final String LINEAGE_MANAGER_CLASS = "controller.lineage.manager.class";
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
@@ -285,6 +286,8 @@ public class ControllerConf extends PinotConfiguration {
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
   private static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
   private static final String DEFAULT_ACCESS_CONTROL_PASSWORD = "admin";
+  private static final String DEFAULT_LINEAGE_MANAGER =
+      "org.apache.pinot.controller.helix.core.lineage.DefaultLineageManager";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
@@ -831,6 +834,14 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setAccessControlFactoryClass(String accessControlFactoryClass) {
     setProperty(ACCESS_CONTROL_FACTORY_CLASS, accessControlFactoryClass);
+  }
+
+  public String getLineageManagerClass() {
+    return getProperty(LINEAGE_MANAGER_CLASS, DEFAULT_LINEAGE_MANAGER);
+  }
+
+  public void setLineageManagerClass(String lineageModifierClass) {
+    setProperty(LINEAGE_MANAGER_CLASS, lineageModifierClass);
   }
 
   public long getSegmentUploadTimeoutInMillis() {
