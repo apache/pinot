@@ -49,6 +49,7 @@ object ExampleSparkPinotConnectorTest extends Logging {
   }
 
   def readOffline()(implicit spark: SparkSession): Unit = {
+    import spark.implicits._
     log.info("## Reading `airlineStats_OFFLINE` table... ##")
     val data = spark.read
       .format("pinot")
