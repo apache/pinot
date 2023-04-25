@@ -58,7 +58,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   public static OpChain build(StageNode node, PlanRequestContext context) {
     MultiStageOperator root = node.visit(INSTANCE, context);
-    return new OpChain(context.getOpChainExecutionContext(), root, context.getReceivingMailboxes());
+    return new OpChain(context.getOpChainExecutionContext(), root, context.getReceivingMailboxIds());
   }
 
   @Override
@@ -67,14 +67,14 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
       SortedMailboxReceiveOperator sortedMailboxReceiveOperator =
           new SortedMailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
               node.getDataSchema(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
-              node.getSenderStageId(), node.getStageId());
-      context.addReceivingMailboxes(sortedMailboxReceiveOperator.getMailboxIds());
+              node.getSenderStageId());
+      context.addReceivingMailboxIds(sortedMailboxReceiveOperator.getMailboxIds());
       return sortedMailboxReceiveOperator;
     } else {
       MailboxReceiveOperator mailboxReceiveOperator =
           new MailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
-              node.getSenderStageId(), node.getStageId());
-      context.addReceivingMailboxes(mailboxReceiveOperator.getMailboxIds());
+              node.getSenderStageId());
+      context.addReceivingMailboxIds(mailboxReceiveOperator.getMailboxIds());
       return mailboxReceiveOperator;
     }
   }
@@ -84,7 +84,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new MailboxSendOperator(context.getOpChainExecutionContext(), nextOperator, node.getExchangeType(),
         node.getPartitionKeySelector(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
-        node.getStageId(), node.getReceiverStageId());
+        node.getReceiverStageId());
   }
 
   @Override

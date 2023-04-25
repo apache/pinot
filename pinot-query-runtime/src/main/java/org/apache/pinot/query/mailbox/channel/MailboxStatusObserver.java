@@ -19,32 +19,25 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.stub.StreamObserver;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * {@code MailboxStatusStreamObserver} is used by the SendingMailbox to send data over the wire.
- *
- * <p>Once {@link org.apache.pinot.query.mailbox.GrpcSendingMailbox#init()} is called, one instances of this class is
- * created based on the opened GRPC connection returned {@link StreamObserver}.
- * end.
+ * {@code MailboxStatusStreamObserver} is the status streaming observer used to track the status by the sender.
  */
-public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.MailboxStatus> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusStreamObserver.class);
+public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
-  private final AtomicInteger _bufferSize = new AtomicInteger(5);
 
-  private final CountDownLatch _finishLatch = new CountDownLatch(1);
-
-  public MailboxStatusStreamObserver() {
-  }
+  private final AtomicInteger _bufferSize = new AtomicInteger(DEFAULT_MAILBOX_QUEUE_CAPACITY);
+  private final AtomicBoolean _finished = new AtomicBoolean();
 
   @Override
-  public void onNext(Mailbox.MailboxStatus mailboxStatus) {
+  public void onNext(MailboxStatus mailboxStatus) {
     // when received a mailbox status from the receiving end, sending end update the known buffer size available
     // so we can make better throughput send judgement. here is a simple example.
     // TODO: this feedback info is not used to throttle the send speed. it is currently being discarded.
@@ -56,18 +49,22 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
     }
   }
 
+  public int getBufferSize() {
+    return _bufferSize.get();
+  }
+
   @Override
-  public void onError(Throwable e) {
-    _finishLatch.countDown();
-    LOGGER.error("[mailbox] Server returned onError", e);
+  public void onError(Throwable t) {
+    LOGGER.warn("Error on sender side", t);
+    _finished.set(true);
   }
 
   @Override
   public void onCompleted() {
-    _finishLatch.countDown();
+    _finished.set(true);
   }
 
   public boolean isFinished() {
-    return _finishLatch.getCount() == 0;
+    return _finished.get();
   }
 }

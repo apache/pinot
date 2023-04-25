@@ -22,7 +22,6 @@ import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 
@@ -33,7 +32,7 @@ import org.apache.pinot.query.runtime.operator.OpChainStats;
  *  This information is then used by the OpChain to create the Operators for a query.
  */
 public class OpChainExecutionContext {
-  private final MailboxService<TransferableBlock> _mailboxService;
+  private final MailboxService _mailboxService;
   private final long _requestId;
   private final int _stageId;
   private final VirtualServerAddress _server;
@@ -44,7 +43,7 @@ public class OpChainExecutionContext {
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
-  public OpChainExecutionContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
+  public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long timeoutMs, long deadlineMs, Map<Integer, StageMetadata> metadataMap,
       boolean traceEnabled) {
     _mailboxService = mailboxService;
@@ -65,7 +64,7 @@ public class OpChainExecutionContext {
         planRequestContext.getMetadataMap(), planRequestContext.isTraceEnabled());
   }
 
-  public MailboxService<TransferableBlock> getMailboxService() {
+  public MailboxService getMailboxService() {
     return _mailboxService;
   }
 

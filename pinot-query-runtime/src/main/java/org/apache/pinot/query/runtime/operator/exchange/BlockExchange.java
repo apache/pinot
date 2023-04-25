@@ -18,19 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,20 +33,14 @@ import org.slf4j.LoggerFactory;
  * exchanging data across different servers.
  */
 public abstract class BlockExchange {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BlockExchange.class);
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
-  private final List<SendingMailbox<TransferableBlock>> _sendingMailboxes;
+  private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
 
-  public static BlockExchange getExchange(MailboxService<TransferableBlock> mailboxService,
-      List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector,
-      BlockSplitter splitter, long deadlineMs) {
-    List<SendingMailbox<TransferableBlock>> sendingMailboxes = new ArrayList<>();
-    for (MailboxIdentifier mid : destinations) {
-      sendingMailboxes.add(mailboxService.getSendingMailbox(mid, deadlineMs));
-    }
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type exchangeType,
+      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
     switch (exchangeType) {
       case SINGLETON:
         return new SingletonExchange(sendingMailboxes, splitter);
@@ -69,7 +58,7 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
+  protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
     _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
   }
@@ -77,7 +66,7 @@ public abstract class BlockExchange {
   public void send(TransferableBlock block)
       throws Exception {
     if (block.isEndOfStreamBlock()) {
-      for (SendingMailbox<TransferableBlock> sendingMailbox : _sendingMailboxes) {
+      for (SendingMailbox sendingMailbox : _sendingMailboxes) {
         sendBlock(sendingMailbox, block);
       }
       return;
@@ -85,7 +74,7 @@ public abstract class BlockExchange {
     route(_sendingMailboxes, block);
   }
 
-  protected void sendBlock(SendingMailbox<TransferableBlock> sendingMailbox, TransferableBlock block)
+  protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)
       throws Exception {
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);
@@ -100,7 +89,7 @@ public abstract class BlockExchange {
     }
   }
 
-  protected abstract void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+  protected abstract void route(List<SendingMailbox> destinations, TransferableBlock block)
       throws Exception;
 
   // Called when the OpChain gracefully returns.
@@ -109,7 +98,7 @@ public abstract class BlockExchange {
   }
 
   public void cancel(Throwable t) {
-    for (SendingMailbox<TransferableBlock> sendingMailbox : _sendingMailboxes) {
+    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
       sendingMailbox.cancel(t);
     }
   }

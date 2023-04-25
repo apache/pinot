@@ -51,10 +51,8 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -75,7 +73,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final int _reducerPort;
   private final long _defaultBrokerTimeoutMs;
 
-  private final MailboxService<TransferableBlock> _mailboxService;
+  private final MailboxService _mailboxService;
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
 
@@ -106,7 +104,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // it is OK to ignore the onDataAvailable callback because the broker top-level operators
     // always run in-line (they don't have any scheduler)
-    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> {
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, ignored -> {
     });
 
     // TODO: move this to a startUp() function.
@@ -140,9 +138,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
-  private BrokerResponse handleRequest(long requestId, String query,
-      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  private BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
@@ -168,8 +165,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions,
-              requestId);
+          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
     } catch (Exception e) {
@@ -195,8 +191,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate QPS quota
     if (hasExceededQPSQuota(tableNames, requestId, requestContext)) {
-      String errorMessage =
-          String.format("Request %d: %s exceeds query quota.", requestId, query);
+      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
@@ -285,14 +280,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return false;
   }
 
-  private void updatePhaseTimingForTables(Set<String> tableNames,
-      BrokerQueryPhase phase, long time) {
+  private void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
     for (String tableName : tableNames) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
     }
   }
-
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();

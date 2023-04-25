@@ -51,7 +51,6 @@ import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -88,15 +87,14 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
 
   private static final ServerRequestPlanVisitor INSTANCE = new ServerRequestPlanVisitor();
-  private static Void _aVoid = null;
 
-  public static ServerPlanRequestContext build(MailboxService<TransferableBlock> mailboxService,
-      DistributedStagePlan stagePlan, Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
-      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList, long deadlineMs) {
+  public static ServerPlanRequestContext build(MailboxService mailboxService, DistributedStagePlan stagePlan,
+      Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo,
+      TableType tableType, List<String> segmentList, long deadlineMs) {
     // Before-visit: construct the ServerPlanRequestContext baseline
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
-    long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16)
-        + (stagePlan.getStageId() << 8) + (tableType == TableType.REALTIME ? 1 : 0);
+    long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16) + (
+        (long) stagePlan.getStageId() << 8) + (tableType == TableType.REALTIME ? 1 : 0);
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     boolean traceEnabled = Boolean.parseBoolean(requestMetadataMap.get(CommonConstants.Broker.Request.TRACE));
     PinotQuery pinotQuery = new PinotQuery();
@@ -178,7 +176,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     context.getPinotQuery().setSelectList(
         CalciteRexExpressionParser.addSelectList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
             context.getPinotQuery()));
-    return _aVoid;
+    return null;
   }
 
   @Override
@@ -196,25 +194,25 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     visitChildren(node, context);
     context.getPinotQuery()
         .setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), context.getPinotQuery()));
-    return _aVoid;
+    return null;
   }
 
   @Override
   public Void visitJoin(JoinNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    return _aVoid;
+    return null;
   }
 
   @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    return _aVoid;
+    return null;
   }
 
   @Override
   public Void visitMailboxSend(MailboxSendNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    return _aVoid;
+    return null;
   }
 
   @Override
@@ -222,7 +220,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     visitChildren(node, context);
     context.getPinotQuery()
         .setSelectList(CalciteRexExpressionParser.overwriteSelectList(node.getProjects(), context.getPinotQuery()));
-    return _aVoid;
+    return null;
   }
 
   @Override
@@ -239,7 +237,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     if (node.getOffset() > 0) {
       context.getPinotQuery().setOffset(node.getOffset());
     }
-    return _aVoid;
+    return null;
   }
 
   @Override
@@ -251,13 +249,13 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     context.getPinotQuery().setDataSource(dataSource);
     context.getPinotQuery().setSelectList(
         node.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression).collect(Collectors.toList()));
-    return _aVoid;
+    return null;
   }
 
   @Override
   public Void visitValue(ValueNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    return _aVoid;
+    return null;
   }
 
   private void visitChildren(StageNode node, ServerPlanRequestContext context) {

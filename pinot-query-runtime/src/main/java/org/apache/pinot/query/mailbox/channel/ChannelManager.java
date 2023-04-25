@@ -22,9 +22,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.service.QueryConfig;
-import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -34,20 +32,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * query/job/stages.
  */
 public class ChannelManager {
-  private final GrpcMailboxServer _grpcMailboxServer;
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
-
-  public ChannelManager(GrpcMailboxService mailboxService, PinotConfiguration extraConfig) {
-    _grpcMailboxServer = new GrpcMailboxServer(mailboxService, extraConfig);
-  }
-
-  public void init() {
-    _grpcMailboxServer.start();
-  }
-
-  public void shutdown() {
-    _grpcMailboxServer.shutdown();
-  }
 
   public ManagedChannel getChannel(String hostname, int port) {
     // TODO: Revisit parameters

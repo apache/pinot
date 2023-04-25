@@ -18,12 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -38,16 +35,8 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   private TransferableBlock _errorBlock;
 
-  public MailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType, int senderStageId,
-      int receiverStageId) {
-    this(context, context.getMetadataMap().get(senderStageId).getServerInstances(), exchangeType, senderStageId,
-        receiverStageId);
-  }
-
-  @VisibleForTesting
-  public MailboxReceiveOperator(OpChainExecutionContext context, List<VirtualServer> sendingStageInstances,
-      RelDistribution.Type exchangeType, int senderStageId, int receiverStageId) {
-    super(context, sendingStageInstances, exchangeType, senderStageId, receiverStageId);
+  public MailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType, int senderStageId) {
+    super(context, exchangeType, senderStageId);
   }
 
   @Override
@@ -71,35 +60,23 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     // - If all content blocks are already returned, return end-of-stream block
     int numMailboxes = _mailboxes.size();
     for (int i = 0; i < numMailboxes; i++) {
-      ReceivingMailbox<TransferableBlock> mailbox = _mailboxes.remove();
-      if (mailbox.isClosed()) {
+      ReceivingMailbox mailbox = _mailboxes.remove();
+      TransferableBlock block = mailbox.poll();
+
+      // Release the mailbox when the block is end-of-stream
+      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
         _mailboxService.releaseReceivingMailbox(mailbox);
+        _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
         continue;
       }
-      try {
-        TransferableBlock block = mailbox.receive();
 
-        // Release the mailbox when the block is end-of-stream
-        if (block != null && block.isEndOfStreamBlock()) {
-          _mailboxService.releaseReceivingMailbox(mailbox);
-          if (block.isErrorBlock()) {
-            _errorBlock = block;
-            return _errorBlock;
-          }
-          _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
-          continue;
+      // Add the mailbox back to the queue if the block is not end-of-stream
+      _mailboxes.add(mailbox);
+      if (block != null) {
+        if (block.isErrorBlock()) {
+          _errorBlock = block;
         }
-
-        // Add the mailbox back to the queue if the block is not end-of-stream
-        _mailboxes.add(mailbox);
-        if (block != null) {
-          return block;
-        }
-      } catch (Exception e) {
-        _mailboxService.releaseReceivingMailbox(mailbox);
-        _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(
-            new RuntimeException("Caught exception while polling from mailbox: " + mailbox.getId(), e));
-        return _errorBlock;
+        return block;
       }
     }
 
