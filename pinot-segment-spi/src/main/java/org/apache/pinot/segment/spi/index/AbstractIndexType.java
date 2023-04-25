@@ -128,4 +128,16 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
   public int hashCode() {
     return Objects.hash(_id);
   }
+
+  /**
+   * Helper method that builds allocation context that includes segment name, column name, and index type.
+   *
+   * @param segmentName Name of segment.
+   * @param columnName Name of column.
+   * @param indexType Index type.
+   * @return Allocation context built from segment name, column name and index type.
+   */
+  public static String buildAllocationContext(String segmentName, String columnName, String indexType) {
+    return segmentName + ":" + columnName + indexType;
+  }
 }

@@ -16,27 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.segment.spi.index.mutable;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.IndexReader;
 
 
-public interface MutableTextIndex extends TextIndexReader, MutableIndex {
-  @Override
-  default void add(@Nonnull Object value, int dictId, int docId) {
-    add((String) value);
-  }
-
-  @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
-    throw new UnsupportedOperationException("Mutable text indexes are not supported for multi-valued columns");
-  }
+public interface MutableIndex extends IndexReader {
 
   /**
-   * Index the document
-   * @param document the document as a string
+   * Adds the given single value cell to the index.
+   *
+   * Rows will be added in no particular order.
+   *
+   * @param value The nonnull value of the cell. In case the cell was actually null, a default value is received instead
+   * @param dictId An optional dictionary value of the cell. If there is no dictionary, -1 is received
    */
-  void add(String document);
+  void add(@Nonnull Object value, int dictId, int docId);
+
+  /**
+   * Adds the given multi value cell to the index.
+   *
+   * Rows will be added in no particular order.
+   *
+   * @param values The nonnull value of the cell. In case the cell was actually null, an empty array is received instead
+   * @param dictIds An optional array of dictionary values. If there is no dictionary, null is received.
+   */
+  void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId);
 }

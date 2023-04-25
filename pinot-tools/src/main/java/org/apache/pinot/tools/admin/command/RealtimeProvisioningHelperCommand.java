@@ -262,20 +262,20 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
     File workingDir = Files.createTempDir();
+    File file = new File(_schemaWithMetadataFile);
+    Schema schema = deserialize(file, Schema.class);
     MemoryEstimator memoryEstimator;
     if (segmentProvided) {
       // use the provided segment to estimate memory
       memoryEstimator =
-          new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes,
-              tableRetentionHours, workingDir);
+          new MemoryEstimator(tableConfig, schema, new File(_sampleCompletedSegmentDir), _ingestionRate,
+              maxUsableHostMemBytes, tableRetentionHours, workingDir);
     } else {
       // no segments provided;
       // generate a segment based on the provided characteristics and then use it to estimate memory
       if (_numRows == 0) {
         _numRows = DEFAULT_NUMBER_OF_ROWS;
       }
-      File file = new File(_schemaWithMetadataFile);
-      Schema schema = deserialize(file, Schema.class);
       SchemaWithMetaData schemaWithMetaData = deserialize(file, SchemaWithMetaData.class);
       memoryEstimator =
           new MemoryEstimator(tableConfig, schema, schemaWithMetaData, _numRows, _ingestionRate, maxUsableHostMemBytes,

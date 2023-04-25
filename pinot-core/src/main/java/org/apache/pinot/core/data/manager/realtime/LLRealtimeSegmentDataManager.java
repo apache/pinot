@@ -1396,16 +1396,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType).setSegmentName(_segmentNameStr)
+        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
+            .setSegmentName(_segmentNameStr)
             .setStreamName(streamTopic).setSchema(_schema).setTimeColumnName(timeColumnName)
             .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
-            .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
-            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(indexLoadingConfig.getInvertedIndexColumns())
-            .setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
-            .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns())
-            .setJsonIndexConfigs(indexLoadingConfig.getJsonIndexConfigs())
-            .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
+            .setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics())

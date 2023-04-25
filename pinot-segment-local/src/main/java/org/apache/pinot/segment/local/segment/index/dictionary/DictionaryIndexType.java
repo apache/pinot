@@ -35,6 +35,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -66,10 +67,14 @@ import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -406,5 +411,40 @@ public class DictionaryIndexType
     indexingConfig.setNoDictionaryColumns(null);
     indexingConfig.setOnHeapDictionaryColumns(null);
     indexingConfig.setVarLengthDictionaryColumns(null);
+  }
+
+  /**
+   * Creates a MutableDictionary.
+   *
+   * Unlikes most indexes, while dictionaries are important when
+   * {@link org.apache.pinot.segment.spi.MutableSegment mutable segments} are created, they do not follow the
+   * {@link MutableIndex} interface and therefore
+   * {@link DictionaryIndexType#createMutableIndex(MutableIndexContext, IndexConfig)} is not implemented.
+   *
+   * This also means that dictionaries cannot be overridden in realtime tables.
+   */
+  @Nullable
+  public static MutableDictionary createMutableDictionary(MutableIndexContext context, DictionaryIndexConfig config) {
+    if (config.isDisabled()) {
+      return null;
+    }
+    String column = context.getFieldSpec().getName();
+    String segmentName = context.getSegmentName();
+    FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    int dictionaryColumnSize;
+    if (storedType.isFixedWidth()) {
+      dictionaryColumnSize = storedType.size();
+    } else {
+      dictionaryColumnSize = context.getEstimatedColSize();
+    }
+    // NOTE: preserve 10% buffer for cardinality to reduce the chance of re-sizing the dictionary
+    // TODO(mutable-index-spi): Actually this 10% extra was applied twice, multiplying the cardinality by 1.21
+    //  first time it was applied in MutableSegmentImpl and then in DefaultMutableIndexProvider (where this code was
+    //  copied from). Decide if we want to actually use 10% as the comment said or 21% as we were doing
+    int estimatedCardinality = (int) (context.getEstimatedCardinality() * 1.21);
+    String dictionaryAllocationContext =
+        buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
+    return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
+        dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
   }
 }

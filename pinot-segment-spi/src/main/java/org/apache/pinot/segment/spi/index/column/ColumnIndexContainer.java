@@ -58,14 +58,14 @@ public interface ColumnIndexContainer extends Closeable {
   }
 
   class FromMap implements ColumnIndexContainer {
-    private final Map<IndexType, IndexReader> _readersByIndex;
+    private final Map<IndexType, ? extends IndexReader> _readersByIndex;
 
     /**
      * @param readersByIndex it is assumed that each index is associated with a compatible reader, but there is no check
      *                       to verify that. It is recommended to construct instances of this class by using
      *                       {@link FromMap.Builder}
      */
-    public FromMap(Map<IndexType, IndexReader> readersByIndex) {
+    public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex) {
       _readersByIndex = readersByIndex;
     }
 
@@ -82,6 +82,11 @@ public interface ColumnIndexContainer extends Closeable {
 
     public static class Builder {
       private final Map<IndexType, IndexReader> _readersByIndex = new HashMap<>();
+
+      public Builder withAll(Map<IndexType, ? extends IndexReader> safeMap) {
+        _readersByIndex.putAll(safeMap);
+        return this;
+      }
 
       public <R extends IndexReader> Builder with(IndexType<?, ? super R, ?> type, R reader) {
         _readersByIndex.put(type, reader);

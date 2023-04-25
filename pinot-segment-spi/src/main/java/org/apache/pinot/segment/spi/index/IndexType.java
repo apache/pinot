@@ -23,6 +23,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -107,4 +109,16 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    * old format.
    */
   void convertToNewFormat(TableConfig tableConfig, Schema schema);
+
+  /**
+   * Creates a mutable index.
+   *
+   * Implementations return null if the index type doesn't support mutable indexes. Some indexes may support mutable
+   * index only in some conditions. For example, they may only be supported if there is a dictionary or if the column is
+   * single-valued.
+   */
+  @Nullable
+  default MutableIndex createMutableIndex(MutableIndexContext context, C config) {
+    return null;
+  }
 }

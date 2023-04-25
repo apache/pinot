@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvertedIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
@@ -44,6 +45,8 @@ import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
@@ -192,5 +195,17 @@ public class InvertedIndexType
   @Override
   protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     tableConfig.getIndexingConfig().setInvertedIndexColumns(null);
+  }
+
+  @Nullable
+  @Override
+  public MutableIndex createMutableIndex(MutableIndexContext context, IndexConfig config) {
+    if (config.isDisabled()) {
+      return null;
+    }
+    if (!context.hasDictionary()) {
+      return null;
+    }
+    return new RealtimeInvertedIndex();
   }
 }
