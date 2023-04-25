@@ -54,8 +54,8 @@ import org.slf4j.LoggerFactory;
  * [input columns, aggregate result1, ... aggregate resultN]
  *
  * The window functions supported today are:
- * Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations
- * Ranking: ROW_NUMBER ranking functions
+ * Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations [RANGE window type only]
+ * Ranking: ROW_NUMBER ranking functions [ROWS window type only]
  * Value: [none]
  *
  * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
@@ -224,6 +224,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     Key emptyOrderKey = AggregationUtils.extractEmptyKey();
     List<Object[]> rows = new ArrayList<>(_numRows);
     if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
+      // All aggregation window functions only support RANGE type today (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
       for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
         Key partitionKey = e.getKey();
         List<Object[]> rowList = e.getValue();
@@ -239,6 +240,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         }
       }
     } else {
+      // Only ROW_NUMBER() window function is supported as ROWS type today
       Key previousPartitionKey = null;
       Object[] previousRowValues = new Object[_windowAccumulators.length];
       for (int i = 0; i < _windowAccumulators.length; i++) {
