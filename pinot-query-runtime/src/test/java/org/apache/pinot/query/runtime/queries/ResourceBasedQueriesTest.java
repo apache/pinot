@@ -374,9 +374,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
               : replaceTableName(testCaseName, queryCase._sql);
 
           int segmentCount = 0;
-          for (String tableName : testCaseEntry.getValue()._tables.keySet()) {
-            segmentCount +=
-                _tableToSegmentMap.getOrDefault(testCaseName + "_" + tableName + "_OFFLINE", new HashSet<>()).size();
+          if (queryCase._expectedNumSegments != null) {
+            segmentCount = queryCase._expectedNumSegments;
+          } else {
+            for (String tableName : testCaseEntry.getValue()._tables.keySet()) {
+              segmentCount +=
+                  _tableToSegmentMap.getOrDefault(testCaseName + "_" + tableName + "_OFFLINE", new HashSet<>()).size();
+            }
           }
 
           Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
