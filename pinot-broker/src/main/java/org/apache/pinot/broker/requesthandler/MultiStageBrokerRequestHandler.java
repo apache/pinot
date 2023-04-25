@@ -88,7 +88,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // use broker ID as host name, but remove the
       String brokerId = brokerIdFromConfig;
       brokerId = brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) ? brokerId.substring(
-          CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : brokerId;
+          CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH) : brokerId;
       brokerId = StringUtils.split(brokerId, "_").length > 1 ? StringUtils.split(brokerId, "_")[0] : brokerId;
       reducerHostname = brokerId;
     }

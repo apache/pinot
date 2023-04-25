@@ -83,8 +83,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
         _contentObserver.onNext(toMailboxContent(
             TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by sender", t))));
         _contentObserver.onCompleted();
-      } catch (Exception ignored) {
+      } catch (Exception e) {
         // Exception can be thrown if the stream is already closed, so we simply ignore it
+        LOGGER.debug("Caught exception cancelling mailbox: {}", _id, e);
       }
     }
   }

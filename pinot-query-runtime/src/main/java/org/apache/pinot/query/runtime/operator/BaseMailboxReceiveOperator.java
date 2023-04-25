@@ -107,7 +107,8 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   protected void cancelRemainingMailboxes() {
-    for (ReceivingMailbox mailbox : _mailboxes) {
+    ReceivingMailbox mailbox;
+    while ((mailbox = _mailboxes.poll()) != null) {
       mailbox.cancel();
     }
   }

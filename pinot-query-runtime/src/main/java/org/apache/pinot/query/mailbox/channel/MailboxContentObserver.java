@@ -97,8 +97,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     try {
       // NOTE: DO NOT use onError() because it will terminate the stream, and sender might not get the callback
       _responseObserver.onCompleted();
-    } catch (Exception ignored) {
+    } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
+      LOGGER.debug("Caught exception cancelling mailbox: {}", _mailbox != null ? _mailbox.getId() : "unknown", e);
     }
   }
 
@@ -117,8 +118,10 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   public void onCompleted() {
     try {
       _responseObserver.onCompleted();
-    } catch (Exception ignored) {
+    } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
+      LOGGER.debug("Caught exception sending complete to mailbox: {}", _mailbox != null ? _mailbox.getId() : "unknown",
+          e);
     }
   }
 }
