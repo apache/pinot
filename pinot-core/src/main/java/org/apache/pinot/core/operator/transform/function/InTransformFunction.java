@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -48,6 +50,7 @@ public class InTransformFunction extends BaseTransformFunction {
   private TransformFunction _mainFunction;
   private TransformFunction[] _valueFunctions;
   private Set _valueSet;
+  private boolean _valueSetContainsNull;
 
   @Override
   public String getName() {
@@ -66,7 +69,12 @@ public class InTransformFunction extends BaseTransformFunction {
     for (int i = 1; i < numArguments; i++) {
       TransformFunction valueFunction = arguments.get(i);
       if (valueFunction instanceof LiteralTransformFunction) {
-        stringValues.add(((LiteralTransformFunction) valueFunction).getStringLiteral());
+        LiteralTransformFunction literalTransformFunction = ((LiteralTransformFunction) valueFunction);
+        if (literalTransformFunction.getResultMetadata().getDataType() == DataType.UNKNOWN) {
+          _valueSetContainsNull = true;
+        } else {
+          stringValues.add(literalTransformFunction.getStringLiteral());
+        }
       } else {
         allLiteralValues = false;
         break;
@@ -114,6 +122,9 @@ public class InTransformFunction extends BaseTransformFunction {
             bytesValues.add(BytesUtils.toByteArray(stringValue));
           }
           _valueSet = bytesValues;
+          break;
+        case UNKNOWN:
+          _valueSet = new ObjectOpenHashSet<>();
           break;
         default:
           throw new IllegalStateException();
@@ -199,6 +210,9 @@ public class InTransformFunction extends BaseTransformFunction {
               }
             }
             break;
+          case UNKNOWN:
+            fillResultUnknown(length);
+            break;
           default:
             throw new IllegalStateException();
         }
@@ -263,6 +277,9 @@ public class InTransformFunction extends BaseTransformFunction {
                 }
               }
             }
+            break;
+          case UNKNOWN:
+            fillResultUnknown(length);
             break;
           default:
             throw new IllegalStateException();
@@ -365,11 +382,62 @@ public class InTransformFunction extends BaseTransformFunction {
             }
           }
           break;
+        case UNKNOWN:
+          fillResultUnknown(length);
+          break;
         default:
           throw new IllegalStateException();
       }
     }
 
     return _intValuesSV;
+  }
+
+  // TODO(https://github.com/apache/pinot/issues/10619): override transformToIntValuesSVWithNull
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    RoaringBitmap result = new RoaringBitmap();
+    RoaringBitmap mainFunctionNullBitmap = _mainFunction.getNullBitmap(valueBlock);
+    if (mainFunctionNullBitmap != null) {
+      result.or(mainFunctionNullBitmap);
+      if (result.getCardinality() == length) {
+        return result;
+      }
+    }
+    int[] intValuesSV = transformToIntValuesSV(valueBlock);
+    if (_valueSet == null) {
+      RoaringBitmap valueFunctionsContainNull = new RoaringBitmap();
+      RoaringBitmap[] valueFunctionNullBitmaps = new RoaringBitmap[_valueFunctions.length];
+      for (int i = 0; i < _valueFunctions.length; i++) {
+        valueFunctionNullBitmaps[i] = _valueFunctions[i].getNullBitmap(valueBlock);
+      }
+      for (int i = 0; i < length; i++) {
+        for (int j = 0; j < _valueFunctions.length; j++) {
+          if (valueFunctionNullBitmaps[j] != null && valueFunctionNullBitmaps[j].contains(i)) {
+            valueFunctionsContainNull.add(i);
+            break;
+          }
+        }
+      }
+      for (int i = 0; i < length; i++) {
+        if (mainFunctionNotContainedInValues(intValuesSV[i]) && valueFunctionsContainNull.contains(i)) {
+          result.add(i);
+        }
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        if (mainFunctionNotContainedInValues(intValuesSV[i]) && _valueSetContainsNull) {
+          result.add(i);
+        }
+      }
+    }
+    return result;
+  }
+
+  protected boolean mainFunctionNotContainedInValues(int value) {
+    return value == 0;
   }
 }
