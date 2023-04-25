@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.OpChain;
 
 
@@ -56,9 +55,9 @@ public interface OpChainScheduler {
    * A callback called whenever data is received for the given mailbox. This can be used by the scheduler
    * implementations to re-scheduled suspended OpChains. This method may be called for an OpChain that has not yet
    * been scheduled, or an OpChain that has already been de-registered.
-   * @param mailbox the mailbox ID
+   * @param mailboxId the mailbox ID
    */
-  void onDataAvailable(MailboxIdentifier mailbox);
+  void onDataAvailable(String mailboxId);
 
   /**
    * Returns an OpChain that is ready to be run by {@link OpChainSchedulerService}, waiting for the given time if

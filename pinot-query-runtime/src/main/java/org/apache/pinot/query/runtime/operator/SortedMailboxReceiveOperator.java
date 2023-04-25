@@ -30,7 +30,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
@@ -58,16 +57,8 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   public SortedMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       DataSchema dataSchema, List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
-      boolean isSortOnSender, int senderStageId, int receiverStageId) {
-    this(context, context.getMetadataMap().get(senderStageId).getServerInstances(), exchangeType, dataSchema,
-        collationKeys, collationDirections, isSortOnSender, senderStageId, receiverStageId);
-  }
-
-  public SortedMailboxReceiveOperator(OpChainExecutionContext context, List<VirtualServer> sendingStageInstances,
-      RelDistribution.Type exchangeType, DataSchema dataSchema, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, boolean isSortOnSender, int senderStageId,
-      int receiverStageId) {
-    super(context, sendingStageInstances, exchangeType, senderStageId, receiverStageId);
+      boolean isSortOnSender, int senderStageId) {
+    super(context, exchangeType, senderStageId);
     Preconditions.checkState(!CollectionUtils.isEmpty(collationKeys), "Collation keys must be set");
     _dataSchema = dataSchema;
     _collationKeys = collationKeys;
@@ -95,37 +86,26 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     // this operator will keep polling from all mailboxes until it receives null block or all blocks are collected.
     // TODO: Use k-way merge when input data is sorted, and return blocks without waiting for all the data.
     while (!_mailboxes.isEmpty()) {
-      ReceivingMailbox<TransferableBlock> mailbox = _mailboxes.remove();
-      if (mailbox.isClosed()) {
+      ReceivingMailbox mailbox = _mailboxes.remove();
+      TransferableBlock block = mailbox.poll();
+
+      // Release the mailbox when the block is end-of-stream
+      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
         _mailboxService.releaseReceivingMailbox(mailbox);
+        _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
         continue;
       }
-      try {
-        TransferableBlock block = mailbox.receive();
 
-        // Release the mailbox when the block is end-of-stream
-        if (block != null && block.isEndOfStreamBlock()) {
-          _mailboxService.releaseReceivingMailbox(mailbox);
-          if (block.isErrorBlock()) {
-            _errorBlock = block;
-            return _errorBlock;
-          }
-          _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
-          continue;
+      // Add the mailbox back to the queue if the block is not end-of-stream
+      _mailboxes.add(mailbox);
+      if (block != null) {
+        if (block.isErrorBlock()) {
+          _errorBlock = block;
+          return _errorBlock;
         }
-
-        // Add the mailbox back to the queue if the block is not end-of-stream
-        _mailboxes.add(mailbox);
-        if (block != null) {
-          _rows.addAll(block.getContainer());
-        } else {
-          return TransferableBlockUtils.getNoOpTransferableBlock();
-        }
-      } catch (Exception e) {
-        _mailboxService.releaseReceivingMailbox(mailbox);
-        _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(
-            new RuntimeException("Caught exception while polling from mailbox: " + mailbox.getId(), e));
-        return _errorBlock;
+        _rows.addAll(block.getContainer());
+      } else {
+        return TransferableBlockUtils.getNoOpTransferableBlock();
       }
     }
 

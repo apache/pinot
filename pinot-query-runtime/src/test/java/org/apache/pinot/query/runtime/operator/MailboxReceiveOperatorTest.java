@@ -25,9 +25,10 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -50,24 +51,26 @@ public class MailboxReceiveOperatorTest {
   private static final VirtualServerAddress RECEIVER_ADDRESS = new VirtualServerAddress("localhost", 123, 0);
   private static final DataSchema DATA_SCHEMA =
       new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
+  private static final String MAILBOX_ID_1 = MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0);
+  private static final String MAILBOX_ID_2 = MailboxIdUtils.toMailboxId(0, 1, 1, 0, 0);
 
   private AutoCloseable _mocks;
   @Mock
-  private MailboxService<TransferableBlock> _mailboxService;
+  private MailboxService _mailboxService;
   @Mock
   private VirtualServer _server1;
   @Mock
   private VirtualServer _server2;
   @Mock
-  private ReceivingMailbox<TransferableBlock> _mailbox1;
+  private ReceivingMailbox _mailbox1;
   @Mock
-  private ReceivingMailbox<TransferableBlock> _mailbox2;
+  private ReceivingMailbox _mailbox2;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
     when(_mailboxService.getHostname()).thenReturn("localhost");
-    when(_mailboxService.getMailboxPort()).thenReturn(123);
+    when(_mailboxService.getPort()).thenReturn(123);
     when(_server1.getHostname()).thenReturn("localhost");
     when(_server1.getQueryMailboxPort()).thenReturn(123);
     when(_server1.getVirtualId()).thenReturn(0);
@@ -86,20 +89,24 @@ public class MailboxReceiveOperatorTest {
   public void shouldThrowSingletonNoMatchMailboxServer() {
     when(_server1.getQueryMailboxPort()).thenReturn(456);
     when(_server2.getQueryMailboxPort()).thenReturn(789);
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
+            Collections.singletonMap(1, stageMetadata), false);
     //noinspection resource
-    new MailboxReceiveOperator(context, Arrays.asList(_server1, _server2), RelDistribution.Type.SINGLETON, 1, 0);
+    new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Multiple instances.*")
   public void shouldThrowReceiveSingletonFromMultiMatchMailboxServer() {
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
+            Collections.singletonMap(1, stageMetadata), false);
     //noinspection resource
-    new MailboxReceiveOperator(context, Arrays.asList(_server1, _server2), RelDistribution.Type.SINGLETON, 1, 0);
+    new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
@@ -108,25 +115,21 @@ public class MailboxReceiveOperatorTest {
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
             Collections.emptyMap(), false);
     //noinspection resource
-    new MailboxReceiveOperator(context, Collections.emptyList(), RelDistribution.Type.RANGE_DISTRIBUTED, 1, 0);
+    new MailboxReceiveOperator(context, RelDistribution.Type.RANGE_DISTRIBUTED, 1);
   }
 
   @Test
   public void shouldTimeoutOnExtraLongSleep()
       throws InterruptedException {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId =
-        new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId), RECEIVER_ADDRESS, RECEIVER_ADDRESS,
-            senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId)).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
 
     // Short timeoutMs should result in timeout
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10L, System.currentTimeMillis() + 10L,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, 1, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       Thread.sleep(100L);
       TransferableBlock mailbox = receiveOp.nextBlock();
       assertTrue(mailbox.isErrorBlock());
@@ -136,9 +139,8 @@ public class MailboxReceiveOperatorTest {
 
     // Longer timeout or default timeout (10s) doesn't result in timeout
     context = new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10_000L,
-        System.currentTimeMillis() + 10_000L, Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, 1, 0)) {
+        System.currentTimeMillis() + 10_000L, Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       Thread.sleep(100L);
       TransferableBlock mailbox = receiveOp.nextBlock();
       assertFalse(mailbox.isErrorBlock());
@@ -146,80 +148,47 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void shouldReceiveSingletonCloseMailbox() {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId =
-        new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId), RECEIVER_ADDRESS, RECEIVER_ADDRESS,
-            senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId)).thenReturn(_mailbox1);
-    when(_mailbox1.isClosed()).thenReturn(true);
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, senderStageId, 0)) {
-      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
-    }
-  }
-
-  @Test
   public void shouldReceiveSingletonNullMailbox() {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId =
-        new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId), RECEIVER_ADDRESS, RECEIVER_ADDRESS,
-            senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId)).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
 
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, senderStageId, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       assertTrue(receiveOp.nextBlock().isNoOpBlock());
     }
   }
 
   @Test
-  public void shouldReceiveEosDirectlyFromSender()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId =
-        new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId), RECEIVER_ADDRESS, RECEIVER_ADDRESS,
-            senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId)).thenReturn(_mailbox1);
-    when(_mailbox1.receive()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+  public void shouldReceiveEosDirectlyFromSender() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, senderStageId, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
     }
   }
 
   @Test
-  public void shouldReceiveSingletonMailbox()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId =
-        new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId), RECEIVER_ADDRESS, RECEIVER_ADDRESS,
-            senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId)).thenReturn(_mailbox1);
+  public void shouldReceiveSingletonMailbox() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     Object[] row = new Object[]{1, 1};
-    when(_mailbox1.receive()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, senderStageId, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
       assertEquals(actualRows.size(), 1);
       assertEquals(actualRows.get(0), row);
@@ -228,23 +197,18 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void shouldReceiveSingletonErrorMailbox()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId =
-        new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId), RECEIVER_ADDRESS, RECEIVER_ADDRESS,
-            senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId)).thenReturn(_mailbox1);
+  public void shouldReceiveSingletonErrorMailbox() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
-    when(_mailbox1.receive()).thenReturn(
+    when(_mailbox1.poll()).thenReturn(
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
 
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, senderStageId, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
       assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
@@ -252,26 +216,21 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void shouldReceiveMailboxFromTwoServersOneClose()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 0), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId1)).thenReturn(_mailbox1);
-    when(_mailbox1.isClosed()).thenReturn(true);
-    JsonMailboxIdentifier mailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 1), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId2)).thenReturn(_mailbox2);
+  public void shouldReceiveMailboxFromTwoServersOneNull() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row = new Object[]{1, 1};
-    when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Arrays.asList(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, senderStageId, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
+        1)) {
       List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
       assertEquals(actualRows.size(), 1);
       assertEquals(actualRows.get(0), row);
@@ -280,57 +239,24 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void shouldReceiveMailboxFromTwoServersOneNull()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 0), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId1)).thenReturn(_mailbox1);
-    when(_mailbox1.receive()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    JsonMailboxIdentifier mailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 1), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId2)).thenReturn(_mailbox2);
-    Object[] row = new Object[]{1, 1};
-    when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Arrays.asList(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, senderStageId, 0)) {
-      List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
-      assertEquals(actualRows.size(), 1);
-      assertEquals(actualRows.get(0), row);
-      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
-    }
-  }
-
-  @Test
-  public void shouldReceiveMailboxFromTwoServers()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
+  public void shouldReceiveMailboxFromTwoServers() {
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 2};
     Object[] row3 = new Object[]{3, 3};
-    JsonMailboxIdentifier mailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 0), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId1)).thenReturn(_mailbox1);
-    when(_mailbox1.receive()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
         OperatorTestUtil.block(DATA_SCHEMA, row3), TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    JsonMailboxIdentifier mailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 1), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId2)).thenReturn(_mailbox2);
-    when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Arrays.asList(_server1, _server2),
-        RelDistribution.Type.HASH_DISTRIBUTED, senderStageId, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
+        1)) {
       // Receive first block from server1
       assertEquals(receiveOp.nextBlock().getContainer().get(0), row1);
       // Receive second block from server2
@@ -342,56 +268,23 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void shouldGetReceptionReceiveErrorMailbox()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 0), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId1)).thenReturn(_mailbox1);
+  public void shouldGetReceptionReceiveErrorMailbox() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
-    when(_mailbox1.receive()).thenReturn(
+    when(_mailbox1.poll()).thenReturn(
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
-    JsonMailboxIdentifier mailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 1), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId2)).thenReturn(_mailbox2);
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row = new Object[]{3, 3};
-    when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
+    StageMetadata stageMetadata = new StageMetadata();
+    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, senderStageId, 0)) {
-      TransferableBlock block = receiveOp.nextBlock();
-      assertTrue(block.isErrorBlock());
-      assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
-    }
-  }
-
-  @Test
-  public void shouldThrowReceiveWhenOneServerReceiveThrowException()
-      throws Exception {
-    long requestId = 0;
-    int senderStageId = 1;
-    JsonMailboxIdentifier mailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 0), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId1)).thenReturn(_mailbox1);
-    String errorMessage = "TEST ERROR";
-    when(_mailbox1.receive()).thenThrow(new Exception(errorMessage));
-    JsonMailboxIdentifier mailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", requestId, senderStageId),
-        new VirtualServerAddress("localhost", 123, 1), RECEIVER_ADDRESS, senderStageId, 0);
-    when(_mailboxService.getReceivingMailbox(mailboxId2)).thenReturn(_mailbox2);
-    Object[] row = new Object[]{3, 3};
-    when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, Collections.singletonList(_server1),
-        RelDistribution.Type.SINGLETON, senderStageId, 0)) {
+            Collections.singletonMap(1, stageMetadata), false);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
+        1)) {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
       assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));

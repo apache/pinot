@@ -83,9 +83,9 @@ public class QueryDispatcher {
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
   }
 
-  public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
-      MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions,
-      Map<Integer, ExecutionStatsAggregator> executionStatsAggregator, boolean traceEnabled)
+  public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan, MailboxService mailboxService, long timeoutMs,
+      Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator,
+      boolean traceEnabled)
       throws Exception {
     try {
       // submit all the distributed stages.
@@ -176,16 +176,13 @@ public class QueryDispatcher {
 
   @VisibleForTesting
   public static ResultTable runReducer(long requestId, QueryPlan queryPlan, int reduceStageId, long timeoutMs,
-      MailboxService<TransferableBlock> mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap,
-      boolean traceEnabled) {
+      MailboxService mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled) {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
-    VirtualServerAddress server =
-        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0);
+    VirtualServerAddress server = new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), 0);
     OpChainExecutionContext context =
         new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs,
             System.currentTimeMillis() + timeoutMs, queryPlan.getStageMetadataMap(), traceEnabled);
-    MailboxReceiveOperator mailboxReceiveOperator =
-        createReduceStageOperator(reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(), context);
+    MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context, reduceNode.getSenderStageId());
     List<DataBlock> resultDataBlocks =
         reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, queryPlan, context.getStats());
     return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
@@ -290,12 +287,8 @@ public class QueryDispatcher {
     return new DataSchema(colNames, colTypes);
   }
 
-  private static MailboxReceiveOperator createReduceStageOperator(int stageId, int reducerStageId,
-      DataSchema dataSchema, OpChainExecutionContext context) {
-    // timeout is set for reduce stage
-    MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(context, RelDistribution.Type.RANDOM_DISTRIBUTED, stageId, reducerStageId);
-    return mailboxReceiveOperator;
+  private static MailboxReceiveOperator createReduceStageOperator(OpChainExecutionContext context, int senderStageId) {
+    return new MailboxReceiveOperator(context, RelDistribution.Type.RANDOM_DISTRIBUTED, senderStageId);
   }
 
   public void shutdown() {

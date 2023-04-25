@@ -44,7 +44,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.query.service.QueryConfig;
@@ -69,7 +69,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 
-  private static Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
 
   @BeforeClass
   public void setUp()
@@ -120,7 +120,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
               partition = RANDOM.nextInt(2);
             } else {
               for (String field : partitionColumns) {
-                partition = (partition + ((GenericRow) row).getValue(field).hashCode()) % 42;
+                partition = (partition + row.getValue(field).hashCode()) % 42;
               }
             }
             if (partition % 2 == 0) {
@@ -162,7 +162,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService = new GrpcMailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
         new PinotConfiguration(reducerConfig), ignored -> {
     });
     _mailboxService.start();
@@ -307,7 +307,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderBoth()
+  private Object[][] testResourceQueryTestCaseProviderBoth()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -333,8 +333,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             expectedRows.add(objs.toArray());
           }
           Object[] testEntry = new Object[]{
-              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder
+              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException, queryCase._keepOutputRowOrder
           };
           providerContent.add(testEntry);
         }
@@ -344,7 +343,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderWithMetadata()
+  private Object[][] testResourceQueryTestCaseProviderWithMetadata()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -389,7 +388,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderInputOnly()
+  private Object[][] testResourceQueryTestCaseProviderInputOnly()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -423,7 +422,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   // TODO: cache this test case generator
-  private static Map<String, QueryTestCase> getTestCases()
+  private Map<String, QueryTestCase> getTestCases()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = new HashMap<>();
     ClassLoader classLoader = ResourceBasedQueriesTest.class.getClassLoader();

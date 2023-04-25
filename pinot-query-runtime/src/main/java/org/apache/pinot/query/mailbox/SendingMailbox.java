@@ -18,23 +18,23 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import java.io.IOException;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 
 
 /**
  * Mailbox that's used to send data.
- *
- * @param <T> unit of data sent in one {@link #send} call.
  */
-public interface SendingMailbox<T> {
+public interface SendingMailbox {
 
   /**
-   * Send a single unit of data to a receiver. Note that SendingMailbox are required to acquire resources lazily in
-   * this call and they should <b>not</b> acquire any resources when they are created. This method should throw if there
-   * was an error sending the data, since that would allow {@link BlockExchange} to exit early.
+   * Sends a block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call, and
+   * they should <b>not</b> acquire any resources when they are created. This method should throw if there was an error
+   * sending the data, since that would allow {@link BlockExchange} to exit early.
    */
-  void send(T data)
-      throws Exception;
+  void send(TransferableBlock block)
+      throws IOException;
 
   /**
    * Called when there is no more data to be sent by the {@link BlockExchange}. This is also a signal for the
@@ -48,17 +48,11 @@ public interface SendingMailbox<T> {
    * {@link #cancel} which can allow callers to force release the underlying resources.
    * </p>
    */
-  void complete()
-      throws Exception;
+  void complete();
 
   /**
-   * A SendingMailbox is considered initialized after it has acquired a reference to the underlying channel that will
-   * be used to send data to the receiver.
-   */
-  boolean isInitialized();
-
-  /**
-   * Allows terminating the underlying channel.
+   * Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
+   * No more blocks can be sent after calling this method.
    */
   void cancel(Throwable t);
 }

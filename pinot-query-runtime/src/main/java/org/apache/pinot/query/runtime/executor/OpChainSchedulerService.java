@@ -24,7 +24,6 @@ import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.slf4j.Logger;
@@ -138,9 +137,8 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     operatorChain.getStats().queued();
     _scheduler.register(operatorChain);
     LOGGER.debug("({}): Scheduler is now handling operator chain listening to mailboxes {}. "
-            + "There are a total of {} chains awaiting execution.",
-        operatorChain,
-        operatorChain.getReceivingMailbox(),
+            + "There are a total of {} chains awaiting execution.", operatorChain,
+        operatorChain.getReceivingMailboxIds(),
         _scheduler.size());
   }
 
@@ -158,10 +156,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    * Implementations of this method should be idempotent, it may be called in the
    * scenario that no mail is available.
    *
-   * @param mailbox the identifier of the mailbox that now has data
+   * @param mailboxId the identifier of the mailbox that now has data
    */
-  public final void onDataAvailable(MailboxIdentifier mailbox) {
-    _scheduler.onDataAvailable(mailbox);
+  public final void onDataAvailable(String mailboxId) {
+    _scheduler.onDataAvailable(mailboxId);
   }
 
   // TODO: remove this method after we pipe down the proper executor pool to the v1 engine

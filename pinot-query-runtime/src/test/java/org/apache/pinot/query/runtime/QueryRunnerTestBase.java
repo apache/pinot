@@ -47,7 +47,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.routing.VirtualServer;
@@ -77,7 +77,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
   protected Map<ServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
-  protected GrpcMailboxService _mailboxService;
+  protected MailboxService _mailboxService;
 
   static {
     SEGMENT_BREAKER_ROW.putValue(SEGMENT_BREAKER_KEY, SEGMENT_BREAKER_STR);
@@ -88,8 +88,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
 
   /**
-   * Dispatch query to each pinot-server. The logic should mimic
-   * {@link QueryDispatcher#submit(long, QueryPlan, long, Map)} but does not actually make ser/de dispatches.
+   * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
+   * ser/de dispatches.
    */
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
