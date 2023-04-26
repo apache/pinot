@@ -220,7 +220,9 @@ public class QueryServerTest extends QueryTestSet {
   private Worker.QueryRequest getQueryRequest(QueryPlan queryPlan, int stageId) {
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
         queryPlan.getDispatchablePlanMetadataMap().get(stageId).getServerInstanceToWorkerIdMap();
-    QueryServerInstance serverInstance = new ArrayList<>(serverInstanceToWorkerIdMap.keySet()).get(0);
+    // this particular test set requires the request to have a single QueryServerInstance to dispatch to
+    // as it is not testing the multi-tenancy dispatch (which is in the QueryDispatcherTest)
+    QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
     int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
 
     return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(

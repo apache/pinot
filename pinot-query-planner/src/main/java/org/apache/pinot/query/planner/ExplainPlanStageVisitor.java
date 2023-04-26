@@ -63,8 +63,8 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     }
 
     // the root of a query plan always only has a single node
-    QueryServerInstance rootServer = new ArrayList<>(
-        queryPlan.getDispatchablePlanMetadataMap().get(0).getServerInstanceToWorkerIdMap().keySet()).get(0);
+    QueryServerInstance rootServer = queryPlan.getDispatchablePlanMetadataMap().get(0).getServerInstanceToWorkerIdMap()
+        .keySet().iterator().next();
     return explainFrom(queryPlan, queryPlan.getQueryStageMap().get(0), rootServer);
   }
 
