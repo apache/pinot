@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -106,6 +107,7 @@ public class MutableSegmentImplTestUtils {
         .setAvgNumMultiValues(2)
         .setIndex(noDictionaryColumns, StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
         .setIndex(varLengthDictionaryColumns, StandardIndexes.dictionary(), varLengthDictConf)
+        .setIndex(invertedIndexColumns, StandardIndexes.inverted(), IndexConfig.ENABLED)
         .setSegmentZKMetadata(new SegmentZKMetadata(SEGMENT_NAME))
         .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
         .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled).setUpsertMode(upsertMode)
