@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -700,7 +701,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private void recordIndexingError(IndexType<?, ?, ?> indexType, Exception exception) {
     _logger.error("failed to index value with {}", indexType, exception);
     if (_serverMetrics != null) {
-      String metricKeyName = _realtimeTableName + "-" + indexType.getPrettyName() + "-indexingError";
+      String indexMetricName = indexType.getPrettyName().toUpperCase(Locale.US);
+      String metricKeyName = _realtimeTableName + "-" + indexMetricName + "-indexingError";
       _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
     }
   }
