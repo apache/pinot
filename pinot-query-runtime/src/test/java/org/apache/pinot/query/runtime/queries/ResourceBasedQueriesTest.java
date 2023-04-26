@@ -191,8 +191,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // this is only use for test identifier purpose.
     int port1 = server1.getPort();
     int port2 = server2.getPort();
-    _servers.put(new QueryServerInstance("localhost", port1, port1, port1), server1);
-    _servers.put(new QueryServerInstance("localhost", port2, port2, port2), server2);
+    _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
+    _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
   }
 
   @AfterClass

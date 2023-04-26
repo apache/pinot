@@ -31,27 +31,21 @@ import org.apache.pinot.core.transport.ServerInstance;
  */
 public class QueryServerInstance {
   private final String _hostname;
-  private final int _port;
   private final int _queryServicePort;
   private final int _queryMailboxPort;
 
   public QueryServerInstance(ServerInstance server) {
-    this(server.getHostname(), server.getPort(), server.getQueryServicePort(), server.getQueryMailboxPort());
+    this(server.getHostname(), server.getQueryServicePort(), server.getQueryMailboxPort());
   }
 
-  public QueryServerInstance(String hostName, int port, int servicePort, int mailboxPort) {
+  public QueryServerInstance(String hostName, int servicePort, int mailboxPort) {
     _hostname = hostName;
-    _port = port;
     _queryServicePort = servicePort;
     _queryMailboxPort = mailboxPort;
   }
 
   public String getHostname() {
     return _hostname;
-  }
-
-  public int getPort() {
-    return _port;
   }
 
   public int getQueryMailboxPort() {
@@ -71,17 +65,17 @@ public class QueryServerInstance {
       return false;
     }
     QueryServerInstance that = (QueryServerInstance) o;
-    return _hostname.equals(that._hostname) && _port == that.getPort() && _queryServicePort == that._queryServicePort
+    return _hostname.equals(that._hostname) && _queryServicePort == that._queryServicePort
         && _queryMailboxPort == that._queryMailboxPort;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_hostname, _port, _queryServicePort, _queryMailboxPort);
+    return Objects.hash(_hostname, _queryServicePort, _queryMailboxPort);
   }
 
   @Override
   public String toString() {
-    return _hostname + ":" + _port + "@{" + _queryServicePort + "," + _queryMailboxPort + "}";
+    return _hostname + "@{" + _queryServicePort + "," + _queryMailboxPort + "}";
   }
 }

@@ -21,7 +21,6 @@ package org.apache.pinot.query.service;
 import com.google.common.collect.Lists;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -234,6 +233,6 @@ public class QueryServerTest extends QueryTestSet {
             String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS))
         // extra configurations we want to test also parsed out correctly.
         .putMetadata(KEY_OF_SERVER_INSTANCE_HOST, serverInstance.getHostname())
-        .putMetadata(KEY_OF_SERVER_INSTANCE_PORT, String.valueOf(serverInstance.getPort())).build();
+        .putMetadata(KEY_OF_SERVER_INSTANCE_PORT, String.valueOf(serverInstance.getQueryServicePort())).build();
   }
 }

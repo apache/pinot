@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +99,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
         .append("]@")
         .append(context._host.getHostname())
         .append(':')
-        .append(context._host.getPort())
+        .append(context._host.getQueryServicePort())
         .append(' ')
         .append(node.explain());
     return context._builder;

@@ -122,22 +122,22 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            tables.get(0).equals("a") ? ImmutableList.of("localhost:1@{1,1}|[1]", "localhost:2@{2,2}|[0]")
-                : ImmutableList.of("localhost:1@{1,1}|[0]"));
+            tables.get(0).equals("a") ? ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]")
+                : ImmutableList.of("localhost@{1,1}|[0]"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
             e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableSet.of("localhost:1@{1,1}|[1]", "localhost:2@{2,2}|[0]"));
+            ImmutableSet.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
             e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableSet.of("localhost:3@{3,3}|[0]"));
+            ImmutableSet.of("localhost@{3,3}|[0]"));
       }
     }
   }
@@ -247,13 +247,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         Assert.assertEquals(e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableList.of("localhost:1@{1,1}|[0]"));
+            ImmutableList.of("localhost@{1,1}|[0]"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableList.of("localhost:1@{1,1}|[1]", "localhost:1@{2,2}|[0]"));
+            ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       }
     }
   }

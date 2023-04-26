@@ -69,7 +69,7 @@ public class WorkerManager {
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
       dispatchablePlanMetadata.setServerInstanceToWorkerIdMap(Collections.singletonMap(
-          new QueryServerInstance(_hostName, _port, _port, _port), Collections.singletonList(0)));
+          new QueryServerInstance(_hostName, _port, _port), Collections.singletonList(0)));
       dispatchablePlanMetadata.setTotalWorkerCount(1);
     } else if (isLeafStage(dispatchablePlanMetadata)) {
       assignWorkerToLeafStage(requestId, dispatchablePlanMetadata);
