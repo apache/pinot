@@ -199,7 +199,7 @@ public class CalciteSqlParser {
   }
 
   @VisibleForTesting
-  static SqlNodeAndOptions extractSqlNodeAndOptions(String sql, SqlNodeList sqlNodeList) {
+  public static SqlNodeAndOptions extractSqlNodeAndOptions(String sql, SqlNodeList sqlNodeList) {
     PinotSqlType sqlType = null;
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
