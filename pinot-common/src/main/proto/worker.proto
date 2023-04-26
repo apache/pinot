@@ -70,23 +70,17 @@ message QueryResponse {
 
 message StagePlan {
   int32 stageId = 1;
-  string instanceId = 2;
+  string virtualAddress = 2;
   StageNode stageRoot = 3;
-  map<int32, StageMetadata> stageMetadata = 4;
+  repeated StageMetadata stageMetadata = 4;
 }
 
 message StageMetadata {
-  repeated string instances = 1;
-  repeated string dataSources = 2;
-  map<string, SegmentMap> instanceToSegmentMap = 3;
-  string timeColumn = 4;
-  string timeValue = 5;
+  repeated WorkerMetadata workerMetadata = 1;
+  map<string, string> customProperty = 2;
 }
 
-message SegmentMap {
-  map<string, SegmentList> tableTypeToSegmentList = 1;
-}
-
-message SegmentList {
-  repeated string segments = 1;
+message WorkerMetadata {
+  string virtualAddress = 1;
+  map<string, string> customProperty = 4;
 }

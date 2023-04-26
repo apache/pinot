@@ -24,48 +24,42 @@ import org.apache.pinot.core.transport.ServerInstance;
 
 
 /**
- * {@code VirtualServer} is a {@link ServerInstance} associated with a
- * unique virtualization identifier which allows the multistage query
- * engine to collocate multiple virtual servers on a single physical
- * instance, enabling higher levels of parallelism and partitioning
- * the query input.
+ * {@code QueryServerInstance} is representation used during query dispatch to indicate the
+ * physical location of a query server.
+ *
+ * <p>Note that {@code QueryServerInstance} should only be used during dispatch.</p>
  */
-public class VirtualServer {
+public class QueryServerInstance {
+  private final String _hostname;
+  private final int _port;
+  private final int _queryServicePort;
+  private final int _queryMailboxPort;
 
-  private final ServerInstance _server;
-  private final int _virtualId;
-
-  public VirtualServer(ServerInstance server, int virtualId) {
-    _server = server;
-    _virtualId = virtualId;
+  public QueryServerInstance(ServerInstance server) {
+    this(server.getHostname(), server.getPort(), server.getQueryServicePort(), server.getQueryMailboxPort());
   }
 
-  public ServerInstance getServer() {
-    return _server;
-  }
-
-  public int getVirtualId() {
-    return _virtualId;
+  public QueryServerInstance(String hostName, int port, int servicePort, int mailboxPort) {
+    _hostname = hostName;
+    _port = port;
+    _queryServicePort = servicePort;
+    _queryMailboxPort = mailboxPort;
   }
 
   public String getHostname() {
-    return _server.getHostname();
+    return _hostname;
   }
 
   public int getPort() {
-    return _server.getPort();
+    return _port;
   }
 
   public int getQueryMailboxPort() {
-    return _server.getQueryMailboxPort();
+    return _queryMailboxPort;
   }
 
   public int getQueryServicePort() {
-    return _server.getQueryServicePort();
-  }
-
-  public int getGrpcPort() {
-    return _server.getGrpcPort();
+    return _queryServicePort;
   }
 
   @Override
@@ -76,17 +70,18 @@ public class VirtualServer {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    VirtualServer that = (VirtualServer) o;
-    return _virtualId == that._virtualId && Objects.equals(_server, that._server);
+    QueryServerInstance that = (QueryServerInstance) o;
+    return _hostname.equals(that._hostname) && _port == that.getPort() && _queryServicePort == that._queryServicePort
+        && _queryMailboxPort == that._queryMailboxPort;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_server, _virtualId);
+    return Objects.hash(_hostname, _port, _queryServicePort, _queryMailboxPort);
   }
 
   @Override
   public String toString() {
-    return _virtualId + "@" + _server.getInstanceId();
+    return _hostname + ":" + _port + "@{" + _queryServicePort + "," + _queryMailboxPort + "}";
   }
 }
