@@ -47,6 +47,7 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -64,6 +65,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -727,6 +729,43 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         assertTrue((maxCount - count == 0 || maxCount - count == 1), "Instance assignment isn't distributed");
       }
     }
+  }
+
+  @Test
+  public void testUpdateTargetTier()
+      throws Exception {
+    TierConfig tierConfig =
+        new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Collections.singletonList("testSegment"),
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setTierConfigList(Collections.singletonList(tierConfig)).setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    String segmentName = "testSegment";
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadata);
+    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "testSegment"), "downloadUrl");
+    assertNull(segmentZKMetadata.getTier());
+
+    // Move on to new tier
+    _helixResourceManager.updateTargetTier("j1", tableConfig.getTableName(), tableConfig);
+    List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
+        _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
+
+    // Move back to default tier
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+    _helixResourceManager.updateTableConfig(tableConfig);
+    _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
+    retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertNull(retrievedSegmentZKMetadata.getTier());
   }
 
   /**

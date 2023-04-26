@@ -645,7 +645,9 @@ public class PinotTableRestletResource {
       value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
   @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
       @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
-      @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs) {
+      @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
+      @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
+      @QueryParam("updateTargetTier") boolean updateTargetTier) {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
@@ -661,8 +663,8 @@ public class PinotTableRestletResource {
         externalViewCheckIntervalInMs);
     rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
         externalViewStabilizationTimeoutInMs);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID,
-        TableRebalancer.createUniqueRebalanceJobIdentifier());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.UPDATE_TARGET_TIER, updateTargetTier);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID, TableRebalancer.createUniqueRebalanceJobIdentifier());
 
     try {
       if (dryRun || downtime) {
