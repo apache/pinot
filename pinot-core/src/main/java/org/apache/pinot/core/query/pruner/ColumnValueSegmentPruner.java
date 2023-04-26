@@ -112,18 +112,17 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
    */
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+    List<String> values = inPredicate.getValues();
+    // Skip pruning when there are too many values in the IN predicate
+    if (values.size() > _inPredicateThreshold) {
+      return false;
+    }
     String column = inPredicate.getLhs().getIdentifier();
     DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
         : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    List<String> values = inPredicate.getValues();
-
-    // Skip pruning when there are too many values in the IN predicate
-    if (values.size() > _inPredicateThreshold) {
-      return false;
-    }
     List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
     for (ValueCache.CachedValue value : cachedValues) {

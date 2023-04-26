@@ -90,25 +90,28 @@ public class CombinePlanNode implements PlanNode {
     int numPlanNodes = _planNodes.size();
     recording.setNumChildren(numPlanNodes);
     List<Operator> operators = new ArrayList<>(numPlanNodes);
-    int numTasks = TaskUtils.getNumTasksWithTarget(numPlanNodes, TARGET_NUM_PLANS_PER_THREAD,
-        _queryContext.getMaxExecutionThreads());
-    if (numTasks == 1) {
+
+    if (numPlanNodes <= TARGET_NUM_PLANS_PER_THREAD) {
+      // Small number of plan nodes, run them sequentially
       for (PlanNode planNode : _planNodes) {
         operators.add(planNode.run());
       }
     } else {
+      // Large number of plan nodes, run them in parallel
       // NOTE: Even if we get single executor thread, still run it using a separate thread so that the timeout can be
       //       honored
+      int numTasks =
+          TaskUtils.getNumTasks(numPlanNodes, TARGET_NUM_PLANS_PER_THREAD, _queryContext.getMaxExecutionThreads());
       recording.setNumTasks(numTasks);
       TaskUtils.runTasksWithDeadline(numTasks, index -> {
-        List<Operator> operators1 = new ArrayList<>();
+        List<Operator> ops = new ArrayList<>();
         for (int i = index; i < numPlanNodes; i += numTasks) {
-          operators1.add(_planNodes.get(i).run());
+          ops.add(_planNodes.get(i).run());
         }
-        return operators1;
-      }, ops -> {
-        if (ops != null && !ops.isEmpty()) {
-          operators.addAll(ops);
+        return ops;
+      }, taskRes -> {
+        if (taskRes != null && !taskRes.isEmpty()) {
+          operators.addAll(taskRes);
         }
       }, e -> {
         // Future object will throw ExecutionException for execution exception, need to check the cause to determine

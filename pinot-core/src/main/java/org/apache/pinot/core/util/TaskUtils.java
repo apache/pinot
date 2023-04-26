@@ -51,23 +51,17 @@ public class TaskUtils {
    * that they can run in parallel. The parallelism is bounded by the task count.
    */
   public static int getNumTasksForQuery(int numOperators, int maxExecutionThreads) {
-    if (maxExecutionThreads > 0) {
-      return Math.min(numOperators, maxExecutionThreads);
-    } else {
-      return Math.min(numOperators, MAX_NUM_THREADS_PER_QUERY);
-    }
+    return getNumTasks(numOperators, 1, maxExecutionThreads);
   }
 
-  public static int getNumTasksWithTarget(int numWorkUnits, int targetUnitsPerThread, int maxExecutionThreads) {
-    // Small number of tasks, just run them sequentially
-    if (numWorkUnits <= targetUnitsPerThread) {
+  public static int getNumTasks(int numWorkUnits, int minUnitsPerThread, int maxExecutionThreads) {
+    if (numWorkUnits <= minUnitsPerThread) {
       return 1;
     }
     if (maxExecutionThreads <= 0) {
       maxExecutionThreads = MAX_NUM_THREADS_PER_QUERY;
     }
-    // Large number of plan nodes, run them in parallel
-    return Math.min((numWorkUnits + targetUnitsPerThread - 1) / targetUnitsPerThread, maxExecutionThreads);
+    return Math.min((numWorkUnits + minUnitsPerThread - 1) / minUnitsPerThread, maxExecutionThreads);
   }
 
   /**
@@ -82,7 +76,7 @@ public class TaskUtils {
     List<Future<T>> futures = new ArrayList<>(numTasks);
     for (int i = 0; i < numTasks; i++) {
       int index = i;
-      futures.add(executorService.submit(new TraceCallable<>() {
+      futures.add(executorService.submit(new TraceCallable<T>() {
         @Override
         public T callJob() {
           try {
