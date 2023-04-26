@@ -1273,7 +1273,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
       BiConsumer<IndexType<?, ?, ?>, AutoCloseable> closer = (indexType, closeable) -> {
         try {
-          closeable.close();
+          if (closeable != null) {
+            closeable.close();
+          }
         } catch (Exception e) {
           _logger.error("Caught exception while closing {} index for column: {}, continuing with error",
               indexType, column, e);
