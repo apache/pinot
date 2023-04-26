@@ -602,10 +602,16 @@ public class MutableSegmentImpl implements MutableSegment {
         value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
         switch (dataType.getStoredType()) {
           case INT:
+            forwardIndex.add(((Number) value).intValue(), -1, docId);
+            break;
           case LONG:
+            forwardIndex.add(((Number) value).longValue(), -1, docId);
+            break;
           case FLOAT:
+            forwardIndex.add(((Number) value).floatValue(), -1, docId);
+            break;
           case DOUBLE:
-            forwardIndex.add(value, -1, docId);
+            forwardIndex.add(((Number) value).doubleValue(), -1, docId);
             break;
           default:
             throw new UnsupportedOperationException(
