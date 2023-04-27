@@ -182,10 +182,11 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final int capacity = _streamConfig.getFlushThresholdRows();
     boolean nullHandlingEnabled = indexingConfig != null && indexingConfig.isNullHandlingEnabled();
     RealtimeSegmentConfig realtimeSegmentConfig =
-        new RealtimeSegmentConfig.Builder(tableConfig, schema).setTableNameWithType(_tableNameWithType)
+        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
             .setSegmentName(_segmentName)
             .setStreamName(_streamConfig.getTopicName()).setSchema(schema).setTimeColumnName(_timeColumnName)
             .setCapacity(capacity).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+            .setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation()).setMemoryManager(
             getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
                 indexLoadingConfig.isRealtimeOffHeapAllocation(),
