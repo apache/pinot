@@ -353,9 +353,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
           _intValuesSV[docId] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
         }
       } else {
-        int[] intValues = _elseStatement.transformToIntValuesSV(valueBlock);
+        int[] elseValues = _elseStatement.transformToIntValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _intValuesSV[docId] = intValues[docId];
+          _intValuesSV[docId] = elseValues[docId];
         }
       }
     }

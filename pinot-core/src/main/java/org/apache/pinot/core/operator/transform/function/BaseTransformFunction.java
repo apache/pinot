@@ -81,6 +81,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, false, false);
   protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, false, false);
+  protected static final TransformResultMetadata UNKNOWN_METADATA =
+      new TransformResultMetadata(DataType.UNKNOWN, true, false);
 
   // These buffers are used to hold the result for different result types. When the subclass overrides a method, it can
   // reuse the buffer for that method. E.g. if transformToIntValuesSV is overridden, the result can be written into

@@ -54,9 +54,9 @@ public class IsNullTransformFunction extends BaseTransformFunction {
     RoaringBitmap bitmap = _transformFunction.getNullBitmap(valueBlock);
     int length = valueBlock.getNumDocs();
     initIntValuesSV(length);
-    Arrays.fill(_intValuesSV, 0);
+    Arrays.fill(_intValuesSV, getIsNullValue() ^ 1);
     if (bitmap != null) {
-      bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 1);
+      bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = getIsNullValue());
     }
     return _intValuesSV;
   }
@@ -64,5 +64,9 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     return null;
+  }
+
+  protected int getIsNullValue() {
+    return 1;
   }
 }

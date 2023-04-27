@@ -18,51 +18,17 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.roaringbitmap.IntConsumer;
-import org.roaringbitmap.RoaringBitmap;
 
 
-public class IsNotNullTransformFunction extends BaseTransformFunction {
-  private TransformFunction _transformFunction;
-
+public class IsNotNullTransformFunction extends IsNullTransformFunction {
   @Override
   public String getName() {
     return TransformFunctionType.IS_NOT_NULL.getName();
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NOT_NULL");
-    _transformFunction = arguments.get(0);
-  }
-
-  @Override
-  public TransformResultMetadata getResultMetadata() {
-    return BOOLEAN_SV_NO_DICTIONARY_METADATA;
-  }
-
-  @Override
-  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    RoaringBitmap bitmap = _transformFunction.getNullBitmap(valueBlock);
-    int length = valueBlock.getNumDocs();
-    initIntValuesSV(length);
-    Arrays.fill(_intValuesSV, 1);
-    if (bitmap != null) {
-      bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = 0);
-    }
-    return _intValuesSV;
-  }
-
-  @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    return null;
+  protected int getIsNullValue() {
+    return 0;
   }
 }

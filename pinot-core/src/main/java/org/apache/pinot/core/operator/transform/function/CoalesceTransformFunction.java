@@ -35,7 +35,7 @@ import org.roaringbitmap.RoaringBitmap;
 /**
  * The <code>CoalesceTransformFunction</code> implements the Coalesce operator.
  *
- * The results are first non-null value in the argument list.
+ * The results is first non-null value in the argument list.
  * If all arguments are null, return null.
  *
  * Note: arguments have to be compatible type.
@@ -43,7 +43,7 @@ import org.roaringbitmap.RoaringBitmap;
  *
  * Expected result:
  * Coalesce(nullColumn, columnA): columnA
- * Coalesce(columnA, nullColumn): nullColumn
+ * Coalesce(columnA, nullColumn): columnA
  * Coalesce(nullColumnA, nullColumnB): null
  *
  */
@@ -330,6 +330,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       case STRING:
         _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
+        break;
+      case UNKNOWN:
+        _resultMetadata = UNKNOWN_METADATA;
         break;
       default:
         throw new UnsupportedOperationException("Coalesce only supports numerical and string data type");

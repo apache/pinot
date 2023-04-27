@@ -92,4 +92,14 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunctionWithNull(coalesceFunc, expectedResults, expectedNull);
   }
+
+  @Test
+  public void testCoalesceNullNullLiteral() {
+    TransformFunction coalesceFunc = TransformFunctionFactory.get(
+        RequestContextUtils.getExpression("COALESCE(null, null)"), _dataSourceMap);
+    double[] expectedResults = new double[NUM_ROWS];
+    RoaringBitmap expectedNull = new RoaringBitmap();
+    expectedNull.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(coalesceFunc, expectedResults, expectedNull);
+  }
 }
