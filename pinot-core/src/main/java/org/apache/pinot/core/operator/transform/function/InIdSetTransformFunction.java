@@ -60,7 +60,7 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
 
     _transformFunction = arguments.get(0);
     try {
-      _idSet = IdSets.fromBase64String(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+      _idSet = IdSets.fromBase64String(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
     } catch (IOException e) {
       throw new IllegalArgumentException("Caught exception while deserializing IdSet", e);
     }
@@ -74,9 +74,7 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     DataType storedType = _transformFunction.getResultMetadata().getDataType().getStoredType();
     switch (storedType) {
       case INT:

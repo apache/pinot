@@ -104,10 +104,10 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     }
     _mainTransformFunction = firstArgument;
 
-    _dateTimeTransformer =
-        DateTimeTransformerFactory.getDateTimeTransformer(((LiteralTransformFunction) arguments.get(1)).getLiteral(),
-            ((LiteralTransformFunction) arguments.get(2)).getLiteral(),
-            ((LiteralTransformFunction) arguments.get(3)).getLiteral());
+    _dateTimeTransformer = DateTimeTransformerFactory.getDateTimeTransformer(
+        ((LiteralTransformFunction) arguments.get(1)).getStringLiteral(),
+            ((LiteralTransformFunction) arguments.get(2)).getStringLiteral(),
+            ((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
     if (_dateTimeTransformer instanceof EpochToEpochTransformer
         || _dateTimeTransformer instanceof SDFToEpochTransformer) {
       _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
@@ -127,9 +127,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
       return super.transformToLongValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
       EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
       dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV,
@@ -148,9 +146,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
       return super.transformToStringValuesSV(valueBlock);
     }
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     if (_dateTimeTransformer instanceof EpochToSDFTransformer) {
       EpochToSDFTransformer dateTimeTransformer = (EpochToSDFTransformer) _dateTimeTransformer;
       dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _stringValuesSV,

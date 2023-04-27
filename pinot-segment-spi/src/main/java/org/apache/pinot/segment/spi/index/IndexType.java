@@ -59,22 +59,10 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   C getDefaultConfig();
 
-  C getConfig(TableConfig tableConfig, Schema schema);
+  Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
 
-  /**
-   * Optional method that can be implemented to ignore the index creation.
-   *
-   * Sometimes it doesn't make sense to create an index, even when the user explicitly asked for it. For example, an
-   * inverted index shouldn't be created when the column is sorted.
-   *
-   * Apache Pinot will call this method once all index configurations have been parsed and it is included in the
-   * {@link FieldIndexConfigs} param.
-   *
-   * This method do not need to return false when the index type itself is not included in the {@link FieldIndexConfigs}
-   * param.
-   */
-  default boolean shouldBeCreated(IndexCreationContext context, FieldIndexConfigs configs) {
-    return true;
+  default String getPrettyName() {
+    return getId();
   }
 
   /**
@@ -102,20 +90,21 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   @Nullable
   default IR getIndexReader(ColumnIndexContainer indexContainer) {
-    throw new UnsupportedOperationException();
+    return indexContainer.getIndex(this);
   }
 
   String getFileExtension(ColumnMetadata columnMetadata);
 
-  /**
-   * Returns whether the index is stored as a buffer or not.
-   *
-   * Most indexes are stored as a buffer, but for example TextIndexType is stored in a separate lucene file.
-   */
-  default boolean storedAsBuffer() {
-    return true;
-  }
-
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig);
+
+  /**
+   * This method is used to perform in place conversion of provided {@link TableConfig} to newer format
+   * related to the IndexType that implements it.
+   *
+   * {@link AbstractIndexType#convertToNewFormat(TableConfig, Schema)} ensures all the index information from old format
+   * is made available in the new format while it depends on the individual index types to handle the data cleanup from
+   * old format.
+   */
+  void convertToNewFormat(TableConfig tableConfig, Schema schema);
 }

@@ -38,14 +38,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.query.service.QueryConfig;
@@ -70,13 +69,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 
-  private static Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-
     // Setting up mock server factories.
     // All test data are loaded upfront b/c the mock server and brokers needs to be in sync.
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
@@ -123,7 +120,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
               partition = RANDOM.nextInt(2);
             } else {
               for (String field : partitionColumns) {
-                partition = (partition + ((GenericRow) row).getValue(field).hashCode()) % 42;
+                partition = (partition + row.getValue(field).hashCode()) % 42;
               }
             }
             if (partition % 2 == 0) {
@@ -165,8 +162,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService = new GrpcMailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig), ignored -> { });
+    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+        new PinotConfiguration(reducerConfig), ignored -> {
+    });
     _mailboxService.start();
 
     Map<String, List<String>> tableToSegmentMap1 = factory1.buildTableSegmentNameMap();
@@ -208,12 +206,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, String sql, String expect, boolean keepOutputRowOrder)
+  public void testQueryTestCasesWithH2(String testCaseName, String sql, String h2Sql, String expect,
+      boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
     runQuery(sql, expect, null).ifPresent(rows -> {
       try {
-        compareRowEquals(rows, queryH2(sql), keepOutputRowOrder);
+        compareRowEquals(rows, queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -221,14 +220,15 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows, String expect,
-      boolean keepOutputRowOrder)
+  public void testQueryTestCasesWithOutput(String testCaseName, String sql, String h2Sql, List<Object[]> expectedRows,
+      String expect, boolean keepOutputRowOrder)
       throws Exception {
     runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
-  public void testQueryTestCasesWithMetadata(String testCaseName, String sql, String expect, int numSegments)
+  public void testQueryTestCasesWithMetadata(String testCaseName, String sql, String h2Sql, String expect,
+      int numSegments)
       throws Exception {
     Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
     runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(rows -> {
@@ -246,6 +246,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
 
       Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
+      int numTables = 0;
       for (Integer stageId : stageIdStats.keySet()) {
         // check stats only for leaf stage
         BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
@@ -256,7 +257,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         String tableName = brokerResponseStats.getTableNames().get(0);
         Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-
+        numTables++;
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
         if (tableType == null) {
           tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -275,6 +276,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
         }
       }
+
+      Assert.assertTrue(numTables > 0);
     });
   }
 
@@ -304,7 +307,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderBoth()
+  private Object[][] testResourceQueryTestCaseProviderBoth()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -322,14 +325,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         if (queryCase._outputs != null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
           List<List<Object>> orgRows = queryCase._outputs;
           List<Object[]> expectedRows = new ArrayList<>(orgRows.size());
           for (List<Object> objs : orgRows) {
             expectedRows.add(objs.toArray());
           }
-
-          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder};
+          Object[] testEntry = new Object[]{
+              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException, queryCase._keepOutputRowOrder
+          };
           providerContent.add(testEntry);
         }
       }
@@ -338,7 +343,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderWithMetadata()
+  private Object[][] testResourceQueryTestCaseProviderWithMetadata()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -365,6 +370,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
 
           int segmentCount = 0;
           for (String tableName : testCaseEntry.getValue()._tables.keySet()) {
@@ -372,7 +379,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
                 _tableToSegmentMap.getOrDefault(testCaseName + "_" + tableName + "_OFFLINE", new HashSet<>()).size();
           }
 
-          Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException, segmentCount};
+          Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
           providerContent.add(testEntry);
         }
       }
@@ -381,7 +388,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderInputOnly()
+  private Object[][] testResourceQueryTestCaseProviderInputOnly()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -398,8 +405,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry =
-              new Object[]{testCaseName, sql, queryCase._expectedException, queryCase._keepOutputRowOrder};
+              new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder};
           providerContent.add(testEntry);
         }
       }
@@ -413,7 +422,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   // TODO: cache this test case generator
-  private static Map<String, QueryTestCase> getTestCases()
+  private Map<String, QueryTestCase> getTestCases()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = new HashMap<>();
     ClassLoader classLoader = ResourceBasedQueriesTest.class.getClassLoader();

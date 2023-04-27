@@ -18,19 +18,16 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class PlanRequestContext {
-  protected final MailboxService<TransferableBlock> _mailboxService;
+  protected final MailboxService _mailboxService;
   protected final long _requestId;
   protected final int _stageId;
   // TODO: Timeout is not needed since deadline is already present.
@@ -38,11 +35,12 @@ public class PlanRequestContext {
   private final long _deadlineMs;
   protected final VirtualServerAddress _server;
   protected final Map<Integer, StageMetadata> _metadataMap;
-  protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
+  protected final List<String> _receivingMailboxIds = new ArrayList<>();
+  private final OpChainExecutionContext _opChainExecutionContext;
+  private final boolean _traceEnabled;
 
-
-  public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, long deadlineMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
+  public PlanRequestContext(MailboxService mailboxService, long requestId, int stageId, long timeoutMs, long deadlineMs,
+      VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap, boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
@@ -50,6 +48,8 @@ public class PlanRequestContext {
     _deadlineMs = deadlineMs;
     _server = server;
     _metadataMap = metadataMap;
+    _traceEnabled = traceEnabled;
+    _opChainExecutionContext = new OpChainExecutionContext(this);
   }
 
   public long getRequestId() {
@@ -76,15 +76,23 @@ public class PlanRequestContext {
     return _metadataMap;
   }
 
-  public MailboxService<TransferableBlock> getMailboxService() {
+  public MailboxService getMailboxService() {
     return _mailboxService;
   }
 
-  public void addReceivingMailboxes(List<MailboxIdentifier> ids) {
-    _receivingMailboxes.addAll(ids);
+  public void addReceivingMailboxIds(List<String> receivingMailboxIds) {
+    _receivingMailboxIds.addAll(receivingMailboxIds);
   }
 
-  public List<MailboxIdentifier> getReceivingMailboxes() {
-    return ImmutableList.copyOf(_receivingMailboxes);
+  public List<String> getReceivingMailboxIds() {
+    return _receivingMailboxIds;
+  }
+
+  public OpChainExecutionContext getOpChainExecutionContext() {
+    return _opChainExecutionContext;
+  }
+
+  public boolean isTraceEnabled() {
+    return _traceEnabled;
   }
 }

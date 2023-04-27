@@ -84,6 +84,10 @@
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.typesafe.netty</groupId>
+          <artifactId>netty-reactive-streams</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -93,10 +97,27 @@
       <type>test-jar</type>
     </dependency>
     <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>com.beust</groupId>
+          <artifactId>jcommander</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
+      <exclusions>
+        <exclusion>
+          <groupId>jakarta.activation</groupId>
+          <artifactId>jakarta.activation-api</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- Kafka  -->
     <dependency>

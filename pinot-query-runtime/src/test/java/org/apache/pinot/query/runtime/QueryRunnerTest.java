@@ -26,11 +26,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.routing.VirtualServer;
@@ -55,10 +54,8 @@ import org.testng.annotations.Test;
 
 
 /**
- * all legacy tests.
- *
- * @deprecated do not add to this test set. this class will be broken down and clean up.
- * add your test to appropraite files in {@link org.apache.pinot.query.runtime.queries} instead.
+ * all special tests that doesn't fit into {@link org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest}
+ * pattern goes here.
  */
 public class QueryRunnerTest extends QueryRunnerTestBase {
   public static final Object[][] ROWS = new Object[][]{
@@ -95,7 +92,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1")
         .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
         .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
@@ -132,8 +128,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService = new GrpcMailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig), ignored -> { });
+    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+        new PinotConfiguration(reducerConfig), ignored -> {
+    });
     _mailboxService.start();
 
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
@@ -158,13 +155,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-  @Test(dataProvider = "testDataWithSqlToFinalRowCount")
+
+  /**
+   * Test compares with expected row count only.
+   */
+   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
       throws Exception {
     List<Object[]> resultRows = queryRunner(sql, null);
     Assert.assertEquals(resultRows.size(), expectedRows);
   }
 
+  /**
+   * Test automatically compares against H2.
+   *
+   * @deprecated do not add to this test set. this class will be broken down and clean up.
+   *   add your test to the appropriate files in {@link org.apache.pinot.query.runtime.queries} instead.
+   */
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
@@ -174,6 +181,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     compareRowEquals(resultRows, expectedRows);
   }
 
+  /**
+   * Test compares against its desired exceptions.
+   */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
@@ -198,7 +208,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
     try {
       QueryDispatcher.runReducer(requestId, queryPlan, reducerStageId,
-          Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService, null);
+          Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService, null,
+          false);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
       Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
@@ -236,6 +247,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT round_decimal(col3) FROM a", 15},
         new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
         new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+
+        // test queries with special query options attached
+        //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
+        new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
     };
   }
 

@@ -75,7 +75,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
   }
 
   @Override
@@ -86,9 +86,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[length][];
-    }
+    initStringValuesMV(length);
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       List<String> values = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);

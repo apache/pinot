@@ -41,6 +41,21 @@ echo "      <url>https://packages.confluent.io/maven/</url>">> ${SETTINGS_FILE}
 echo "      <blocked>false</blocked>">> ${SETTINGS_FILE}
 echo "    </mirror>">> ${SETTINGS_FILE}
 echo "  </mirrors>">> ${SETTINGS_FILE}
+
+echo "  <servers>">> ${SETTINGS_FILE}
+echo "    <server>">> ${SETTINGS_FILE}
+echo "      <id>central</id>">> ${SETTINGS_FILE}
+echo "      <configuration>">> ${SETTINGS_FILE}
+echo "        <httpConfiguration>">> ${SETTINGS_FILE}
+echo "          <all>">> ${SETTINGS_FILE}
+echo "            <connectionTimeout>120000</connectionTimeout>">> ${SETTINGS_FILE}
+echo "            <readTimeout>120000</readTimeout>">> ${SETTINGS_FILE}
+echo "          </all>">> ${SETTINGS_FILE}
+echo "        </httpConfiguration>">> ${SETTINGS_FILE}
+echo "      </configuration>">> ${SETTINGS_FILE}
+echo "    </server>">> ${SETTINGS_FILE}
+echo "  </servers>">> ${SETTINGS_FILE}
+
 echo "</settings>">> ${SETTINGS_FILE}
 
 # PINOT_MAVEN_OPTS is used to provide additional maven options to the checkoutAndBuild.sh command

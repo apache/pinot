@@ -24,6 +24,8 @@ import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.glassfish.jersey.internal.guava.Preconditions;
 
 
 /**
@@ -35,6 +37,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     _arguments = arguments;
     int numArguments = arguments.size();
     if (numArguments <= 1) {
@@ -44,10 +47,10 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
     }
     for (int i = 0; i < numArguments; i++) {
       TransformResultMetadata argumentMetadata = arguments.get(i).getResultMetadata();
-      if (!(argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric())) {
-        throw new IllegalArgumentException(
-            "Unsupported argument of index: " + i + ", expecting single-valued boolean/number");
-      }
+      FieldSpec.DataType storedType = argumentMetadata.getDataType().getStoredType();
+      Preconditions.checkState(
+          argumentMetadata.isSingleValue() && storedType.isNumeric() || storedType.isUnknown(),
+          "Unsupported argument type. Expecting single-valued boolean/number");
     }
   }
 
@@ -59,9 +62,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(numDocs);
     System.arraycopy(_arguments.get(0).transformToIntValuesSV(valueBlock), 0, _intValuesSV, 0, numDocs);
     int numArguments = _arguments.size();
     for (int i = 1; i < numArguments; i++) {

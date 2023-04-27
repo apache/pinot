@@ -167,14 +167,6 @@ public abstract class ClusterTest extends ControllerTest {
     return _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
   }
 
-  protected int getBrokerPort(int index) {
-    return _brokerPorts.get(index);
-  }
-
-  protected List<Integer> getBrokerPorts() {
-    return ImmutableList.copyOf(_brokerPorts);
-  }
-
   protected PinotConfiguration getDefaultServerConfiguration() {
     PinotConfiguration serverConf = new PinotConfiguration();
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
@@ -383,23 +375,26 @@ public abstract class ClusterTest extends ControllerTest {
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File _avroFile;
-    private org.apache.avro.Schema _avroSchema;
-    private RecordExtractor _recordExtractor;
-    private DecoderFactory _decoderFactory = new DecoderFactory();
+    private RecordExtractor<GenericRecord> _recordExtractor;
+    private final DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;
 
     @Override
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
         throws Exception {
       // Load Avro schema
+      org.apache.avro.Schema avroSchema;
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(_avroFile)) {
-        _avroSchema = reader.getSchema();
+        avroSchema = reader.getSchema();
+      } catch (Exception ex) {
+        LOGGER.error("Caught exception", ex);
+        throw new RuntimeException(ex);
       }
       AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
       config.init(props);
       _recordExtractor = new AvroRecordExtractor();
       _recordExtractor.init(fieldsToRead, config);
-      _reader = new GenericDatumReader<>(_avroSchema);
+      _reader = new GenericDatumReader<>(avroSchema);
     }
 
     @Override
@@ -466,11 +461,13 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
-   * Queries the controller's sql query endpoint (/query/sql)
+   * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
    */
-  protected JsonNode postQueryToController(String query)
-      throws Exception {
-    return postQueryToController(query, _controllerBaseApiUrl);
+  protected JsonNode postQueryWithOptions(String query, String queryOptions) throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
+    payload.put("sql", query);
+    payload.put("queryOptions", queryOptions);
+    return JsonUtils.stringToJsonNode(sendPostRequest(_brokerBaseApiUrl + "/query/sql", payload.toString(), null));
   }
 
   /**
@@ -486,8 +483,22 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers)
       throws Exception {
+    return postQueryToController(query, controllerBaseApiUrl, headers, null);
+  }
+
+  /**
+   * Queries the controller's sql query endpoint (/sql)
+   */
+  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers,
+      Map<String, String> extraJsonProperties)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
+    if (MapUtils.isNotEmpty(extraJsonProperties)) {
+      for (Map.Entry<String, String> extraProperty :extraJsonProperties.entrySet()) {
+        payload.put(extraProperty.getKey(), extraProperty.getValue());
+      }
+    }
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
   }

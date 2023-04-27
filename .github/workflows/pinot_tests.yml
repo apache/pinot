@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Pinot Linter Test Set
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -60,7 +60,7 @@ jobs:
         env:
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -76,7 +76,7 @@ jobs:
         testset: [ 1, 2 ]
     name: Pinot Unit Test Set ${{ matrix.testset }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -98,7 +98,7 @@ jobs:
           RUN_TEST_SET: ${{ matrix.testset }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -108,6 +108,8 @@ jobs:
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           flags: unittests${{ matrix.testset }}
           name: codecov-unit-tests
@@ -122,7 +124,7 @@ jobs:
         testset: [ 1, 2 ]
     name: Pinot Integration Test Set ${{ matrix.testset }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -144,7 +146,7 @@ jobs:
           RUN_TEST_SET: ${{ matrix.testset }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -154,6 +156,8 @@ jobs:
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           flags: integration${{ matrix.testset }}
           name: codecov-integration-tests
@@ -166,16 +170,28 @@ jobs:
     strategy:
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
-        old_commit: [ "release-0.9.0", "master" ]
+        old_commit: [
+          "release-0.9.3", "release-0.10.0", "release-0.11.0", "release-0.12.1", "master"
+        ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v2
-      - name: Set up JDK 8
+      - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
-          java-version: 8
+          java-version: 11
           distribution: 'adopt'
           cache: 'maven'
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: v10.16.1
+          cache: 'npm'
+          cache-dependency-path: pinot-controller/src/main/resources/package-lock.json
+      - name: Install npm
+        run: |
+          npm install -g npm@6.10.0
+          npm --version
       # Step that does that actual cache save and restore
       - uses: actions/cache@v3
         env:
@@ -192,7 +208,7 @@ jobs:
           TEST_SUITE: ${{ matrix.test_suite }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -211,7 +227,7 @@ jobs:
         java: [ 8, 11, 15 ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v3
         with:
@@ -235,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Build Presto Pinot Driver
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -246,7 +262,7 @@ jobs:
         env:
           MAVEN_OPTS: >
             -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -263,6 +279,6 @@ jobs:
           cache: 'maven'
       - name: Build presto pinot driver with JDK 8
         env:
-          MAVEN_OPTS: -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+          MAVEN_OPTS: -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: |
           mvn clean install -DskipTests -Ppresto-driver -am -B -pl ':presto-pinot-driver' -Djdk.version=8 -T 16 || exit 1

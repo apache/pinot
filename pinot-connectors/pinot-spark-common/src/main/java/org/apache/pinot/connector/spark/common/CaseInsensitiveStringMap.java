@@ -41,39 +41,39 @@ import org.slf4j.LoggerFactory;
  * keys converted to lower case. This map doesn't allow null key.
  */
 public class CaseInsensitiveStringMap implements Map<String, String> {
-  private final Logger logger = LoggerFactory.getLogger(CaseInsensitiveStringMap.class);
+  private final Logger _logger = LoggerFactory.getLogger(CaseInsensitiveStringMap.class);
 
-  private String unsupportedOperationMsg = "CaseInsensitiveStringMap is read-only.";
+  private String _unsupportedOperationMsg = "CaseInsensitiveStringMap is read-only.";
 
   public static CaseInsensitiveStringMap empty() {
     return new CaseInsensitiveStringMap(new HashMap<>(0));
   }
 
-  private final Map<String, String> original;
+  private final Map<String, String> _original;
 
-  private final Map<String, String> delegate;
+  private final Map<String, String> _delegate;
 
   public CaseInsensitiveStringMap(Map<String, String> originalMap) {
-    original = new HashMap<>(originalMap);
-    delegate = new HashMap<>(originalMap.size());
+    _original = new HashMap<>(originalMap);
+    _delegate = new HashMap<>(originalMap.size());
     for (Map.Entry<String, String> entry : originalMap.entrySet()) {
       String key = toLowerCase(entry.getKey());
-      if (delegate.containsKey(key)) {
-        logger.warn("Converting duplicated key " + entry.getKey() +
-            " into CaseInsensitiveStringMap.");
+      if (_delegate.containsKey(key)) {
+        _logger.warn("Converting duplicated key " + entry.getKey()
+            + " into CaseInsensitiveStringMap.");
       }
-      delegate.put(key, entry.getValue());
+      _delegate.put(key, entry.getValue());
     }
   }
 
   @Override
   public int size() {
-    return delegate.size();
+    return _delegate.size();
   }
 
   @Override
   public boolean isEmpty() {
-    return delegate.isEmpty();
+    return _delegate.isEmpty();
   }
 
   private String toLowerCase(Object key) {
@@ -82,52 +82,52 @@ public class CaseInsensitiveStringMap implements Map<String, String> {
 
   @Override
   public boolean containsKey(Object key) {
-    return delegate.containsKey(toLowerCase(key));
+    return _delegate.containsKey(toLowerCase(key));
   }
 
   @Override
   public boolean containsValue(Object value) {
-    return delegate.containsValue(value);
+    return _delegate.containsValue(value);
   }
 
   @Override
   public String get(Object key) {
-    return delegate.get(toLowerCase(key));
+    return _delegate.get(toLowerCase(key));
   }
 
   @Override
   public String put(String key, String value) {
-    throw new UnsupportedOperationException(unsupportedOperationMsg);
+    throw new UnsupportedOperationException(_unsupportedOperationMsg);
   }
 
   @Override
   public String remove(Object key) {
-    throw new UnsupportedOperationException(unsupportedOperationMsg);
+    throw new UnsupportedOperationException(_unsupportedOperationMsg);
   }
 
   @Override
   public void putAll(Map<? extends String, ? extends String> m) {
-    throw new UnsupportedOperationException(unsupportedOperationMsg);
+    throw new UnsupportedOperationException(_unsupportedOperationMsg);
   }
 
   @Override
   public void clear() {
-    throw new UnsupportedOperationException(unsupportedOperationMsg);
+    throw new UnsupportedOperationException(_unsupportedOperationMsg);
   }
 
   @Override
   public Set<String> keySet() {
-    return delegate.keySet();
+    return _delegate.keySet();
   }
 
   @Override
   public Collection<String> values() {
-    return delegate.values();
+    return _delegate.values();
   }
 
   @Override
   public Set<Map.Entry<String, String>> entrySet() {
-    return delegate.entrySet();
+    return _delegate.entrySet();
   }
 
   /**
@@ -179,7 +179,7 @@ public class CaseInsensitiveStringMap implements Map<String, String> {
    * Returns the original case-sensitive map.
    */
   public Map<String, String> asCaseSensitiveMap() {
-    return Collections.unmodifiableMap(original);
+    return Collections.unmodifiableMap(_original);
   }
 
   @Override
@@ -191,11 +191,11 @@ public class CaseInsensitiveStringMap implements Map<String, String> {
       return false;
     }
     CaseInsensitiveStringMap that = (CaseInsensitiveStringMap) o;
-    return delegate.equals(that.delegate);
+    return _delegate.equals(that._delegate);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(delegate);
+    return Objects.hash(_delegate);
   }
 }

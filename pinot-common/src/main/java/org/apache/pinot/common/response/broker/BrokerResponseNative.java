@@ -321,7 +321,10 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setResultTable(ResultTable resultTable) {
     _resultTable = resultTable;
-    _numRowsResultSet = resultTable.getRows().size();
+    // If query level parameter is set to not return the results, then resultTable will be null.
+    if (resultTable != null) {
+      _numRowsResultSet = resultTable.getRows().size();
+    }
   }
 
   @JsonProperty("exceptions")

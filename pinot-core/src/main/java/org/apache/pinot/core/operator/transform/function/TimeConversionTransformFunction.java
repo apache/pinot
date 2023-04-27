@@ -55,8 +55,8 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
     _mainTransformFunction = firstArgument;
 
     _timeUnitTransformer = TimeUnitTransformerFactory.getTimeUnitTransformer(
-        TimeUnit.valueOf(((LiteralTransformFunction) arguments.get(1)).getLiteral().toUpperCase()),
-        ((LiteralTransformFunction) arguments.get(2)).getLiteral());
+        TimeUnit.valueOf(((LiteralTransformFunction) arguments.get(1)).getStringLiteral().toUpperCase()),
+        ((LiteralTransformFunction) arguments.get(2)).getStringLiteral());
   }
 
   @Override
@@ -67,11 +67,8 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
-    _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV,
-        length);
+    initLongValuesSV(length);
+    _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV, length);
     return _longValuesSV;
   }
 }

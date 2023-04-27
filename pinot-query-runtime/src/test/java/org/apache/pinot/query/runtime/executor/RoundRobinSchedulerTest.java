@@ -20,10 +20,11 @@ package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.collect.ImmutableList;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxIdUtils;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -37,18 +38,16 @@ public class RoundRobinSchedulerTest {
   private static final int DEFAULT_SENDER_STAGE_ID = 0;
   private static final int DEFAULT_RECEIVER_STAGE_ID = 1;
   private static final int DEFAULT_VIRTUAL_SERVER_ID = 1;
-  private static final int DEFAULT_POLL_TIMEOUT_MS = 0;
+  private static final int DEFAULT_POLL_TIMEOUT_MS = 1;
   private static final int DEFAULT_RELEASE_TIMEOUT_MS = 10;
   private static final long DEFAULT_REQUEST_ID = 123;
-  private static final String DEFAULT_SENDER_SERIALIZED = "0@foo:2";
-  private static final String DEFAULT_JOB_ID = String.format("%s_%s", DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID);
 
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier(DEFAULT_JOB_ID,
-      DEFAULT_SENDER_SERIALIZED, "1@bar:1", DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier(DEFAULT_JOB_ID,
-      DEFAULT_SENDER_SERIALIZED, "2@bar:1", DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
-  private static final MailboxIdentifier MAILBOX_3 = new JsonMailboxIdentifier(DEFAULT_JOB_ID,
-      DEFAULT_SENDER_SERIALIZED, "3@bar:1", DEFAULT_SENDER_STAGE_ID, DEFAULT_RECEIVER_STAGE_ID);
+  private static final String MAILBOX_1 =
+      MailboxIdUtils.toMailboxId(DEFAULT_REQUEST_ID, DEFAULT_SENDER_STAGE_ID, 0, DEFAULT_RECEIVER_STAGE_ID, 1);
+  private static final String MAILBOX_2 =
+      MailboxIdUtils.toMailboxId(DEFAULT_REQUEST_ID, DEFAULT_SENDER_STAGE_ID, 0, DEFAULT_RECEIVER_STAGE_ID, 2);
+  private static final String MAILBOX_3 =
+      MailboxIdUtils.toMailboxId(DEFAULT_REQUEST_ID, DEFAULT_SENDER_STAGE_ID, 0, DEFAULT_RECEIVER_STAGE_ID, 3);
 
   @Mock
   private MultiStageOperator _operator;
@@ -76,8 +75,9 @@ public class RoundRobinSchedulerTest {
   @Test
   public void testSchedulerHappyPath()
       throws InterruptedException {
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), DEFAULT_VIRTUAL_SERVER_ID,
-        123, DEFAULT_RECEIVER_STAGE_ID);
+    OpChain chain = new OpChain(
+        getOpChainExecutionContext(DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID, DEFAULT_VIRTUAL_SERVER_ID), _operator,
+        ImmutableList.of(MAILBOX_1));
     _scheduler = new RoundRobinScheduler(DEFAULT_RELEASE_TIMEOUT_MS);
     _scheduler.register(chain);
 
@@ -102,8 +102,9 @@ public class RoundRobinSchedulerTest {
   @Test
   public void testSchedulerWhenSenderDies()
       throws InterruptedException {
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), DEFAULT_VIRTUAL_SERVER_ID,
-        DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID);
+    OpChain chain = new OpChain(
+        getOpChainExecutionContext(DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID, DEFAULT_VIRTUAL_SERVER_ID), _operator,
+        ImmutableList.of(MAILBOX_1));
     _scheduler = new RoundRobinScheduler(DEFAULT_RELEASE_TIMEOUT_MS);
     _scheduler.register(chain);
 
@@ -132,12 +133,16 @@ public class RoundRobinSchedulerTest {
     // When parallelism is > 1, multiple OpChains with the same requestId and stageId would be registered in the same
     // scheduler. Data received on a given mailbox should wake up exactly 1 OpChain corresponding to the virtual
     // server-id determined by the Mailbox.
-    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), MAILBOX_1.getToHost().virtualId(),
-        DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID);
-    OpChain chain2 = new OpChain(_operator, ImmutableList.of(MAILBOX_2), MAILBOX_2.getToHost().virtualId(),
-        DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID);
-    OpChain chain3 = new OpChain(_operator, ImmutableList.of(MAILBOX_3), MAILBOX_3.getToHost().virtualId(),
-        DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID);
+    OpChain chain1 =
+        new OpChain(getOpChainExecutionContext(DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID, 1), _operator,
+            ImmutableList.of(MAILBOX_1));
+    OpChain chain2 =
+        new OpChain(getOpChainExecutionContext(DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID, 2), _operator,
+            ImmutableList.of(MAILBOX_2));
+    OpChain chain3 =
+        new OpChain(getOpChainExecutionContext(DEFAULT_REQUEST_ID, DEFAULT_RECEIVER_STAGE_ID, 3), _operator,
+            ImmutableList.of(MAILBOX_3));
+
     // Register 3 OpChains. Keep release timeout high to avoid unintended OpChain wake-ups.
     _scheduler = new RoundRobinScheduler(10_000);
     _scheduler.register(chain1);
@@ -171,5 +176,10 @@ public class RoundRobinSchedulerTest {
     // There should be no entries left in the scheduler after everything is done
     Assert.assertEquals(0,
         _scheduler.aliveChainsSize() + _scheduler.readySize() + _scheduler.seenMailSize() + _scheduler.availableSize());
+  }
+
+  private OpChainExecutionContext getOpChainExecutionContext(long requestId, int stageId, int virtualServerId) {
+    return new OpChainExecutionContext(null, requestId, stageId,
+        new VirtualServerAddress("localhost", 1234, virtualServerId), 0, 0, null, true);
   }
 }

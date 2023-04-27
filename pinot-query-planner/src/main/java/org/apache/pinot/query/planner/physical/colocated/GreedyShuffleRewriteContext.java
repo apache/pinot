@@ -35,6 +35,8 @@ class GreedyShuffleRewriteContext {
   private final Map<Integer, StageNode> _rootStageNode;
   private final Map<Integer, List<StageNode>> _leafNodes;
   private final Set<Integer> _joinStages;
+  private final Set<Integer> _setOpStages;
+
   /**
    * A map to track the partition keys for the input to the MailboxSendNode of a given stageId. This is needed
    * because the {@link GreedyShuffleRewriteVisitor} doesn't determine the distribution of the sender if the receiver
@@ -46,6 +48,7 @@ class GreedyShuffleRewriteContext {
     _rootStageNode = new HashMap<>();
     _leafNodes = new HashMap<>();
     _joinStages = new HashSet<>();
+    _setOpStages = new HashSet<>();
     _senderInputColocationKeys = new HashMap<>();
   }
 
@@ -90,6 +93,22 @@ class GreedyShuffleRewriteContext {
    */
   boolean isJoinStage(Integer stageId) {
     return _joinStages.contains(stageId);
+  }
+
+
+  /**
+   * {@link GreedyShuffleRewriteContext} allows checking whether a given stageId has a SetOpNode or not. During
+   * pre-computation, this method may be used to mark that the given stageId has a SetOpNode.
+   */
+  void markSetOpStage(Integer stageId) {
+    _setOpStages.add(stageId);
+  }
+
+  /**
+   * Returns true if the given stageId has a SetOpNode.
+   */
+  boolean isSetOpStage(Integer stageId) {
+    return _setOpStages.contains(stageId);
   }
 
   /**

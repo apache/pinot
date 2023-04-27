@@ -270,10 +270,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         // return the error table to broker sooner than here. But in case of race condition, we construct the error
         // table here too.
         instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
-            "Query cancelled on: " + _instanceDataManager.getInstanceId() + e));
+            "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e));
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
+            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e));
       }
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -556,7 +557,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       ExpressionContext subqueryExpression = arguments.get(1);
       Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
-      QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteralString());
+      QueryContext subquery =
+          QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteral().getStringValue());
       // Subquery should be an ID_SET aggregation only query
       //noinspection rawtypes
       AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();

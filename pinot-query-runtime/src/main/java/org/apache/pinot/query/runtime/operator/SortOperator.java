@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -31,9 +30,10 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.SortUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,18 +54,18 @@ public class SortOperator extends MultiStageOperator {
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
-  public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      long requestId, int stageId, VirtualServerAddress serverAddress) {
-    this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, requestId, stageId, serverAddress);
+  public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections, int fetch, int offset,
+      DataSchema dataSchema, boolean isInputSorted) {
+    this(context, upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema, isInputSorted,
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
   }
 
   @VisibleForTesting
-  SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
+  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      int defaultHolderCapacity, long requestId, int stageId, VirtualServerAddress serverAddress) {
-    super(requestId, stageId, serverAddress);
+      boolean isInputSorted, int defaultHolderCapacity) {
+    super(context);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = Math.max(offset, 0);
@@ -73,13 +73,17 @@ public class SortOperator extends MultiStageOperator {
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
     _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultHolderCapacity;
-    // When there's no collationKeys, the SortOperator is a simple selection with row trim on limit & offset
-    if (collationKeys.isEmpty()) {
+    // Under the following circumstances, the SortOperator is a simple selection with row trim on limit & offset:
+    // - There are no collationKeys
+    // - 'isInputSorted' is set to true indicating that the data was already sorted
+    if (collationKeys.isEmpty() || isInputSorted) {
       _priorityQueue = null;
       _rows = new ArrayList<>();
     } else {
+      // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
+      // which elements to keep and which to remove based on the limits.
       _priorityQueue = new PriorityQueue<>(_numRowsToKeep,
-          new SortComparator(collationKeys, collationDirections, dataSchema, false));
+          new SortUtils.SortComparator(collationKeys, collationDirections, dataSchema, false, true));
       _rows = null;
     }
   }
@@ -172,47 +176,6 @@ public class SortOperator extends MultiStageOperator {
         }
         block = _upstreamOperator.nextBlock();
       }
-    }
-  }
-
-  private static class SortComparator implements Comparator<Object[]> {
-    private final int _size;
-    private final int[] _valueIndices;
-    private final int[] _multipliers;
-    private final boolean[] _useDoubleComparison;
-
-    public SortComparator(List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
-        DataSchema dataSchema, boolean isNullHandlingEnabled) {
-      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-      _size = collationKeys.size();
-      _valueIndices = new int[_size];
-      _multipliers = new int[_size];
-      _useDoubleComparison = new boolean[_size];
-      for (int i = 0; i < _size; i++) {
-        _valueIndices[i] = ((RexExpression.InputRef) collationKeys.get(i)).getIndex();
-        _multipliers[i] = collationDirections.get(i).isDescending() ? 1 : -1;
-        _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
-      }
-    }
-
-    @Override
-    public int compare(Object[] o1, Object[] o2) {
-      for (int i = 0; i < _size; i++) {
-        int index = _valueIndices[i];
-        Object v1 = o1[index];
-        Object v2 = o2[index];
-        int result;
-        if (_useDoubleComparison[i]) {
-          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-        } else {
-          //noinspection unchecked
-          result = ((Comparable) v1).compareTo(v2);
-        }
-        if (result != 0) {
-          return result * _multipliers[i];
-        }
-      }
-      return 0;
     }
   }
 }

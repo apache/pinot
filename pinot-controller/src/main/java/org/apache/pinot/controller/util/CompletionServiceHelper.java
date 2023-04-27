@@ -57,7 +57,7 @@ public class CompletionServiceHelper {
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, int timeoutMs) {
-    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs);
+    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, null);
   }
 
   /**
@@ -70,11 +70,14 @@ public class CompletionServiceHelper {
    *                              get response.
    * @param requestHeaders Headers to be set when making the http calls.
    * @param timeoutMs timeout in milliseconds to wait per request.
+   * @param useCase the use case initiating the multi-get request. If not null and an exception is thrown, only the
+   *                error message and the use case are logged instead of the full stack trace.
    * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
    * multiRequestPerServer is true) to the response from that endpoint.
    */
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
+      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
+      @Nullable String useCase) {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
@@ -95,7 +98,8 @@ public class CompletionServiceHelper {
         completionServiceResponse._httpResponses
             .put(multiRequestPerServer ? uri.toString() : instance, getMethod.getResponseBodyAsString());
       } catch (Exception e) {
-        LOGGER.error("Connection error", e);
+        String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
+        LOGGER.error("Connection error{}. Details: {}", reason, e.getMessage());
         completionServiceResponse._failedResponseCount++;
       } finally {
         if (getMethod != null) {
@@ -113,6 +117,17 @@ public class CompletionServiceHelper {
     }
     return completionServiceResponse;
   }
+
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+      boolean multiRequestPerServer, int timeoutMs, @Nullable String useCase) {
+    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, useCase);
+  }
+
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
+    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, requestHeaders, timeoutMs, null);
+  }
+
 
   /**
    * Helper class to maintain the completion service response to be sent back to the caller.

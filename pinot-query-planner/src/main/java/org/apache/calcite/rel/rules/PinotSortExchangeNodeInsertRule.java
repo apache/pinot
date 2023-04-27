@@ -24,7 +24,7 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalSortExchange;
+import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
@@ -62,10 +62,15 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Sort sort = call.rel(0);
-    LogicalSortExchange exchange = LogicalSortExchange.create(
+    // TODO: Assess whether sorting is needed on both sender and receiver side or only receiver side. Potentially add
+    //       SqlHint support to determine this. For now setting sort only on receiver side as sender side sorting is
+    //       not yet implemented.
+    PinotLogicalSortExchange exchange = PinotLogicalSortExchange.create(
         sort.getInput(),
         RelDistributions.hash(Collections.emptyList()),
-        sort.getCollation());
+        sort.getCollation(),
+        false,
+        !sort.getCollation().getKeys().isEmpty());
     call.transformTo(LogicalSort.create(exchange, sort.getCollation(), sort.offset, sort.fetch));
   }
 }

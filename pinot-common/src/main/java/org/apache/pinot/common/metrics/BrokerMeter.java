@@ -32,6 +32,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", false),
 
   // These metrics track the exceptions caught during query execution in broker side.
+  // Query rejected by Jersey thread pool executor
+  QUERY_REJECTED_EXCEPTIONS("exceptions", true),
   // Query compile phase.
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
   // Get resource phase.

@@ -34,14 +34,8 @@ public class DataSchemaTest {
       "string_array", "boolean_array", "timestamp_array", "bytes_array"
   };
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
-  private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES =
-      {INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
-      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY};
-  private static final DataSchema.ColumnDataType[] COMPATIBLE_COLUMN_DATA_TYPES =
-      {LONG, FLOAT, DOUBLE, INT, STRING, OBJECT, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, INT_ARRAY, STRING_ARRAY,
-       BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY};
-  private static final DataSchema.ColumnDataType[] UPGRADED_COLUMN_DATA_TYPES = {
-      LONG, DOUBLE, DOUBLE, DOUBLE, STRING, OBJECT, LONG_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
+  private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES = {
+      INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
       BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
   };
 
@@ -70,22 +64,6 @@ public class DataSchemaTest {
     DataSchema dataSchemaAfterSerDe = DataSchema.fromBytes(ByteBuffer.wrap(dataSchema.toBytes()));
     Assert.assertEquals(dataSchema, dataSchemaAfterSerDe);
     Assert.assertEquals(dataSchema.hashCode(), dataSchemaAfterSerDe.hashCode());
-  }
-
-  @Test
-  public void testTypeCompatible() {
-    DataSchema dataSchema = new DataSchema(COLUMN_NAMES, COLUMN_DATA_TYPES);
-    DataSchema compatibleDataSchema = new DataSchema(COLUMN_NAMES, COMPATIBLE_COLUMN_DATA_TYPES);
-    Assert.assertTrue(dataSchema.isTypeCompatibleWith(compatibleDataSchema));
-
-    String[] anotherColumnNames = new String[NUM_COLUMNS];
-    Arrays.fill(anotherColumnNames, "foo");
-    DataSchema incompatibleDataSchema = new DataSchema(anotherColumnNames, COLUMN_DATA_TYPES);
-    Assert.assertFalse(dataSchema.isTypeCompatibleWith(incompatibleDataSchema));
-
-    dataSchema = DataSchema.upgradeToCover(dataSchema, compatibleDataSchema);
-    DataSchema upgradedDataSchema = new DataSchema(COLUMN_NAMES, UPGRADED_COLUMN_DATA_TYPES);
-    Assert.assertEquals(dataSchema, upgradedDataSchema);
   }
 
   @Test
@@ -207,8 +185,9 @@ public class DataSchemaTest {
       Assert.assertFalse(columnDataType.isCompatible(BYTES_ARRAY));
     }
 
-    for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{STRING_ARRAY, BOOLEAN_ARRAY,
-        TIMESTAMP_ARRAY, BYTES_ARRAY}) {
+    for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{
+        STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
+    }) {
       Assert.assertFalse(columnDataType.isNumber());
       Assert.assertFalse(columnDataType.isWholeNumber());
       Assert.assertTrue(columnDataType.isArray());

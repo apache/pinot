@@ -80,13 +80,39 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   /**
+   * Get compatible data type of left and right.
+   *
+   * When left or right is numerical, we check both data types are numerical and widen the type.
+   * Otherwise, left and right have to be the same type.
+   * @param left data type
+   * @param right data type
+   * @return compatible data type.
+   */
+  private static DataType getCompatibleType(DataType left, DataType right) {
+    if (left.isNumeric() && right.isNumeric()) {
+      if (left == DataType.BIG_DECIMAL || right == DataType.BIG_DECIMAL) {
+        return DataType.BIG_DECIMAL;
+      }
+      if (left == DataType.DOUBLE || right == DataType.DOUBLE) {
+        return DataType.DOUBLE;
+      }
+      if (left == DataType.FLOAT || right == DataType.FLOAT) {
+        return DataType.FLOAT;
+      }
+      if (left == DataType.LONG || right == DataType.LONG) {
+        return DataType.LONG;
+      }
+      return DataType.INT;
+    }
+    return DataType.STRING;
+  }
+
+  /**
    * Get transform int results based on store type.
    */
   private int[] getIntTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+    initIntValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     int[][] data = new int[width][length];
@@ -118,9 +144,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private long[] getLongTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    initLongValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     long[][] data = new long[width][length];
@@ -152,9 +176,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private float[] getFloatTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[length];
-    }
+    initFloatValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     float[][] data = new float[width][length];
@@ -186,9 +208,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private double[] getDoubleTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     double[][] data = new double[width][length];
@@ -220,9 +240,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private BigDecimal[] getBigDecimalTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+    initBigDecimalValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     BigDecimal[][] data = new BigDecimal[width][length];
@@ -254,9 +272,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private String[] getStringTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    initStringValuesSV(length);
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     String[][] data = new String[width][length];
@@ -299,10 +315,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           func instanceof IdentifierTransformFunction || func instanceof LiteralTransformFunction,
           "Only column names and literals are supported in COALESCE.");
       DataType dataType = func.getResultMetadata().getDataType();
-      if (_dataType == null) {
-        _dataType = dataType;
+      if (_dataType != null) {
+        _dataType = getCompatibleType(_dataType, dataType);
       } else {
-        Preconditions.checkArgument(dataType == _dataType, "Argument types have to be the same.");
+        _dataType = dataType;
       }
       _transformFunctions[i] = func;
     }

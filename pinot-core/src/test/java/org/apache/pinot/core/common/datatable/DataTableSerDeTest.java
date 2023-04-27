@@ -123,36 +123,143 @@ public class DataTableSerDeTest {
   }
 
   @Test(dataProvider = "versionProvider")
-  public void testEmptyStrings(int dataTableVersion)
+  public void testEmptyValues(int dataTableVersion)
       throws IOException {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
     String emptyString = StringUtils.EMPTY;
     String[] emptyStringArray = {StringUtils.EMPTY};
+    ByteArray emptyBytes = new ByteArray(new byte[0]);
+    for (int numRows = 0; numRows < NUM_ROWS; numRows++) {
+      testEmptyValues(new DataSchema(new String[]{"STR_SV", "STR_MV"}, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING_ARRAY
+      }), numRows, new Object[]{emptyString, emptyStringArray});
 
-    DataSchema dataSchema = new DataSchema(new String[]{"SV", "MV"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING_ARRAY});
+      testEmptyValues(
+          new DataSchema(new String[]{"STR_SV"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}),
+          numRows, new Object[]{emptyString});
+
+      testEmptyValues(new DataSchema(new String[]{"STR_MV"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING_ARRAY}), numRows,
+          new Object[]{emptyStringArray});
+
+      testEmptyValues(
+          new DataSchema(new String[]{"BYTES"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES}),
+          numRows, new Object[]{emptyBytes});
+
+      testEmptyValues(
+          new DataSchema(new String[]{"BOOL_ARR"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN_ARRAY}),
+          numRows, new Object[]{new int[]{}});
+
+      testEmptyValues(
+          new DataSchema(new String[]{"BOOL_ARR"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN_ARRAY}),
+          numRows, new Object[]{new int[]{0}});
+
+      testEmptyValues(
+          new DataSchema(new String[]{"INT_ARR"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT_ARRAY}),
+          numRows, new Object[]{new int[]{}});
+
+      testEmptyValues(
+          new DataSchema(new String[]{"INT_ARR"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT_ARRAY}),
+          numRows, new Object[]{new int[]{0}});
+
+      testEmptyValues(new DataSchema(new String[]{"LONG_ARR"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG_ARRAY}), numRows, new Object[]{new long[]{}});
+
+      testEmptyValues(new DataSchema(new String[]{"LONG_ARR"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG_ARRAY}), numRows, new Object[]{new long[]{0}});
+
+      testEmptyValues(new DataSchema(new String[]{"FLOAT_ARR"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.FLOAT_ARRAY}), numRows,
+          new Object[]{new float[]{}});
+
+      testEmptyValues(new DataSchema(new String[]{"FLOAT_ARR"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.FLOAT_ARRAY}), numRows,
+          new Object[]{new float[]{0}});
+
+      testEmptyValues(new DataSchema(new String[]{"DOUBLE_ARR"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE_ARRAY}), numRows,
+          new Object[]{new double[]{}});
+
+      testEmptyValues(new DataSchema(new String[]{"DOUBLE_ARR"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE_ARRAY}), numRows,
+          new Object[]{new double[]{0}});
+    }
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+  }
+
+  private void testEmptyValues(DataSchema dataSchema, int numRows, Object[] emptyValues)
+      throws IOException {
+
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
-    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+    for (int rowId = 0; rowId < numRows; rowId++) {
       dataTableBuilder.startRow();
-      dataTableBuilder.setColumn(0, emptyString);
-      dataTableBuilder.setColumn(1, emptyStringArray);
+      for (int columnId = 0; columnId < dataSchema.size(); columnId++) {
+        Object emptyValue = emptyValues[columnId];
+        if (emptyValue instanceof int[]) {
+          dataTableBuilder.setColumn(columnId, (int[]) emptyValue);
+        } else if (emptyValue instanceof long[]) {
+          dataTableBuilder.setColumn(columnId, (long[]) emptyValue);
+        } else if (emptyValue instanceof float[]) {
+          dataTableBuilder.setColumn(columnId, (float[]) emptyValue);
+        } else if (emptyValue instanceof double[]) {
+          dataTableBuilder.setColumn(columnId, (double[]) emptyValue);
+        } else if (emptyValue instanceof String[]) {
+          dataTableBuilder.setColumn(columnId, (String[]) emptyValue);
+        } else if (emptyValue instanceof String) {
+          dataTableBuilder.setColumn(columnId, (String) emptyValue);
+        } else if (emptyValue instanceof ByteArray) {
+          dataTableBuilder.setColumn(columnId, (ByteArray) emptyValue);
+        } else {
+          dataTableBuilder.setColumn(columnId, emptyValue);
+        }
+      }
       dataTableBuilder.finishRow();
     }
 
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), numRows);
 
-    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
-      Assert.assertEquals(newDataTable.getString(rowId, 0), emptyString);
-      Assert.assertEquals(newDataTable.getStringArray(rowId, 1), emptyStringArray);
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      for (int columnId = 0; columnId < dataSchema.size(); columnId++) {
+        Object entry;
+        switch (dataSchema.getColumnDataType(columnId)) {
+          case BOOLEAN_ARRAY:
+          case INT_ARRAY:
+            entry = newDataTable.getIntArray(rowId, columnId);
+            break;
+          case LONG_ARRAY:
+            entry = newDataTable.getLongArray(rowId, columnId);
+            break;
+          case FLOAT_ARRAY:
+            entry = newDataTable.getFloatArray(rowId, columnId);
+            break;
+          case DOUBLE_ARRAY:
+            entry = newDataTable.getDoubleArray(rowId, columnId);
+            break;
+          case STRING_ARRAY:
+            entry = newDataTable.getStringArray(rowId, columnId);
+            break;
+          case STRING:
+            entry = newDataTable.getString(rowId, columnId);
+            break;
+          case BYTES:
+            entry = newDataTable.getBytes(rowId, columnId);
+            break;
+          default:
+            entry = newDataTable.getCustomObject(rowId, columnId);
+            break;
+        }
+        Assert.assertEquals(entry, emptyValues[columnId]);
+      }
     }
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @Test(dataProvider = "versionProvider")
-  public void testAllDataTypes(int dataTableVersion)
+  public void testAllDataTypesInOneSchema(int dataTableVersion)
       throws IOException {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
@@ -171,6 +278,29 @@ public class DataTableSerDeTest {
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+  }
+
+  @Test(dataProvider = "versionProvider")
+  public void testAllDataTypes(int dataTableVersion)
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
+    int numColumns = columnDataTypes.length;
+    for (int i = 0; i < numColumns; i++) {
+      String[] columnName = new String[]{columnDataTypes[i].name()};
+      DataSchema.ColumnDataType[] columnDataType = new DataSchema.ColumnDataType[]{columnDataTypes[i]};
+      DataSchema dataSchema = new DataSchema(columnName, columnDataType);
+      for (int numRows = 0; numRows < NUM_ROWS; numRows++) {
+        DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+        fillDataTableWithRandomData(dataTableBuilder, columnDataType, 1, numRows);
+        DataTable dataTable = dataTableBuilder.build();
+        DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+        Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+        Assert.assertEquals(newDataTable.getNumberOfRows(), numRows, ERROR_MESSAGE);
+        verifyDataIsSame(newDataTable, columnDataType, 1, numRows);
+      }
+    }
     DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
@@ -553,6 +683,12 @@ public class DataTableSerDeTest {
   private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
       DataSchema.ColumnDataType[] columnDataTypes, int numColumns)
       throws IOException {
+    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns, NUM_ROWS);
+  }
+
+  private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
+      DataSchema.ColumnDataType[] columnDataTypes, int numColumns, int numRows)
+      throws IOException {
     RoaringBitmap[] nullBitmaps = null;
     if (DataTableBuilderFactory.getDataTableVersion() >= DataTableFactory.VERSION_4) {
       nullBitmaps = new RoaringBitmap[numColumns];
@@ -560,7 +696,7 @@ public class DataTableSerDeTest {
         nullBitmaps[colId] = new RoaringBitmap();
       }
     }
-    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+    for (int rowId = 0; rowId < numRows; rowId++) {
       dataTableBuilder.startRow();
       for (int colId = 0; colId < numColumns; colId++) {
         // Note: isNull is handled for SV columns only for now.
@@ -680,6 +816,9 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
+          case UNKNOWN:
+            dataTableBuilder.setColumn(colId, (Object) null);
+            break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
         }
@@ -694,11 +833,16 @@ public class DataTableSerDeTest {
   }
 
   private void verifyDataIsSame(DataTable newDataTable, DataSchema.ColumnDataType[] columnDataTypes, int numColumns) {
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns, NUM_ROWS);
+  }
+
+  private void verifyDataIsSame(DataTable newDataTable, DataSchema.ColumnDataType[] columnDataTypes, int numColumns,
+      int numRows) {
     RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
       nullBitmaps[colId] = newDataTable.getNullRowIds(colId);
     }
-    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+    for (int rowId = 0; rowId < numRows; rowId++) {
       for (int colId = 0; colId < numColumns; colId++) {
         boolean isNull = nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId);
         switch (columnDataTypes[colId]) {
@@ -772,6 +916,10 @@ public class DataTableSerDeTest {
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
+            break;
+          case UNKNOWN:
+            Object nulValue = newDataTable.getCustomObject(rowId, colId);
+            Assert.assertNull(nulValue, ERROR_MESSAGE);
             break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);

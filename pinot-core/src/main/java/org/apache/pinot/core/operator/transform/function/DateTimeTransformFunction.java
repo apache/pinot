@@ -52,8 +52,8 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     if (arguments.size() == 2) {
       Preconditions.checkArgument(arguments.get(1) instanceof LiteralTransformFunction,
           "zoneId parameter %s must be a literal", _name);
-      _chronology =
-          ISOChronology.getInstance(DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getLiteral()));
+      _chronology = ISOChronology.getInstance(
+          DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getStringLiteral()));
     } else {
       _chronology = UTC;
     }
@@ -72,9 +72,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(numDocs);
     long[] timestamps = _timestampsFunction.transformToLongValuesSV(valueBlock);
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;

@@ -161,5 +161,10 @@ public class MockRoutingManagerFactory {
       return _hybridTables.contains(rawTableName) ? new TimeBoundaryInfo(TIME_BOUNDARY_COLUMN,
           String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
     }
+
+    @Override
+    public Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType) {
+      return _serverInstances;
+    }
   }
 }

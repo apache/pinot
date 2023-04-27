@@ -70,6 +70,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -396,7 +397,7 @@ public class PinotSchemaRestletResource {
     }
 
     try {
-      _pinotHelixResourceManager.updateSchema(schema, reload);
+      _pinotHelixResourceManager.updateSchema(schema, reload, false);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
@@ -450,20 +451,28 @@ public class PinotSchemaRestletResource {
     }
 
     // If the schema is associated with a table, we should not delete it.
-    List<String> tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
-    for (String tableName : tableNames) {
-      TableConfig config = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
-      String tableSchema = config.getValidationConfig().getSchemaName();
-
-      if (schemaName.equals(tableSchema)) {
+    // TODO: Check OFFLINE tables as well. There are 2 side effects:
+    //       - Increases ZK read when there are lots of OFFLINE tables
+    //       - Behavior change since we don't allow deleting schema for OFFLINE tables
+    List<String> realtimeTables = _pinotHelixResourceManager.getAllRealtimeTables();
+    for (String realtimeTableName : realtimeTables) {
+      if (schemaName.equals(TableNameBuilder.extractRawTableName(realtimeTableName))) {
         throw new ControllerApplicationException(LOGGER,
-            String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, tableName),
+            String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, realtimeTableName),
             Response.Status.CONFLICT);
+      }
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
+      if (tableConfig != null) {
+        if (schemaName.equals(tableConfig.getValidationConfig().getSchemaName())) {
+          throw new ControllerApplicationException(LOGGER,
+              String.format("Cannot delete schema %s, as it is associated with table %s", schemaName,
+                  realtimeTableName), Response.Status.CONFLICT);
+        }
       }
     }
 
     LOGGER.info("Trying to delete schema {}", schemaName);
-    if (_pinotHelixResourceManager.deleteSchema(schema)) {
+    if (_pinotHelixResourceManager.deleteSchema(schemaName)) {
       LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
       LOGGER.info("Success: Deleted schema {}", schemaName);

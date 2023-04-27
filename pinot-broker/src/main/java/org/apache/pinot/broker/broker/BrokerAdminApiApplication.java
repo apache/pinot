@@ -55,10 +55,10 @@ import org.slf4j.LoggerFactory;
 
 public class BrokerAdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerAdminApiApplication.class);
-  private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
 
+  private final String _brokerResourcePackages;
   private final boolean _useHttps;
   private final boolean _swaggerBrokerEnabled;
   private final ExecutorService _executorService;
@@ -68,7 +68,10 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory) {
-    packages(RESOURCE_PACKAGE);
+    _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
+        CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
+    String[] pkgs = _brokerResourcePackages.split(",");
+    packages(pkgs);
     property(PINOT_CONFIGURATION, brokerConf);
     _useHttps = Boolean.parseBoolean(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_USE_HTTPS));
     _swaggerBrokerEnabled = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED,
@@ -102,6 +105,12 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(accessFactory).to(AccessControlFactory.class);
       }
     });
+    boolean enableBoundedJerseyThreadPoolExecutor = brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR,
+            CommonConstants.Broker.DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR);
+    if (enableBoundedJerseyThreadPoolExecutor) {
+      register(buildBrokerManagedAsyncExecutorProvider(brokerConf, brokerMetrics));
+    }
     register(JacksonFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
@@ -137,7 +146,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     }
     beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(RESOURCE_PACKAGE);
+    beanConfig.setResourcePackage(_brokerResourcePackages);
     beanConfig.setScan(true);
 
     HttpHandler httpHandler = new CLStaticHttpHandler(BrokerAdminApiApplication.class.getClassLoader(), "/api/");
@@ -148,6 +157,19 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         BrokerAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+  }
+
+  private BrokerManagedAsyncExecutorProvider buildBrokerManagedAsyncExecutorProvider(PinotConfiguration brokerConf,
+      BrokerMetrics brokerMetrics) {
+    int corePoolSize = brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE,
+            CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE);
+    int maximumPoolSize = brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE,
+            CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE);
+    int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE,
+        CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE);
+    return new BrokerManagedAsyncExecutorProvider(corePoolSize, maximumPoolSize, queueSize, brokerMetrics);
   }
 
   public void stop() {

@@ -200,7 +200,7 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryconfig()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setQueryConfig(getQueryConfig()).setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }

@@ -19,17 +19,21 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rel.core.SortExchange;
+import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
+import org.apache.pinot.query.planner.physical.DispatchablePlanVisitor;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
@@ -63,7 +67,7 @@ public class StagePlanner {
    * @param relRoot relational plan root.
    * @return dispatchable plan.
    */
-  public QueryPlan makePlan(RelRoot relRoot) {
+  public QueryPlan makePlan(RelRoot relRoot, Set<String> tableNames) {
     RelNode relRootNode = relRoot.rel;
     // Stage ID starts with 1, 0 will be reserved for ROOT stage.
     _stageIdCounter = 1;
@@ -74,19 +78,19 @@ public class StagePlanner {
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
     StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalStageRoot.getDataSchema(),
-        0, RelDistribution.Type.RANDOM_DISTRIBUTED, null);
+        0, RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false);
     globalSenderNode.addInput(globalStageRoot);
 
     StageNode globalReceiverNode =
         new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getStageId(),
-            RelDistribution.Type.RANDOM_DISTRIBUTED, null, globalSenderNode);
+            RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, globalSenderNode);
 
-    QueryPlan queryPlan = StageMetadataVisitor.attachMetadata(relRoot.fields, globalReceiverNode);
-
-    // assign workers to each stage.
-    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
-      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId, _plannerContext.getOptions());
-    }
+    // perform physical plan conversion and assign workers to each stage.
+    DispatchablePlanContext physicalPlanContext = new DispatchablePlanContext(
+        _workerManager, _requestId, _plannerContext, relRoot.fields, tableNames
+    );
+    DispatchablePlanVisitor.INSTANCE.constructDispatchablePlan(globalReceiverNode, physicalPlanContext);
+    QueryPlan queryPlan = physicalPlanContext.getQueryPlan();
 
     // Run physical optimizations
     runPhysicalOptimizers(queryPlan);
@@ -100,7 +104,19 @@ public class StagePlanner {
     if (isExchangeNode(node)) {
       StageNode nextStageRoot = walkRelPlan(node.getInput(0), getNewStageId());
       RelDistribution distribution = ((Exchange) node).getDistribution();
-      return createSendReceivePair(nextStageRoot, distribution, currentStageId);
+      RelCollation collation = null;
+      boolean isSortOnSender = false;
+      boolean isSortOnReceiver = false;
+      if (isSortExchangeNode(node)) {
+        collation = ((SortExchange) node).getCollation();
+        if (node instanceof PinotLogicalSortExchange) {
+          // These flags only take meaning if the collation is not null or empty
+          isSortOnSender = ((PinotLogicalSortExchange) node).isSortOnSender();
+          isSortOnReceiver = ((PinotLogicalSortExchange) node).isSortOnReceiver();
+        }
+      }
+      return createSendReceivePair(nextStageRoot, distribution, collation, isSortOnSender, isSortOnReceiver,
+          currentStageId);
     } else {
       StageNode stageNode = RelToStageConverter.toStageNode(node, currentStageId);
       List<RelNode> inputs = node.getInputs();
@@ -118,7 +134,8 @@ public class StagePlanner {
     }
   }
 
-  private StageNode createSendReceivePair(StageNode nextStageRoot, RelDistribution distribution, int currentStageId) {
+  private StageNode createSendReceivePair(StageNode nextStageRoot, RelDistribution distribution, RelCollation collation,
+      boolean isSortOnSender, boolean isSortOnReceiver, int currentStageId) {
     List<Integer> distributionKeys = distribution.getKeys();
     RelDistribution.Type exchangeType = distribution.getType();
 
@@ -129,9 +146,11 @@ public class StagePlanner {
         ? new FieldSelectionKeySelector(distributionKeys) : null;
 
     StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
-        currentStageId, exchangeType, keySelector);
+        currentStageId, exchangeType, keySelector, collation == null ? null : collation.getFieldCollations(),
+        isSortOnSender);
     StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
-        nextStageRoot.getStageId(), exchangeType, keySelector, mailboxSender);
+        nextStageRoot.getStageId(), exchangeType, keySelector,
+        collation == null ? null : collation.getFieldCollations(), isSortOnSender, isSortOnReceiver, mailboxSender);
     mailboxSender.addInput(nextStageRoot);
 
     return mailboxReceiver;
@@ -139,6 +158,10 @@ public class StagePlanner {
 
   private boolean isExchangeNode(RelNode node) {
     return (node instanceof Exchange);
+  }
+
+  private boolean isSortExchangeNode(RelNode node) {
+    return (node instanceof SortExchange);
   }
 
   private int getNewStageId() {

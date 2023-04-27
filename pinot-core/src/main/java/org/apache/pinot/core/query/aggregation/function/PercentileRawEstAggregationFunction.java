@@ -57,15 +57,6 @@ public class PercentileRawEstAggregationFunction
   }
 
   @Override
-  public String getColumnName() {
-    final double percentile = _percentileEstAggregationFunction._percentile;
-    final int version = _percentileEstAggregationFunction._version;
-    final String type = getType().getName();
-
-    return version == 0 ? type + (int) percentile + "_" + _expression : type + percentile + "_" + _expression;
-  }
-
-  @Override
   public String getResultColumnName() {
     final double percentile = _percentileEstAggregationFunction._percentile;
     final int version = _percentileEstAggregationFunction._version;

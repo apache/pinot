@@ -120,13 +120,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("0@Server_localhost_2", "0@Server_localhost_1")
+            tables.get(0).equals("a") ? ImmutableList.of("0@Server_localhost_2", "1@Server_localhost_1")
                 : ImmutableList.of("0@Server_localhost_1"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toSet()),
-            ImmutableSet.of("0@Server_localhost_1", "0@Server_localhost_2"));
+            ImmutableSet.of("1@Server_localhost_1", "0@Server_localhost_2"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
@@ -290,24 +290,58 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @DataProvider(name = "testQueryPlanDataProvider")
   private Object[][] provideQueriesWithExplainedPlan() {
+    //@formatter:off
     return new Object[][] {
-        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a", "{\n"
-            + "  \"rels\": [\n" + "    {\n" + "      \"id\": \"0\",\n" + "      \"relOp\": \"LogicalTableScan\",\n"
-            + "      \"table\": [\n" + "        \"a\"\n" + "      ],\n" + "      \"inputs\": []\n" + "    },\n"
-            + "    {\n" + "      \"id\": \"1\",\n" + "      \"relOp\": \"LogicalProject\",\n" + "      \"fields\": [\n"
-            + "        \"col1\",\n" + "        \"col3\"\n" + "      ],\n" + "      \"exprs\": [\n" + "        {\n"
-            + "          \"input\": 3,\n" + "          \"name\": \"$3\"\n" + "        },\n" + "        {\n"
-            + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        }\n" + "      ]\n" + "    }\n"
-            + "  ]\n" + "}"},
+        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
+              "{\n"
+            + "  \"rels\": [\n"
+            + "    {\n"
+            + "      \"id\": \"0\",\n"
+            + "      \"relOp\": \"LogicalTableScan\",\n"
+            + "      \"table\": [\n"
+            + "        \"a\"\n"
+            + "      ],\n"
+            + "      \"inputs\": []\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"id\": \"1\",\n"
+            + "      \"relOp\": \"LogicalProject\",\n"
+            + "      \"fields\": [\n"
+            + "        \"col1\",\n"
+            + "        \"col3\"\n"
+            + "      ],\n"
+            + "      \"exprs\": [\n"
+            + "        {\n"
+            + "          \"input\": 0,\n"
+            + "          \"name\": \"$0\"\n"
+            + "        },\n"
+            + "        {\n"
+            + "          \"input\": 2,\n"
+            + "          \"name\": \"$2\"\n"
+            + "        }\n"
+            + "      ]\n"
+            + "    }\n"
+            + "  ]\n"
+            + "}"},
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-            "Execution Plan\n" + "digraph {\n" + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-                + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
-                + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n" + "}\n"},
-        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1", "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col3=[$1])\n" + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
-            + "    LogicalExchange(distribution=[hash[0]])\n" + "      LogicalProject(col1=[$3])\n"
-            + "        LogicalTableScan(table=[[a]])\n" + "    LogicalExchange(distribution=[hash[1]])\n"
-            + "      LogicalProject(col3=[$2], col1=[$3])\n" + "        LogicalTableScan(table=[[b]])\n"},
+              "Execution Plan\n"
+            + "digraph {\n"
+            + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+            + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
+            + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+            + "}\n"},
+        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+              "Execution Plan\n"
+            + "LogicalProject(col1=[$0], col3=[$2])\n"
+            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "      LogicalProject(col1=[$0])\n"
+            + "        LogicalTableScan(table=[[a]])\n"
+            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "      LogicalProject(col1=[$0], col3=[$2])\n"
+            + "        LogicalTableScan(table=[[b]])\n"
+        },
     };
+    //@formatter:on
   }
 }

@@ -25,11 +25,9 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,20 +37,17 @@ import org.slf4j.LoggerFactory;
  * send by the sender of the sender/receiver pair.
  */
 public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxServer.class);
-  private static final long DEFAULT_GRPC_MAILBOX_SERVER_TIMEOUT = 10000L;
+  private static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000L;
 
-  private final GrpcMailboxService _mailboxService;
+  private final MailboxService _mailboxService;
   private final Server _server;
 
-  public GrpcMailboxServer(GrpcMailboxService mailboxService, int port, PinotConfiguration extraConfig) {
+  public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config) {
     _mailboxService = mailboxService;
-    _server = ServerBuilder.forPort(port)
-        .addService(this)
-        .maxInboundMessageSize(extraConfig.getProperty(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES))
-        .build();
-    LOGGER.info("Initialized GrpcMailboxServer on port: {}", port);
+    int port = mailboxService.getPort();
+    _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(
+        config.getProperty(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+            QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
   }
 
   public void start() {
@@ -65,7 +60,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
   public void shutdown() {
     try {
-      _server.shutdown().awaitTermination(DEFAULT_GRPC_MAILBOX_SERVER_TIMEOUT, TimeUnit.MILLISECONDS);
+      _server.shutdown().awaitTermination(DEFAULT_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -73,6 +68,6 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
   @Override
   public StreamObserver<Mailbox.MailboxContent> open(StreamObserver<Mailbox.MailboxStatus> responseObserver) {
-    return new MailboxContentStreamObserver(_mailboxService, responseObserver);
+    return new MailboxContentObserver(_mailboxService, responseObserver);
   }
 }

@@ -95,6 +95,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
         new TableTaskConfig(
             ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 * * ? * * *")))).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     addTableConfig(tableConfig);
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),
@@ -128,6 +129,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
         new TableTaskConfig(
             ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */10 * ? * * *")))).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     addTableConfig(tableConfig);
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),
@@ -193,6 +195,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
         new TableTaskConfig(
             ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */10 * ? * * *")))).build();
+    waitForEVToDisappear(tableConfig.getTableName());
     addTableConfig(tableConfig);
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),

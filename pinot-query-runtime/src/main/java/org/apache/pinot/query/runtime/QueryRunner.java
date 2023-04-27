@@ -40,20 +40,20 @@ import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
@@ -81,7 +81,7 @@ public class QueryRunner {
   private ServerQueryExecutorV1Impl _serverExecutor;
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
-  private MailboxService<TransferableBlock> _mailboxService;
+  private MailboxService _mailboxService;
   private String _hostname;
   private int _port;
   private VirtualServerAddress _rootServer;
@@ -129,14 +129,12 @@ public class QueryRunner {
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-      _queryWorkerExecutorService = Executors.newFixedThreadPool(
-          ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+      _queryWorkerExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("query_worker_on_" + _port + "_port"));
-      _queryRunnerExecutorService = Executors.newFixedThreadPool(
-          ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
+      _queryRunnerExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
           new NamedThreadFactory("query_runner_on_" + _port + "_port"));
       _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _queryWorkerExecutorService);
-      _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
+      _mailboxService = new MailboxService(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
@@ -162,14 +160,17 @@ public class QueryRunner {
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
+    boolean isTraceEnabled =
+        Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     if (isLeafStage(distributedStagePlan)) {
-      runLeafStage(distributedStagePlan, requestMetadataMap, deadlineMs, requestId);
+      runLeafStage(distributedStagePlan, requestMetadataMap, timeoutMs, deadlineMs, requestId);
     } else {
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
           new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, deadlineMs,
-              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
+              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap(),
+              isTraceEnabled));
       _scheduler.register(rootOperator);
     }
   }
@@ -187,12 +188,14 @@ public class QueryRunner {
   }
 
   private void runLeafStage(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap,
-      long deadlineMs, long requestId) {
+      long timeoutMs, long deadlineMs, long requestId) {
     // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
     // and package it here for return. But we should really use a MailboxSendOperator directly put into the
     // server executor.
     MailboxSendOperator mailboxSendOperator = null;
     try {
+      boolean isTraceEnabled =
+          Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
       long leafStageStartMillis = System.currentTimeMillis();
       List<ServerPlanRequestContext> serverQueryRequests =
           constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService,
@@ -209,12 +212,16 @@ public class QueryRunner {
           "RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId() + " Leaf stage v1 processing time:"
               + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
-      StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
-      mailboxSendOperator = new MailboxSendOperator(_mailboxService,
-          new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
-              sendNode.getStageId(), _rootServer), receivingStageMetadata.getServerInstances(),
-          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _rootServer, requestId,
-          sendNode.getStageId(), sendNode.getReceiverStageId(), deadlineMs);
+      OpChainExecutionContext opChainExecutionContext =
+          new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(),
+              new VirtualServerAddress(distributedStagePlan.getServer()), timeoutMs, deadlineMs,
+              distributedStagePlan.getMetadataMap(), isTraceEnabled);
+      MultiStageOperator leafStageOperator =
+          new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
+      mailboxSendOperator =
+          new MailboxSendOperator(opChainExecutionContext, leafStageOperator, sendNode.getExchangeType(),
+              sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
+              sendNode.isSortOnSender(), sendNode.getReceiverStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
@@ -230,7 +237,7 @@ public class QueryRunner {
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
       Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore,
-      MailboxService<TransferableBlock> mailboxService, long deadlineMs) {
+      MailboxService mailboxService, long deadlineMs) {
     StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId());
     Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
         "Server request for V2 engine should only have 1 scan table per request.");

@@ -37,9 +37,7 @@
     <paranamer.version>2.8</paranamer.version>
     <scalaxml.version>1.3.0</scalaxml.version>
     <scalatest.version>3.1.1</scalatest.version>
-
-    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
-    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
+    <shadeBase>org.apache.pinot.\$internal</shadeBase>
   </properties>
 
   <profiles>
@@ -119,6 +117,29 @@
       <build>
         <plugins>
           <!-- scala build -->
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>shade</goal>
+                </goals>
+                <configuration>
+                  <relocations>
+                    <relocation>
+                      <pattern>com</pattern>
+                      <shadedPattern>${shadeBase}.com</shadedPattern>
+                      <includes>
+                        <include>com.google.protobuf.**</include>
+                        <include>com.google.common.**</include>
+                      </includes>
+                    </relocation>
+                  </relocations>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <groupId>net.alchim31.maven</groupId>
             <artifactId>scala-maven-plugin</artifactId>

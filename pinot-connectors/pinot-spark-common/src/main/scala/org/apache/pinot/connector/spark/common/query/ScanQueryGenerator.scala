@@ -29,7 +29,8 @@ private[pinot] class ScanQueryGenerator(
     tableType: Option[TableType],
     timeBoundaryInfo: Option[TimeBoundaryInfo],
     columns: Array[String],
-    whereClause: Option[String]) {
+    whereClause: Option[String],
+    queryOptions: Set[String]) {
   private val columnsExpression = columnsAsExpression()
 
   def generateSQLs(): ScanQuery = {
@@ -45,7 +46,11 @@ private[pinot] class ScanQueryGenerator(
 
   /** Get all columns if selecting columns empty(eg: resultDataFrame.count()) */
   private def columnsAsExpression(): String = {
-    if (columns.isEmpty) "*" else columns.mkString(",")
+    if (columns.isEmpty) "*" else columns.map(escapeCol).mkString(",")
+  }
+
+  private def escapeCol(col: String): String = {
+      if (col.contains("\"")) col else s""""$col""""
   }
 
   /** Build realtime or offline SQL selection query. */
@@ -56,7 +61,11 @@ private[pinot] class ScanQueryGenerator(
     }
 
     val tableNameWithType = s"${tableName}_${tableType.toString}"
-    val queryBuilder = new StringBuilder(s"SELECT $columnsExpression FROM $tableNameWithType")
+    val queryBuilder = new StringBuilder()
+
+    // add Query Options and SELECT clause
+    queryOptions.foreach(opt => queryBuilder.append(s"SET $opt;"))
+    queryBuilder.append(s"SELECT $columnsExpression FROM $tableNameWithType")
 
     // add where clause if exists
     whereClause.foreach(c => queryBuilder.append(s" WHERE $c"))
@@ -84,8 +93,9 @@ private[pinot] object ScanQueryGenerator {
       tableType: Option[TableType],
       timeBoundaryInfo: Option[TimeBoundaryInfo],
       columns: Array[String],
-      whereClause: Option[String]): ScanQuery = {
-    new ScanQueryGenerator(tableName, tableType, timeBoundaryInfo, columns, whereClause)
+      whereClause: Option[String],
+      queryOptions: Set[String]): ScanQuery = {
+    new ScanQueryGenerator(tableName, tableType, timeBoundaryInfo, columns, whereClause, queryOptions)
       .generateSQLs()
   }
 }

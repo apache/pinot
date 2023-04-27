@@ -41,6 +41,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are exactly 2 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for MOD transform function");
@@ -48,7 +49,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
 
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction) {
-      _firstLiteral = Double.parseDouble(((LiteralTransformFunction) firstArgument).getLiteral());
+      _firstLiteral = ((LiteralTransformFunction) firstArgument).getDoubleLiteral();
     } else {
       if (!firstArgument.getResultMetadata().isSingleValue()) {
         throw new IllegalArgumentException("First argument of MOD transform function must be single-valued");
@@ -58,7 +59,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
 
     TransformFunction secondArgument = arguments.get(1);
     if (secondArgument instanceof LiteralTransformFunction) {
-      _secondLiteral = Double.parseDouble(((LiteralTransformFunction) secondArgument).getLiteral());
+      _secondLiteral = ((LiteralTransformFunction) secondArgument).getDoubleLiteral();
     } else {
       if (!secondArgument.getResultMetadata().isSingleValue()) {
         throw new IllegalArgumentException("Second argument of MOD transform function must be single-valued");
@@ -75,9 +76,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     if (_firstTransformFunction == null) {
       Arrays.fill(_doubleValuesSV, 0, length, _firstLiteral);
     } else {

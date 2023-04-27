@@ -197,7 +197,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
-    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = false;
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = true;
   }
 
   public static class Broker {
@@ -228,8 +228,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
+    // Comma separated list of packages that contains javax service resources.
+    public static final String BROKER_RESOURCE_PACKAGES = "broker.restlet.api.resource.packages";
+    public static final String DEFAULT_BROKER_RESOURCE_PACKAGES = "org.apache.pinot.broker.api.resources";
+
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
-    // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
+    // are ONLINE for this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
@@ -241,6 +245,25 @@ public class CommonConstants {
     public static final int DEFAULT_MAX_REDUCE_THREADS_PER_QUERY =
         Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
     // Same logic as CombineOperatorUtils
+
+    // Config for Jersey ThreadPoolExecutorProvider.
+    // By default, Jersey uses the default unbounded thread pool to process queries.
+    // By enabling it, BrokerManagedAsyncExecutorProvider will be used to create a bounded thread pool.
+    public static final String CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR =
+            "pinot.broker.enable.bounded.jersey.threadpool.executor";
+    public static final boolean DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR = false;
+    // Default capacities for the bounded thread pool
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
+            "pinot.broker.jersey.threadpool.executor.max.pool.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
+            Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
+            "pinot.broker.jersey.threadpool.executor.core.pool.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
+            Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE =
+            "pinot.broker.jersey.threadpool.executor.queue.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE = Integer.MAX_VALUE;
 
     // used for SQL GROUP BY during broker reduce
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
@@ -262,7 +285,6 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
-
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
     // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
@@ -319,6 +341,8 @@ public class CommonConstants {
 
         // Handle IN predicate evaluation for big IN lists
         public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
+
+        public static final String DROP_RESULTS = "dropResults";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated

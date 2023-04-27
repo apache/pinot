@@ -49,7 +49,7 @@ public class ExtractTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Exactly 2 arguments are required for EXTRACT transform function");
     }
 
-    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getLiteral());
+    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getStringLiteral());
     _mainTransformFunction = arguments.get(1);
   }
 
@@ -61,9 +61,7 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
+    initIntValuesSV(numDocs);
     long[] timestamps = _mainTransformFunction.transformToLongValuesSV(valueBlock);
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;

@@ -65,7 +65,10 @@ import static org.testng.Assert.assertNotNull;
  * Tests for PERCENTILE_TDIGEST aggregation function.
  *
  * <ul>
- *   <li>Generates a segment with a double column, a TDigest column and a group-by column</li>
+ *   <li>
+ *     Generates a segment with a double column, a TDigest column, a custom compression TDigest column and a group-by
+ *     column
+ *   </li>
  *   <li>Runs aggregation and group-by queries on the generated segment</li>
  *   <li>
  *     Compares the results for PERCENTILE_TDIGEST on double column and TDigest column with results for PERCENTILE on
@@ -81,8 +84,10 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   protected static final int NUM_ROWS = 1000;
   protected static final double VALUE_RANGE = Integer.MAX_VALUE;
   protected static final double DELTA = 0.05 * VALUE_RANGE; // Allow 5% quantile error
+  protected static final int CUSTOM_COMPRESSION = 1000;
   protected static final String DOUBLE_COLUMN = "doubleColumn";
   protected static final String TDIGEST_COLUMN = "tDigestColumn";
+  protected static final String TDIGEST_CUSTOM_COMPRESSION_COLUMN = "tDigestColumnCustom";
   protected static final String GROUP_BY_COLUMN = "groupByColumn";
   protected static final String[] GROUPS = new String[]{"G1", "G2", "G3"};
   protected static final long RANDOM_SEED = System.nanoTime();
@@ -133,6 +138,12 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       tDigest.asBytes(byteBuffer);
       row.putValue(TDIGEST_COLUMN, byteBuffer.array());
 
+      TDigest tDigestCustom = TDigest.createMergingDigest(CUSTOM_COMPRESSION);
+      tDigestCustom.add(value);
+      ByteBuffer byteBufferCustom = ByteBuffer.allocate(tDigestCustom.byteSize());
+      tDigestCustom.asBytes(byteBufferCustom);
+      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, byteBufferCustom.array());
+
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
       row.putValue(GROUP_BY_COLUMN, group);
 
@@ -142,6 +153,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     Schema schema = new Schema();
     schema.addField(new MetricFieldSpec(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE));
     schema.addField(new MetricFieldSpec(TDIGEST_COLUMN, FieldSpec.DataType.BYTES));
+    schema.addField(new MetricFieldSpec(TDIGEST_CUSTOM_COMPRESSION_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new DimensionFieldSpec(GROUP_BY_COLUMN, FieldSpec.DataType.STRING, true));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
 
@@ -149,7 +161,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setRawIndexCreationColumns(Collections.singletonList(TDIGEST_COLUMN));
+    config.setRawIndexCreationColumns(Arrays.asList(TDIGEST_COLUMN, TDIGEST_CUSTOM_COMPRESSION_COLUMN));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
@@ -165,7 +177,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(aggregationResult.size(), 6);
+    assertEquals(aggregationResult.size(), 8);
     DoubleList doubleList0 = (DoubleList) aggregationResult.get(0);
     Collections.sort(doubleList0);
     assertTDigest((TDigest) aggregationResult.get(1), doubleList0);
@@ -176,6 +188,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     assertEquals(doubleList3, doubleList0);
     assertTDigest((TDigest) aggregationResult.get(4), doubleList0);
     assertTDigest((TDigest) aggregationResult.get(5), doubleList0);
+    assertTDigest((TDigest) aggregationResult.get(6), doubleList0);
+    assertTDigest((TDigest) aggregationResult.get(7), doubleList0);
   }
 
   @Test
@@ -183,9 +197,9 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     for (int percentile = 0; percentile <= 100; percentile++) {
       BrokerResponseNative brokerResponse = getBrokerResponse(getAggregationQuery(percentile));
       Object[] results = brokerResponse.getResultTable().getRows().get(0);
-      assertEquals(results.length, 6);
+      assertEquals(results.length, 8);
       double expectedResult = (Double) results[0];
-      for (int i = 1; i < 6; i++) {
+      for (int i = 1; i < 8; i++) {
         assertEquals((Double) results[i], expectedResult, DELTA, ERROR_MESSAGE);
       }
     }
@@ -211,6 +225,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       assertEquals(doubleList3, doubleList0);
       assertTDigest((TDigest) groupByResult.getResultForGroupId(4, groupId), doubleList0);
       assertTDigest((TDigest) groupByResult.getResultForGroupId(5, groupId), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(6, groupId), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(7, groupId), doubleList0);
     }
   }
 
@@ -221,9 +237,9 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       List<Object[]> rows = brokerResponse.getResultTable().getRows();
       assertEquals(rows.size(), 3);
       for (Object[] row : rows) {
-        assertEquals(row.length, 6);
+        assertEquals(row.length, 8);
         double expectedResult = (Double) row[0];
-        for (int i = 1; i < 6; i++) {
+        for (int i = 1; i < 8; i++) {
           assertEquals((Double) row[i], expectedResult, DELTA, ERROR_MESSAGE);
         }
       }
@@ -232,9 +248,10 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   protected String getAggregationQuery(int percentile) {
     return String.format("SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), "
-            + "PERCENTILE(%2$s, %1$d), PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s",
+            + "PERCENTILE(%2$s, %1$d), PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d), "
+            + "PERCENTILETDIGEST(%2$s, %1$d, %6$d), PERCENTILETDIGEST(%5$s, %1$d, %6$d) FROM %4$s",
         percentile,
-        DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME);
+        DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME, TDIGEST_CUSTOM_COMPRESSION_COLUMN, CUSTOM_COMPRESSION);
   }
 
   private String getGroupByQuery(int percentile) {

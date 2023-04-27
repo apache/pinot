@@ -40,6 +40,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are more than 1 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for power transform function");
@@ -49,7 +50,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
-      _exponent = Double.parseDouble(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
+      _exponent = ((LiteralTransformFunction) _rightTransformFunction).getDoubleLiteral();
       _fixedExponent = true;
     }
     Preconditions.checkArgument(
@@ -65,9 +66,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     if (_fixedExponent) {
       for (int i = 0; i < length; i++) {

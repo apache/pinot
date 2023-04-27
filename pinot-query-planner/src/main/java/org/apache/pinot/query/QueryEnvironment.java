@@ -20,14 +20,18 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.PinotCalciteCatalogReader;
@@ -79,7 +83,6 @@ public class QueryEnvironment {
   private final HepProgram _hepProgram;
 
   // Pinot extensions
-  private final Collection<RelOptRule> _logicalRuleSet;
   private final WorkerManager _workerManager;
   private final TableCache _tableCache;
 
@@ -110,12 +113,24 @@ public class QueryEnvironment {
             .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true)))
         .build();
 
-    // optimizer rules
-    _logicalRuleSet = PinotQueryRuleSets.LOGICAL_OPT_RULES;
-
-    // optimizer
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
-    for (RelOptRule relOptRule : _logicalRuleSet) {
+    // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
+    // best to be explicit.
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
+    // First run the basic rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
+    // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
+    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
+      hepProgramBuilder.addRuleInstance(relOptRule);
+    }
+    // Pushdown filters using a single HepInstruction.
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+
+    // Prune duplicate/unnecessary nodes using a single HepInstruction.
+    // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
+
+    // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
+    for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
     _hepProgram = hepProgramBuilder.build();
@@ -131,18 +146,20 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @return a dispatchable query plan
+   * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
-  public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
+  public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return toDispatchablePlan(relRoot, plannerContext, requestId);
+      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
+      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId, tableNames), null,
+          tableNames);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
-    } catch (Exception e) {
-      throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
+    } catch (Throwable t) {
+      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
   }
 
@@ -155,9 +172,9 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @return the explained query plan.
+   * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
-  public String explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
@@ -165,7 +182,8 @@ public class QueryEnvironment {
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      return PlannerUtils.explainPlan(relRoot.rel, format, level);
+      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
+      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -173,12 +191,40 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public QueryPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0);
+    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0).getQueryPlan();
   }
 
   @VisibleForTesting
   public String explainQuery(String sqlQuery) {
-    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery)).getExplainPlan();
+  }
+
+  /**
+   * Results of planning a query
+   */
+  public static class QueryPlannerResult {
+    private QueryPlan _queryPlan;
+    private String _explainPlan;
+    Set<String> _tableNames;
+
+    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, Set<String> tableNames) {
+      _queryPlan = queryPlan;
+      _explainPlan = explainPlan;
+      _tableNames = tableNames;
+    }
+
+    public String getExplainPlan() {
+      return _explainPlan;
+    }
+
+    public QueryPlan getQueryPlan() {
+      return _queryPlan;
+    }
+
+    // Returns all the table names in the query.
+    public Set<String> getTableNames() {
+      return _tableNames;
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -228,10 +274,11 @@ public class QueryEnvironment {
     }
   }
 
-  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
+  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
+      Set<String> tableNames) {
     // 5. construct a dispatchable query plan.
     StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager, requestId, _tableCache);
-    return queryStagePlanner.makePlan(relRoot);
+    return queryStagePlanner.makePlan(relRoot, tableNames);
   }
 
   // --------------------------------------------------------------------------
@@ -240,5 +287,18 @@ public class QueryEnvironment {
 
   private HintStrategyTable getHintStrategyTable() {
     return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
+  }
+
+
+  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
+    Set<String> tableNames = new HashSet<>();
+    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
+    for (String qualifiedTableName : qualifiedTableNames) {
+      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
+      // statements, particularly to handle cases when they contain special characters or reserved keywords.
+      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
+      tableNames.add(tableName);
+    }
+    return tableNames;
   }
 }

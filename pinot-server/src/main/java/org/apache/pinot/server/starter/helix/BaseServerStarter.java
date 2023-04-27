@@ -54,6 +54,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
+import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
@@ -67,6 +68,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -168,6 +170,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
       _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + "_" + _port;
       // NOTE: Need to add the instance id to the config because it is required in HelixInstanceDataManagerConfig
       _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, _instanceId);
+    }
+    if (_serverConf.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT) == 0) {
+      _serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, NetUtils.findOpenPort());
+    }
+    if (_serverConf.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT) == 0) {
+      _serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
     }
 
     _instanceConfigScope =
@@ -502,6 +510,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
+    LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
 
     // install default SSL context if necessary (even if not force-enabled everywhere)

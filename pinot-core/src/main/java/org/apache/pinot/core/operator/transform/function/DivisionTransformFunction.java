@@ -46,6 +46,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are exactly 2 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for DIV transform function");
@@ -69,9 +70,9 @@ public class DivisionTransformFunction extends BaseTransformFunction {
       if (argument instanceof LiteralTransformFunction) {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
         if (_resultDataType == DataType.BIG_DECIMAL) {
-          _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral());
+          _bigDecimalLiterals[i] = literalTransformFunction.getBigDecimalLiteral();
         } else {
-          _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          _doubleLiterals[i] = ((LiteralTransformFunction) argument).getDoubleLiteral();
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {
@@ -98,9 +99,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _doubleValuesSV, length);
@@ -128,9 +127,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+    initBigDecimalValuesSV(length);
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _bigDecimalValuesSV, length);

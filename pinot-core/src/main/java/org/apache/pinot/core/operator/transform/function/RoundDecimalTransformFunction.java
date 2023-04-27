@@ -45,6 +45,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     int numArguments = arguments.size();
     // Check that there are more than 2 arguments or no arguments
     if (numArguments < 1 || numArguments > 2) {
@@ -57,7 +58,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
       if (_rightTransformFunction instanceof LiteralTransformFunction) {
-        _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
+        _scale = ((LiteralTransformFunction) _rightTransformFunction).getIntLiteral();
         _fixedScale = true;
       }
       Preconditions.checkArgument(
@@ -85,9 +86,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+    initDoubleValuesSV(length);
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {

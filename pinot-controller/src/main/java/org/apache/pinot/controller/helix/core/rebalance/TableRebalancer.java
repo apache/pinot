@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
@@ -115,15 +116,35 @@ public class TableRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
+  private final TableRebalanceObserver _tableRebalanceObserver;
+
+  public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver) {
+    _helixManager = helixManager;
+    if (tableRebalanceObserver != null) {
+      _tableRebalanceObserver = tableRebalanceObserver;
+    } else {
+      _tableRebalanceObserver = new NoOpTableRebalanceObserver();
+    }
+    _helixDataAccessor = helixManager.getHelixDataAccessor();
+  }
 
   public TableRebalancer(HelixManager helixManager) {
-    _helixManager = helixManager;
-    _helixDataAccessor = helixManager.getHelixDataAccessor();
+    this(helixManager, null);
+  }
+
+  public static String createUniqueRebalanceJobIdentifier() {
+    return UUID.randomUUID().toString();
   }
 
   public RebalanceResult rebalance(TableConfig tableConfig, Configuration rebalanceConfig) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
+    String rebalanceJobId = rebalanceConfig.getString(RebalanceConfigConstants.JOB_ID);
+    if (rebalanceJobId == null) {
+      // If not passed along, create one.
+      // TODO - Add rebalanceJobId to all log messages for easy tracking.
+      rebalanceJobId = createUniqueRebalanceJobIdentifier();
+    }
 
     boolean dryRun =
         rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN);
@@ -161,15 +182,17 @@ public class TableRebalancer {
       // Do not allow rebalancing HLC real-time table
       if (tableConfig.getTableType() == TableType.REALTIME && new StreamConfig(tableNameWithType,
           IngestionConfigUtils.getStreamConfigMap(tableConfig)).hasHighLevelConsumerType()) {
-        LOGGER.warn("Cannot rebalance table: {} with high-level consumer, aborting the rebalance", tableNameWithType);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot rebalance table with high-level consumer",
-            null, null, null);
+        LOGGER.warn("For rebalanceId: {}, cannot rebalance table: {} with high-level consumer, aborting the rebalance",
+            rebalanceJobId, tableNameWithType);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+            "Cannot rebalance table with high-level consumer", null, null, null);
       }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while validating table config for table: {}, aborting the rebalance",
-          tableNameWithType, e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while validating table config: " + e,
-          null, null, null);
+      LOGGER.warn(
+          "For rebalanceId: {}, caught exception while validating table config for table: {}, aborting the rebalance",
+          rebalanceJobId, tableNameWithType, e);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+          "Caught exception while validating table config: " + e, null, null, null);
     }
 
     // Fetch ideal state
@@ -178,34 +201,37 @@ public class TableRebalancer {
     try {
       currentIdealState = _helixDataAccessor.getProperty(idealStatePropertyKey);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while fetching IdealState for table: {}, aborting the rebalance", tableNameWithType,
-          e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while fetching IdealState: " + e,
-          null, null, null);
+      LOGGER.warn(
+          "For rebalanceId: {}, caught exception while fetching IdealState for table: {}," + " aborting the rebalance",
+          rebalanceJobId, tableNameWithType, e);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+          "Caught exception while fetching IdealState: " + e, null, null, null);
     }
     if (currentIdealState == null) {
-      LOGGER.warn("Cannot find the IdealState for table: {}, aborting the rebalance", tableNameWithType);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot find the IdealState for table", null, null,
-          null);
-    }
-    if (!currentIdealState.isEnabled() && !downtime) {
-      LOGGER.warn("Cannot rebalance disabled table: {} without downtime, aborting the rebalance", tableNameWithType);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot rebalance disabled table without downtime",
+      LOGGER.warn("For rebalanceId: {}, cannot find the IdealState for table: {}, aborting the rebalance",
+          rebalanceJobId, tableNameWithType);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, "Cannot find the IdealState for table",
           null, null, null);
     }
+    if (!currentIdealState.isEnabled() && !downtime) {
+      LOGGER.warn(
+          "For rebalanceId: {}, cannot rebalance disabled table: {} without downtime, aborting the" + " rebalance",
+          rebalanceJobId, tableNameWithType);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+          "Cannot rebalance disabled table without downtime", null, null, null);
+    }
 
-    LOGGER.info("Fetching/computing instance partitions, reassigning instances if configured for table: {}",
-        tableNameWithType);
+    LOGGER.info("For rebalanceId: {}, fetching/computing instance partitions, reassigning instances if configured for"
+        + " table: {}", rebalanceJobId, tableNameWithType);
 
     // Calculate instance partitions map
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
     try {
       instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
     } catch (Exception e) {
-      LOGGER.warn(
-          "Caught exception while fetching/calculating instance partitions for table: {}, aborting the rebalance",
-          tableNameWithType, e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED,
+      LOGGER.warn("For rebalanceId: {}, caught exception while fetching/calculating instance partitions for table: {}, "
+          + "aborting the rebalance", rebalanceJobId, tableNameWithType, e);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
           "Caught exception while fetching/calculating instance partitions: " + e, null, null, null);
     }
 
@@ -214,7 +240,8 @@ public class TableRebalancer {
     Map<String, InstancePartitions> tierToInstancePartitionsMap =
         getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
 
-    LOGGER.info("Calculating the target assignment for table: {}", tableNameWithType);
+    LOGGER.info("For rebalanceId: {}, calculating the target assignment for table: {}", rebalanceJobId,
+        tableNameWithType);
     SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
     Map<String, Map<String, String>> currentAssignment = currentIdealState.getRecord().getMapFields();
     Map<String, Map<String, String>> targetAssignment;
@@ -222,9 +249,9 @@ public class TableRebalancer {
       targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
           tierToInstancePartitionsMap, rebalanceConfig);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
-          tableNameWithType, e);
-      return new RebalanceResult(RebalanceResult.Status.FAILED,
+      LOGGER.warn("For rebalanceId: {}, caught exception while calculating target assignment for table: {}, "
+          + "aborting the rebalance", rebalanceJobId, tableNameWithType, e);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
           "Caught exception while calculating target assignment: " + e, instancePartitionsMap,
           tierToInstancePartitionsMap, null);
     }
@@ -233,27 +260,29 @@ public class TableRebalancer {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
       if (reassignInstances) {
         if (dryRun) {
-          return new RebalanceResult(RebalanceResult.Status.DONE,
+          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
               "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
               tierToInstancePartitionsMap, targetAssignment);
         } else {
-          return new RebalanceResult(RebalanceResult.Status.DONE, "Instance reassigned, table is already balanced",
-              instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
+          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
+              "Instance reassigned, table is already balanced", instancePartitionsMap, tierToInstancePartitionsMap,
+              targetAssignment);
         }
       } else {
-        return new RebalanceResult(RebalanceResult.Status.NO_OP, "Table is already balanced", instancePartitionsMap,
-            tierToInstancePartitionsMap, targetAssignment);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
+            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
       }
     }
 
     if (dryRun) {
-      LOGGER.info("Rebalancing table: {} in dry-run mode, returning the target assignment", tableNameWithType);
-      return new RebalanceResult(RebalanceResult.Status.DONE, "Dry-run mode", instancePartitionsMap,
+      LOGGER.info("For rebalanceId: {}, rebalancing table: {} in dry-run mode, returning the target assignment",
+          rebalanceJobId, tableNameWithType);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE, "Dry-run mode", instancePartitionsMap,
           tierToInstancePartitionsMap, targetAssignment);
     }
 
     if (downtime) {
-      LOGGER.info("Rebalancing table: {} with downtime", tableNameWithType);
+      LOGGER.info("For rebalanceId: {}, rebalancing table: {} with downtime", rebalanceJobId, tableNameWithType);
 
       // Reuse current IdealState to update the IdealState in cluster
       ZNRecord idealStateRecord = currentIdealState.getRecord();
@@ -266,19 +295,24 @@ public class TableRebalancer {
         Preconditions.checkState(_helixDataAccessor.getBaseDataAccessor()
             .set(idealStatePropertyKey.getPath(), idealStateRecord, idealStateRecord.getVersion(),
                 AccessOption.PERSISTENT), "Failed to update IdealState");
-        LOGGER.info("Finished rebalancing table: {} with downtime in {}ms.", tableNameWithType,
-            System.currentTimeMillis() - startTimeMs);
-        return new RebalanceResult(RebalanceResult.Status.DONE,
+        LOGGER.info("For rebalanceId: {}, finished rebalancing table: {} with downtime in {}ms.", rebalanceJobId,
+            tableNameWithType, System.currentTimeMillis() - startTimeMs);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
             "Success with downtime (replaced IdealState with the target segment assignment, ExternalView might not "
                 + "reach the target segment assignment yet)", instancePartitionsMap, tierToInstancePartitionsMap,
             targetAssignment);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while updating IdealState for table: {}, aborting the rebalance",
-            tableNameWithType, e);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
-            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
+        LOGGER.warn("For rebalanceId: {}, caught exception while updating IdealState for table: {},"
+            + " aborting the rebalance", rebalanceJobId, tableNameWithType, e);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+            "Caught exception while updating IdealState: " + e, instancePartitionsMap, tierToInstancePartitionsMap,
+            targetAssignment);
       }
     }
+
+    // Record the beginning of rebalance
+    _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
+        targetAssignment);
 
     // Calculate the min available replicas for no-downtime rebalance
     // NOTE: The calculation is based on the number of replicas of the target assignment. In case of increasing the
@@ -294,12 +328,15 @@ public class TableRebalancer {
     if (minReplicasToKeepUpForNoDowntime >= 0) {
       // For non-negative value, use it as min available replicas
       if (minReplicasToKeepUpForNoDowntime >= numReplicas) {
-        LOGGER.warn(
-            "Illegal config for minReplicasToKeepUpForNoDowntime: {} for table: {}, must be less than number of "
-                + "replicas: {}, aborting the rebalance", minReplicasToKeepUpForNoDowntime, tableNameWithType,
-            numReplicas);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Illegal min available replicas config",
-            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
+        String errorMsg = String.format(
+            "For rebalanceId: %s, Illegal config for minReplicasToKeepUpForNoDowntime: %d for table: %s," + " must be"
+                + " less than number of " + "replicas: %d, aborting the rebalance", rebalanceJobId,
+            minReplicasToKeepUpForNoDowntime, tableNameWithType, numReplicas);
+        LOGGER.warn(errorMsg);
+        _tableRebalanceObserver.onError(errorMsg);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+            "Illegal min available replicas config", instancePartitionsMap, tierToInstancePartitionsMap,
+            targetAssignment);
       }
       minAvailableReplicas = minReplicasToKeepUpForNoDowntime;
     } else {
@@ -307,11 +344,14 @@ public class TableRebalancer {
       minAvailableReplicas = Math.max(numReplicas + minReplicasToKeepUpForNoDowntime, 0);
     }
 
-    LOGGER.info("Rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts: {}, "
-            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}", tableNameWithType,
-        minAvailableReplicas, enableStrictReplicaGroup, bestEfforts, externalViewCheckIntervalInMs,
+    LOGGER.info(
+        "For rebalanceId: {}, rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, "
+            + "bestEfforts: {}, "
+            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}", rebalanceJobId,
+        tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts, externalViewCheckIntervalInMs,
         externalViewStabilizationTimeoutInMs);
     int expectedVersion = currentIdealState.getRecord().getVersion();
+
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
       Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
@@ -321,9 +361,12 @@ public class TableRebalancer {
             waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMove, externalViewCheckIntervalInMs,
                 externalViewStabilizationTimeoutInMs);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while waiting for ExternalView to converge for table: {}, aborting the rebalance",
-            tableNameWithType, e);
-        return new RebalanceResult(RebalanceResult.Status.FAILED,
+        String errorMsg = String.format(
+            "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
+                + "aborting the rebalance", rebalanceJobId, tableNameWithType);
+        LOGGER.warn(errorMsg, e);
+        _tableRebalanceObserver.onError(errorMsg);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
             "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment);
       }
@@ -332,8 +375,8 @@ public class TableRebalancer {
       ZNRecord idealStateRecord = idealState.getRecord();
       if (idealStateRecord.getVersion() != expectedVersion) {
         LOGGER.info(
-            "IdealState version changed while waiting for ExternalView to converge for table: {}, re-calculating the "
-                + "target assignment", tableNameWithType);
+            "For rebalanceId: {}, idealState version changed while waiting for ExternalView to converge for table: {},"
+                + " re-calculating the " + "target assignment", rebalanceJobId, tableNameWithType);
         Map<String, Map<String, String>> oldAssignment = currentAssignment;
         currentAssignment = idealStateRecord.getMapFields();
         expectedVersion = idealStateRecord.getVersion();
@@ -346,9 +389,9 @@ public class TableRebalancer {
           Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
           if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
             LOGGER.info(
-                "Segment state changed in IdealState from: {} to: {} for table: {}, segment: {}, re-calculating the "
-                    + "target assignment based on the new IdealState", oldInstanceStateMap, currentInstanceStateMap,
-                tableNameWithType, segment);
+                "For rebalanceId: {}, segment state changed in IdealState from: {} to: {} for table: {}, segment: {},"
+                    + " re-calculating the " + "target assignment based on the new IdealState", rebalanceJobId,
+                oldInstanceStateMap, currentInstanceStateMap, tableNameWithType, segment);
             segmentsToMoveChanged = true;
             break;
           }
@@ -362,17 +405,19 @@ public class TableRebalancer {
             targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
                 tierToInstancePartitionsMap, rebalanceConfig);
           } catch (Exception e) {
-            LOGGER.warn(
-                "Caught exception while re-calculating the target assignment for table: {}, aborting the rebalance",
-                tableNameWithType, e);
-            return new RebalanceResult(RebalanceResult.Status.FAILED,
+            String errorMsg = String.format(
+                "For rebalanceId: %s, caught exception while re-calculating the target assignment for table: %s," + " "
+                    + "aborting the rebalance", rebalanceJobId, tableNameWithType);
+            LOGGER.warn(errorMsg, e);
+            _tableRebalanceObserver.onError(errorMsg);
+            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
                 "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
                 tierToInstancePartitionsMap, targetAssignment);
           }
         } else {
           LOGGER.info(
-              "No state change found for segments to be moved, re-calculating the target assignment based on the "
-                  + "previous target assignment for table: {}", tableNameWithType);
+              "For rebalanceId:{}, no state change found for segments to be moved, re-calculating the target assignment"
+                  + " based on the " + "previous target assignment for table: {}", rebalanceJobId, tableNameWithType);
           Map<String, Map<String, String>> oldTargetAssignment = targetAssignment;
           targetAssignment = new HashMap<>(currentAssignment);
           for (String segment : segmentsToMove) {
@@ -382,20 +427,27 @@ public class TableRebalancer {
       }
 
       if (currentAssignment.equals(targetAssignment)) {
-        LOGGER.info(
-            "Finished rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts:"
-                + " {} in {}ms.", tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
+        String msg = String.format(
+            "For rebalanceId: %s, finished rebalancing table: %s with minAvailableReplicas: %d," + " "
+                + "enableStrictReplicaGroup: %b, " + "bestEfforts:" + " %b in %d ms.", rebalanceJobId,
+            tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
             System.currentTimeMillis() - startTimeMs);
-        return new RebalanceResult(RebalanceResult.Status.DONE,
+        LOGGER.info(msg);
+        // Record completion
+        _tableRebalanceObserver.onSuccess(msg);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
             "Success with minAvailableReplicas: " + minAvailableReplicas
                 + " (both IdealState and ExternalView should reach the target segment assignment)",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
       }
 
+      // Record change of current ideal state and the new target
+      _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
+          targetAssignment);
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup);
-      LOGGER.info("Got the next assignment for table: {} with number of segments to be moved to each instance: {}",
-          tableNameWithType,
+      LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to"
+              + " each instance: {}", rebalanceJobId, tableNameWithType,
           SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, nextAssignment));
 
       // Reuse current IdealState to update the IdealState in cluster
@@ -410,14 +462,20 @@ public class TableRebalancer {
             "Failed to update IdealState");
         currentAssignment = nextAssignment;
         expectedVersion++;
-        LOGGER.info("Successfully updated the IdealState for table: {}", tableNameWithType);
+        LOGGER.info("For rebalanceId: {}, successfully updated the IdealState for table: {}", rebalanceJobId,
+            tableNameWithType);
       } catch (ZkBadVersionException e) {
-        LOGGER.info("Version changed while updating IdealState for table: {}", tableNameWithType);
+        LOGGER.info("For rebalanceId:{}, version changed while updating IdealState for table: {}", rebalanceJobId,
+            tableNameWithType);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while updating IdealState for table: {}, aborting the rebalance",
-            tableNameWithType, e);
-        return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
-            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
+        String errorMsg = String.format(
+            "For rebalanceId: %s, caught exception while updating IdealState for table: %s, "
+                + "aborting the rebalance", rebalanceJobId, tableNameWithType);
+        LOGGER.warn(errorMsg, e);
+        _tableRebalanceObserver.onError(errorMsg);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+            "Caught exception while updating IdealState: " + e, instancePartitionsMap, tierToInstancePartitionsMap,
+            targetAssignment);
       }
     }
   }
@@ -614,6 +672,10 @@ public class TableRebalancer {
           _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType));
       // ExternalView might be null when table is just created, skipping check for this iteration
       if (externalView != null) {
+        // Record external view and ideal state convergence status
+        _tableRebalanceObserver.onTrigger(
+            TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
+            externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields());
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
             idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);

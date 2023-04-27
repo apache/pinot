@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -45,6 +46,8 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -394,13 +397,6 @@ public final class TableConfigUtils {
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
-          if (schema != null) {
-            Preconditions.checkState(
-                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
-                "The destination column '" + columnName
-                    + "' of the transform function must be present in the schema or as a source column for "
-                    + "aggregations");
-          }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
             throw new IllegalStateException(
@@ -408,6 +404,13 @@ public final class TableConfigUtils {
           }
           if (!transformColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
+          }
+          if (schema != null) {
+            Preconditions.checkState(
+                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
+                "The destination column '" + columnName
+                    + "' of the transform function must be present in the schema or as a source column for "
+                    + "aggregations");
           }
           FunctionEvaluator expressionEvaluator;
           if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
@@ -434,8 +437,8 @@ public final class TableConfigUtils {
       ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
       if (complexTypeConfig != null && schema != null) {
         Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
-        Set<String> fieldNames = schema.getFieldSpecMap().keySet();
         if (MapUtils.isNotEmpty(prefixesToRename)) {
+          Set<String> fieldNames = schema.getColumnNames();
           for (String prefix : prefixesToRename.keySet()) {
             for (String field : fieldNames) {
               Preconditions.checkState(!field.startsWith(prefix),
@@ -967,6 +970,11 @@ public final class TableConfigUtils {
               + " version >= 2 to use this feature", columnName));
     }
 
+    Preconditions.checkState(
+        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(),
+        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+            + " not supported with forward index for column: %s, disabled", columnName));
+
     boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
         || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);
     boolean hasInvertedIndex = indexingConfigs.getInvertedIndexColumns() != null
@@ -1170,5 +1178,31 @@ public final class TableConfigUtils {
   private static boolean isRoutingStrategyAllowedForUpsert(@Nonnull RoutingConfig routingConfig) {
     String instanceSelectorType = routingConfig.getInstanceSelectorType();
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
+  }
+
+  /**
+   * Helper method to extract TableConfig in updated syntax from current TableConfig.
+   * <ul>
+   *   <li>Moves all index configs to FieldConfig.indexes</li>
+   *   <li>Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes</li>
+   * </ul>
+   */
+  public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
+    TableConfig clone = new TableConfig(tableConfig);
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      // get all the index data in new format
+      indexType.convertToNewFormat(clone, schema);
+    }
+    // cleanup the indexTypes field from all FieldConfig items
+    if (clone.getFieldConfigList() != null) {
+      List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
+      for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
+            .withIndexTypes(null)
+            .build());
+      }
+      clone.setFieldConfigList(cleanFieldConfigList);
+    }
+    return clone;
   }
 }

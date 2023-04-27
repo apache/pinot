@@ -37,30 +37,32 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
     super(expression, percentile);
   }
 
+  public PercentileTDigestMVAggregationFunction(ExpressionContext expression, double percentile,
+      int compressionFactor) {
+    super(expression, percentile, compressionFactor);
+  }
+
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILETDIGESTMV;
   }
 
   @Override
-  public String getColumnName() {
-    return _version == 0 ? AggregationFunctionType.PERCENTILETDIGEST.getName() + (int) _percentile + "MV_" + _expression
-        : AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "MV_" + _expression;
-  }
-
-  @Override
   public String getResultColumnName() {
     return _version == 0 ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "mv("
         + _expression + ")"
-        : AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", " + _percentile
-            + ")";
+        : ((_compressionFactor == PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION)
+            ? (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", "
+                + _percentile + ")")
+            : (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", "
+                + _percentile + ", " + _compressionFactor + ")"));
   }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    TDigest tDigest = getDefaultTDigest(aggregationResultHolder);
+    TDigest tDigest = getDefaultTDigest(aggregationResultHolder, _compressionFactor);
     for (int i = 0; i < length; i++) {
       for (double value : valuesArray[i]) {
         tDigest.add(value);
@@ -73,7 +75,7 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
-      TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKeyArray[i]);
+      TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor);
       for (double value : valuesArray[i]) {
         tDigest.add(value);
       }
@@ -87,7 +89,7 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKey);
+        TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor);
         for (double value : values) {
           tDigest.add(value);
         }

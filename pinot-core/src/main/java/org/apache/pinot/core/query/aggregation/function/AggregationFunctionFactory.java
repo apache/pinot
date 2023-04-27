@@ -103,7 +103,7 @@ public class AggregationFunctionFactory {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
           // second argument is a decimal number from 0.0 to 100.0.
           // Have to use literal string because we need to cast int to double here.
-          double percentile = parsePercentileToDouble(arguments.get(1).getLiteralString());
+          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
           if (remainingFunctionName.isEmpty()) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, percentile);
@@ -144,6 +144,31 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigestMV
             return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile);
           }
+        } else if (numArguments == 3) {
+          // Triple arguments percentile (e.g. percentileTDigest(bar, 95, 1000), etc.) where the
+          // second argument is a decimal number from 0.0 to 100.0 and third argument is a decimal number indicating
+          // the compression_factor for the TDigest. This can only be used for TDigest type percentile functions to
+          // pass in a custom compression_factor. If the two argument version is used the default compression_factor
+          // of 100.0 is used.
+          // Have to use literal string because we need to cast int to double here.
+          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
+          int compressionFactor = parseCompressionFactorToInt(arguments.get(2).getLiteral().getStringValue());
+          if (remainingFunctionName.equals("TDIGEST")) {
+            // PercentileTDigest
+            return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("RAWTDIGEST")) {
+            // PercentileRawTDigest
+            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("TDIGESTMV")) {
+            // PercentileTDigestMV
+            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("RAWTDIGESTMV")) {
+            // PercentileRawTDigestMV
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
@@ -170,7 +195,8 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
+              FieldSpec.DataType fieldDataType =
+                  FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
@@ -199,7 +225,8 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
+              FieldSpec.DataType fieldDataType =
+                  FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
@@ -327,5 +354,11 @@ public class AggregationFunctionFactory {
     double percentile = Double.parseDouble(percentileString);
     Preconditions.checkArgument(percentile >= 0d && percentile <= 100d, "Invalid percentile: %s", percentile);
     return percentile;
+  }
+
+  private static int parseCompressionFactorToInt(String compressionFactorString) {
+    int compressionFactor = Integer.parseInt(compressionFactorString);
+    Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
+    return compressionFactor;
   }
 }

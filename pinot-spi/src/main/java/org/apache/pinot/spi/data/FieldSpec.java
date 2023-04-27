@@ -397,7 +397,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BYTES(false, false),
     STRUCT(false, false),
     MAP(false, false),
-    LIST(false, false);
+    LIST(false, false),
+    UNKNOWN(false, true);
 
     private final DataType _storedType;
     private final int _size;
@@ -459,6 +460,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
      */
     public boolean isNumeric() {
       return _numeric;
+    }
+
+    /**
+     * Returns {@code true} if the data type is unknown, {@code false} otherwise.
+     */
+    public boolean isUnknown() {
+      return _storedType == UNKNOWN;
     }
 
     /**

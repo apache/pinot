@@ -66,6 +66,9 @@ private[datasource] object TypeConverter {
       dataTable: DataTable,
       sparkSchema: StructType): Seq[InternalRow] = {
     val dataTableColumnNames = dataTable.getDataSchema.getColumnNames
+    val nullRowIdsByColumn = (0 until dataTable.getDataSchema.size()).map{ col =>
+      dataTable.getNullRowIds(col)
+    }
     (0 until dataTable.getNumberOfRows).map { rowIndex =>
       // spark schema is used to ensure columns order
       val columns = sparkSchema.fields.map { field =>
@@ -73,10 +76,13 @@ private[datasource] object TypeConverter {
         if (colIndex < 0) {
           throw PinotException(s"'${field.name}' not found in Pinot server response")
         } else {
-          // pinot column data type can be used directly,
-          // because all of them is supported in spark schema
-          val columnDataType = dataTable.getDataSchema.getColumnDataType(colIndex)
-          readPinotColumnData(dataTable, columnDataType, rowIndex, colIndex)
+          if (nullRowIdsByColumn(colIndex) != null
+              && nullRowIdsByColumn(colIndex).contains(rowIndex)) {
+            null
+          } else {
+            val columnDataType = dataTable.getDataSchema.getColumnDataType(colIndex)
+            readPinotColumnData(dataTable, columnDataType, rowIndex, colIndex)
+          }
         }
       }
       InternalRow.fromSeq(columns)

@@ -89,7 +89,7 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
     }
 
     // return a positive number because this is used directly to modulo-index
-    return Math.abs(hashCode);
+    return hashCode & Integer.MAX_VALUE;
   }
 
   @Override

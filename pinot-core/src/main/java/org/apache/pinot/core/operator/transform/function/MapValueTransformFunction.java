@@ -73,7 +73,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
     TransformFunction keyValueFunction = arguments.get(1);
     Preconditions.checkState(keyValueFunction instanceof LiteralTransformFunction,
         "Key value must be a literal (number or string)");
-    String keyValue = ((LiteralTransformFunction) keyValueFunction).getLiteral();
+    String keyValue = ((LiteralTransformFunction) keyValueFunction).getStringLiteral();
     _keyDictId = keyColumnDictionary.indexOf(keyValue);
 
     _valueColumnFunction = arguments.get(2);
@@ -97,7 +97,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToDictIdsSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    if (_dictIds == null) {
+    if (_dictIds == null || _dictIds.length < length) {
       _dictIds = new int[length];
     }
     int[][] keyDictIdsMV = _keyColumnFunction.transformToDictIdsMV(valueBlock);
