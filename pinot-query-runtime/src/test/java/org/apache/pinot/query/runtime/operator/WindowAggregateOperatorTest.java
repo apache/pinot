@@ -389,12 +389,12 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected aggregation "
-      + "function name: RANK.*")
+      + "function name: NTILE.*")
   public void testShouldThrowOnUnknownRankAggFunction() {
-    // TODO: Remove this test when support is added for RANK functions
+    // TODO: Remove this test when support is added for NTILE function
     // Given:
     List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.RANK, FieldSpec.DataType.INT, "RANK", ImmutableList.of()));
+        new RexExpression.FunctionCall(SqlKind.RANK, FieldSpec.DataType.INT, "NTILE", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
     DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
@@ -404,6 +404,67 @@ public class WindowAggregateOperatorTest {
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+  }
+
+  @Test
+  public void testRankDenseRankRankingFunctions() {
+    // Given:
+    List<RexExpression> calls = ImmutableList.of(
+        new RexExpression.FunctionCall(SqlKind.RANK, FieldSpec.DataType.INT, "RANK", ImmutableList.of()),
+        new RexExpression.FunctionCall(SqlKind.DENSE_RANK, FieldSpec.DataType.INT, "DENSE_RANK", ImmutableList.of()));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
+    List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
+    Mockito.when(_input.nextBlock())
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"},
+            new Object[]{2, "foo"}, new Object[]{1, "foo"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"},
+            new Object[]{1, "numb"}, new Object[]{2, "the"}, new Object[]{3, "true"}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "rank", "dense_rank"},
+        new DataSchema.ColumnDataType[]{INT, STRING, LONG, LONG});
+
+    // When:
+    WindowAggregateOperator operator =
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 0,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+
+    TransferableBlock result = operator.getNextBlock();
+    while (result.isNoOpBlock()) {
+      result = operator.getNextBlock();
+    }
+    TransferableBlock eosBlock = operator.getNextBlock();
+    List<Object[]> resultRows = result.getContainer();
+    Map<Integer, List<Object[]>> expectedPartitionToRowsMap = new HashMap<>();
+    expectedPartitionToRowsMap.put(1, Arrays.asList(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L},
+        new Object[]{1, "numb", 3L, 2L}));
+    expectedPartitionToRowsMap.put(2, Arrays.asList(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L},
+        new Object[]{2, "foo", 2L, 2L}, new Object[]{2, "the", 4L, 3L}));
+    expectedPartitionToRowsMap.put(3, Arrays.asList(new Object[]{3, "and", 1L, 1L}, new Object[]{3, "true", 2L, 2L}));
+
+    Integer previousPartitionKey = null;
+    Map<Integer, List<Object[]>> resultsPartitionToRowsMap = new HashMap<>();
+    for (Object[] row : resultRows) {
+      Integer currentPartitionKey = (Integer) row[0];
+      if (!currentPartitionKey.equals(previousPartitionKey)) {
+        Assert.assertFalse(resultsPartitionToRowsMap.containsKey(currentPartitionKey));
+      }
+      resultsPartitionToRowsMap.computeIfAbsent(currentPartitionKey, k -> new ArrayList<>()).add(row);
+      previousPartitionKey = currentPartitionKey;
+    }
+
+    resultsPartitionToRowsMap.forEach((key, value) -> {
+      List<Object[]> expectedRows = expectedPartitionToRowsMap.get(key);
+      Assert.assertEquals(value.size(), expectedRows.size());
+      for (int i = 0; i < value.size(); i++) {
+        Assert.assertEquals(value.get(i), expectedRows.get(i));
+      }
+    });
+    Assert.assertTrue(eosBlock.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -430,7 +491,7 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 0,
-            WindowNode.WindowFrameType.ROW, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.ROWS, Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = operator.getNextBlock();
     while (result.isNoOpBlock()) {
@@ -561,7 +622,7 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.ROW, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.ROWS, Collections.emptyList(), outSchema, inSchema);
   }
 
   @Test
