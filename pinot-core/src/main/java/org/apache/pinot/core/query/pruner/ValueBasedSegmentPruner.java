@@ -56,8 +56,46 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
 
   @Override
   public boolean isApplicableTo(QueryContext query) {
-    return query.getFilter() != null;
+    if (query.getFilter() == null) {
+      return false;
+    }
+    return isApplicableToFilter(query.getFilter());
   }
+
+  /**
+   * 1. NOT is not applicable for segment pruning;
+   * 2. For OR, if one of the child filter is not applicable for pruning, the parent filter is not applicable;
+   * 3. For AND, if one of the child filter is applicable for pruning, the parent filter is applicable, but it
+   *    doesn't mean this child filter can prune the segment.
+   * 4. The specific pruners decide their own applicable predicate types.
+   */
+  private boolean isApplicableToFilter(FilterContext filter) {
+    switch (filter.getType()) {
+      case AND:
+        for (FilterContext child : filter.getChildren()) {
+          if (isApplicableToFilter(child)) {
+            return true;
+          }
+        }
+        return false;
+      case OR:
+        for (FilterContext child : filter.getChildren()) {
+          if (!isApplicableToFilter(child)) {
+            return false;
+          }
+        }
+        return true;
+      case NOT:
+        // Do not prune NOT filter
+        return false;
+      case PREDICATE:
+        return isApplicableToPredicate(filter.getPredicate());
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  abstract boolean isApplicableToPredicate(Predicate predicate);
 
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {

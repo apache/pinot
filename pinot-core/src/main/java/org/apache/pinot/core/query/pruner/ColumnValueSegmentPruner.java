@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.pruner;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
@@ -55,6 +56,26 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 @SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
 public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
+  @Override
+  protected boolean isApplicableToPredicate(Predicate predicate) {
+    // Only prune columns
+    if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
+      return false;
+    }
+    Predicate.Type predicateType = predicate.getType();
+    if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.RANGE) {
+      return true;
+    }
+    if (predicateType == Predicate.Type.IN) {
+      List<String> values = ((InPredicate) predicate).getValues();
+      // Skip pruning when there are too many values in the IN predicate
+      if (values.size() <= _inPredicateThreshold) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @Override
   boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate, Map<String, DataSource> dataSourceCache,
       ValueCache cachedValues) {

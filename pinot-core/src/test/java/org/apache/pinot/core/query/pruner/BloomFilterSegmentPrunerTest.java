@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -55,14 +56,18 @@ import static org.testng.Assert.assertTrue;
 public class BloomFilterSegmentPrunerTest {
   private static final BloomFilterSegmentPruner PRUNER = new BloomFilterSegmentPruner();
 
-  @Test
-  public void testBloomFilterPruning()
-      throws IOException {
+  @BeforeClass
+  public void setUp() {
     Map<String, Object> properties = new HashMap<>();
     // override default value
     properties.put(ColumnValueSegmentPruner.IN_PREDICATE_THRESHOLD, 5);
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PRUNER.init(configuration);
+  }
+
+  @Test
+  public void testBloomFilterPruning()
+      throws IOException {
     IndexSegment indexSegment = mockIndexSegment(new String[]{"1.0", "2.0", "3.0", "5.0", "7.0", "21.0"});
 
     // all out the bloom filter
@@ -117,6 +122,42 @@ public class BloomFilterSegmentPrunerTest {
     List<IndexSegment> selected =
         runPruner(segments, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0", 5000);
     assertEquals(selected.size(), 1);
+  }
+
+  @Test
+  public void testIsApplicableTo() {
+    // EQ and IN (with small number of values) are applicable for bloom filter based pruning.
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable WHERE column = 1");
+    assertTrue(PRUNER.isApplicableTo(queryContext));
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable WHERE column IN (1, 2)");
+    assertTrue(PRUNER.isApplicableTo(queryContext));
+
+    // NOT is not applicable
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable WHERE NOT column = 1");
+    assertFalse(PRUNER.isApplicableTo(queryContext));
+    // Too many values for IN clause
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3, 4, 5, 6, 7)");
+    assertFalse(PRUNER.isApplicableTo(queryContext));
+    // Other predicate types are not applicable
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable WHERE column LIKE 5");
+    assertFalse(PRUNER.isApplicableTo(queryContext));
+
+    // AND with one applicable child filter is applicable
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column NOT IN (1, 2) AND column = 3");
+    assertTrue(PRUNER.isApplicableTo(queryContext));
+
+    // OR with one child filter that's not applicable is not applicable
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column = 3 OR column NOT IN (1, 2)");
+    assertFalse(PRUNER.isApplicableTo(queryContext));
+
+    // Nested with AND/OR
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column = 3 OR (column NOT IN (1, 2) AND column = 4)");
+    assertTrue(PRUNER.isApplicableTo(queryContext));
   }
 
   private IndexSegment mockIndexSegment(String[] values)

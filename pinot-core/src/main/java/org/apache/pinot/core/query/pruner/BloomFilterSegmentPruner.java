@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -61,6 +62,26 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   public void init(PinotConfiguration config) {
     super.init(config);
     _fetchPlanner = FetchPlannerRegistry.getPlanner();
+  }
+
+  @Override
+  protected boolean isApplicableToPredicate(Predicate predicate) {
+    // Only prune columns
+    if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
+      return false;
+    }
+    Predicate.Type predicateType = predicate.getType();
+    if (predicateType == Predicate.Type.EQ) {
+      return true;
+    }
+    if (predicateType == Predicate.Type.IN) {
+      List<String> values = ((InPredicate) predicate).getValues();
+      // Skip pruning when there are too many values in the IN predicate
+      if (values.size() <= _inPredicateThreshold) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
