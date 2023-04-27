@@ -459,6 +459,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public String _expectedException;
       @JsonProperty("keepOutputRowOrder")
       public boolean _keepOutputRowOrder;
+      @JsonProperty("expectedNumSegments")
+      public Integer _expectedNumSegments;
     }
 
     public static class ColumnAndType {
