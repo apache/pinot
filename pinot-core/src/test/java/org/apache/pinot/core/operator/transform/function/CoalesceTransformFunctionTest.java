@@ -44,8 +44,9 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testCoalesceIntColumnsAndLiterals() {
+    final int intLiteral = 313;
     TransformFunction coalesceFunc = TransformFunctionFactory.get(
-        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", INT_SV_NULL_COLUMN, 314)),
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", INT_SV_NULL_COLUMN, intLiteral)),
         _dataSourceMap);
     Assert.assertEquals(coalesceFunc.getName(), "coalesce");
     int[] expectedResults = new int[NUM_ROWS];
@@ -53,7 +54,7 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
       if (i % 2 == 0) {
         expectedResults[i] = _intSVValues[i];
       } else {
-        expectedResults[i] = 314;
+        expectedResults[i] = intLiteral;
       }
     }
     testTransformFunction(coalesceFunc, expectedResults);

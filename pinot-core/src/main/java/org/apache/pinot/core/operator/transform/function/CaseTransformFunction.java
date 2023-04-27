@@ -32,7 +32,6 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -70,7 +69,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   private List<TransformFunction> _thenStatements = new ArrayList<>();
   private TransformFunction _elseStatement;
 
-  private boolean[] _selections;
+  private boolean[] _computeThenStatements;
   private TransformResultMetadata _resultMetadata;
   private int[] _selectedResults;
 
@@ -90,7 +89,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     _whenStatements = new ArrayList<>(numWhenStatements);
     _thenStatements = new ArrayList<>(numWhenStatements);
     constructStatementList(arguments);
-    _selections = new boolean[_thenStatements.size()];
+    _computeThenStatements = new boolean[_thenStatements.size()];
     _resultMetadata = calculateResultMetadata();
   }
 
@@ -189,7 +188,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
           break;
         case LONG:
           switch (thenStatementDataType) {
-            case INT:
+            case INT: // fall through
             case UNKNOWN:
               break;
             case FLOAT:
@@ -274,8 +273,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     if (_selectedResults == null || _selectedResults.length < numDocs) {
       _selectedResults = new int[numDocs];
     }
-    Arrays.fill(_selectedResults, 0, numDocs, -1);
-    Arrays.fill(_selections, false);
+    Arrays.fill(_selectedResults, -1);
+    Arrays.fill(_computeThenStatements, false);
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     int numWhenStatements = _whenStatements.size();
@@ -295,7 +294,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     // try to prune clauses now
     for (int i = 0; i < numDocs; i++) {
       if (_selectedResults[i] != -1) {
-        _selections[_selectedResults[i]] = true;
+        _computeThenStatements[_selectedResults[i]] = true;
       }
     }
     return _selectedResults;
@@ -312,11 +311,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
     RoaringBitmap bitmap = result.getRight();
     int[] intResult = result.getLeft();
     if (bitmap != null) {
-      bitmap.forEach((IntConsumer) (i) -> {
-        if (bitmap.contains(i)) {
-          intResult[i] = 0;
-        }
-      });
+      for (int i : bitmap) {
+        intResult[i] = 0;
+      }
     }
     return intResult;
   }
@@ -333,7 +330,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         int[] intValues = transformFunction.transformToIntValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
@@ -375,7 +372,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         Pair<int[], RoaringBitmap> intValuesNullPair = transformFunction.transformToIntValuesSVWithNull(valueBlock);
         int[] intValues = intValuesNullPair.getLeft();
@@ -427,7 +424,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         long[] longValues = transformFunction.transformToLongValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
@@ -469,7 +466,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         Pair<long[], RoaringBitmap> longValuesNullPair = transformFunction.transformToLongValuesSVWithNull(valueBlock);
         long[] longValues = longValuesNullPair.getLeft();
@@ -521,7 +518,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         float[] floatValues = transformFunction.transformToFloatValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
@@ -563,7 +560,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         Pair<float[], RoaringBitmap> floatValuesNullPair =
             transformFunction.transformToFloatValuesSVWithNull(valueBlock);
@@ -616,7 +613,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         double[] doubleValues = transformFunction.transformToDoubleValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
@@ -658,7 +655,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         Pair<double[], RoaringBitmap> doubleValuesNullPair =
             transformFunction.transformToDoubleValuesSVWithNull(valueBlock);
@@ -712,7 +709,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
@@ -754,7 +751,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         Pair<BigDecimal[], RoaringBitmap> bigDecimalValuesNullPair =
             transformFunction.transformToBigDecimalValuesSVWithNull(valueBlock);
@@ -808,7 +805,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         String[] stringValues = transformFunction.transformToStringValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
@@ -850,7 +847,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         Pair<String[], RoaringBitmap> stringValuesNullPair =
             transformFunction.transformToStringValuesSVWithNull(valueBlock);
@@ -903,7 +900,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         byte[][] byteValues = transformFunction.transformToBytesValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
@@ -945,7 +942,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         Pair<byte[][], RoaringBitmap> byteValuesNullPair =
             transformFunction.transformToBytesValuesSVWithNull(valueBlock);
@@ -995,7 +992,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < numThenStatements; i++) {
-      if (_selections[i]) {
+      if (_computeThenStatements[i]) {
         TransformFunction transformFunction = _thenStatements.get(i);
         RoaringBitmap nullBitmap = transformFunction.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
