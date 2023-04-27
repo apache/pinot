@@ -140,8 +140,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   private TransformResultMetadata calculateResultMetadata() {
-    TransformFunction elseStatement = _elseStatement;
-    TransformResultMetadata elseStatementResultMetadata = elseStatement.getResultMetadata();
+    TransformResultMetadata elseStatementResultMetadata = _elseStatement.getResultMetadata();
     DataType dataType = elseStatementResultMetadata.getDataType();
     Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
         "Unsupported multi-value expression in the ELSE clause");
