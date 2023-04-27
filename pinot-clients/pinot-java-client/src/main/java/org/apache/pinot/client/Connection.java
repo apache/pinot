@@ -120,6 +120,9 @@ public class Connection {
   public ResultSetGroup execute(@Nullable String tableName, String query)
       throws PinotClientException {
     String brokerHostPort = getBrokerHostPort(tableName, query);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query for table: " + tableName);
+    }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, query);
     if (response.hasExceptions() && _failOnExceptions) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
@@ -184,20 +187,12 @@ public class Connection {
    * @return the broker hosting the tables for query.
    */
   private String getBrokerHostPort(@Nullable String tableName, String query) throws PinotClientException {
-    String brokerHostPort;
-
     if (tableName == null) {
       List<String> tableNames = resolveTableNames(query);
-      brokerHostPort = getCommonBrokerHostPort(tableNames);
-    } else {
-      brokerHostPort = _brokerSelector.selectBroker(tableName);
+      return tableNames != null ? getCommonBrokerHostPort(tableNames): null;
     }
 
-    if (brokerHostPort == null) {
-      throw new PinotClientException("Could not find broker to query for statement: " + query);
-    }
-
-    return brokerHostPort;
+    return _brokerSelector.selectBroker(tableName);
   }
 
   /**
@@ -213,10 +208,7 @@ public class Connection {
       tableBrokers.add(_brokerSelector.selectBroker(tableName));
     }
 
-    if (tableBrokers.size() != 1) {
-      return null;
-    }
-    return (String) (tableBrokers.toArray()[0]);
+    return tableBrokers.size() == 1? (String) (tableBrokers.toArray()[0]): null;
   }
 
   /**
@@ -224,9 +216,15 @@ public class Connection {
    *
    * @return name of all the tables used in a sql query.
    */
+  @Nullable
   private static List<String> resolveTableNames(String query) {
+    try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
       return CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    } catch (Exception e) {
+      //OGGER.error("Cannot parse table name from query: {}", query, e);
+      return null;
+    }
   }
 
   /**
