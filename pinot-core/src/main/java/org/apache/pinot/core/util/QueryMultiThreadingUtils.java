@@ -33,8 +33,8 @@ import org.apache.pinot.core.util.trace.TraceCallable;
  * The term `task` and `thread` are used interchangeably in the logic to parallelize CombinePlanNode and
  * BaseCombineOperator. This class provides common methods used to set up the parallel processing.
  */
-public class TaskUtils {
-  private TaskUtils() {
+public class QueryMultiThreadingUtils {
+  private QueryMultiThreadingUtils() {
   }
 
   /**

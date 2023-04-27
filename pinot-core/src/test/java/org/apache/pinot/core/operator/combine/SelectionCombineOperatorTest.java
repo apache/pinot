@@ -35,7 +35,7 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.util.TaskUtils;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
@@ -75,7 +75,7 @@ public class SelectionCombineOperatorTest {
   private static final String SEGMENT_NAME_PREFIX = "testSegment_";
 
   // Create (MAX_NUM_THREADS_PER_QUERY * 2) segments so that each thread needs to process 2 segments
-  private static final int NUM_SEGMENTS = TaskUtils.MAX_NUM_THREADS_PER_QUERY * 2;
+  private static final int NUM_SEGMENTS = QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * 2;
   private static final int NUM_CONSUMING_SEGMENTS = NUM_SEGMENTS / 2;
   private static final String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
   private static final int NUM_RECORDS_PER_SEGMENT = 100;
@@ -178,13 +178,13 @@ public class SelectionCombineOperatorTest {
     // Should early-terminate after processing the result of the first segment. Each thread should process at most 1
     // segment.
     long numDocsScanned = combineResult.getNumDocsScanned();
-    assertTrue(numDocsScanned >= 10 && numDocsScanned <= TaskUtils.MAX_NUM_THREADS_PER_QUERY * 10);
+    assertTrue(numDocsScanned >= 10 && numDocsScanned <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * 10);
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
     int numSegmentsMatched = combineResult.getNumSegmentsMatched();
-    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= TaskUtils.MAX_NUM_THREADS_PER_QUERY);
+    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
     // The check below depends on the order of segment processing. When segments# <= 10 (the value of
     // CombinePlanNode.TARGET_NUM_PLANS_PER_THREAD to be specific), the segments are processed in the order as they
     // are prepared, which is OFFLINE segments followed by RT segments and this case makes the value here equal to 0.
@@ -196,9 +196,9 @@ public class SelectionCombineOperatorTest {
       assertEquals(numConsumingSegmentsMatched, 0, "numSegments: " + NUM_SEGMENTS);
     } else {
       assertTrue(numConsumingSegmentsMatched >= 0
-          && numConsumingSegmentsMatched <= TaskUtils.MAX_NUM_THREADS_PER_QUERY, String
+          && numConsumingSegmentsMatched <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY, String
           .format("numConsumingSegmentsMatched: %d, maxThreadsPerQuery: %d, numSegments: %d",
-              combineResult.getNumConsumingSegmentsMatched(), TaskUtils.MAX_NUM_THREADS_PER_QUERY,
+              combineResult.getNumConsumingSegmentsMatched(), QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY,
               NUM_SEGMENTS));
     }
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
@@ -234,14 +234,14 @@ public class SelectionCombineOperatorTest {
     // segment.
     long numDocsScanned = combineResult.getNumDocsScanned();
     // Need to scan 10 documents per segment because 'intColumn' is sorted
-    assertTrue(numDocsScanned >= 10 && numDocsScanned <= TaskUtils.MAX_NUM_THREADS_PER_QUERY * 10);
+    assertTrue(numDocsScanned >= 10 && numDocsScanned <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * 10);
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
     assertEquals(combineResult.getNumConsumingSegmentsMatched(), 0);
     int numSegmentsMatched = combineResult.getNumSegmentsMatched();
-    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= TaskUtils.MAX_NUM_THREADS_PER_QUERY);
+    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
 
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC");
@@ -258,14 +258,14 @@ public class SelectionCombineOperatorTest {
     // segment.
     numDocsScanned = combineResult.getNumDocsScanned();
     assertTrue(numDocsScanned >= NUM_RECORDS_PER_SEGMENT
-        && numDocsScanned <= TaskUtils.MAX_NUM_THREADS_PER_QUERY * NUM_RECORDS_PER_SEGMENT);
+        && numDocsScanned <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * NUM_RECORDS_PER_SEGMENT);
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
     assertEquals(combineResult.getNumConsumingSegmentsMatched(), NUM_CONSUMING_SEGMENTS);
     numSegmentsMatched = combineResult.getNumSegmentsMatched();
-    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= TaskUtils.MAX_NUM_THREADS_PER_QUERY);
+    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
 
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 10000");

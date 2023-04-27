@@ -31,7 +31,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.TaskUtils;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -71,7 +71,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     // NOTE: We split the query execution into multiple tasks, where each task handles the query execution on multiple
     //       (>=1) segments. These tasks are assigned to multiple execution threads so that they can run in parallel.
     //       The parallelism is bounded by the task count.
-    _numTasks = TaskUtils.getNumTasksForQuery(operators.size(), queryContext.getMaxExecutionThreads());
+    _numTasks = QueryMultiThreadingUtils.getNumTasksForQuery(operators.size(), queryContext.getMaxExecutionThreads());
 
     // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
     // returns. We need to ensure this because the main thread holds the reference to the segments. If a segment is

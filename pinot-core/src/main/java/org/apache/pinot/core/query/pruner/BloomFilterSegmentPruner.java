@@ -33,7 +33,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.TaskUtils;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -101,8 +101,8 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     // With executor service and large number of segments, prune them in parallel.
     // NOTE: Even if numTasks=1 i.e. we get a single executor thread, still run it using a separate thread so that
     //       the timeout can be honored. For example, this may happen when there is only one processor.
-    int numTasks =
-        TaskUtils.getNumTasks(segments.size(), TARGET_NUM_SEGMENTS_PER_THREAD, query.getMaxExecutionThreads());
+    int numTasks = QueryMultiThreadingUtils.getNumTasks(segments.size(), TARGET_NUM_SEGMENTS_PER_THREAD,
+        query.getMaxExecutionThreads());
     if (!query.isEnablePrefetch()) {
       return pruneInParallel(numTasks, segments, query, executorService, null);
     }
@@ -114,7 +114,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
       ExecutorService executorService, FetchContext[] fetchContexts) {
     int numSegments = segments.size();
     List<IndexSegment> allSelectedSegments = new ArrayList<>();
-    TaskUtils.runTasksWithDeadline(numTasks, index -> {
+    QueryMultiThreadingUtils.runTasksWithDeadline(numTasks, index -> {
       FilterContext filter = Objects.requireNonNull(queryContext.getFilter());
       ValueCache cachedValues = new ValueCache();
       Map<String, DataSource> dataSourceCache = new HashMap<>();
@@ -129,7 +129,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
       }
       return selectedSegments;
     }, taskRes -> {
-      if (taskRes != null && !taskRes.isEmpty()) {
+      if (taskRes != null) {
         allSelectedSegments.addAll(taskRes);
       }
     }, e -> {

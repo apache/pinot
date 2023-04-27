@@ -41,7 +41,7 @@ import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOpe
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOrderByCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.TaskUtils;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -100,17 +100,17 @@ public class CombinePlanNode implements PlanNode {
       // Large number of plan nodes, run them in parallel
       // NOTE: Even if we get single executor thread, still run it using a separate thread so that the timeout can be
       //       honored
-      int numTasks =
-          TaskUtils.getNumTasks(numPlanNodes, TARGET_NUM_PLANS_PER_THREAD, _queryContext.getMaxExecutionThreads());
+      int numTasks = QueryMultiThreadingUtils.getNumTasks(numPlanNodes, TARGET_NUM_PLANS_PER_THREAD,
+          _queryContext.getMaxExecutionThreads());
       recording.setNumTasks(numTasks);
-      TaskUtils.runTasksWithDeadline(numTasks, index -> {
+      QueryMultiThreadingUtils.runTasksWithDeadline(numTasks, index -> {
         List<Operator> ops = new ArrayList<>();
         for (int i = index; i < numPlanNodes; i += numTasks) {
           ops.add(_planNodes.get(i).run());
         }
         return ops;
       }, taskRes -> {
-        if (taskRes != null && !taskRes.isEmpty()) {
+        if (taskRes != null) {
           operators.addAll(taskRes);
         }
       }, e -> {
