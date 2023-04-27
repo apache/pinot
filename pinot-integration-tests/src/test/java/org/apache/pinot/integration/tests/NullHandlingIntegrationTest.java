@@ -447,7 +447,8 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     }
 
     // greatest, least.
-    sqlQuery = "SELECT greatest(null, salary, salary + 1) END FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    sqlQuery =
+        "SELECT greatest(null, salary, salary + 1) END FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
     for (int i = 0; i < 10; i++) {
@@ -471,8 +472,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     }
 
     // Scalar
-    sqlQuery =
-        "SELECT lower(description) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
+    sqlQuery = "SELECT lower(description) FROM " + getTableName() + " OPTION(enableNullHandling=true);";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     rows = response.get("resultTable").get("rows");
     for (int i = 0; i < 10; i++) {
