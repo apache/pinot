@@ -36,6 +36,7 @@ public class AvgValueIntegerTupleSketchAggregationFunction
   }
 
   // TODO if extra aggregation modes are supported, make this switch
+  // ie, if a Mode argument other than SUM is passed in, switch to the matching AggregationFunctionType
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH;
