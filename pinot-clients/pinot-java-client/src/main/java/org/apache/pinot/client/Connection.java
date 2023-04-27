@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.client;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -117,11 +119,7 @@ public class Connection {
    */
   public ResultSetGroup execute(@Nullable String tableName, String query)
       throws PinotClientException {
-    tableName = tableName == null ? resolveTableName(query) : tableName;
-    String brokerHostPort = _brokerSelector.selectBroker(tableName);
-    if (brokerHostPort == null) {
-      throw new PinotClientException("Could not find broker to query for table: " + tableName);
-    }
+    String brokerHostPort = getBrokerHostPort(tableName, query);
     BrokerResponse response = _transport.executeQuery(brokerHostPort, query);
     if (response.hasExceptions() && _failOnExceptions) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
@@ -176,27 +174,55 @@ public class Connection {
    */
   public Future<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
       throws PinotClientException {
-    tableName = tableName == null ? resolveTableName(query) : tableName;
-    String brokerHostPort = _brokerSelector.selectBroker(tableName);
-    if (brokerHostPort == null) {
-      throw new PinotClientException("Could not find broker to query for statement: " + query);
-    }
+    String brokerHostPort = getBrokerHostPort(tableName, query);
     return new ResultSetGroupFuture(_transport.executeQueryAsync(brokerHostPort, query));
   }
 
-  @Nullable
-  private static String resolveTableName(String query) {
-    List<String> tableNames = resolveTableNames(query);
-    if (tableNames.size() > 1) {
-      return tableNames.get(0);
+  /**
+   * Returns the broker hosting the tables for query.
+   *
+   * @return the broker hosting the tables for query.
+   */
+  private String getBrokerHostPort(@Nullable String tableName, String query) throws PinotClientException {
+    String brokerHostPort;
+
+    if (tableName == null) {
+      List<String> tableNames = resolveTableNames(query);
+      brokerHostPort = getCommonBrokerHostPort(tableNames);
+    } else {
+      brokerHostPort = _brokerSelector.selectBroker(tableName);
     }
-    return null;
+
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query for statement: " + query);
+    }
+
+    return brokerHostPort;
   }
 
   /**
-   * Returns the name of all the tables used in sql query.
+   * Returns the common broker hosting all the tables.
    *
-   * @return name of all the tables used in sql query.
+   * @return the common broker hosting all the tables.
+   */
+  @Nullable
+  private String getCommonBrokerHostPort(List<String> tableNames) {
+    Set<String> tableBrokers = new HashSet<>();
+
+    for (String tableName: tableNames) {
+      tableBrokers.add(_brokerSelector.selectBroker(tableName));
+    }
+
+    if (tableBrokers.size() != 1) {
+      return null;
+    }
+    return (String) (tableBrokers.toArray()[0]);
+  }
+
+  /**
+   * Returns the name of all the tables used in a sql query.
+   *
+   * @return name of all the tables used in a sql query.
    */
   private static List<String> resolveTableNames(String query) {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
