@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.util.Pair;
-import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -32,14 +31,15 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
- * The {@code QueryPlan} is the dispatchable query execution plan from the result of {@link LogicalPlanner}.
+ * The {@code QueryPlan} is the dispatchable query execution plan from the result of
+ * {@link org.apache.pinot.query.planner.logical.StagePlanner}.
  *
  * <p>QueryPlan should contain the necessary stage boundary information and the cross exchange information
  * for:
  * <ul>
  *   <li>dispatch individual stages to executor.</li>
- *   <li>instruct stage executor to establish connection channels to other stages.</li>
- *   <li>encode data blocks for transfer between stages based on partitioning scheme.</li>
+ *   <li>instruction for stage executor to establish connection channels to other stages.</li>
+ *   <li>instruction for encoding data blocks & transferring between stages based on partitioning scheme.</li>
  * </ul>
  */
 public class QueryPlan {
@@ -101,6 +101,9 @@ public class QueryPlan {
     return ExplainPlanStageVisitor.explain(this);
   }
 
+  /**
+   * Convert the {@link DispatchablePlanMetadata} into dispatchable info for each stage/worker.
+   */
   private static List<StageMetadata> constructStageMetadataList(
       Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
     StageMetadata[] stageMetadataList = new StageMetadata[dispatchablePlanMetadataMap.size()];

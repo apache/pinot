@@ -82,5 +82,5 @@ message StageMetadata {
 
 message WorkerMetadata {
   string virtualAddress = 1;
-  map<string, string> customProperty = 4;
+  map<string, string> customProperty = 2;
 }

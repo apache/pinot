@@ -34,7 +34,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
  */
 public class DistributedStagePlan {
   private int _stageId;
-  private VirtualServerAddress _serverAddress;
+  private VirtualServerAddress _server;
   private StageNode _stageRoot;
   private List<StageMetadata> _stageMetadataList;
 
@@ -43,10 +43,10 @@ public class DistributedStagePlan {
     _stageMetadataList = new ArrayList<>();
   }
 
-  public DistributedStagePlan(int stageId, VirtualServerAddress serverAddress, StageNode stageRoot,
+  public DistributedStagePlan(int stageId, VirtualServerAddress server, StageNode stageRoot,
       List<StageMetadata> stageMetadataList) {
     _stageId = stageId;
-    _serverAddress = serverAddress;
+    _server = server;
     _stageRoot = stageRoot;
     _stageMetadataList = stageMetadataList;
   }
@@ -56,7 +56,7 @@ public class DistributedStagePlan {
   }
 
   public VirtualServerAddress getServer() {
-    return _serverAddress;
+    return _server;
   }
 
   public StageNode getStageRoot() {
@@ -68,7 +68,7 @@ public class DistributedStagePlan {
   }
 
   public void setServer(VirtualServerAddress serverAddress) {
-    _serverAddress = serverAddress;
+    _server = serverAddress;
   }
 
   public void setStageRoot(StageNode stageRoot) {
@@ -80,6 +80,6 @@ public class DistributedStagePlan {
   }
 
   public WorkerMetadata getCurrentWorkerMetadata() {
-    return getCurrentStageMetadata().getWorkerMetadataList().get(_serverAddress.workerId());
+    return getCurrentStageMetadata().getWorkerMetadataList().get(_server.workerId());
   }
 }

@@ -50,6 +50,7 @@ import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -230,9 +231,9 @@ public class QueryDispatcher {
             rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             if (stageStatsAggregator != null) {
               if (queryPlan != null) {
-                DispatchablePlanMetadata operatorStageMetadata = queryPlan.getDispatchablePlanMetadataMap()
+                StageMetadata stageMetadata = queryPlan.getStageMetadataList()
                     .get(operatorStats.getStageId());
-                OperatorUtils.recordTableName(operatorStats, operatorStageMetadata);
+                OperatorUtils.recordTableName(operatorStats, stageMetadata);
               }
               stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             }

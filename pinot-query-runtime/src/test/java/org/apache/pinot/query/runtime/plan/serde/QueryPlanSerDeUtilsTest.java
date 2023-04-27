@@ -36,7 +36,7 @@ public class QueryPlanSerDeUtilsTest {
     Mockito.when(server.port()).thenReturn(80);
 
     // When:
-    String serialized = QueryPlanSerDeUtils.addressToString(server);
+    String serialized = QueryPlanSerDeUtils.addressToProto(server);
 
     // Then:
     Assert.assertEquals(serialized, "1@Server_192.987.1.123:80");

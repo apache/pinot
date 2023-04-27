@@ -86,11 +86,10 @@ public class StagePlanner {
             RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, globalSenderNode);
 
     // perform physical plan conversion and assign workers to each stage.
-    DispatchablePlanContext dispatchablePlanContext = new DispatchablePlanContext(
-        _workerManager, _requestId, _plannerContext, relRoot.fields, tableNames
-    );
-    QueryPlan queryPlan = DispatchablePlanVisitor.INSTANCE.constructDispatchablePlan(
-        globalReceiverNode, dispatchablePlanContext);
+    DispatchablePlanContext dispatchablePlanContext = new DispatchablePlanContext(_workerManager, _requestId,
+        _plannerContext, relRoot.fields, tableNames);
+    QueryPlan queryPlan = DispatchablePlanVisitor.INSTANCE.constructDispatchablePlan(globalReceiverNode,
+        dispatchablePlanContext);
 
     // Run physical optimizations
     runPhysicalOptimizers(queryPlan);

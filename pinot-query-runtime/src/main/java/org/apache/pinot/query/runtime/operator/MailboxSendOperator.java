@@ -97,20 +97,20 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<SendingMailbox> sendingMailboxes;
     if (exchangeType == RelDistribution.Type.SINGLETON) {
       // TODO: this logic should be moved into SingletonExchange
-      VirtualServerAddress singletonAddress = null;
+      VirtualServerAddress singletonReceiver = null;
       for (WorkerMetadata receivingMetadata : receivingMetadataList) {
         VirtualServerAddress receiver = receivingMetadata.getVirtualServerAddress();
         if (receiver.hostname().equals(mailboxService.getHostname())
             && receiver.port() == mailboxService.getPort()) {
-          Preconditions.checkState(singletonAddress == null, "Multiple instances found for SINGLETON exchange type");
-          singletonAddress = receiver;
+          Preconditions.checkState(singletonReceiver == null, "Multiple instances found for SINGLETON exchange type");
+          singletonReceiver = receiver;
         }
       }
-      Preconditions.checkState(singletonAddress != null, "Failed to find instance for SINGLETON exchange type");
+      Preconditions.checkState(singletonReceiver != null, "Failed to find instance for SINGLETON exchange type");
       String mailboxId = MailboxIdUtils.toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId,
-          singletonAddress.workerId());
+          singletonReceiver.workerId());
       sendingMailboxes = Collections.singletonList(
-          mailboxService.getSendingMailbox(singletonAddress.hostname(), singletonAddress.port(), mailboxId,
+          mailboxService.getSendingMailbox(singletonReceiver.hostname(), singletonReceiver.port(), mailboxId,
               deadlineMs));
     } else {
       sendingMailboxes = new ArrayList<>(receivingMetadataList.size());

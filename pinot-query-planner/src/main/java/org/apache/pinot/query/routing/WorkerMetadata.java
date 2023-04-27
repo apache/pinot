@@ -28,18 +28,17 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * The {@code WorkerMetadata} info contains the information for executing a particular worker on a particular stage.
+ * {@code WorkerMetadata} is used to send worker-level info about how to execute a stage on a particular worker.
  *
- * <p>It contains information about:</p>
+ * <p>It contains information specific to a single worker within a stage, such as:</p>
  * <ul>
- *   <li>the tables it is suppose to scan (including real-time and offline portions separately)</li>
- *   <li>the underlying segments a stage requires to execute upon if it is a leaf stage worker</li>
- *   <li>the partition mechanism of the data being execute on this worker</li>
+ *   <li>the underlying segments this particular worker needs to execute.</li>
+ *   <li>the mailbox info required to construct data transfer linkages.</li>
+ *   <li>the partition mechanism of the data being execute on this worker.</li>
  * </ul>
  *
- * <p>WorkerMetadata should allow {@link org.apache.pinot.query.planner.stage.MailboxSendNode} and
- * {@link org.apache.pinot.query.planner.stage.MailboxReceiveNode} to derive the appropriate set of mailboxes to be
- * created when executing the worker.</p>
+ * TODO: WorkerMetadata now doesn't have info directly about how to construct the mailboxes. instead it rely on
+ * MailboxSendNode and MailboxReceiveNode to derive the info during runtime. this should changed to plan time soon.
  */
 public class WorkerMetadata {
   private final VirtualServerAddress _virtualServerAddress;

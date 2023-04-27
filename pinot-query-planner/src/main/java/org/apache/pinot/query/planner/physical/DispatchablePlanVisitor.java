@@ -85,20 +85,20 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   @Override
   public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    DispatchablePlanMetadata stageMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
     return null;
   }
 
   @Override
   public Void visitWindow(WindowNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    DispatchablePlanMetadata stageMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
     // TODO: Figure out a way to parallelize Empty OVER() and OVER(ORDER BY) so the computation can be done across
     //       multiple nodes.
     // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
     // distributed as no global ordering is required across partitions.
-    stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
     return null;
   }
 
@@ -150,15 +150,15 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   @Override
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    DispatchablePlanMetadata stageMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    stageMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
     return null;
   }
 
   @Override
   public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
-    DispatchablePlanMetadata stageMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    stageMetadata.addScannedTable(node.getTableName());
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.addScannedTable(node.getTableName());
     return null;
   }
 

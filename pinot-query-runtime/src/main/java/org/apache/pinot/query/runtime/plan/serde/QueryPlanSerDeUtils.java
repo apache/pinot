@@ -51,7 +51,7 @@ public class QueryPlanSerDeUtils {
   public static Worker.StagePlan serialize(DistributedStagePlan distributedStagePlan) {
     return Worker.StagePlan.newBuilder()
         .setStageId(distributedStagePlan.getStageId())
-        .setVirtualAddress(addressToString(distributedStagePlan.getServer()))
+        .setVirtualAddress(addressToProto(distributedStagePlan.getServer()))
         .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) distributedStagePlan.getStageRoot()))
         .addAllStageMetadata(stageMetadataListToProtoList(distributedStagePlan.getStageMetadataList())).build();
   }
@@ -72,7 +72,7 @@ public class QueryPlanSerDeUtils {
         Integer.parseInt(matcher.group("port")), Integer.parseInt(matcher.group("virtualid")));
   }
 
-  public static String addressToString(VirtualServerAddress serverAddress) {
+  public static String addressToProto(VirtualServerAddress serverAddress) {
     return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
   }
 
@@ -121,7 +121,7 @@ public class QueryPlanSerDeUtils {
 
   private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata) {
     Worker.WorkerMetadata.Builder builder = Worker.WorkerMetadata.newBuilder();
-    builder.setVirtualAddress(addressToString(workerMetadata.getVirtualServerAddress()));
+    builder.setVirtualAddress(addressToProto(workerMetadata.getVirtualServerAddress()));
     builder.putAllCustomProperty(workerMetadata.getCustomProperties());
     return builder.build();
   }

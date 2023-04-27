@@ -39,7 +39,6 @@ public class DispatchablePlanContext {
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
   private final Map<Integer, StageNode> _dispatchablePlanStageRootMap;
 
-
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
       List<Pair<Integer, String>> resultFields, Set<String> tableNames) {
     _workerManager = workerManager;

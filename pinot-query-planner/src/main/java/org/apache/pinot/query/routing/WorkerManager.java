@@ -72,8 +72,14 @@ public class WorkerManager {
           new QueryServerInstance(_hostName, _port, _port), Collections.singletonList(0)));
       dispatchablePlanMetadata.setTotalWorkerCount(1);
     } else if (isLeafStage(dispatchablePlanMetadata)) {
+      // --- LEAF STAGE ---
       assignWorkerToLeafStage(requestId, dispatchablePlanMetadata);
     } else {
+      // --- INTERMEDIATE STAGES ---
+      // If the query has more than one table, it is possible that the tables could be hosted on different tenants.
+      // The intermediate stage will be processed on servers randomly picked from the tenants belonging to either or
+      // all of the tables in the query.
+      // TODO: actually make assignment strategy decisions for intermediate stages
       assignWorkerToIntermediateStage(dispatchablePlanMetadata, tableNames, options);
     }
   }
