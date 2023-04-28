@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -188,9 +189,17 @@ public class BrokerCache {
     _brokerData = getBrokerData(responses);
   }
 
-  public String getBroker(String tableName) {
-    List<String> brokers =
-        (tableName == null) ? _brokerData.getBrokers() : _brokerData.getTableToBrokerMap().get(tableName);
+  public String getBroker(List<String> tableNames) {
+    List<String> brokers;
+    if (tableNames == null) {
+      brokers = _brokerData.getBrokers();
+    } else {
+       List<List<String>> brokersHostingTables = new ArrayList<>();
+       for (String table: tableNames) {
+         brokersHostingTables.add(_brokerData.getTableToBrokerMap().get(table));
+       }
+      brokers = BrokerSelectorUtils.getTablesCommonBrokers(brokersHostingTables);
+    }
     return brokers.get(_random.nextInt(brokers.size()));
   }
 

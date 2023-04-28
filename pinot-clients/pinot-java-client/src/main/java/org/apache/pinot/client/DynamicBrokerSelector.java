@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
+import org.apache.pinot.client.utils.BrokerSelectorUtils;
 
 
 /**
@@ -86,24 +87,20 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   @Nullable
   @Override
-  public String selectBroker(String table) {
-    if (table != null) {
-      String tableName =
-          table.replace(ExternalViewReader.OFFLINE_SUFFIX, "").replace(ExternalViewReader.REALTIME_SUFFIX, "");
-      List<String> list = _tableToBrokerListMapRef.get().get(tableName);
-      if (list != null && !list.isEmpty()) {
-        return list.get(RANDOM.nextInt(list.size()));
+  public String selectBroker(List<String> tableNames) {
+    if (tableNames != null) {
+      List<List<String>> commonBrokers = new ArrayList<>();
+      // getting list of brokers hosting the table.
+      for (String table: tableNames) {
+        commonBrokers.add(getBrokerListForTable(table));
       }
-      // In case tableName is formatted as <db>.<table>
-      int idx = tableName.indexOf('.');
-      if (idx > 0) {
-        tableName = tableName.substring(idx + 1);
-      }
-      list = _tableToBrokerListMapRef.get().get(tableName);
+      // getting list of brokers hosting all the tables.
+      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(commonBrokers);
       if (list != null && !list.isEmpty()) {
         return list.get(RANDOM.nextInt(list.size()));
       }
     }
+
     // Return a broker randomly if table is null or no broker is found for the specified table.
     List<String> list = _allBrokerListRef.get();
     if (list != null && !list.isEmpty()) {
@@ -130,5 +127,22 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   @Override
   public void handleDataDeleted(String dataPath) {
     refresh();
+  }
+
+  private List<String> getBrokerListForTable(String table) {
+    String tableName =
+        table.replace(ExternalViewReader.OFFLINE_SUFFIX, "").replace(ExternalViewReader.REALTIME_SUFFIX, "");
+    List<String> list = _tableToBrokerListMapRef.get().get(tableName);
+    if (list != null && !list.isEmpty()) {
+      return list;
+    }
+
+    // In case tableName is formatted as <db>.<table>
+    int idx = tableName.indexOf('.');
+    if (idx > 0) {
+      tableName = tableName.substring(idx + 1);
+    }
+    list = _tableToBrokerListMapRef.get().get(tableName);
+    return list;
   }
 }

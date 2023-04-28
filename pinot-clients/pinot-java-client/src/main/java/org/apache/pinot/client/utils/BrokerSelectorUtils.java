@@ -16,25 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.client.utils;
 
 import java.util.List;
 
-public interface BrokerSelector {
-  /**
-   * Returns the broker address in the form host:port
-   * @param tableNames
-   * @return
-   */
-  String selectBroker(List<String> tableNames);
+public class BrokerSelectorUtils {
 
-  /**
-   * Returns list of all brokers.
-   */
-  List<String> getBrokers();
+  private BrokerSelectorUtils() {
+  }
 
-  /**
-   * Close any resources
-   */
-  void close();
+  public static List<String> getTablesCommonBrokers(List<List<String>> tablesBrokersList) {
+    List<String> commonBrokers = tablesBrokersList.get(0);
+    for (int i = 1; i < tablesBrokersList.size(); i++) {
+      commonBrokers.retainAll(tablesBrokersList.get(i));
+    }
+    return commonBrokers;
+  }
 }

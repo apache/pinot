@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.client;
 
-import java.util.HashSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -119,7 +118,8 @@ public class Connection {
    */
   public ResultSetGroup execute(@Nullable String tableName, String query)
       throws PinotClientException {
-    String brokerHostPort = getBrokerHostPort(tableName, query);
+    List<String> tableNames = (tableName == null) ? resolveTableName(query) : Arrays.asList(tableName);
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query for table: " + tableName);
     }
@@ -177,38 +177,9 @@ public class Connection {
    */
   public Future<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
       throws PinotClientException {
-    String brokerHostPort = getBrokerHostPort(tableName, query);
+    List<String> tableNames = (tableName == null) ? resolveTableName(query) : Arrays.asList(tableName);
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
     return new ResultSetGroupFuture(_transport.executeQueryAsync(brokerHostPort, query));
-  }
-
-  /**
-   * Returns the broker hosting the tables for query.
-   *
-   * @return the broker hosting the tables for query.
-   */
-  private String getBrokerHostPort(@Nullable String tableName, String query) throws PinotClientException {
-    if (tableName == null) {
-      List<String> tableNames = resolveTableNames(query);
-      return tableNames != null ? getCommonBrokerHostPort(tableNames): null;
-    }
-
-    return _brokerSelector.selectBroker(tableName);
-  }
-
-  /**
-   * Returns the common broker hosting all the tables.
-   *
-   * @return the common broker hosting all the tables.
-   */
-  @Nullable
-  private String getCommonBrokerHostPort(List<String> tableNames) {
-    Set<String> tableBrokers = new HashSet<>();
-
-    for (String tableName: tableNames) {
-      tableBrokers.add(_brokerSelector.selectBroker(tableName));
-    }
-
-    return tableBrokers.size() == 1? (String) (tableBrokers.toArray()[0]): null;
   }
 
   /**
@@ -217,12 +188,12 @@ public class Connection {
    * @return name of all the tables used in a sql query.
    */
   @Nullable
-  private static List<String> resolveTableNames(String query) {
+  private static List<String> resolveTableName(String query) {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
       return CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
     } catch (Exception e) {
-      //OGGER.error("Cannot parse table name from query: {}", query, e);
+      LOGGER.error("Cannot parse table name from query: {}", query, e);
       return null;
     }
   }

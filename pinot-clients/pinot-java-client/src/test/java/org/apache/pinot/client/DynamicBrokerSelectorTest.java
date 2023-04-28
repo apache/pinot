@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -92,7 +93,7 @@ public class DynamicBrokerSelectorTest {
   public void testSelectBrokerWithTableName() {
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
-    String result = _dynamicBrokerSelectorUnderTest.selectBroker("table1");
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker(Arrays.asList("table1"));
 
     assertEquals("broker1", result);
   }
@@ -100,7 +101,7 @@ public class DynamicBrokerSelectorTest {
   @Test
   public void testSelectBrokerWithDBAndTableName() {
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
-    String result = _dynamicBrokerSelectorUnderTest.selectBroker("db1.table1");
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker(Arrays.asList("db1.table1"));
     assertEquals("broker1", result);
 
     Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
@@ -108,7 +109,7 @@ public class DynamicBrokerSelectorTest {
     tableToBrokerListMap.put("db1.table1", Collections.singletonList("broker2"));
     when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
-    result = _dynamicBrokerSelectorUnderTest.selectBroker("db1.table1");
+    result = _dynamicBrokerSelectorUnderTest.selectBroker(Arrays.asList("db1.table1"));
     assertEquals("broker2", result);
   }
 
@@ -136,7 +137,7 @@ public class DynamicBrokerSelectorTest {
     when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Collections.emptyMap());
     _dynamicBrokerSelectorUnderTest.handleDataChange("dummy-data-path", "dummy-date");
 
-    String result = _dynamicBrokerSelectorUnderTest.selectBroker("dummyTableName");
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker(Arrays.asList("dummyTableName"));
 
     assertNull(result);
   }
