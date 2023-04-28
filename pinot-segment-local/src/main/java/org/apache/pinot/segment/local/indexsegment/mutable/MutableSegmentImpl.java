@@ -120,7 +120,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MutableSegmentImpl implements MutableSegment {
 
-  public static final String TOMBSTONE_KEY = "tombstone_marker";
+  public static final String TOMBSTONE_KEY = "__tombstone_marker__";
   private static final String RECORD_ID_MAP = "__recordIdMap__";
   private static final int EXPECTED_COMPRESSION = 1000;
   private static final int MIN_ROWS_TO_INDEX = 1000_000; // Min size of recordIdMap for updatable metrics.
