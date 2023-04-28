@@ -259,6 +259,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @Override
   protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
     assert _partialUpsertHandler != null;
+
+    if (record.getFieldToValueMap()
+        .containsKey(org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl.TOMBSTONE_KEY)) {
+      return record;
+    }
+
     AtomicReference<GenericRow> previousRecordReference = new AtomicReference<>();
     RecordLocation currentRecordLocation = _primaryKeyToRecordLocationMap.computeIfPresent(
         HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (pk, recordLocation) -> {
@@ -281,6 +287,26 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       // New primary key
       return record;
     }
+  }
+
+  @Override
+  public boolean isValidForPartialUpsertInsert(GenericRow row, RecordInfo recordInfo) {
+
+    if (_partialUpsertHandler == null) {
+      return true;
+    }
+
+    // Do not check for comparison value as this check will be done upstream anyway
+    RecordLocation currentRecordLocation =
+        _primaryKeyToRecordLocationMap.get(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
+
+    // If this is a new primary key or this is a full insert and the previous record has been deleted, this
+    // is a valid insert
+    if (currentRecordLocation != null && currentRecordLocation.getIsTombstoneMarker()) {
+      return _partialUpsertHandler.isValidInsertRecordForDeletedRow(row);
+    }
+
+    return true;
   }
 
   @VisibleForTesting

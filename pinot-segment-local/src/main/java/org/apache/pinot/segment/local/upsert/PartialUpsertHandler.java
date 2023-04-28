@@ -37,12 +37,14 @@ public class PartialUpsertHandler {
   private final PartialUpsertMerger _defaultPartialUpsertMerger;
   private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
+  private final Schema _schema;
 
   public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
       UpsertConfig.Strategy defaultPartialUpsertStrategy, List<String> comparisonColumns) {
     _defaultPartialUpsertMerger = PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy);
     _comparisonColumns = comparisonColumns;
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
+    _schema = schema;
 
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
@@ -73,12 +75,34 @@ public class PartialUpsertHandler {
             newRecord.removeNullValueField(column);
           } else {
             PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
-            newRecord.putValue(column,
-                merger.merge(previousRecord.getValue(column), newRecord.getValue(column)));
+            newRecord.putValue(column, merger.merge(previousRecord.getValue(column), newRecord.getValue(column)));
           }
         }
       }
     }
     return newRecord;
+  }
+
+  /**
+   * A deleted partial upsert table record can have another insert with the same primary key.
+   * We do not allow further updates on deleted records but do allow inserting a new record
+   * with the same primary key.
+   *
+   * This check sees if all partial upsert columns are present in the row. If this is true,
+   * then this is an insert record. There is a chance that this might be an update row which
+   * just happens to have all fields present.
+   *
+   * TODO: Is this correct?
+   */
+  public boolean isValidInsertRecordForDeletedRow(GenericRow row) {
+    for (String column : _schema.getColumnNames()) {
+      if (!row.getFieldToValueMap().containsKey(column) || row.getFieldToValueMap().get(column) == null) {
+        if (!row.isNullValue(column)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 }

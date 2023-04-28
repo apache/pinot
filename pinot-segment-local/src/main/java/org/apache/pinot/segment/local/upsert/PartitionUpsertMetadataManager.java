@@ -91,6 +91,15 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   GenericRow updateRecord(GenericRow record, RecordInfo recordInfo);
 
   /**
+   * Check if given record is valid for partial update insert *if* the primary
+   * key already exists but the record is tombstoned
+   *
+   * We do not allow any modifications to a deleted partial upsert row but allow
+   * new records to be inserted with the same primary key.
+   */
+  public boolean isValidForPartialUpsertInsert(GenericRow record, RecordInfo recordInfo);
+
+  /**
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();

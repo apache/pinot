@@ -23,10 +23,6 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -74,7 +70,7 @@ public class MutableSegmentImplUpsertTest {
     return upsertConfigWithHash;
   }
 
-  private void setup(UpsertConfig upsertConfigWithHash, boolean shouldDelete)
+  private void setup(UpsertConfig upsertConfigWithHash)
       throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
@@ -100,13 +96,6 @@ public class MutableSegmentImplUpsertTest {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);
         _mutableSegmentImpl.index(transformedRow, null);
-
-        if (shouldDelete && (_mutableSegmentImpl.getNumDocsIndexed() == 1
-            || _mutableSegmentImpl.getNumDocsIndexed() == 5)) {
-          transformedRow.putValue(TOMBSTONE_KEY, "true");
-
-          _mutableSegmentImpl.index(transformedRow, null);
-        }
         reuse.clear();
       }
     }
@@ -131,14 +120,36 @@ public class MutableSegmentImplUpsertTest {
   @Test
   public void testUpsertDeletion()
       throws Exception {
+    testUpsertDeletion(createFullUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createFullUpsertConfig(HashFunction.MD5));
+    testUpsertDeletion(createFullUpsertConfig(HashFunction.MURMUR3));
+
     testUpsertDeletion(createPartialUpsertConfig(HashFunction.NONE));
     testUpsertDeletion(createPartialUpsertConfig(HashFunction.MD5));
     testUpsertDeletion(createPartialUpsertConfig(HashFunction.MURMUR3));
   }
 
+  @Test
+  public void testUpsertDeletionWithInsertion()
+      throws Exception {
+    testUpsertDeletionWithInsertion(createPartialUpsertConfig(HashFunction.NONE));
+  }
+
+  @Test
+  public void testUpsertDeletionWithUpdate()
+      throws Exception {
+    testUpsertDeletionWithUpdate(createPartialUpsertConfig(HashFunction.NONE));
+  }
+
+  @Test
+  public void testUpsertDeletionWithInvalidUpdate()
+      throws Exception {
+    testUpsertDeletionWithInvalidUpdate(createPartialUpsertConfig(HashFunction.NONE));
+  }
+
   private void testUpsertIngestion(UpsertConfig upsertConfig)
       throws Exception {
-    setup(upsertConfig, false);
+    setup(upsertConfig);
     ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
     if (upsertConfig.getComparisonColumns() == null) {
       // aa
@@ -165,12 +176,114 @@ public class MutableSegmentImplUpsertTest {
 
   private void testUpsertDeletion(UpsertConfig upsertConfig)
       throws Exception {
-    setup(upsertConfig, true);
+    setup(upsertConfig);
+
+    GenericRow row = new GenericRow();
+
+    int docId = _mutableSegmentImpl.getNumDocsIndexed();
+    row.putValue("event_id", "pp");
+    row.putValue("description", "foobar");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
     ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
 
-    // aa
-    Assert.assertFalse(bitmap.contains(1));
-    // bb
-    Assert.assertFalse(bitmap.contains(5));
+    Assert.assertTrue(bitmap.contains(docId));
+
+    row.putValue(TOMBSTONE_KEY, "true");
+    _mutableSegmentImpl.index(row, null);
+    bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+    Assert.assertFalse(bitmap.contains(docId));
+  }
+
+  private void testUpsertDeletionWithInsertion(UpsertConfig upsertConfig)
+      throws Exception {
+    setup(upsertConfig);
+    GenericRow row = new GenericRow();
+
+    row.putValue("event_id", "pp");
+    row.putValue("description", "testest");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row.putValue(TOMBSTONE_KEY, "true");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row = new GenericRow();
+
+    int docId = _mutableSegmentImpl.getNumDocsIndexed();
+    row.putValue("event_id", "pp");
+    row.putValue("description", "foobar");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+
+    Assert.assertTrue(bitmap.contains(docId));
+  }
+
+  private void testUpsertDeletionWithUpdate(UpsertConfig upsertConfig)
+      throws Exception {
+    setup(upsertConfig);
+    GenericRow row = new GenericRow();
+    row.putValue("event_id", "pp");
+    row.putValue("description", "testest");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row.putValue(TOMBSTONE_KEY, "true");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row = new GenericRow();
+
+    int docId = _mutableSegmentImpl.getNumDocsIndexed();
+    row.putValue("event_id", "pp");
+    row.putValue("description", "foobar");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+
+    Assert.assertTrue(bitmap.contains(docId));
+  }
+
+  private void testUpsertDeletionWithInvalidUpdate(UpsertConfig upsertConfig)
+      throws Exception {
+    setup(upsertConfig);
+    GenericRow row = new GenericRow();
+    row.putValue("event_id", "pp");
+    row.putValue("description", "testest");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row.putValue(TOMBSTONE_KEY, "true");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row = new GenericRow();
+
+    int docId = _mutableSegmentImpl.getNumDocsIndexed();
+    row.putValue("event_id", "pp");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+
+    Assert.assertFalse(bitmap.contains(docId));
   }
 }

@@ -523,7 +523,9 @@ public class MutableSegmentImpl implements MutableSegment {
       if (row.getFieldToValueMap().containsKey(TOMBSTONE_KEY)) {
         _partitionUpsertMetadataManager.deleteRecord(this, recordInfo);
       } else {
-        _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+        if (_partitionUpsertMetadataManager.isValidForPartialUpsertInsert(row, recordInfo)) {
+          _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+        }
       }
     } else {
       // Update dictionary first
