@@ -57,7 +57,7 @@ public class PartitionDedupMetadataManager {
     try {
       byte[] id = (tableNameWithType + "@" + partitionId).getBytes();
       _keyValueStore = StringUtils.isEmpty(dedupConfig.getKeyStore())
-              ? new ConcurrentHashMapKeyValueStore()
+              ? new ConcurrentHashMapKeyValueStore(id)
               : PluginManager.get().createInstance(
                       dedupConfig.getKeyStore(),
                       new Class[]{byte[].class},
@@ -95,7 +95,7 @@ public class PartitionDedupMetadataManager {
     if (pk instanceof ByteArray) {
       return ((ByteArray) pk).getBytes();
     }
-    throw new RuntimeException("Unsupported pk class: " + pk);
+    throw new RuntimeException("Invalid primary key: " + pk);
   }
 
   public void removeSegment(IndexSegment segment) {

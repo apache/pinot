@@ -28,7 +28,7 @@ public class DedupConfig extends BaseJsonConfig {
   private final String _keyStore;
 
   public DedupConfig(boolean dedupEnabled, HashFunction hashFunction) {
-    this(dedupEnabled, hashFunction, "");
+    this(dedupEnabled, hashFunction, null);
   }
 
   @JsonCreator
