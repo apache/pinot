@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.dedup;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.spi.ingestion.LocalKeyValueStore;
+import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;

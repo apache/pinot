@@ -34,7 +34,7 @@ import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.ingestion.LocalKeyValueStore;
+import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.ByteArray;
 

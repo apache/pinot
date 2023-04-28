@@ -16,34 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.ingestion;
+package org.apache.pinot.spi.ingestion.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 
-
-/**
- * Machine local ephemeral key value store. The implementation could be memory based or disk based.
- */
 public interface LocalKeyValueStore {
   byte[] get(byte[] key);
 
   void delete(byte[] key);
 
   void put(byte[] key, byte[] value);
-
   byte[] putIfAbsent(byte[] key, byte[] value);
 
   void putBatch(List<Pair<byte[], byte[]>> keyValues);
 
   long getKeyCount();
 
-  /**
-   * Perform compaction on the Key Value store. For memory based stores this will be a no-op but for disk based stores
-   * this will perform real compaction. This is needed for testing because after deletion, compaction may be necessary
-   * to get correct results from getKeyCount() method. Please note that compaction is an expensive operation.
-   */
   @VisibleForTesting
   void compact() throws Exception;
 }

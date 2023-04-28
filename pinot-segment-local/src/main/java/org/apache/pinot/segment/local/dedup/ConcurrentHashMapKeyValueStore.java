@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.spi.ingestion.LocalKeyValueStore;
+import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
 import org.apache.pinot.spi.utils.ByteArray;
 
 public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
@@ -48,7 +48,6 @@ public class ConcurrentHashMapKeyValueStore implements LocalKeyValueStore {
   public void put(byte[] key, byte[] value) {
     _map.put(new ByteArray(key), value);
   }
-
   public byte[] putIfAbsent(byte[] key, byte[] value) {
     return _map.putIfAbsent(new ByteArray(key), value);
   }
