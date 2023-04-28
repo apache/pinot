@@ -22,7 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -36,7 +36,7 @@ import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.QueryServerInstance;
 
 
 /**
@@ -62,7 +62,8 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     }
 
     // the root of a query plan always only has a single node
-    VirtualServer rootServer = queryPlan.getStageMetadataMap().get(0).getServerInstances().get(0);
+    QueryServerInstance rootServer = queryPlan.getDispatchablePlanMetadataMap().get(0).getServerInstanceToWorkerIdMap()
+        .keySet().iterator().next();
     return explainFrom(queryPlan, queryPlan.getQueryStageMap().get(0), rootServer);
   }
 
@@ -78,10 +79,10 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
    *
    * @return a query plan associated with
    */
-  public static String explainFrom(QueryPlan queryPlan, StageNode node, VirtualServer rootServer) {
+  public static String explainFrom(QueryPlan queryPlan, StageNode node, QueryServerInstance rootServer) {
     final ExplainPlanStageVisitor visitor = new ExplainPlanStageVisitor(queryPlan);
     return node
-        .visit(visitor, new Context(rootServer, "", "", new StringBuilder()))
+        .visit(visitor, new Context(rootServer, 0, "", "", new StringBuilder()))
         .toString();
   }
 
@@ -98,7 +99,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
         .append("]@")
         .append(context._host.getHostname())
         .append(':')
-        .append(context._host.getPort())
+        .append(context._host.getQueryServicePort())
         .append(' ')
         .append(node.explain());
     return context._builder;
@@ -106,7 +107,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
 
   private StringBuilder visitSimpleNode(StageNode node, Context context) {
     appendInfo(node, context).append('\n');
-    return node.getInputs().get(0).visit(this, context.next(false, context._host));
+    return node.getInputs().get(0).visit(this, context.next(false, context._host, context._workerId));
   }
 
   @Override
@@ -123,7 +124,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   public StringBuilder visitSetOp(SetOpNode setOpNode, Context context) {
     appendInfo(setOpNode, context).append('\n');
     for (StageNode input : setOpNode.getInputs()) {
-      input.visit(this, context.next(false, context._host));
+      input.visit(this, context.next(false, context._host, context._workerId));
     }
     return context._builder;
   }
@@ -136,8 +137,8 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   @Override
   public StringBuilder visitJoin(JoinNode node, Context context) {
     appendInfo(node, context).append('\n');
-    node.getInputs().get(0).visit(this, context.next(true, context._host));
-    node.getInputs().get(1).visit(this, context.next(false, context._host));
+    node.getInputs().get(0).visit(this, context.next(true, context._host, context._workerId));
+    node.getInputs().get(1).visit(this, context.next(false, context._host, context._workerId));
     return context._builder;
   }
 
@@ -147,24 +148,27 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
 
     MailboxSendNode sender = (MailboxSendNode) node.getSender();
     int senderStageId = node.getSenderStageId();
-    StageMetadata metadata = _queryPlan.getStageMetadataMap().get(senderStageId);
-    Map<ServerInstance, Map<String, List<String>>> segments = metadata.getServerInstanceToSegmentsMap();
+    DispatchablePlanMetadata metadata = _queryPlan.getDispatchablePlanMetadataMap().get(senderStageId);
+    Map<Integer, Map<String, List<String>>> segments = metadata.getWorkerIdToSegmentsMap();
 
-    Iterator<VirtualServer> iterator = metadata.getServerInstances().iterator();
+    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap = metadata.getServerInstanceToWorkerIdMap();
+    Iterator<QueryServerInstance> iterator = serverInstanceToWorkerIdMap.keySet().iterator();
     while (iterator.hasNext()) {
-      VirtualServer serverInstance = iterator.next();
-      if (segments.containsKey(serverInstance)) {
-        // always print out leaf stages
-        sender.visit(this, context.next(iterator.hasNext(), serverInstance));
-      } else {
-        if (!iterator.hasNext()) {
-          // always print out the last one
-          sender.visit(this, context.next(false, serverInstance));
+      QueryServerInstance queryServerInstance = iterator.next();
+      for (int workerId : serverInstanceToWorkerIdMap.get(queryServerInstance)) {
+        if (segments.containsKey(workerId)) {
+          // always print out leaf stages
+          sender.visit(this, context.next(iterator.hasNext(), queryServerInstance, workerId));
         } else {
-          // only print short version of the sender node
-          appendMailboxSend(sender, context.next(true, serverInstance))
-              .append(" (Subtree Omitted)")
-              .append('\n');
+          if (!iterator.hasNext()) {
+            // always print out the last one
+            sender.visit(this, context.next(false, queryServerInstance, workerId));
+          } else {
+            // only print short version of the sender node
+            appendMailboxSend(sender, context.next(true, queryServerInstance, workerId))
+                .append(" (Subtree Omitted)")
+                .append('\n');
+          }
         }
       }
     }
@@ -174,17 +178,18 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   @Override
   public StringBuilder visitMailboxSend(MailboxSendNode node, Context context) {
     appendMailboxSend(node, context).append('\n');
-    return node.getInputs().get(0).visit(this, context.next(false, context._host));
+    return node.getInputs().get(0).visit(this, context.next(false, context._host, context._workerId));
   }
 
   private StringBuilder appendMailboxSend(MailboxSendNode node, Context context) {
     appendInfo(node, context);
 
     int receiverStageId = node.getReceiverStageId();
-    List<VirtualServer> servers = _queryPlan.getStageMetadataMap().get(receiverStageId).getServerInstances();
+    Map<QueryServerInstance, List<Integer>> servers = _queryPlan.getDispatchablePlanMetadataMap().get(receiverStageId)
+        .getServerInstanceToWorkerIdMap();
     context._builder.append("->");
-    String receivers = servers.stream()
-        .map(VirtualServer::toString)
+    String receivers = servers.entrySet().stream()
+        .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
         .map(s -> "[" + receiverStageId + "]@" + s)
         .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
@@ -204,10 +209,10 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   public StringBuilder visitTableScan(TableScanNode node, Context context) {
     return appendInfo(node, context)
         .append(' ')
-        .append(_queryPlan.getStageMetadataMap()
+        .append(_queryPlan.getDispatchablePlanMetadataMap()
             .get(node.getStageId())
-            .getServerInstanceToSegmentsMap()
-            .get(context._host.getServer()))
+            .getWorkerIdToSegmentsMap()
+            .get(context._host))
         .append('\n');
   }
 
@@ -217,25 +222,32 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   }
 
   static class Context {
-    final VirtualServer _host;
+    final QueryServerInstance _host;
+    final int _workerId;
     final String _prefix;
     final String _childPrefix;
     final StringBuilder _builder;
 
-    Context(VirtualServer host, String prefix, String childPrefix, StringBuilder builder) {
+    Context(QueryServerInstance host, int workerId, String prefix, String childPrefix, StringBuilder builder) {
       _host = host;
+      _workerId = workerId;
       _prefix = prefix;
       _childPrefix = childPrefix;
       _builder = builder;
     }
 
-    Context next(boolean hasMoreChildren, VirtualServer host) {
+    Context next(boolean hasMoreChildren, QueryServerInstance host, int workerId) {
       return new Context(
           host,
+          workerId,
           hasMoreChildren ? _childPrefix + "├── " : _childPrefix + "└── ",
           hasMoreChildren ? _childPrefix + "│   " : _childPrefix + "   ",
           _builder
       );
     }
+  }
+
+  public static String stringifyQueryServerInstanceToWorkerIdsEntry(Map.Entry<QueryServerInstance, List<Integer>> e) {
+    return e.getKey() + "|" + e.getValue();
   }
 }

@@ -21,7 +21,7 @@ package org.apache.pinot.query.service.dispatch;
 import io.grpc.stub.StreamObserver;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.QueryServerInstance;
 
 
 /**
@@ -30,12 +30,12 @@ import org.apache.pinot.query.routing.VirtualServer;
  * {@link #getThrowable()} to check if it is null.
  */
 class AsyncQueryDispatchResponse {
-  private final VirtualServer _virtualServer;
+  private final QueryServerInstance _virtualServer;
   private final int _stageId;
   private final Worker.QueryResponse _queryResponse;
   private final Throwable _throwable;
 
-  public AsyncQueryDispatchResponse(VirtualServer virtualServer, int stageId, Worker.QueryResponse queryResponse,
+  public AsyncQueryDispatchResponse(QueryServerInstance virtualServer, int stageId, Worker.QueryResponse queryResponse,
       @Nullable Throwable throwable) {
     _virtualServer = virtualServer;
     _stageId = stageId;
@@ -43,7 +43,7 @@ class AsyncQueryDispatchResponse {
     _throwable = throwable;
   }
 
-  public VirtualServer getVirtualServer() {
+  public QueryServerInstance getVirtualServer() {
     return _virtualServer;
   }
 

@@ -43,14 +43,14 @@ import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -76,7 +76,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected QueryEnvironment _queryEnvironment;
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
-  protected Map<ServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
+  protected Map<QueryServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
   protected MailboxService _mailboxService;
 
   static {
@@ -107,15 +107,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
 
     int reducerStageId = -1;
-    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
+    for (int stageId : queryPlan.getDispatchablePlanMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         reducerStageId = stageId;
       } else {
-        for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          DistributedStagePlan distributedStagePlan =
-              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance.getServer()).processQuery(distributedStagePlan, requestMetadataMap);
-        }
+        processDistributedStagePlans(queryPlan, stageId, requestMetadataMap);
       }
       if (executionStatsAggregatorMap != null) {
         executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
@@ -126,6 +122,20 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
         executionStatsAggregatorMap, true);
     return resultTable.getRows();
+  }
+
+  protected void processDistributedStagePlans(QueryPlan queryPlan, int stageId,
+      Map<String, String> requestMetadataMap) {
+    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
+        queryPlan.getDispatchablePlanMetadataMap().get(stageId).getServerInstanceToWorkerIdMap();
+    for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
+      QueryServerInstance server = entry.getKey();
+      for (int workerId : entry.getValue()) {
+        DistributedStagePlan distributedStagePlan = QueryDispatcher.constructDistributedStagePlan(
+            queryPlan, stageId, new VirtualServerAddress(server, workerId));
+        _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
+      }
+    }
   }
 
   protected List<Object[]> queryH2(String sql)

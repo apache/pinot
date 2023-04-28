@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -49,12 +49,11 @@ import static org.testng.Assert.assertTrue;
 
 public class MailboxSendOperatorTest {
   private static final int SENDER_STAGE_ID = 1;
-  private static final int RECEIVER_STAGE_ID = 0;
 
   private AutoCloseable _mocks;
 
   @Mock
-  private VirtualServer _server;
+  private VirtualServerAddress _server;
   @Mock
   private MultiStageOperator _sourceOperator;
   @Mock
@@ -65,9 +64,9 @@ public class MailboxSendOperatorTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    when(_server.getHostname()).thenReturn("localhost");
-    when(_server.getQueryMailboxPort()).thenReturn(123);
-    when(_server.getVirtualId()).thenReturn(0);
+    when(_server.hostname()).thenReturn("mock");
+    when(_server.port()).thenReturn(0);
+    when(_server.workerId()).thenReturn(0);
   }
 
   @AfterMethod
@@ -166,12 +165,12 @@ public class MailboxSendOperatorTest {
   }
 
   private MailboxSendOperator getMailboxSendOperator() {
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server));
-    Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(RECEIVER_STAGE_ID, stageMetadata);
+    StageMetadata stageMetadata = new StageMetadata.Builder()
+        .setWorkerMetadataList(Collections.singletonList(
+            new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, new VirtualServerAddress(_server),
-            Long.MAX_VALUE, Long.MAX_VALUE, stageMetadataMap, false);
+        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE, Long.MAX_VALUE,
+            Collections.singletonList(stageMetadata), false);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

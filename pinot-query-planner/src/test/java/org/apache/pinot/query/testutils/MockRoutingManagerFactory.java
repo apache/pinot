@@ -24,15 +24,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -65,7 +67,7 @@ public class MockRoutingManagerFactory {
 
     _tableServerSegmentMap = new HashMap<>();
     for (int port : ports) {
-      _serverInstances.put(toHostname(port), new WorkerInstance(HOST_NAME, port, port, port, port));
+      _serverInstances.put(toHostname(port), getServerInstance(HOST_NAME, port, port, port, port));
     }
   }
 
@@ -117,6 +119,20 @@ public class MockRoutingManagerFactory {
 
   private static String toHostname(int port) {
     return String.format("%s_%d", HOST_NAME, port);
+  }
+
+  private static ServerInstance getServerInstance(String hostname, int nettyPort, int grpcPort, int servicePort,
+      int mailboxPort) {
+    String server = String.format("%s%s_%d", CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE, hostname, nettyPort);
+    InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(server);
+    ZNRecord znRecord = instanceConfig.getRecord();
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
+    simpleFields.put(CommonConstants.Helix.Instance.GRPC_PORT_KEY, String.valueOf(grpcPort));
+    simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY,
+        String.valueOf(servicePort));
+    simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
+        String.valueOf(mailboxPort));
+    return new ServerInstance(instanceConfig);
   }
 
   private void registerTableNameWithType(Schema schema, String tableNameWithType) {

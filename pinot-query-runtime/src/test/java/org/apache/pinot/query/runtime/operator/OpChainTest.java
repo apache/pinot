@@ -21,10 +21,11 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.DataTable;
@@ -35,10 +36,10 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -64,8 +65,6 @@ public class OpChainTest {
 
   private AutoCloseable _mocks;
   @Mock
-  private VirtualServer _server;
-  @Mock
   private MultiStageOperator _sourceOperator;
   @Mock
   private MailboxService _mailboxService1;
@@ -78,12 +77,17 @@ public class OpChainTest {
   @Mock
   private BlockExchange _exchange;
 
+  private VirtualServerAddress _serverAddress;
+  private StageMetadata _receivingStageMetadata;
+
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    when(_server.getHostname()).thenReturn("localhost");
-    when(_server.getQueryMailboxPort()).thenReturn(123);
-    when(_server.getVirtualId()).thenReturn(0);
+    _serverAddress = new VirtualServerAddress("localhost", 123, 0);
+    _receivingStageMetadata = new StageMetadata.Builder()
+            .setWorkerMetadataList(Stream.of(_serverAddress).map(
+                s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
+            .build();
 
     when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);
     when(_mailboxService2.getReceivingMailbox(any())).thenReturn(_mailbox2);
@@ -176,12 +180,9 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server));
-    Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(receivedStageId, stageMetadata);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, new VirtualServerAddress(_server), 1000,
-            System.currentTimeMillis() + 1000, stageMetadataMap, true);
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, Arrays.asList(null, null, _receivingStageMetadata), true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -194,8 +195,8 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, new VirtualServerAddress(_server), 1000,
-            System.currentTimeMillis() + 1000, stageMetadataMap, true);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, Arrays.asList(null, null, _receivingStageMetadata), true);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -219,15 +220,11 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server));
-    Map<Integer, StageMetadata> stageMetadataMap = new HashMap<>();
-    for (int i = 0; i < 3; i++) {
-      stageMetadataMap.put(i, stageMetadata);
-    }
+    List<StageMetadata> metadataList =
+        Arrays.asList(_receivingStageMetadata, _receivingStageMetadata, _receivingStageMetadata);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, new VirtualServerAddress(_server), 1000,
-            System.currentTimeMillis() + 1000, stageMetadataMap, false);
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, metadataList, false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -238,8 +235,8 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, new VirtualServerAddress(_server), 1000,
-            System.currentTimeMillis() + 1000, stageMetadataMap, false);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, metadataList, false);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 

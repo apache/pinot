@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.pinot.query.planner.StageMetadata;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
@@ -33,28 +34,28 @@ import org.apache.pinot.query.routing.VirtualServer;
  */
 public class DistributedStagePlan {
   private int _stageId;
-  private VirtualServer _server;
+  private VirtualServerAddress _server;
   private StageNode _stageRoot;
-  private Map<Integer, StageMetadata> _metadataMap;
+  private List<StageMetadata> _stageMetadataList;
 
   public DistributedStagePlan(int stageId) {
     _stageId = stageId;
-    _metadataMap = new HashMap<>();
+    _stageMetadataList = new ArrayList<>();
   }
 
-  public DistributedStagePlan(int stageId, VirtualServer server, StageNode stageRoot,
-      Map<Integer, StageMetadata> metadataMap) {
+  public DistributedStagePlan(int stageId, VirtualServerAddress server, StageNode stageRoot,
+      List<StageMetadata> stageMetadataList) {
     _stageId = stageId;
     _server = server;
     _stageRoot = stageRoot;
-    _metadataMap = metadataMap;
+    _stageMetadataList = stageMetadataList;
   }
 
   public int getStageId() {
     return _stageId;
   }
 
-  public VirtualServer getServer() {
+  public VirtualServerAddress getServer() {
     return _server;
   }
 
@@ -62,15 +63,23 @@ public class DistributedStagePlan {
     return _stageRoot;
   }
 
-  public Map<Integer, StageMetadata> getMetadataMap() {
-    return _metadataMap;
+  public List<StageMetadata> getStageMetadataList() {
+    return _stageMetadataList;
   }
 
-  public void setServer(VirtualServer serverInstance) {
-    _server = serverInstance;
+  public void setServer(VirtualServerAddress serverAddress) {
+    _server = serverAddress;
   }
 
   public void setStageRoot(StageNode stageRoot) {
     _stageRoot = stageRoot;
+  }
+
+  public StageMetadata getCurrentStageMetadata() {
+    return _stageMetadataList.get(_stageId);
+  }
+
+  public WorkerMetadata getCurrentWorkerMetadata() {
+    return getCurrentStageMetadata().getWorkerMetadataList().get(_server.workerId());
   }
 }
