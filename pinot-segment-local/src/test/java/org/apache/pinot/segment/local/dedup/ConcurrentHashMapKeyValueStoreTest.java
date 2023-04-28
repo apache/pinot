@@ -27,88 +27,72 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-
 public class ConcurrentHashMapKeyValueStoreTest {
 
-  LocalKeyValueStore _keyValueStore = new ConcurrentHashMapKeyValueStore();
-  byte[] _nonExistingKey = "non-existing".getBytes();
-  byte[] _key = "someKey".getBytes();
-  byte[] _key2 = "someKey2".getBytes();
+    LocalKeyValueStore _keyValueStore = new ConcurrentHashMapKeyValueStore();
+    byte[] _nonExistingKey = "non-existing".getBytes();
+    byte[] _key = "someKey".getBytes();
+    byte[] _key2 = "someKey2".getBytes();
 
-  @BeforeMethod
-  public void setUp()
-      throws Exception {
-    cleanup();
-  }
+    @BeforeMethod
+    public void setUp() throws Exception {
+        cleanup();
+    }
 
-  private void cleanup()
-      throws Exception {
-    List<byte[]> allKeys = Arrays.asList(_key, _key2, _nonExistingKey);
-    allKeys.forEach(aKey -> _keyValueStore.delete(aKey));
-    _keyValueStore.compact();
-  }
+    private void cleanup() throws Exception {
+        List<byte[]> allKeys = Arrays.asList(_key, _key2, _nonExistingKey);
+        allKeys.forEach(aKey -> _keyValueStore.delete(aKey));
+        _keyValueStore.compact();
+    }
 
-  @AfterMethod
-  public void tearDown()
-      throws Exception {
-    cleanup();
-  }
+    @AfterMethod
+    public void tearDown() throws Exception {
+        cleanup();
+    }
 
-  @Test
-  public void testGetWithNonExistingKey() {
-    Assert.assertNull(_keyValueStore.get(_nonExistingKey));
-  }
+    @Test
+    public void testGetWithNonExistingKey() {
+        Assert.assertNull(_keyValueStore.get(_nonExistingKey));
+    }
 
-  @Test
-  public void testPut() {
-    byte[] value = "someValue".getBytes();
-    Assert.assertNull(_keyValueStore.get(_key));
-    _keyValueStore.put(_key, value);
-    Assert.assertEquals(_keyValueStore.get(_key), value);
-  }
+    @Test
+    public void testPut() {
+        byte[] value = "someValue".getBytes();
+        Assert.assertNull(_keyValueStore.get(_key));
+        _keyValueStore.put(_key, value);
+        Assert.assertEquals(_keyValueStore.get(_key), value);
+    }
 
-  @Test
-  public void testPutIfAbsent() {
-    byte[] value = "someValue".getBytes();
-    Assert.assertNull(_keyValueStore.get(_key));
-    _keyValueStore.put(_key, value);
-    Assert.assertEquals(_keyValueStore.get(_key), value);
-    byte[] value2 = "someValue2".getBytes();
-    byte[] response = _keyValueStore.putIfAbsent(_key, value2);
-    Assert.assertEquals(response, value);
-    Assert.assertEquals(_keyValueStore.get(_key), value);
-  }
+    @Test
+    public void testDelete() {
+        byte[] value = "someValue".getBytes();
+        Assert.assertNull(_keyValueStore.get(_key));
+        _keyValueStore.put(_key, value);
+        Assert.assertEquals(_keyValueStore.get(_key), value);
+        _keyValueStore.delete(_key);
+        Assert.assertNull(_keyValueStore.get(_key));
+    }
 
-  @Test
-  public void testDelete() {
-    byte[] value = "someValue".getBytes();
-    Assert.assertNull(_keyValueStore.get(_key));
-    _keyValueStore.put(_key, value);
-    Assert.assertEquals(_keyValueStore.get(_key), value);
-    _keyValueStore.delete(_key);
-    Assert.assertNull(_keyValueStore.get(_key));
-  }
+    @Test
+    public void testPutBatch() {
+        byte[] value = "someValue".getBytes();
+        Assert.assertNull(_keyValueStore.get(_key));
+        Assert.assertNull(_keyValueStore.get(_key2));
+        List<Pair<byte[], byte[]>> batch = Arrays.asList(Pair.of(_key, value), Pair.of(_key2, value));
+        _keyValueStore.putBatch(batch);
+        Assert.assertEquals(_keyValueStore.get(_key), value);
+        Assert.assertEquals(_keyValueStore.get(_key2), value);
+    }
 
-  @Test
-  public void testPutBatch() {
-    byte[] value = "someValue".getBytes();
-    Assert.assertNull(_keyValueStore.get(_key));
-    Assert.assertNull(_keyValueStore.get(_key2));
-    List<Pair<byte[], byte[]>> batch = Arrays.asList(Pair.of(_key, value), Pair.of(_key2, value));
-    _keyValueStore.putBatch(batch);
-    Assert.assertEquals(_keyValueStore.get(_key), value);
-    Assert.assertEquals(_keyValueStore.get(_key2), value);
-  }
-
-  @Test
-  public void testGetKeyCount() {
-    byte[] value = "someValue".getBytes();
-    Assert.assertNull(_keyValueStore.get(_key));
-    _keyValueStore.put(_key, value);
-    Assert.assertEquals(_keyValueStore.get(_key), value);
-    Assert.assertEquals(_keyValueStore.getKeyCount(), 1);
-    _keyValueStore.put(_key2, value);
-    Assert.assertEquals(_keyValueStore.get(_key2), value);
-    Assert.assertEquals(_keyValueStore.getKeyCount(), 2);
-  }
+    @Test
+    public void testGetKeyCount() {
+        byte[] value = "someValue".getBytes();
+        Assert.assertNull(_keyValueStore.get(_key));
+        _keyValueStore.put(_key, value);
+        Assert.assertEquals(_keyValueStore.get(_key), value);
+        Assert.assertEquals(_keyValueStore.getKeyCount(), 1);
+        _keyValueStore.put(_key2, value);
+        Assert.assertEquals(_keyValueStore.get(_key2), value);
+        Assert.assertEquals(_keyValueStore.getKeyCount(), 2);
+    }
 }

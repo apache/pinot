@@ -23,17 +23,16 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 
 public interface LocalKeyValueStore {
-  byte[] get(byte[] key);
+    byte[] get(byte[] key);
 
-  void delete(byte[] key);
+    void delete(byte[] key);
 
-  void put(byte[] key, byte[] value);
-  byte[] putIfAbsent(byte[] key, byte[] value);
+    void put(byte[] key, byte[] value);
 
-  void putBatch(List<Pair<byte[], byte[]>> keyValues);
+    void putBatch(List<Pair<byte[], byte[]>> keyValues);
 
-  long getKeyCount();
+    long getKeyCount();
 
-  @VisibleForTesting
-  void compact() throws Exception;
+    @VisibleForTesting
+    void compact() throws Exception;
 }
