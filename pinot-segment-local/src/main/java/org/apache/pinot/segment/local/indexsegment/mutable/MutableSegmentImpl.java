@@ -120,6 +120,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MutableSegmentImpl implements MutableSegment {
 
+  public static final String TOMBSTONE_KEY = "tombstone_marker";
   private static final String RECORD_ID_MAP = "__recordIdMap__";
   private static final int EXPECTED_COMPRESSION = 1000;
   private static final int MIN_ROWS_TO_INDEX = 1000_000; // Min size of recordIdMap for updatable metrics.
@@ -518,7 +519,12 @@ public class MutableSegmentImpl implements MutableSegment {
       // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
       // once validated
       canTakeMore = numDocsIndexed++ < _capacity;
-      _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+
+      if (row.getFieldToValueMap().containsKey(TOMBSTONE_KEY)) {
+        _partitionUpsertMetadataManager.deleteRecord(this, recordInfo);
+      } else {
+        _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+      }
     } else {
       // Update dictionary first
       updateDictionary(row);
@@ -597,6 +603,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
     Preconditions.checkState(comparableIndex != -1,
         "Documents must have exactly 1 non-null comparison column value");
+
     return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues, comparableIndex));
   }
 

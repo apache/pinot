@@ -182,6 +182,46 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
+  public void deleteRecord(MutableSegment segment, RecordInfo recordInfo) {
+    ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
+    _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+        (primaryKey, currentRecordLocation) -> {
+          if (currentRecordLocation == null) {
+            _logger.warn(
+                "Delete invoked for non existent record " + recordInfo.getPrimaryKey() + " " + recordInfo.getDocId()
+                    + " " + recordInfo.getComparisonValue());
+
+            return null;
+          } else {
+            // Existing primary key
+
+            // If the comparison value is lesser for the delete record, that signifies that the delete record
+            // is now invalid since a new row with the same primary key has arrived after the delete record.
+            // NOTE: This is valid only for non-partial upserts
+            if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0
+                && !currentRecordLocation.getIsTombstoneMarker()) {
+              IndexSegment currentSegment = currentRecordLocation.getSegment();
+              int currentDocId = currentRecordLocation.getDocId();
+              // Delete involves two steps:
+              // 1. Removing the docID from validDocIds.
+              // 2. Marking the RecordLocation as a tombstone marker
+              if (segment == currentSegment) {
+                validDocIds.remove(currentDocId);
+              } else {
+                Objects.requireNonNull(currentSegment.getValidDocIds()).remove(currentDocId);
+              }
+              // The reason why we cannot put a null as the record location and need the entire record location of
+              // the last record
+              // since it might be needed to handle an out-of-order update request
+              return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue(), true);
+            } else {
+              return currentRecordLocation;
+            }
+          }
+        });
+  }
+
+  @Override
   protected void doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
@@ -248,11 +288,17 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     private final IndexSegment _segment;
     private final int _docId;
     private final Comparable _comparisonValue;
+    private final boolean _isTombstoneMarker;
 
     public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue) {
+      this(indexSegment, docId, comparisonValue, false);
+    }
+
+    public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue, boolean isTombstoneMarker) {
       _segment = indexSegment;
       _docId = docId;
       _comparisonValue = comparisonValue;
+      _isTombstoneMarker = isTombstoneMarker;
     }
 
     public IndexSegment getSegment() {
@@ -265,6 +311,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
     public Comparable getComparisonValue() {
       return _comparisonValue;
+    }
+
+    public boolean getIsTombstoneMarker() {
+      return _isTombstoneMarker;
     }
   }
 }

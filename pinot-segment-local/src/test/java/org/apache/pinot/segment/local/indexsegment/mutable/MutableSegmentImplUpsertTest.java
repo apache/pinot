@@ -23,6 +23,10 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -42,6 +46,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl.TOMBSTONE_KEY;
 import static org.mockito.Mockito.mock;
 
 
@@ -69,10 +74,11 @@ public class MutableSegmentImplUpsertTest {
     return upsertConfigWithHash;
   }
 
-  private void setup(UpsertConfig upsertConfigWithHash)
+  private void setup(UpsertConfig upsertConfigWithHash, boolean shouldDelete)
       throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
+
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setUpsertConfig(upsertConfigWithHash)
@@ -94,6 +100,13 @@ public class MutableSegmentImplUpsertTest {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);
         _mutableSegmentImpl.index(transformedRow, null);
+
+        if (shouldDelete && (_mutableSegmentImpl.getNumDocsIndexed() == 1
+            || _mutableSegmentImpl.getNumDocsIndexed() == 5)) {
+          transformedRow.putValue(TOMBSTONE_KEY, "true");
+
+          _mutableSegmentImpl.index(transformedRow, null);
+        }
         reuse.clear();
       }
     }
@@ -115,9 +128,17 @@ public class MutableSegmentImplUpsertTest {
     testUpsertIngestion(createPartialUpsertConfig(HashFunction.MURMUR3));
   }
 
+  @Test
+  public void testUpsertDeletion()
+      throws Exception {
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MD5));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MURMUR3));
+  }
+
   private void testUpsertIngestion(UpsertConfig upsertConfig)
       throws Exception {
-    setup(upsertConfig);
+    setup(upsertConfig, false);
     ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
     if (upsertConfig.getComparisonColumns() == null) {
       // aa
@@ -140,5 +161,16 @@ public class MutableSegmentImplUpsertTest {
       Assert.assertTrue(bitmap.contains(5));
       Assert.assertFalse(bitmap.contains(6));
     }
+  }
+
+  private void testUpsertDeletion(UpsertConfig upsertConfig)
+      throws Exception {
+    setup(upsertConfig, true);
+    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+
+    // aa
+    Assert.assertFalse(bitmap.contains(1));
+    // bb
+    Assert.assertFalse(bitmap.contains(5));
   }
 }

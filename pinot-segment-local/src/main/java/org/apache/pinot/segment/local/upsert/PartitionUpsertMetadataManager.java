@@ -70,6 +70,12 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   void addRecord(MutableSegment segment, RecordInfo recordInfo);
 
   /**
+   * Delete a given record with a specified primary key. In the RecordInfo instance, set
+   * the primary key and the corresponding doc id to be deleted
+   */
+  void deleteRecord(MutableSegment segment, RecordInfo recordInfo);
+
+  /**
    * Replaces the upsert metadata for the old segment with the new immutable segment.
    */
   void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment);
