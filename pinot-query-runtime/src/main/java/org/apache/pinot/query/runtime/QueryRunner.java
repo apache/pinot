@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -96,7 +97,8 @@ public class QueryRunner {
    *   </li>
    * </ol>
    */
-  private ExecutorService _queryWorkerExecutorService;
+  private ExecutorService _queryWorkerIntermediateExecutorService;
+  private ExecutorService _queryWorkerLeafExecutorService;
   /**
    * Query runner threads are used for:
    * <ol>
@@ -128,11 +130,14 @@ public class QueryRunner {
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-      _queryWorkerExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+      _queryWorkerIntermediateExecutorService = Executors.newFixedThreadPool(
+          ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("query_worker_on_" + _port + "_port"));
+      _queryWorkerLeafExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("query_worker_on_" + _port + "_port"));
       _queryRunnerExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
           new NamedThreadFactory("query_runner_on_" + _port + "_port"));
-      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _queryWorkerExecutorService);
+      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
+          getQueryWorkerIntermediateExecutorService());
       _mailboxService = new MailboxService(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -177,8 +182,14 @@ public class QueryRunner {
     _scheduler.cancel(requestId);
   }
 
-  public ExecutorService getQueryWorkerExecutorService() {
-    return _queryWorkerExecutorService;
+  @VisibleForTesting
+  public ExecutorService getQueryWorkerLeafExecutorService() {
+    return _queryWorkerLeafExecutorService;
+  }
+
+  @VisibleForTesting
+  public ExecutorService getQueryWorkerIntermediateExecutorService() {
+    return _queryWorkerIntermediateExecutorService;
   }
 
   public ExecutorService getQueryRunnerExecutorService() {
@@ -204,7 +215,7 @@ public class QueryRunner {
       for (ServerPlanRequestContext requestContext : serverQueryRequests) {
         ServerQueryRequest request = new ServerQueryRequest(requestContext.getInstanceRequest(),
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
-        serverQueryResults.add(processServerQuery(request, _scheduler.getWorkerPool()));
+        serverQueryResults.add(processServerQuery(request, getQueryWorkerLeafExecutorService()));
       }
       LOGGER.debug(
           "RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId() + " Leaf stage v1 processing time:"

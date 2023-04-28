@@ -78,7 +78,8 @@ public class QueryServerTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      Mockito.when(queryRunner.getQueryWorkerExecutorService()).thenReturn(WORKER_EXECUTOR_SERVICE);
+      Mockito.when(queryRunner.getQueryWorkerLeafExecutorService()).thenReturn(WORKER_EXECUTOR_SERVICE);
+      Mockito.when(queryRunner.getQueryWorkerIntermediateExecutorService()).thenReturn(WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryRunnerExecutorService()).thenReturn(RUNNER_EXECUTOR_SERVICE);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
