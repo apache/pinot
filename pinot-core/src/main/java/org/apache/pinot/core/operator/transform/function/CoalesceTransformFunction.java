@@ -35,7 +35,7 @@ import org.roaringbitmap.RoaringBitmap;
 /**
  * The <code>CoalesceTransformFunction</code> implements the Coalesce operator.
  *
- * The results is first non-null value in the argument list.
+ * The result is first non-null value in the argument list.
  * If all arguments are null, return null.
  *
  * Note: arguments have to be compatible type.
