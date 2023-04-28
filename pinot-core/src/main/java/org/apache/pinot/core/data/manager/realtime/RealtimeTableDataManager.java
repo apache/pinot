@@ -196,7 +196,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for dedup");
       _tableDedupMetadataManager = new TableDedupMetadataManager(_tableNameWithType, primaryKeyColumns, _serverMetrics,
-          dedupConfig);
+          dedupConfig.getHashFunction());
     }
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();

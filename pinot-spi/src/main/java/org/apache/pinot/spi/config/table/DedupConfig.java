@@ -25,20 +25,13 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class DedupConfig extends BaseJsonConfig {
   private final boolean _dedupEnabled;
   private final HashFunction _hashFunction;
-  private final String _keyStore;
-
-  public DedupConfig(boolean dedupEnabled, HashFunction hashFunction) {
-    this(dedupEnabled, hashFunction, null);
-  }
 
   @JsonCreator
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
-      @JsonProperty(value = "hashFunction") HashFunction hashFunction,
-      @JsonProperty(value = "keyStore") String keyStore
+      @JsonProperty(value = "hashFunction") HashFunction hashFunction
   ) {
     _dedupEnabled = dedupEnabled;
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
-    _keyStore = keyStore;
   }
 
   public HashFunction getHashFunction() {
@@ -47,9 +40,5 @@ public class DedupConfig extends BaseJsonConfig {
 
   public boolean isDedupEnabled() {
     return _dedupEnabled;
-  }
-
-  public String getKeyStore() {
-    return _keyStore;
   }
 }

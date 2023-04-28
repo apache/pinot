@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 
 
 public class TableDedupMetadataManager {
@@ -30,19 +30,19 @@ public class TableDedupMetadataManager {
   private final String _tableNameWithType;
   private final List<String> _primaryKeyColumns;
   private final ServerMetrics _serverMetrics;
-  private final DedupConfig _dedupConfig;
+  private final HashFunction _hashFunction;
 
   public TableDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      ServerMetrics serverMetrics, DedupConfig dedupConfig) {
+      ServerMetrics serverMetrics, HashFunction hashFunction) {
     _tableNameWithType = tableNameWithType;
     _primaryKeyColumns = primaryKeyColumns;
     _serverMetrics = serverMetrics;
-    _dedupConfig = dedupConfig;
+    _hashFunction = hashFunction;
   }
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
         k -> new PartitionDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, k, _serverMetrics,
-                _dedupConfig));
+            _hashFunction));
   }
 }
