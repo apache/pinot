@@ -129,6 +129,11 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     refresh();
   }
 
+  /**
+   *
+   * @param table for which list of brokers required.
+   * @return list of brokers hosting the table.
+   */
   private List<String> getBrokerListForTable(String table) {
     String tableName =
         table.replace(ExternalViewReader.OFFLINE_SUFFIX, "").replace(ExternalViewReader.REALTIME_SUFFIX, "");

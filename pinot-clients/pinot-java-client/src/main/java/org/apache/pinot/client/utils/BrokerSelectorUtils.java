@@ -25,6 +25,11 @@ public class BrokerSelectorUtils {
   private BrokerSelectorUtils() {
   }
 
+  /**
+   *
+   * @param tablesBrokersList: List of brokers hosting each table in the list.
+   * @return list of common brokers hosting all the tables.
+   */
   public static List<String> getTablesCommonBrokers(List<List<String>> tablesBrokersList) {
     List<String> commonBrokers = tablesBrokersList.get(0);
     for (int i = 1; i < tablesBrokersList.size(); i++) {

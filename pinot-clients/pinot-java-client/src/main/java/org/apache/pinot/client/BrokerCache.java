@@ -198,7 +198,8 @@ public class BrokerCache {
        for (String table: tableNames) {
          brokersHostingTables.add(_brokerData.getTableToBrokerMap().get(table));
        }
-      brokers = BrokerSelectorUtils.getTablesCommonBrokers(brokersHostingTables);
+       // returning list of common brokers hosting all the tables.
+       brokers = BrokerSelectorUtils.getTablesCommonBrokers(brokersHostingTables);
     }
     return brokers.get(_random.nextInt(brokers.size()));
   }
