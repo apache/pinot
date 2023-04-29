@@ -77,7 +77,7 @@ public class HelixServerStarter extends BaseServerStarter {
     Map<String, Object> properties = new HashMap<>();
     int port = 8003;
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, "quickstart");
-    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, "localhost:2191");
+    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, "localhost:2122");
     properties.put(Helix.KEY_OF_SERVER_NETTY_PORT, port);
     properties.put(Server.CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
     properties.put(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");

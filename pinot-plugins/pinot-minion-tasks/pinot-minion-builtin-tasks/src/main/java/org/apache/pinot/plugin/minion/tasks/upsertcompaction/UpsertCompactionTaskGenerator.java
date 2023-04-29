@@ -20,14 +20,23 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -70,12 +79,14 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       Map<String, String> compactionConfigs = getCompactionConfigs(taskConfigs);
       String bufferPeriod = compactionConfigs.getOrDefault(
           UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
+      int invalidRecordsThreshold = Integer.parseInt(compactionConfigs.getOrDefault(
+          UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, DEFAULT_INVALID_RECORDS_THRESHOLD));
       long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
       List<SegmentZKMetadata> completedSegments = new ArrayList<>();
       List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
       for (SegmentZKMetadata segment : allSegments) {
         CommonConstants.Segment.Realtime.Status status = segment.getStatus();
-        // only compact the completed segments that are older than the bufferTimePeriod
+        // initial segments selection based on status and age
         if (status.isCompleted() && segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs)) {
           completedSegments.add(segment);
         }
@@ -97,8 +108,49 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
         partitionToSegmentNames.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
       }
+
+      // only compact segments that exceed the invalidRecordThreshold
+      Map<String, List<String>> serverToSegments = _clusterInfoAccessor.getServerToSegmentsMap(tableNameWithType);
+      Map<String, String> segmentToServer = getSegmentToServer(serverToSegments);
+      PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
+      BiMap<String, String> serverToEndpoints;
+      try {
+        serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+      } catch (InvalidConfigException e) {
+        throw new RuntimeException(e);
+      }
+      Map<Integer, List<String>> selectedPartitions = new HashMap<>();
+      for (Map.Entry<Integer, List<String>> partitionEntry : partitionToSegmentNames.entrySet()) {
+        List<String> segments = partitionEntry.getValue();
+        List<String> urls = new ArrayList<>(completedSegments.size());
+        for (String segment : segments) {
+          String server = segmentToServer.get(segment);
+          String endpoint = serverToEndpoints.get(server);
+          String url = String.format("%s/tables/%s/segments/%s/invalidRecordCount",
+            endpoint, tableNameWithType, segment);
+          urls.add(url);
+        }
+        // request the urls from the server
+        CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(
+              Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager(), serverToEndpoints.inverse());
+        CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+              completionServiceHelper.doMultiGetRequest(urls, tableNameWithType, true, 3000);
+        Map<String, String> segmentToInvalidRecordCount = new HashMap<>();
+        for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+          String invalidRecordCount = streamResponse.getValue();
+          segmentToInvalidRecordCount.put(streamResponse.getKey(), invalidRecordCount);
+        }
+        for (Map.Entry<String, String> countEntry : segmentToInvalidRecordCount.entrySet()) {
+          int invalidRecordCount = Integer.parseInt(countEntry.getValue());
+          if (invalidRecordCount > invalidRecordsThreshold) {
+            selectedPartitions.put(partitionEntry.getKey(), segments);
+            break;
+          }
+        }
+      }
+
       int numTaskConfigsForTable = 0;
-      for (Map.Entry<Integer, List<String>> entry : partitionToSegmentNames.entrySet()) {
+      for (Map.Entry<Integer, List<String>> entry : selectedPartitions.entrySet()) {
         List<String> completedSegmentNames = entry.getValue();
         PinotTaskConfig pinotTaskConfig =
             getPinotTaskConfig(tableNameWithType, compactionConfigs, completedSegmentNames);
@@ -109,6 +161,19 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           numTaskConfigsForTable, tableNameWithType, taskType);
     }
     return pinotTaskConfigs;
+  }
+
+  private Map<String, String> getSegmentToServer(Map<String, List<String>> serverToSegments) {
+    Map<String, String> segmentToServer = new HashMap<>();
+    for (String server : serverToSegments.keySet()) {
+      List<String> segments = serverToSegments.get(server);
+      for (String segment : segments) {
+        if (!segmentToServer.containsKey(segment)) {
+          segmentToServer.put(segment, server);
+        }
+      }
+    }
+    return segmentToServer;
   }
 
   private static PinotTaskConfig getPinotTaskConfig(String tableNameWithType, Map<String, String> compactionConfigs,
@@ -163,12 +228,12 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       LOGGER.warn(message, taskType, tableNameWithType);
       return false;
     }
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    if (indexingConfig == null || indexingConfig.getSegmentPartitionConfig() == null) {
-      LOGGER.warn("Skip generation task: {} for table: {}, unable to find segment partition config",
-          taskType, tableNameWithType);
-      return false;
-    }
+//    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+//    if (indexingConfig == null || indexingConfig.getSegmentPartitionConfig() == null) {
+//      LOGGER.warn("Skip generation task: {} for table: {}, unable to find segment partition config",
+//          taskType, tableNameWithType);
+//      return false;
+//    }
     return true;
   }
 }
