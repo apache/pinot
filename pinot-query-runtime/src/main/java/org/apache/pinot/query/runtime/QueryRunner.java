@@ -97,7 +97,7 @@ public class QueryRunner {
    *   </li>
    * </ol>
    */
-  private ExecutorService _queryWorkerIntermediateExecutorService;
+  private ExecutorService _queryWorkerIntermExecutorService;
   private ExecutorService _queryWorkerLeafExecutorService;
   /**
    * Query runner threads are used for:
@@ -130,14 +130,14 @@ public class QueryRunner {
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-      _queryWorkerIntermediateExecutorService = Executors.newFixedThreadPool(
-          ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("query_worker_on_" + _port + "_port"));
+      _queryWorkerIntermExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+          new NamedThreadFactory("query_intermediate_worker_on_" + _port + "_port"));
       _queryWorkerLeafExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-          new NamedThreadFactory("query_worker_on_" + _port + "_port"));
+          new NamedThreadFactory("query_leaf_worker_on_" + _port + "_port"));
       _queryRunnerExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
           new NamedThreadFactory("query_runner_on_" + _port + "_port"));
       _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
-          getQueryWorkerIntermediateExecutorService());
+          getQueryWorkerIntermExecutorService());
       _mailboxService = new MailboxService(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -188,8 +188,8 @@ public class QueryRunner {
   }
 
   @VisibleForTesting
-  public ExecutorService getQueryWorkerIntermediateExecutorService() {
-    return _queryWorkerIntermediateExecutorService;
+  public ExecutorService getQueryWorkerIntermExecutorService() {
+    return _queryWorkerIntermExecutorService;
   }
 
   public ExecutorService getQueryRunnerExecutorService() {
