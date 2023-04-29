@@ -132,19 +132,33 @@ public class MutableSegmentImplUpsertTest {
   @Test
   public void testUpsertDeletionWithInsertion()
       throws Exception {
-    testUpsertDeletionWithInsertion(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MD5));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MURMUR3));
   }
 
   @Test
   public void testUpsertDeletionWithUpdate()
       throws Exception {
-    testUpsertDeletionWithUpdate(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MD5));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MURMUR3));
   }
 
   @Test
   public void testUpsertDeletionWithInvalidUpdate()
       throws Exception {
-    testUpsertDeletionWithInvalidUpdate(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MD5));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MURMUR3));
+  }
+
+  @Test
+  public void testUpsertDeletionWithInvalidDelete()
+      throws Exception {
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.NONE));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MD5));
+    testUpsertDeletion(createPartialUpsertConfig(HashFunction.MURMUR3));
   }
 
   private void testUpsertIngestion(UpsertConfig upsertConfig)
@@ -259,6 +273,35 @@ public class MutableSegmentImplUpsertTest {
   }
 
   private void testUpsertDeletionWithInvalidUpdate(UpsertConfig upsertConfig)
+      throws Exception {
+    setup(upsertConfig);
+    GenericRow row = new GenericRow();
+    row.putValue("event_id", "pp");
+    row.putValue("description", "testest");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row.putValue(TOMBSTONE_KEY, "true");
+
+    _mutableSegmentImpl.index(row, null);
+
+    row = new GenericRow();
+
+    int docId = _mutableSegmentImpl.getNumDocsIndexed();
+    row.putValue("event_id", "pp");
+    row.putValue("secondsSinceEpoch", System.currentTimeMillis());
+    row.addNullValueField("otherComparisonColumn");
+
+    _mutableSegmentImpl.index(row, null);
+
+    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+
+    Assert.assertFalse(bitmap.contains(docId));
+  }
+
+  private void testUpsertDeletionWithInvalidDelete(UpsertConfig upsertConfig)
       throws Exception {
     setup(upsertConfig);
     GenericRow row = new GenericRow();

@@ -521,7 +521,7 @@ public class MutableSegmentImpl implements MutableSegment {
       canTakeMore = numDocsIndexed++ < _capacity;
 
       if (row.getFieldToValueMap().containsKey(TOMBSTONE_KEY)) {
-        _partitionUpsertMetadataManager.deleteRecord(this, recordInfo);
+      _partitionUpsertMetadataManager.deleteRecord(this, recordInfo);
       } else {
         if (_partitionUpsertMetadataManager.isValidForPartialUpsertInsert(row, recordInfo)) {
           _partitionUpsertMetadataManager.addRecord(this, recordInfo);

@@ -92,7 +92,7 @@ public class PartialUpsertHandler {
    * then this is an insert record. There is a chance that this might be an update row which
    * just happens to have all fields present.
    *
-   * TODO: Is this correct?
+   * TODO: Is this correct? Should we introduce an op field in the table schema to distinguish?
    */
   public boolean isValidInsertRecordForDeletedRow(GenericRow row) {
     for (String column : _schema.getColumnNames()) {

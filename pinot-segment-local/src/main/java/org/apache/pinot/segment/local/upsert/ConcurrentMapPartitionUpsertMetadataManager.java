@@ -197,7 +197,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
             // If the comparison value is lesser for the delete record, that signifies that the delete record
             // is now invalid since a new row with the same primary key has arrived after the delete record.
-            // NOTE: This is valid only for non-partial upserts
             if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0
                 && !currentRecordLocation.getIsTombstoneMarker()) {
               IndexSegment currentSegment = currentRecordLocation.getSegment();
