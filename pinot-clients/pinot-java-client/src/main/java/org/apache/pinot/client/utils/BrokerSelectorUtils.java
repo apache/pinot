@@ -19,6 +19,8 @@
 package org.apache.pinot.client.utils;
 
 import java.util.List;
+import java.util.Objects;
+
 
 public class BrokerSelectorUtils {
 
@@ -31,6 +33,11 @@ public class BrokerSelectorUtils {
    * @return list of common brokers hosting all the tables.
    */
   public static List<String> getTablesCommonBrokers(List<List<String>> tablesBrokersList) {
+    // check whether tablesBrokersList is null or elements in list are null or not.
+    if (tablesBrokersList == null || tablesBrokersList.stream().anyMatch(Objects::isNull)) {
+     return null;
+    }
+
     List<String> commonBrokers = tablesBrokersList.get(0);
     for (int i = 1; i < tablesBrokersList.size(); i++) {
       commonBrokers.retainAll(tablesBrokersList.get(i));
