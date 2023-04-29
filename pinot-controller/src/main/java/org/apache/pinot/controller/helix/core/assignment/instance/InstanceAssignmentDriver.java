@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -57,9 +56,6 @@ public class InstanceAssignmentDriver {
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
-    Preconditions.checkState(
-        InstanceAssignmentConfigUtils.allowInstanceAssignment(_tableConfig, instancePartitionsType),
-        "Instance assignment is not allowed for the given table config");
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
     return getInstancePartitions(
