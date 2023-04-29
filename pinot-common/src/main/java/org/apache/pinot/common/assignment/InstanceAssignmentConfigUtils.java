@@ -83,8 +83,6 @@ public class InstanceAssignmentConfigUtils {
    */
   public static InstanceAssignmentConfig getInstanceAssignmentConfig(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    Preconditions.checkState(allowInstanceAssignment(tableConfig, instancePartitionsType),
-        "Instance assignment is not allowed for the given table config");
 
     // Use the instance assignment config from the table config if it exists
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
