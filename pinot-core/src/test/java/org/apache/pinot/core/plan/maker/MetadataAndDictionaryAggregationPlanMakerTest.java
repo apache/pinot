@@ -114,8 +114,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED,
-        "column6", "column7", "column11", "column17", "column18");
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, "column6", "column7", "column11",
+        "column17", "column18");
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -131,8 +131,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
         new ConcurrentMapPartitionUpsertMetadataManager("testTable_REALTIME", 0, Collections.singletonList("column6"),
-            Collections.singletonList("daysSinceEpoch"), HashFunction.NONE, null, false, serverMetrics),
-        new ThreadSafeMutableRoaringBitmap());
+            Collections.singletonList("daysSinceEpoch"), null, HashFunction.NONE, null, false, serverMetrics),
+        new ThreadSafeMutableRoaringBitmap(), null);
   }
 
   @AfterClass
@@ -196,8 +196,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     });
     // MINMAXRANGE from dictionary with match all filter
     entries.add(new Object[]{
-        "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10", NonScanBasedAggregationOperator.class,
-        AggregationOperator.class
+        "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10", NonScanBasedAggregationOperator.class
+        , AggregationOperator.class
     });
     // Aggregation
     entries.add(new Object[]{

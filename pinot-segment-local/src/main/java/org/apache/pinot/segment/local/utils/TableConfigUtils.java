@@ -570,19 +570,28 @@ public final class TableConfigUtils {
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
-
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig != null) {
       // no startree index
       Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
               && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
           "The upsert table cannot have star-tree index.");
 
       // comparison column exists
-      if (tableConfig.getUpsertConfig().getComparisonColumns() != null) {
-        List<String> comparisonCols = tableConfig.getUpsertConfig().getComparisonColumns();
-        for (String comparisonCol : comparisonCols) {
-          Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+      List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+      if (comparisonColumns != null) {
+        for (String column : comparisonColumns) {
+          Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
         }
+      }
+
+      // Delete record column exist and is a BOOLEAN field
+      String deleteRecordColumn = upsertConfig.getDeletedRecordColumn();
+      if (deleteRecordColumn != null) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
+        Preconditions.checkState(
+            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
+            "The deleted record column must be a single-valued BOOLEAN column");
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);

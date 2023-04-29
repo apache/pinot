@@ -54,6 +54,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Columns for upsert comparison, default to time column")
   private List<String> _comparisonColumns;
 
+  @JsonPropertyDescription("Boolean column to indicate whether a records should be deleted")
+  private String _deletedRecordColumn;
+
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
@@ -94,6 +97,11 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public List<String> getComparisonColumns() {
     return _comparisonColumns;
+  }
+
+  @Nullable
+  public String getDeletedRecordColumn() {
+    return _deletedRecordColumn;
   }
 
   public boolean isEnableSnapshot() {
@@ -152,6 +160,10 @@ public class UpsertConfig extends BaseJsonConfig {
     if (comparisonColumn != null) {
       _comparisonColumns = Collections.singletonList(comparisonColumn);
     }
+  }
+
+  public void setDeletedRecordColumn(String deletedRecordColumn) {
+    _deletedRecordColumn = deletedRecordColumn;
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {

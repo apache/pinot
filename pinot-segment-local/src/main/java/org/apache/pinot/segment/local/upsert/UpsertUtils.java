@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -75,31 +76,31 @@ public class UpsertUtils {
     };
   }
 
-  public static RecordInfoReader makeRecordReader(IndexSegment segment, List<String> primaryKeyColumns,
-      List<String> comparisonColumns) {
-    if (comparisonColumns.size() > 1) {
-      return new RecordInfoReader(segment, primaryKeyColumns, comparisonColumns);
-    }
-    return new RecordInfoReader(segment, primaryKeyColumns, comparisonColumns.get(0));
-  }
-
   public static class RecordInfoReader implements Closeable {
-    public final PrimaryKeyReader _primaryKeyReader;
-    public final ComparisonColumnReader _comparisonColumnReader;
+    private final PrimaryKeyReader _primaryKeyReader;
+    private final ComparisonColumnReader _comparisonColumnReader;
+    private final PinotSegmentColumnReader _deleteRecordColumnReader;
 
-    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, List<String> comparisonColumns) {
+    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, List<String> comparisonColumns,
+        @Nullable String deleteRecordColumn) {
       _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
-      _comparisonColumnReader = new MultiComparisonColumnReader(segment, comparisonColumns);
-    }
-
-    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, String comparisonColumn) {
-      _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
-      _comparisonColumnReader = new SingleComparisonColumnReader(segment, comparisonColumn);
+      if (comparisonColumns.size() == 1) {
+        _comparisonColumnReader = new SingleComparisonColumnReader(segment, comparisonColumns.get(0));
+      } else {
+        _comparisonColumnReader = new MultiComparisonColumnReader(segment, comparisonColumns);
+      }
+      if (deleteRecordColumn != null) {
+        _deleteRecordColumnReader = new PinotSegmentColumnReader(segment, deleteRecordColumn);
+      } else {
+        _deleteRecordColumnReader = null;
+      }
     }
 
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
-      return new RecordInfo(primaryKey, docId, _comparisonColumnReader.getComparisonValue(docId));
+      Comparable comparisonValue = _comparisonColumnReader.getComparisonValue(docId);
+      boolean deleteRecord = _deleteRecordColumnReader != null && (boolean) _deleteRecordColumnReader.getValue(docId);
+      return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
     }
 
     @Override
@@ -150,7 +151,6 @@ public class UpsertUtils {
     Object value = columnReader.getValue(docId);
     return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
   }
-
 
   public interface ComparisonColumnReader extends Closeable {
     Comparable getComparisonValue(int docId);
