@@ -456,9 +456,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     return new EmptyIndexSegment(segmentMetadata);
   }
 
-  private static MutableSegment mockMutableSegment(int sequenceNumber, ThreadSafeMutableRoaringBitmap validDocIds) {
+  private static MutableSegment mockMutableSegment(int sequenceNumber, ThreadSafeMutableRoaringBitmap validDocIds,
+      ThreadSafeMutableRoaringBitmap queryableDocIds) {
     MutableSegment segment = mock(MutableSegment.class);
     when(segment.getSegmentName()).thenReturn(getSegmentName(sequenceNumber));
+    when(segment.getQueryableDocIds()).thenReturn(queryableDocIds);
     when(segment.getValidDocIds()).thenReturn(validDocIds);
     return segment;
   }
@@ -510,7 +512,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     // Update records from the second segment
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
-    MutableSegment segment2 = mockMutableSegment(1, validDocIds2);
+    MutableSegment segment2 = mockMutableSegment(1, validDocIds2, null);
     upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
@@ -568,6 +570,115 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 3});
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testAddRecordWithDeleteColumn()
+      throws IOException {
+    verifyAddRecordWithDeleteColumn(HashFunction.NONE);
+    verifyAddRecordWithDeleteColumn(HashFunction.MD5);
+    verifyAddRecordWithDeleteColumn(HashFunction.MURMUR3);
+  }
+  private void verifyAddRecordWithDeleteColumn(HashFunction hashFunction)
+      throws IOException {
+    String comparisonColumn = "timeCol";
+    String deleteColumn = "deleteCol";
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
+            Collections.singletonList(comparisonColumn), deleteColumn, hashFunction, null,
+            false, mock(ServerMetrics.class));
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // queryableDocIds is same as validDocIds in the absence of delete markers
+    // Add the first segment
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
+    int numRecords = 3;
+    int[] primaryKeys = new int[]{0, 1, 2};
+    int[] timestamps = new int[]{100, 120, 100};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegment(1, validDocIds1, queryableDocIds1, getPrimaryKeyList(numRecords, primaryKeys));
+    upsertMetadataManager.addSegment(segment1, validDocIds1, queryableDocIds1,
+        getRecordInfoList(numRecords, primaryKeys, timestamps, null).iterator());
+
+    // Update records from the second segment
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment2 = mockMutableSegment(1, validDocIds2, queryableDocIds2);
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
+    // segment2: 3 -> {0, 100}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
+    assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
+
+    // Mark a record with latest value in segment1 as deleted
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(120), true));
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}
+    // segment2: 2 -> {1, 120}, 3 -> {0, 100}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
+
+    // Mark a record with latest value in segment2 as deleted
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 2, new IntWrapper(150), true));
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}
+    // segment2: 2 -> {1, 120}, 3 -> {2, 150}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 2, 150, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{1, 2});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{});
+
+    // Revive a deleted primary key (by providing a larger comparisonValue)
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 3, new IntWrapper(200), false));
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}
+    // segment2: 2 -> {1, 120}, 3 -> {3, 200}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 3, 200, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{1, 3});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{3});
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Add record should be no-op
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(0), 4, new IntWrapper(120), false));
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}
+    // segment2: 2 -> {1, 120}, 3 -> {3, 200}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 3, 200, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{1, 3});
+    assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{3});
 
     // Close the metadata manager
     upsertMetadataManager.close();

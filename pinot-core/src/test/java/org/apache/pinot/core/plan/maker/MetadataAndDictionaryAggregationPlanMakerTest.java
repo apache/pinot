@@ -196,8 +196,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     });
     // MINMAXRANGE from dictionary with match all filter
     entries.add(new Object[]{
-        "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10", NonScanBasedAggregationOperator.class
-        , AggregationOperator.class
+        "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10", NonScanBasedAggregationOperator.class,
+        AggregationOperator.class
     });
     // Aggregation
     entries.add(new Object[]{
