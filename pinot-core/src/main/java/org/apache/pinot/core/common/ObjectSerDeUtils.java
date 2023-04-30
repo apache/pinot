@@ -58,7 +58,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.kll.KllDoublesSketch;
-import org.apache.datasketches.kll.KllSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.CustomObject;
@@ -179,7 +178,7 @@ public class ObjectSerDeUtils {
         return ObjectType.DistinctTable;
       } else if (value instanceof Sketch) {
         return ObjectType.DataSketch;
-      } else if (value instanceof KllSketch) {
+      } else if (value instanceof KllDoublesSketch) {
         return ObjectType.KllDataSketch;
       } else if (value instanceof Geometry) {
         return ObjectType.Geometry;
@@ -923,15 +922,15 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<KllSketch> KLL_SKETCH_SER_DE = new ObjectSerDe<KllSketch>() {
+  public static final ObjectSerDe<KllDoublesSketch> KLL_SKETCH_SER_DE = new ObjectSerDe<KllDoublesSketch>() {
 
     @Override
-    public byte[] serialize(KllSketch value) {
+    public byte[] serialize(KllDoublesSketch value) {
       return value.toByteArray();
     }
 
     @Override
-    public KllSketch deserialize(byte[] bytes) {
+    public KllDoublesSketch deserialize(byte[] bytes) {
       return KllDoublesSketch.wrap(Memory.wrap(bytes));
     }
 

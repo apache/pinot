@@ -147,9 +147,9 @@ public enum AggregationFunctionType {
       } else if (remainingFunctionName.equals("RAWTDIGEST") || remainingFunctionName.matches("RAWTDIGEST\\d+")) {
         return PERCENTILERAWTDIGEST;
       } else if (remainingFunctionName.equals("KLL") || remainingFunctionName.matches("KLL\\d+")) {
-        return PERCENTILETDIGEST;
+        return PERCENTILEKLL;
       } else if (remainingFunctionName.equals("RAWKLL") || remainingFunctionName.matches("RAWKLL\\d+")) {
-        return PERCENTILERAWTDIGEST;
+        return PERCENTILERAWKLL;
       } else if (remainingFunctionName.equals("MV") || remainingFunctionName.matches("\\d+MV")) {
         return PERCENTILEMV;
       } else if (remainingFunctionName.equals("ESTMV") || remainingFunctionName.matches("EST\\d+MV")) {

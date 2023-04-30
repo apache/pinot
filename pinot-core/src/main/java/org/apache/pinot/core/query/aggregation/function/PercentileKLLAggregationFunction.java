@@ -50,6 +50,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </ul>
  *
  * <p>
+ *   If the column type is BYTES, the aggregation function will assume it is a serialized KllDoubleSketch and will
+ *   attempt to deserialize it for further processing.
+ * </p>
+ *
+ * <p>
  *   There is a variation of the function (<b>PERCENTILE_RAW_KLL</b>) that returns the Base64 encoded
  *   sketch object to be used externally.
  * </p>
@@ -70,6 +75,8 @@ public class PercentileKLLAggregationFunction
             + "PERCENTILE_KLL(column, percentile, k=200");
 
     _percentile = arguments.get(1).getLiteral().getDoubleValue();
+    Preconditions.checkArgument(_percentile >= 0 && _percentile <= 100,
+            "Percentile value needs to be in range 0-100, inclusive");
     if (numArguments == 3) {
       _kValue = arguments.get(2).getLiteral().getIntValue();
     }
@@ -103,7 +110,7 @@ public class PercentileKLLAggregationFunction
     KllDoublesSketch sketch = getOrCreateSketch(aggregationResultHolder);
 
     if (valueType == DataType.BYTES) {
-      // serialized sketch
+      // Assuming the column contains serialized data sketch
       KllDoublesSketch[] deserializedSketches =
           deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       for (int i = 0; i < length; i++) {

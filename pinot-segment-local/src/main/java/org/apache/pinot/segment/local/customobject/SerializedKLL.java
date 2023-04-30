@@ -38,7 +38,7 @@ public class SerializedKLL implements Comparable<SerializedKLL> {
 
   @Override
   public int compareTo(SerializedKLL other) {
-    checkArgument(other._quantile == _quantile, "Quantile numbers don't matchå");
+    checkArgument(other._quantile == _quantile, "Quantile numbers don't match");
     return Double.compare(_sketch.getQuantile(_quantile), other._sketch.getQuantile(_quantile));
   }
 

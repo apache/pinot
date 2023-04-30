@@ -63,7 +63,7 @@ import static org.testng.Assert.assertNotNull;
  * Tests for PERCENTILE_KLL aggregation function.
  *
  * <ul>
- *   <li>Generates a segment with a double column: a KLL column and a group-by column</li>
+ *   <li>Generates a segment with a double column, a KLL column and a group-by column</li>
  *   <li>Runs aggregation and group-by queries on the generated segment</li>
  *   <li>
  *     Compares the results for PERCENTILE_KLL on double column and KLL column with results for PERCENTILE on

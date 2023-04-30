@@ -46,7 +46,7 @@ public class PercentileKLLMVAggregationFunction extends PercentileKLLAggregation
     KllDoublesSketch sketch = getOrCreateSketch(aggregationResultHolder);
 
     if (valueType == DataType.BYTES) {
-      // serialized sketch
+      // Assuming the column contains serialized data sketches
       KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       for (int i = 0; i < length; i++) {
         sketch.merge(deserializedSketches[i]);
