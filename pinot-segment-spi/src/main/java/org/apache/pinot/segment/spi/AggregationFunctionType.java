@@ -97,7 +97,7 @@ public enum AggregationFunctionType {
   BOOLOR("boolOr"),
 
   // funnel aggregate functions
-  FUNNEL("funnel");
+  FUNNELCOUNT("funnelCount");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
       func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());

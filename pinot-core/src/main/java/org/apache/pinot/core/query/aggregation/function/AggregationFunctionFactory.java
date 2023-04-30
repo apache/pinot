@@ -300,8 +300,8 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
-          case FUNNEL:
-            return new FunnelAggregationFunction(arguments);
+          case FUNNELCOUNT:
+            return new FunnelCountAggregationFunction(arguments);
           default:
             throw new IllegalArgumentException();
         }

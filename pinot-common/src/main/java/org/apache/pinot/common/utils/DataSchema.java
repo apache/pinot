@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.collect.Ordering;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -469,6 +470,8 @@ public class DataSchema {
     private static long[] toLongArray(Object value) {
       if (value instanceof long[]) {
         return (long[]) value;
+      } else if (value instanceof LongArrayList) {
+        return ((LongArrayList) value).elements();
       } else {
         int[] intValues = (int[]) value;
         int length = intValues.length;
