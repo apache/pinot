@@ -20,28 +20,34 @@ package org.apache.pinot.query.planner.physical;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
 public class DispatchablePlanContext {
   private final WorkerManager _workerManager;
+
   private final long _requestId;
+  private final Set<String> _tableNames;
+  private final List<Pair<Integer, String>> _resultFields;
+
   private final PlannerContext _plannerContext;
-  private final QueryPlan _queryPlan;
+  private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
+  private final Map<Integer, StageNode> _dispatchablePlanStageRootMap;
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
-      List<Pair<Integer, String>> resultFields) {
+      List<Pair<Integer, String>> resultFields, Set<String> tableNames) {
     _workerManager = workerManager;
     _requestId = requestId;
     _plannerContext = plannerContext;
-    _queryPlan = new QueryPlan(resultFields, new HashMap<>(), new HashMap<>());
-  }
-
-  public QueryPlan getQueryPlan() {
-    return _queryPlan;
+    _dispatchablePlanMetadataMap = new HashMap<>();
+    _dispatchablePlanStageRootMap = new HashMap<>();
+    _resultFields = resultFields;
+    _tableNames = tableNames;
   }
 
   public WorkerManager getWorkerManager() {
@@ -52,7 +58,24 @@ public class DispatchablePlanContext {
     return _requestId;
   }
 
+  // Returns all the table names.
+  public Set<String> getTableNames() {
+    return _tableNames;
+  }
+
+  public List<Pair<Integer, String>> getResultFields() {
+    return _resultFields;
+  }
+
   public PlannerContext getPlannerContext() {
     return _plannerContext;
+  }
+
+  public Map<Integer, DispatchablePlanMetadata> getDispatchablePlanMetadataMap() {
+    return _dispatchablePlanMetadataMap;
+  }
+
+  public Map<Integer, StageNode> getDispatchablePlanStageRootMap() {
+    return _dispatchablePlanStageRootMap;
   }
 }

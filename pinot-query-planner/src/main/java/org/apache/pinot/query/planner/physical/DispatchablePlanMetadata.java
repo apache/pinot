@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
+package org.apache.pinot.query.planner.physical;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -24,8 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.QueryServerInstance;
 
 
 /**
@@ -38,16 +37,16 @@ import org.apache.pinot.query.routing.VirtualServer;
  *   <li>the server instances to which this stage should be execute on</li>
  * </ul>
  */
-public class StageMetadata implements Serializable {
+public class DispatchablePlanMetadata implements Serializable {
   private List<String> _scannedTables;
 
   // used for assigning server/worker nodes.
-  private List<VirtualServer> _serverInstances;
+  private Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
 
   // used for table scan stage - we use ServerInstance instead of VirtualServer
   // here because all virtual servers that share a server instance will have the
   // same segments on them
-  private Map<ServerInstance, Map<String, List<String>>> _serverInstanceToSegmentsMap;
+  private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -55,10 +54,13 @@ public class StageMetadata implements Serializable {
   // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
   private boolean _requiresSingletonInstance;
 
-  public StageMetadata() {
+  // Total worker count of this stage.
+  private int _totalWorkerCount;
+
+  public DispatchablePlanMetadata() {
     _scannedTables = new ArrayList<>();
-    _serverInstances = new ArrayList<>();
-    _serverInstanceToSegmentsMap = new HashMap<>();
+    _serverInstanceToWorkerIdMap = new HashMap<>();
+    _workerIdToSegmentsMap = new HashMap<>();
     _timeBoundaryInfo = null;
     _requiresSingletonInstance = false;
   }
@@ -75,21 +77,21 @@ public class StageMetadata implements Serializable {
   // attached physical plan context.
   // -----------------------------------------------
 
-  public Map<ServerInstance, Map<String, List<String>>> getServerInstanceToSegmentsMap() {
-    return _serverInstanceToSegmentsMap;
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToSegmentsMap() {
+    return _workerIdToSegmentsMap;
   }
 
-  public void setServerInstanceToSegmentsMap(
-      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap) {
-    _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
+  public void setWorkerIdToSegmentsMap(
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+    _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
-  public List<VirtualServer> getServerInstances() {
-    return _serverInstances;
+  public Map<QueryServerInstance, List<Integer>> getServerInstanceToWorkerIdMap() {
+    return _serverInstanceToWorkerIdMap;
   }
 
-  public void setServerInstances(List<VirtualServer> serverInstances) {
-    _serverInstances = serverInstances;
+  public void setServerInstanceToWorkerIdMap(Map<QueryServerInstance, List<Integer>> serverInstances) {
+    _serverInstanceToWorkerIdMap = serverInstances;
   }
 
   public TimeBoundaryInfo getTimeBoundaryInfo() {
@@ -108,10 +110,18 @@ public class StageMetadata implements Serializable {
     _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
   }
 
+  public int getTotalWorkerCount() {
+    return _totalWorkerCount;
+  }
+
+  public void setTotalWorkerCount(int totalWorkerCount) {
+    _totalWorkerCount = totalWorkerCount;
+  }
+
   @Override
   public String toString() {
-    return "StageMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstances=" + _serverInstances
-        + ", _serverInstanceToSegmentsMap=" + _serverInstanceToSegmentsMap + ", _timeBoundaryInfo=" + _timeBoundaryInfo
-        + '}';
+    return "DispatchablePlanMetadata{" + "_scannedTables=" + _scannedTables + ", _servers="
+        + _serverInstanceToWorkerIdMap + ", _serverInstanceToSegmentsMap=" + _workerIdToSegmentsMap
+        + ", _timeBoundaryInfo=" + _timeBoundaryInfo + '}';
   }
 }

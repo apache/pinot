@@ -48,4 +48,9 @@ public class NotInTransformFunction extends InTransformFunction {
     }
     return intValuesSV;
   }
+
+  @Override
+  protected boolean mainFunctionNotContainedInValues(int value) {
+    return value == 1;
+  }
 }

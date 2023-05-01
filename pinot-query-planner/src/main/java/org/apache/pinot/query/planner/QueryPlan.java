@@ -18,34 +18,42 @@
  */
 package org.apache.pinot.query.planner;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.util.Pair;
-import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
- * The {@code QueryPlan} is the dispatchable query execution plan from the result of {@link LogicalPlanner}.
+ * The {@code QueryPlan} is the dispatchable query execution plan from the result of
+ * {@link org.apache.pinot.query.planner.logical.StagePlanner}.
  *
  * <p>QueryPlan should contain the necessary stage boundary information and the cross exchange information
  * for:
  * <ul>
  *   <li>dispatch individual stages to executor.</li>
- *   <li>instruct stage executor to establish connection channels to other stages.</li>
- *   <li>encode data blocks for transfer between stages based on partitioning scheme.</li>
+ *   <li>instruction for stage executor to establish connection channels to other stages.</li>
+ *   <li>instruction for encoding data blocks & transferring between stages based on partitioning scheme.</li>
  * </ul>
  */
 public class QueryPlan {
   private final List<Pair<Integer, String>> _queryResultFields;
   private final Map<Integer, StageNode> _queryStageMap;
-  private final Map<Integer, StageMetadata> _stageMetadataMap;
+  private final List<StageMetadata> _stageMetadataList;
+  private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
 
   public QueryPlan(List<Pair<Integer, String>> fields, Map<Integer, StageNode> queryStageMap,
-      Map<Integer, StageMetadata> stageMetadataMap) {
+      Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
     _queryResultFields = fields;
     _queryStageMap = queryStageMap;
-    _stageMetadataMap = stageMetadataMap;
+    _dispatchablePlanMetadataMap = dispatchablePlanMetadataMap;
+    _stageMetadataList = constructStageMetadataList(_dispatchablePlanMetadataMap);
   }
 
   /**
@@ -60,8 +68,16 @@ public class QueryPlan {
    * Get the stage metadata information.
    * @return stage metadata info.
    */
-  public Map<Integer, StageMetadata> getStageMetadataMap() {
-    return _stageMetadataMap;
+  public List<StageMetadata> getStageMetadataList() {
+    return _stageMetadataList;
+  }
+
+  /**
+   * Get the dispatch metadata information.
+   * @return dispatch metadata info.
+   */
+  public Map<Integer, DispatchablePlanMetadata> getDispatchablePlanMetadataMap() {
+    return _dispatchablePlanMetadataMap;
   }
 
   /**
@@ -83,5 +99,44 @@ public class QueryPlan {
    */
   public String explain() {
     return ExplainPlanStageVisitor.explain(this);
+  }
+
+  /**
+   * Convert the {@link DispatchablePlanMetadata} into dispatchable info for each stage/worker.
+   */
+  private static List<StageMetadata> constructStageMetadataList(
+      Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
+    StageMetadata[] stageMetadataList = new StageMetadata[dispatchablePlanMetadataMap.size()];
+    for (Map.Entry<Integer, DispatchablePlanMetadata> dispatchableEntry : dispatchablePlanMetadataMap.entrySet()) {
+      DispatchablePlanMetadata dispatchablePlanMetadata = dispatchableEntry.getValue();
+
+      // construct each worker metadata
+      WorkerMetadata[] workerMetadataList = new WorkerMetadata[dispatchablePlanMetadata.getTotalWorkerCount()];
+      for (Map.Entry<QueryServerInstance, List<Integer>> queryServerEntry
+          : dispatchablePlanMetadata.getServerInstanceToWorkerIdMap().entrySet()) {
+        for (int workerId : queryServerEntry.getValue()) {
+          VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerEntry.getKey(), workerId);
+          WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
+          builder.setVirtualServerAddress(virtualServerAddress);
+          if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
+            builder.addTableSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap().get(workerId));
+          }
+          workerMetadataList[workerId] = builder.build();
+        }
+      }
+
+      // construct the stageMetadata
+      int stageId = dispatchableEntry.getKey();
+      StageMetadata.Builder builder = new StageMetadata.Builder();
+      builder.setWorkerMetadataList(Arrays.asList(workerMetadataList));
+      if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
+        builder.addTableName(dispatchablePlanMetadata.getScannedTables().get(0));
+      }
+      if (dispatchablePlanMetadata.getTimeBoundaryInfo() != null) {
+        builder.addTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
+      }
+      stageMetadataList[stageId] = builder.build();
+    }
+    return Arrays.asList(stageMetadataList);
   }
 }

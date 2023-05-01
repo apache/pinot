@@ -244,7 +244,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         .setLoadMode(getLoadMode()).setTaskConfig(
             new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs)))
         .setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setLLC(useLlc()).setStreamConfigs(streamConfigs).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 

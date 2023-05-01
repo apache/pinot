@@ -134,7 +134,8 @@ public class ClusterIntegrationTestUtils {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true));
               break;
             }
-            Assert.fail("Unsupported UNION Avro field: " + fieldName + " with underlying types: " + typesInUnion);
+            Assert.fail(
+                String.format("Unsupported UNION Avro field: %s with underlying types: %s", fieldName, typesInUnion));
             break;
           case ARRAY:
             Schema.Type type = field.schema().getElementType().getType();
@@ -146,24 +147,21 @@ public class ClusterIntegrationTestUtils {
             if (isSingleValueAvroFieldType(fieldType)) {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, fieldType, false));
             } else {
-              Assert.fail("Unsupported Avro field: " + fieldName + " with type: " + fieldType);
+              Assert.fail(String.format("Unsupported Avro field: %s with underlying types: %s", fieldName, fieldType));
             }
             break;
         }
       }
 
-      h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
-      h2Connection.prepareCall("CREATE TABLE " + tableName + "(" + StringUtil.join(",",
-          h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
+      h2Connection.prepareCall(String.format("DROP TABLE IF EXISTS %s", tableName)).execute();
+      String columnsStr = StringUtil.join(",", h2FieldNameAndTypes.toArray(new String[0]));
+      h2Connection.prepareCall(String.format("CREATE TABLE %s (%s)", tableName, columnsStr)).execute();
     }
 
     // Insert Avro records into H2 table
-    StringBuilder params = new StringBuilder("?");
-    for (int i = 0; i < h2FieldNameAndTypes.size() - 1; i++) {
-      params.append(",?");
-    }
+    String params = "?" + StringUtils.repeat(",?", h2FieldNameAndTypes.size() - 1);
     PreparedStatement h2Statement =
-        h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
+        h2Connection.prepareStatement(String.format("INSERT INTO %s VALUES (%s)", tableName, params));
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
@@ -248,7 +246,7 @@ public class ClusterIntegrationTestUtils {
     }
     // if column is array data type, add Array with size.
     if (arrayType) {
-      h2FieldType = h2FieldType + " ARRAY[" + MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE + "]";
+      h2FieldType = String.format("%s  ARRAY[%d]", h2FieldType, MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
     }
     if (nullable) {
       return String.format("`%s` %s", fieldName, h2FieldType);
@@ -399,7 +397,6 @@ public class ClusterIntegrationTestUtils {
    * @param avroFiles List of Avro files
    * @param kafkaBroker Kafka broker config
    * @param kafkaTopic Kafka topic
-   * @param maxNumKafkaMessagesPerBatch Maximum number of Kafka messages per batch
    * @param header Optional Kafka message header
    * @param partitionColumn Optional partition column
    * @param commit if the transaction commits or aborts

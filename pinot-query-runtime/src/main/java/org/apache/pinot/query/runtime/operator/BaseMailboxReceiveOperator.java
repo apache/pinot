@@ -19,21 +19,19 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.service.QueryConfig;
 
 
 /**
@@ -46,91 +44,73 @@ import org.apache.pinot.query.service.QueryConfig;
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
-
-  // TODO: Unify SUPPORTED_EXCHANGE_TYPES with MailboxSendOperator.
-  protected static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
-      ImmutableSet.of(RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED,
-          RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED);
-
-  protected final MailboxService<TransferableBlock> _mailboxService;
+  protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
-  protected final List<MailboxIdentifier> _sendingMailbox;
-  protected final long _deadlineTimestampNano;
-  protected int _serverIdx;
-  protected TransferableBlock _upstreamErrorBlock;
+  protected final List<String> _mailboxIds;
+  protected final Deque<ReceivingMailbox> _mailboxes;
 
-  protected static MailboxIdentifier toMailboxId(VirtualServer sender, long jobId, int senderStageId,
-      int receiverStageId, VirtualServerAddress receiver) {
-    return new JsonMailboxIdentifier(
-        String.format("%s_%s", jobId, senderStageId),
-        new VirtualServerAddress(sender),
-        receiver,
-        senderStageId,
-        receiverStageId);
-  }
-
-  public BaseMailboxReceiveOperator(OpChainExecutionContext context, List<VirtualServer> sendingStageInstances,
-      RelDistribution.Type exchangeType, int senderStageId, int receiverStageId, Long timeoutMs) {
+  public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
+      int senderStageId) {
     super(context);
     _mailboxService = context.getMailboxService();
-    VirtualServerAddress receiver = context.getServer();
-    long jobId = context.getRequestId();
-    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
-        "Exchange/Distribution type: " + exchangeType + " is not supported!");
-    long timeoutNano = (timeoutMs != null ? timeoutMs : QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS) * 1_000_000L;
-    _deadlineTimestampNano = timeoutNano + System.nanoTime();
-
+    Preconditions.checkState(MailboxSendOperator.SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
+        "Unsupported exchange type: %s", exchangeType);
     _exchangeType = exchangeType;
-    if (_exchangeType == RelDistribution.Type.SINGLETON) {
-      VirtualServer singletonInstance = null;
-      for (VirtualServer serverInstance : sendingStageInstances) {
-        if (serverInstance.getHostname().equals(_mailboxService.getHostname())
-            && serverInstance.getQueryMailboxPort() == _mailboxService.getMailboxPort()) {
-          Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
-          singletonInstance = serverInstance;
+
+    long requestId = context.getRequestId();
+    int receiverStageId = context.getStageId();
+    List<WorkerMetadata> senderMetadataList = context.getStageMetadataList().get(senderStageId).getWorkerMetadataList();
+    VirtualServerAddress receiver = context.getServer();
+    if (exchangeType == RelDistribution.Type.SINGLETON) {
+      VirtualServerAddress singletonSender = null;
+      for (WorkerMetadata senderMetadata : senderMetadataList) {
+        VirtualServerAddress sender = senderMetadata.getVirtualServerAddress();
+        if (sender.hostname().equals(_mailboxService.getHostname()) && sender.port() == _mailboxService.getPort()) {
+          Preconditions.checkState(singletonSender == null, "Multiple instances found for SINGLETON exchange type");
+          singletonSender = sender;
         }
       }
-
-      if (singletonInstance == null) {
-        // TODO: fix WorkerManager assignment, this should not happen if we properly assign workers.
-        // see: https://github.com/apache/pinot/issues/9611
-        _sendingMailbox = Collections.emptyList();
-      } else {
-        _sendingMailbox =
-            Collections.singletonList(toMailboxId(singletonInstance, jobId, senderStageId, receiverStageId, receiver));
-      }
+      Preconditions.checkState(singletonSender != null, "Failed to find instance for SINGLETON exchange type");
+      _mailboxIds = Collections.singletonList(
+          MailboxIdUtils.toMailboxId(requestId, senderStageId, singletonSender.workerId(), receiverStageId,
+              receiver.workerId()));
     } else {
-      _sendingMailbox = new ArrayList<>(sendingStageInstances.size());
-      for (VirtualServer instance : sendingStageInstances) {
-        _sendingMailbox.add(toMailboxId(instance, jobId, senderStageId, receiverStageId, receiver));
+      _mailboxIds = new ArrayList<>(senderMetadataList.size());
+      for (WorkerMetadata senderMetadata : senderMetadataList) {
+        VirtualServerAddress sender = senderMetadata.getVirtualServerAddress();
+        _mailboxIds.add(MailboxIdUtils.toMailboxId(requestId, senderStageId, sender.workerId(), receiverStageId,
+            receiver.workerId()));
       }
     }
-    _upstreamErrorBlock = null;
-    _serverIdx = 0;
+    _mailboxes = _mailboxIds.stream().map(_mailboxService::getReceivingMailbox)
+        .collect(Collectors.toCollection(ArrayDeque::new));
   }
 
-  public List<MailboxIdentifier> getSendingMailbox() {
-    return _sendingMailbox;
+  public List<String> getMailboxIds() {
+    return _mailboxIds;
   }
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of();
+    return Collections.emptyList();
   }
 
   @Override
   public void close() {
     super.close();
-    for (MailboxIdentifier sendingMailbox : _sendingMailbox) {
-      _mailboxService.releaseReceivingMailbox(sendingMailbox);
-    }
+    cancelRemainingMailboxes();
   }
 
   @Override
   public void cancel(Throwable t) {
     super.cancel(t);
-    for (MailboxIdentifier sendingMailbox : _sendingMailbox) {
-      _mailboxService.releaseReceivingMailbox(sendingMailbox);
+    cancelRemainingMailboxes();
+  }
+
+  protected void cancelRemainingMailboxes() {
+    ReceivingMailbox mailbox;
+    while ((mailbox = _mailboxes.poll()) != null) {
+      mailbox.cancel();
     }
   }
 }

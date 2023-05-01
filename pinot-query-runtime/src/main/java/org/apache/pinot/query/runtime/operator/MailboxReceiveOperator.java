@@ -18,19 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,23 +31,14 @@ import org.slf4j.LoggerFactory;
  * {@link MultiStageOperator#getNextBlock()}()} API.
  */
 public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
 
-  public MailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType, int senderStageId,
-      int receiverStageId) {
-    this(context, context.getMetadataMap().get(senderStageId).getServerInstances(), exchangeType, senderStageId,
-        receiverStageId, context.getTimeoutMs());
+  private TransferableBlock _errorBlock;
+
+  public MailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType, int senderStageId) {
+    super(context, exchangeType, senderStageId);
   }
 
-  // TODO: Move deadlineInNanoSeconds to OperatorContext.
-  // TODO: Remove boxed timeoutMs value from here and use long deadlineMs from context.
-  public MailboxReceiveOperator(OpChainExecutionContext context, List<VirtualServer> sendingStageInstances,
-      RelDistribution.Type exchangeType, int senderStageId, int receiverStageId, Long timeoutMs) {
-    super(context, sendingStageInstances, exchangeType, senderStageId, receiverStageId, timeoutMs);
-  }
-
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -62,59 +46,41 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
-    } else if (System.nanoTime() >= _deadlineTimestampNano) {
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+    if (_errorBlock != null) {
+      return _errorBlock;
+    }
+    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
+      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+      return _errorBlock;
     }
 
-    int startingIdx = _serverIdx;
-    int openMailboxCount = 0;
-    int eosMailboxCount = 0;
-    // For all non-singleton distribution, we poll from every instance to check mailbox content.
-    // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
-    for (int i = 0; i < _sendingMailbox.size(); i++) {
-      // this implements a round-robin mailbox iterator, so we don't starve any mailboxes
-      _serverIdx = (startingIdx + i) % _sendingMailbox.size();
-      MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
-      try {
-        ReceivingMailbox<TransferableBlock> mailbox = _mailboxService.getReceivingMailbox(mailboxId);
-        if (!mailbox.isClosed()) {
-          openMailboxCount++;
-          TransferableBlock block = mailbox.receive();
-          // Get null block when pulling times out from mailbox.
-          if (block != null) {
-            if (block.isErrorBlock()) {
-              _upstreamErrorBlock =
-                  TransferableBlockUtils.getErrorTransferableBlock(block.getDataBlock().getExceptions());
-              return _upstreamErrorBlock;
-            }
-            if (!block.isEndOfStreamBlock()) {
-              return block;
-            } else {
-              if (_opChainStats != null && !block.getResultMetadata().isEmpty()) {
-                for (Map.Entry<String, OperatorStats> entry : block.getResultMetadata().entrySet()) {
-                  _opChainStats.getOperatorStatsMap().compute(entry.getKey(), (_key, _value) -> entry.getValue());
-                }
-              }
-              eosMailboxCount++;
-            }
-          }
+    // Poll from every mailbox in round-robin fashion:
+    // - Return the first content block
+    // - If no content block found but there are mailboxes not finished, return no-op block
+    // - If all content blocks are already returned, return end-of-stream block
+    int numMailboxes = _mailboxes.size();
+    for (int i = 0; i < numMailboxes; i++) {
+      ReceivingMailbox mailbox = _mailboxes.remove();
+      TransferableBlock block = mailbox.poll();
+
+      // Release the mailbox when the block is end-of-stream
+      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
+        _mailboxService.releaseReceivingMailbox(mailbox);
+        _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
+        continue;
+      }
+
+      // Add the mailbox back to the queue if the block is not end-of-stream
+      _mailboxes.add(mailbox);
+      if (block != null) {
+        if (block.isErrorBlock()) {
+          _errorBlock = block;
         }
-      } catch (Exception e) {
-        return TransferableBlockUtils.getErrorTransferableBlock(
-            new RuntimeException(String.format("Error polling mailbox=%s", mailboxId), e));
+        return block;
       }
     }
 
-    // there are two conditions in which we should return EOS: (1) there were
-    // no mailboxes to open (this shouldn't happen because the second condition
-    // should be hit first, but is defensive) (2) every mailbox that was opened
-    // returned an EOS block. in every other scenario, there are mailboxes that
-    // are not yet exhausted and we should wait for more data to be available
-    TransferableBlock block =
-        openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
-            : TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    return block;
+    return _mailboxes.isEmpty() ? TransferableBlockUtils.getEndOfStreamTransferableBlock()
+        : TransferableBlockUtils.getNoOpTransferableBlock();
   }
 }

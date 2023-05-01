@@ -20,7 +20,10 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
@@ -37,6 +40,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
@@ -48,10 +52,12 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
+import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
@@ -149,7 +155,9 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId), null, relRoot.rel);
+      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
+      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId, tableNames), null,
+          tableNames);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -177,7 +185,8 @@ public class QueryEnvironment {
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), relRoot.rel);
+      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
+      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -199,12 +208,12 @@ public class QueryEnvironment {
   public static class QueryPlannerResult {
     private QueryPlan _queryPlan;
     private String _explainPlan;
-    private RelNode _relRoot;
+    Set<String> _tableNames;
 
-    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, RelNode relRoot) {
+    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, Set<String> tableNames) {
       _queryPlan = queryPlan;
       _explainPlan = explainPlan;
-      _relRoot = relRoot;
+      _tableNames = tableNames;
     }
 
     public String getExplainPlan() {
@@ -215,8 +224,9 @@ public class QueryEnvironment {
       return _queryPlan;
     }
 
-    public RelNode getRelRoot() {
-      return _relRoot;
+    // Returns all the table names in the query.
+    public Set<String> getTableNames() {
+      return _tableNames;
     }
   }
 
@@ -229,8 +239,28 @@ public class QueryEnvironment {
       throws Exception {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
-    RelNode optimized = optimize(relation, plannerContext);
+    RelRoot decorrelated = decorrelateIfNeeded(relation);
+    RelNode optimized = optimize(decorrelated, plannerContext);
     return relation.withRel(optimized);
+  }
+
+  private RelRoot decorrelateIfNeeded(RelRoot relRoot) {
+    if (hasCorrelateNode(relRoot.rel)) {
+      relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, RelBuilder.create(_config)));
+    }
+    return relRoot;
+  }
+
+  private static boolean hasCorrelateNode(RelNode relNode) {
+    if (relNode instanceof LogicalCorrelate) {
+      return true;
+    }
+    for (RelNode input : relNode.getInputs()) {
+      if (hasCorrelateNode(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private SqlNode validate(SqlNode parsed, PlannerContext plannerContext)
@@ -267,10 +297,11 @@ public class QueryEnvironment {
     }
   }
 
-  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
+  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
+      Set<String> tableNames) {
     // 5. construct a dispatchable query plan.
     StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager, requestId, _tableCache);
-    return queryStagePlanner.makePlan(relRoot);
+    return queryStagePlanner.makePlan(relRoot, tableNames);
   }
 
   // --------------------------------------------------------------------------
@@ -279,5 +310,18 @@ public class QueryEnvironment {
 
   private HintStrategyTable getHintStrategyTable() {
     return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
+  }
+
+
+  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
+    Set<String> tableNames = new HashSet<>();
+    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
+    for (String qualifiedTableName : qualifiedTableNames) {
+      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
+      // statements, particularly to handle cases when they contain special characters or reserved keywords.
+      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
+      tableNames.add(tableName);
+    }
+    return tableNames;
   }
 }

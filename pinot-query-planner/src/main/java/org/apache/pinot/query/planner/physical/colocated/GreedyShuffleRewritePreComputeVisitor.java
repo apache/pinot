@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.physical.colocated;
 import org.apache.pinot.query.planner.stage.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 
@@ -62,6 +63,13 @@ class GreedyShuffleRewritePreComputeVisitor
   public Integer visitTableScan(TableScanNode stageNode, GreedyShuffleRewriteContext context) {
     super.visitTableScan(stageNode, context);
     context.addLeafNode(stageNode.getStageId(), stageNode);
+    return 0;
+  }
+
+  @Override
+  public Integer visitSetOp(SetOpNode setOpNode, GreedyShuffleRewriteContext context) {
+    super.visitSetOp(setOpNode, context);
+    context.markSetOpStage(setOpNode.getStageId());
     return 0;
   }
 }

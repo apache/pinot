@@ -58,6 +58,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<RangeIndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "range";
 
   protected RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
@@ -83,8 +84,13 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<RangeIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("range", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           if (tableConfig.getIndexingConfig() == null) {
             return Collections.emptyMap();
@@ -172,5 +178,10 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
       throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.range(),
           "Unknown range index version " + version);
     }
+  }
+
+  @Override
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+    tableConfig.getIndexingConfig().setRangeIndexColumns(null);
   }
 }

@@ -57,6 +57,7 @@ import org.apache.pinot.spi.data.Schema;
 public class InvertedIndexType
     extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<IndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "inverted";
 
   protected InvertedIndexType() {
     super(StandardIndexes.INVERTED_ID);
@@ -79,11 +80,16 @@ public class InvertedIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
     ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
         tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
         (acum, column) -> acum.put(column, IndexConfig.ENABLED));
-    return IndexConfigDeserializer.fromIndexes("inverted", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.ifIndexingConfig(fromInvertedCols));
   }
 
@@ -181,5 +187,10 @@ public class InvertedIndexType
       PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
       return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
     }
+  }
+
+  @Override
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(null);
   }
 }

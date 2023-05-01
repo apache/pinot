@@ -16,28 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.mailbox;
+package org.apache.pinot.core.segment.processing.lifecycle;
 
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-
-public final class Utils {
-
-  private Utils() {
-    // do not instantiate.
-  }
-
-  public static String constructChannelId(String mailboxId) {
-    MailboxIdentifier mailboxIdentifier = toMailboxIdentifier(mailboxId);
-    VirtualServerAddress dest = mailboxIdentifier.getToHost();
-    return dest.toString();
-  }
-
-  public static MailboxIdentifier toMailboxIdentifier(String mailboxId) {
-    return JsonMailboxIdentifier.parse(mailboxId);
-  }
-
-  public static String fromMailboxIdentifier(MailboxIdentifier mailboxId) {
-    return mailboxId.toString();
-  }
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface SegmentLifecycleEventListener {
+  boolean enabled() default true;
 }

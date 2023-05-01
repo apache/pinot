@@ -24,6 +24,7 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
@@ -57,7 +58,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   public static OpChain build(StageNode node, PlanRequestContext context) {
     MultiStageOperator root = node.visit(INSTANCE, context);
-    return new OpChain(context.getOpChainExecutionContext(), root, context.getReceivingMailboxes());
+    return new OpChain(context.getOpChainExecutionContext(), root, context.getReceivingMailboxIds());
   }
 
   @Override
@@ -65,15 +66,15 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     if (node.isSortOnReceiver()) {
       SortedMailboxReceiveOperator sortedMailboxReceiveOperator =
           new SortedMailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
-              node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(), node.isSortOnReceiver(),
-              node.getDataSchema(), node.getSenderStageId(), node.getStageId());
-      context.addReceivingMailboxes(sortedMailboxReceiveOperator.getSendingMailbox());
+              node.getDataSchema(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
+              node.getSenderStageId());
+      context.addReceivingMailboxIds(sortedMailboxReceiveOperator.getMailboxIds());
       return sortedMailboxReceiveOperator;
     } else {
       MailboxReceiveOperator mailboxReceiveOperator =
           new MailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
-              node.getSenderStageId(), node.getStageId());
-      context.addReceivingMailboxes(mailboxReceiveOperator.getSendingMailbox());
+              node.getSenderStageId());
+      context.addReceivingMailboxIds(mailboxReceiveOperator.getMailboxIds());
       return mailboxReceiveOperator;
     }
   }
@@ -83,7 +84,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new MailboxSendOperator(context.getOpChainExecutionContext(), nextOperator, node.getExchangeType(),
         node.getPartitionKeySelector(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
-        node.getStageId(), node.getReceiverStageId());
+        node.getReceiverStageId());
   }
 
   @Override
@@ -103,10 +104,16 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   }
 
   @Override
+  public MultiStageOperator visitSetOp(SetOpNode setOpNode, PlanRequestContext context) {
+    throw new UnsupportedOperationException(
+        "Stage node of type SetOpNode: " + setOpNode.getSetOpType() + " is not supported!");
+  }
+
+  @Override
   public MultiStageOperator visitFilter(FilterNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new FilterOperator(context.getOpChainExecutionContext(),
-        nextOperator, node.getDataSchema(), node.getCondition());
+    return new FilterOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
+        node.getCondition());
   }
 
   @Override

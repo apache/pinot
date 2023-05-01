@@ -18,65 +18,79 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class SortedMailboxReceiveOperatorTest {
-
-  private static final int DEFAULT_RECEIVER_STAGE_ID = 10;
+  private static final VirtualServerAddress RECEIVER_ADDRESS = new VirtualServerAddress("localhost", 123, 0);
+  private static final DataSchema DATA_SCHEMA =
+      new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
+  private static final List<RexExpression> COLLATION_KEYS = Collections.singletonList(new RexExpression.InputRef(0));
+  private static final List<RelFieldCollation.Direction> COLLATION_DIRECTIONS =
+      Collections.singletonList(RelFieldCollation.Direction.ASCENDING);
+  private static final String MAILBOX_ID_1 = MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0);
+  private static final String MAILBOX_ID_2 = MailboxIdUtils.toMailboxId(0, 1, 1, 0, 0);
 
   private AutoCloseable _mocks;
-
   @Mock
-  private ReceivingMailbox<TransferableBlock> _mailbox;
-
+  private MailboxService _mailboxService;
   @Mock
-  private ReceivingMailbox<TransferableBlock> _mailbox2;
-
+  private ReceivingMailbox _mailbox1;
   @Mock
-  private MailboxService<TransferableBlock> _mailboxService;
-  @Mock
-  private VirtualServer _server1;
-  @Mock
-  private VirtualServer _server2;
+  private ReceivingMailbox _mailbox2;
 
-  private final VirtualServerAddress _testAddr = new VirtualServerAddress("test", 123, 0);
-
-  private final Random _random = new Random();
+  private List<StageMetadata> _stageMetadataListBoth;
+  private List<StageMetadata> _stageMetadataList1;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    when(_mailboxService.getHostname()).thenReturn("localhost");
+    when(_mailboxService.getPort()).thenReturn(123);
+    VirtualServerAddress server1 = new VirtualServerAddress("localhost", 123, 0);
+    VirtualServerAddress server2 = new VirtualServerAddress("localhost", 123, 1);
+    StageMetadata stageMetadata = new StageMetadata.Builder()
+        .setWorkerMetadataList(Stream.of(server1, server2).map(
+            s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
+        .build();
+    // sending stage is 0, receiving stage is 1
+    _stageMetadataListBoth = Arrays.asList(null, stageMetadata);
+    stageMetadata = new StageMetadata.Builder()
+        .setWorkerMetadataList(Stream.of(server1).map(
+            s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
+        .build();
+    _stageMetadataList1 = Arrays.asList(null, stageMetadata);
   }
 
   @AfterMethod
@@ -85,832 +99,235 @@ public class SortedMailboxReceiveOperatorTest {
     _mocks.close();
   }
 
-  @Test
-  public void shouldTimeoutOnExtraLongSleep()
-      throws InterruptedException {
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
-    // shorter timeoutMs should result in error.
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Failed to find instance.*")
+  public void shouldThrowSingletonNoMatchMailboxServer() {
+    VirtualServerAddress server1 = new VirtualServerAddress("localhost", 456, 0);
+    VirtualServerAddress server2 = new VirtualServerAddress("localhost", 789, 1);
+    StageMetadata stageMetadata = new StageMetadata.Builder()
+        .setWorkerMetadataList(Stream.of(server1, server2).map(
+            s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
+        .build();
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 10L, 10L,
-            new HashMap<>(), false);
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, collationKeys,
-            collationDirections, false, true, inSchema, 456, 789, 10L);
-    Thread.sleep(200L);
-    TransferableBlock mailbox = receiveOp.nextBlock();
-    Assert.assertTrue(mailbox.isErrorBlock());
-    MetadataBlock errorBlock = (MetadataBlock) mailbox.getDataBlock();
-    Assert.assertTrue(errorBlock.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
-
-    // longer timeout or default timeout (10s) doesn't result in error.
-    context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, 2000L, 2000L,
-        new HashMap<>(), false);
-    receiveOp = new SortedMailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON,
-        collationKeys, collationDirections, false, true, inSchema, 456, 789, 2000L);
-    Thread.sleep(200L);
-    mailbox = receiveOp.nextBlock();
-    Assert.assertFalse(mailbox.isErrorBlock());
-    context = new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-        Long.MAX_VALUE, new HashMap<>(), false);
-    receiveOp = new SortedMailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON,
-        collationKeys, collationDirections, false, true, inSchema, 456, 789, null);
-    Thread.sleep(200L);
-    mailbox = receiveOp.nextBlock();
-    Assert.assertFalse(mailbox.isErrorBlock());
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            Arrays.asList(null, stageMetadata), false);
+    //noinspection resource
+    new SortedMailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS,
+        COLLATION_DIRECTIONS, false, 1);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*multiple instance "
-      + "found.*")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Multiple instances.*")
   public void shouldThrowReceiveSingletonFromMultiMatchMailboxServer() {
-
-    Mockito.when(_mailboxService.getHostname()).thenReturn("singleton");
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(123);
-
-    Mockito.when(_server1.getHostname()).thenReturn("singleton");
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(123);
-
-    Mockito.when(_server2.getHostname()).thenReturn("singleton");
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
-            collationKeys, collationDirections, false, true, inSchema, 456, 789, null);
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataListBoth, false);
+    //noinspection resource
+    new SortedMailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS,
+        COLLATION_DIRECTIONS, false, 1);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
   public void shouldThrowRangeDistributionNotSupported() {
-    Mockito.when(_mailboxService.getHostname()).thenReturn("singleton");
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(123);
-
-    Mockito.when(_server1.getHostname()).thenReturn("singleton");
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(123);
-
-    Mockito.when(_server2.getHostname()).thenReturn("singleton");
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, DEFAULT_RECEIVER_STAGE_ID, _testAddr, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-    SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
-        ImmutableList.of(_server1, _server2), RelDistribution.Type.RANGE_DISTRIBUTED, collationKeys,
-        collationDirections, false, true, inSchema, 456, 789, null);
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            Collections.emptyList(), false);
+    //noinspection resource
+    new SortedMailboxReceiveOperator(context, RelDistribution.Type.RANGE_DISTRIBUTED, DATA_SCHEMA, COLLATION_KEYS,
+        COLLATION_DIRECTIONS, false, 1);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Collation keys.*")
+  public void shouldThrowOnEmptyCollationKey() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10L, System.currentTimeMillis() + 10L,
+            _stageMetadataList1, false);
+    //noinspection resource
+    new SortedMailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, DATA_SCHEMA, Collections.emptyList(),
+        Collections.emptyList(), false, 1);
   }
 
   @Test
-  public void shouldReceiveSingletonNoMatchMailboxServer() {
-    String serverHost = "singleton";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    int server2port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
-
-    int mailboxPort = 789;
-    Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
+  public void shouldTimeoutOnExtraLongSleep()
+      throws InterruptedException {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    // Short timeoutMs should result in timeout
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10L, System.currentTimeMillis() + 10L,
+            _stageMetadataList1, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      Thread.sleep(100L);
+      TransferableBlock mailbox = receiveOp.nextBlock();
+      assertTrue(mailbox.isErrorBlock());
+      MetadataBlock errorBlock = (MetadataBlock) mailbox.getDataBlock();
+      assertTrue(errorBlock.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
+    }
 
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
-            collationKeys, collationDirections, false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID,
-            null);
-
-    // Receive end of stream block directly when there is no match.
-    Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    // Longer timeout or default timeout (10s) doesn't result in timeout
+    context = new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10_000L,
+        System.currentTimeMillis() + 10_000L, _stageMetadataList1, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      Thread.sleep(100L);
+      TransferableBlock mailbox = receiveOp.nextBlock();
+      assertFalse(mailbox.isErrorBlock());
+    }
   }
 
   @Test
-  public void shouldReceiveSingletonCloseMailbox() {
-    String serverHost = "singleton";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    int server2port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
-
-    int mailboxPort = server2port;
-    Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(true);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
+  public void shouldReceiveSingletonNullMailbox() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
-            collationKeys, collationDirections, false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID,
-            null);
-
-    // Receive end of stream block directly when mailbox is close.
-    Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataList1, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      assertTrue(receiveOp.nextBlock().isNoOpBlock());
+    }
   }
 
   @Test
-  public void shouldReceiveSingletonNullMailbox()
-      throws Exception {
-    String serverHost = "singleton";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    int server2port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
-
-    int mailboxPort = server2port;
-    Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    // Receive null mailbox during timeout.
-    Mockito.when(_mailbox.receive()).thenReturn(null);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
+  public void shouldReceiveEosDirectlyFromSender() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
-            collationKeys, collationDirections, false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID,
-            null);
-    // Receive NoOpBlock.
-    Assert.assertTrue(receiveOp.nextBlock().isNoOpBlock());
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataList1, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    }
   }
 
   @Test
-  public void shouldReceiveEosDirectlyFromSender()
-      throws Exception {
-    String serverHost = "singleton";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    int server2port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
-
-    int mailboxPort = server2port;
-    Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
+  public void shouldReceiveSingletonMailbox() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    Object[] row = new Object[]{1, 1};
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
-            collationKeys, collationDirections, false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID,
-            null);
-    // Receive EosBloc.
-    Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataList1, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
+      assertEquals(actualRows.size(), 1);
+      assertEquals(actualRows.get(0), row);
+      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    }
   }
 
   @Test
-  public void shouldReceiveSingletonMailbox()
-      throws Exception {
-    String serverHost = "singleton";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+  public void shouldReceiveSingletonErrorMailbox() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    String errorMessage = "TEST ERROR";
+    when(_mailbox1.poll()).thenReturn(
+        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataList1, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      TransferableBlock block = receiveOp.nextBlock();
+      assertTrue(block.isErrorBlock());
+      assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+    }
+  }
 
-    int server2port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+  @Test
+  public void shouldReceiveMailboxFromTwoServersOneNull() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
+    Object[] row = new Object[]{1, 1};
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataListBoth, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      assertTrue(receiveOp.nextBlock().isNoOpBlock());
+      List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
+      assertEquals(actualRows.size(), 1);
+      assertEquals(actualRows.get(0), row);
+      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    }
+  }
 
-    int mailboxPort = server2port;
-    Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
+  @Test
+  public void shouldGetReceptionReceiveErrorMailbox() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    String errorMessage = "TEST ERROR";
+    when(_mailbox1.poll()).thenReturn(
+        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
+    Object[] row = new Object[]{3, 3};
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataListBoth, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      TransferableBlock block = receiveOp.nextBlock();
+      assertTrue(block.isErrorBlock());
+      assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+    }
+  }
 
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
+  @Test
+  public void shouldReceiveMailboxFromTwoServersWithCollationKey() {
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    Object[] row1 = new Object[]{3, 3};
+    Object[] row2 = new Object[]{1, 1};
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
+        OperatorTestUtil.block(DATA_SCHEMA, row2), TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
+    Object[] row3 = new Object[]{4, 2};
+    Object[] row4 = new Object[]{2, 4};
+    Object[] row5 = new Object[]{-1, 95};
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row3),
+        OperatorTestUtil.block(DATA_SCHEMA, row4), OperatorTestUtil.block(DATA_SCHEMA, row5),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataListBoth, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.HASH_DISTRIBUTED, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, false, 1)) {
+      assertEquals(receiveOp.nextBlock().getContainer(), Arrays.asList(row5, row2, row4, row1, row3));
+      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    }
+  }
 
-    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Object[] expRow = new Object[]{1, 1};
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_mailbox.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow),
+  @Test
+  public void shouldReceiveMailboxFromTwoServersWithCollationKeyTwoColumns() {
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"col1", "col2", "col3"}, new DataSchema.ColumnDataType[]{INT, INT, STRING});
+    List<RexExpression> collationKeys = Arrays.asList(new RexExpression.InputRef(2), new RexExpression.InputRef(0));
+    List<RelFieldCollation.Direction> collationDirection =
+        Arrays.asList(RelFieldCollation.Direction.DESCENDING, RelFieldCollation.Direction.ASCENDING);
+
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    Object[] row1 = new Object[]{3, 3, "queen"};
+    Object[] row2 = new Object[]{1, 1, "pink floyd"};
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(dataSchema, row1),
+        OperatorTestUtil.block(dataSchema, row2), TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
+    Object[] row3 = new Object[]{4, 2, "pink floyd"};
+    Object[] row4 = new Object[]{2, 4, "aerosmith"};
+    Object[] row5 = new Object[]{-1, 95, "foo fighters"};
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(dataSchema, row3),
+        OperatorTestUtil.block(dataSchema, row4), OperatorTestUtil.block(dataSchema, row5),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
-            collationKeys, collationDirections, false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID,
-            null);
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    while (receivedBlock.isNoOpBlock()) {
-      receivedBlock = receiveOp.nextBlock();
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataListBoth, false);
+    try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
+        RelDistribution.Type.HASH_DISTRIBUTED, dataSchema, collationKeys, collationDirection, false, 1)) {
+      assertEquals(receiveOp.nextBlock().getContainer(), Arrays.asList(row1, row2, row3, row5, row4));
+      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
     }
-    List<Object[]> resultRows = receivedBlock.getContainer();
-    Assert.assertEquals(resultRows.size(), 1);
-    Assert.assertEquals(resultRows.get(0), expRow);
-  }
-
-  @Test
-  public void shouldReceiveSingletonErrorMailbox()
-      throws Exception {
-    String serverHost = "singleton";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    int server2port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(serverHost);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
-
-    int mailboxPort = server2port;
-    Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
-    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    JsonMailboxIdentifier expectedMailboxId = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(serverHost, server2port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Exception e = new Exception("errorBlock");
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(e));
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2), RelDistribution.Type.SINGLETON,
-            collationKeys, collationDirections, false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID,
-            null);
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    Assert.assertTrue(receivedBlock.isErrorBlock());
-    MetadataBlock error = (MetadataBlock) receivedBlock.getDataBlock();
-    Assert.assertTrue(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("errorBlock"));
-  }
-
-  @Test(expectedExceptions = IllegalStateException.class,
-      expectedExceptionsMessageRegExp = ".*Collation keys should exist.*")
-  public void shouldThrowOnEmptyCollationKey()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
-            RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirections, false, true, inSchema, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null);
-  }
-
-  @Test(expectedExceptions = IllegalStateException.class,
-      expectedExceptionsMessageRegExp = ".*sorting must be enabled.*")
-  public void shouldThrowOnShouldSortOnReceiverFalse()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
-            RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirections, false, false, inSchema, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null);
-  }
-
-  @Test
-  public void shouldReceiveMailboxFromTwoServersOneClose()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(true);
-
-    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
-    Mockito.when(_mailbox2.isClosed()).thenReturn(false);
-    Object[] expRow = new Object[]{1, 1};
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
-            RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirections, false, true, inSchema, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null);
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    while (receivedBlock.isNoOpBlock()) {
-      receivedBlock = receiveOp.nextBlock();
-    }
-    List<Object[]> resultRows = receivedBlock.getContainer();
-    Assert.assertEquals(resultRows.size(), 1);
-    Assert.assertEquals(resultRows.get(0), expRow);
-  }
-
-  @Test
-  public void shouldReceiveMailboxFromTwoServersOneNull()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox.receive()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
-    Mockito.when(_mailbox2.isClosed()).thenReturn(false);
-    Object[] expRow = new Object[]{1, 1};
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
-            RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirections, false, true, inSchema, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null);
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    while (receivedBlock.isNoOpBlock()) {
-      receivedBlock = receiveOp.nextBlock();
-    }
-    List<Object[]> resultRows = receivedBlock.getContainer();
-    Assert.assertEquals(resultRows.size(), 1);
-    Assert.assertEquals(resultRows.get(0), expRow);
-  }
-
-  @Test
-  public void shouldGetReceptionReceiveErrorMailbox()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox.receive())
-        .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("mailboxError")));
-
-    Object[] expRow3 = new Object[]{3, 3};
-    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
-    Mockito.when(_mailbox2.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
-            RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirections, false, true, inSchema, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null);
-    // Receive error block from first server.
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    Assert.assertTrue(receivedBlock.isErrorBlock());
-    MetadataBlock error = (MetadataBlock) receivedBlock.getDataBlock();
-    Assert.assertTrue(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("mailboxError"));
-  }
-
-  @Test
-  public void shouldThrowReceiveWhenOneServerReceiveThrowException()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox.receive()).thenThrow(new Exception("mailboxError"));
-
-    Object[] expRow3 = new Object[]{3, 3};
-    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
-    Mockito.when(_mailbox2.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-
-    List<RexExpression> collationKeys = new ArrayList<>();
-    List<RelFieldCollation.Direction> collationDirections = new ArrayList<>();
-    collationKeys.add(new RexExpression.InputRef(0));
-    collationDirections.add(RelFieldCollation.Direction.ASCENDING);
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp =
-        new SortedMailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
-            RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirections, false, true, inSchema, stageId,
-            DEFAULT_RECEIVER_STAGE_ID, null);
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    Assert.assertTrue(receivedBlock.isErrorBlock(), "server-1 should have returned an error-block");
-  }
-
-  @Test
-  public void shouldReceiveMailboxFromTwoServersWithCollationKey()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Object[] expRow1 = new Object[]{3, 3};
-    Object[] expRow2 = new Object[]{1, 1};
-    Mockito.when(_mailbox.receive())
-        .thenReturn(OperatorTestUtil.block(inSchema, expRow1), OperatorTestUtil.block(inSchema, expRow2),
-            TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    Object[] expRow3 = new Object[]{4, 2};
-    Object[] expRow4 = new Object[]{2, 4};
-    Object[] expRow5 = new Object[]{-1, 95};
-    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
-    Mockito.when(_mailbox2.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3),
-        OperatorTestUtil.block(inSchema, expRow4), OperatorTestUtil.block(inSchema, expRow5),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    // Setup the collation key and direction
-    List<RexExpression> collationKeys = new ArrayList<>(Collections.singletonList(new RexExpression.InputRef(0)));
-    RelFieldCollation.Direction direction = _random.nextBoolean() ? RelFieldCollation.Direction.ASCENDING
-        : RelFieldCollation.Direction.DESCENDING;
-    List<RelFieldCollation.Direction> collationDirection = new ArrayList<>(Collections.singletonList(direction));
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
-        ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirection,
-        false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID, null);
-
-    // Receive a set of no-op blocks and skip over them
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    while (receivedBlock.isNoOpBlock()) {
-      receivedBlock = receiveOp.nextBlock();
-    }
-    List<Object[]> resultRows = receivedBlock.getContainer();
-    // All blocks should be returned together since ordering was required
-    Assert.assertEquals(resultRows.size(), 5);
-    if (direction == RelFieldCollation.Direction.ASCENDING) {
-      Assert.assertEquals(resultRows.get(0), expRow5);
-      Assert.assertEquals(resultRows.get(1), expRow2);
-      Assert.assertEquals(resultRows.get(2), expRow4);
-      Assert.assertEquals(resultRows.get(3), expRow1);
-      Assert.assertEquals(resultRows.get(4), expRow3);
-    } else {
-      Assert.assertEquals(resultRows.get(0), expRow3);
-      Assert.assertEquals(resultRows.get(1), expRow1);
-      Assert.assertEquals(resultRows.get(2), expRow4);
-      Assert.assertEquals(resultRows.get(3), expRow2);
-      Assert.assertEquals(resultRows.get(4), expRow5);
-    }
-
-    receivedBlock = receiveOp.nextBlock();
-    Assert.assertTrue(receivedBlock.isEndOfStreamBlock());
-  }
-
-  @Test
-  public void shouldReceiveMailboxFromTwoServersWithCollationKeyTwoColumns()
-      throws Exception {
-    String server1Host = "hash1";
-    int server1Port = 123;
-    Mockito.when(_server1.getHostname()).thenReturn(server1Host);
-    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
-
-    String server2Host = "hash2";
-    int server2Port = 456;
-    Mockito.when(_server2.getHostname()).thenReturn(server2Host);
-    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2Port);
-
-    int jobId = 456;
-    int stageId = 0;
-    int toPort = 8888;
-    String toHost = "toHost";
-    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
-
-    DataSchema inSchema = new DataSchema(new String[]{"col1", "col2", "col3"},
-        new DataSchema.ColumnDataType[]{INT, INT, STRING});
-    JsonMailboxIdentifier expectedMailboxId1 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server1Host, server1Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
-    Mockito.when(_mailbox.isClosed()).thenReturn(false);
-    Object[] expRow1 = new Object[]{3, 3, "queen"};
-    Object[] expRow2 = new Object[]{1, 1, "pink floyd"};
-    Mockito.when(_mailbox.receive())
-        .thenReturn(OperatorTestUtil.block(inSchema, expRow1), OperatorTestUtil.block(inSchema, expRow2),
-            TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    Object[] expRow3 = new Object[]{42, 2, "pink floyd"};
-    Object[] expRow4 = new Object[]{2, 4, "aerosmith"};
-    Object[] expRow5 = new Object[]{-1, 95, "foo fighters"};
-    JsonMailboxIdentifier expectedMailboxId2 = new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(server2Host, server2Port, 0), toAddress, stageId, DEFAULT_RECEIVER_STAGE_ID);
-    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
-    Mockito.when(_mailbox2.isClosed()).thenReturn(false);
-    Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3),
-        OperatorTestUtil.block(inSchema, expRow4), OperatorTestUtil.block(inSchema, expRow5),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    // Setup the collation key and direction
-    List<RexExpression> collationKeys = new ArrayList<>(Arrays.asList(new RexExpression.InputRef(2),
-        new RexExpression.InputRef(0)));
-    RelFieldCollation.Direction direction1 = _random.nextBoolean() ? RelFieldCollation.Direction.ASCENDING
-        : RelFieldCollation.Direction.DESCENDING;
-    RelFieldCollation.Direction direction2 = RelFieldCollation.Direction.ASCENDING;
-    List<RelFieldCollation.Direction> collationDirection = new ArrayList<>(Arrays.asList(direction1, direction2));
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, jobId, DEFAULT_RECEIVER_STAGE_ID, toAddress, Long.MAX_VALUE,
-            Long.MAX_VALUE, new HashMap<>(), false);
-
-    SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
-        ImmutableList.of(_server1, _server2), RelDistribution.Type.HASH_DISTRIBUTED, collationKeys, collationDirection,
-        false, true, inSchema, stageId, DEFAULT_RECEIVER_STAGE_ID, null);
-
-    // Receive a set of no-op blocks and skip over them
-    TransferableBlock receivedBlock = receiveOp.nextBlock();
-    while (receivedBlock.isNoOpBlock()) {
-      receivedBlock = receiveOp.nextBlock();
-    }
-    List<Object[]> resultRows = receivedBlock.getContainer();
-    // All blocks should be returned together since ordering was required
-    Assert.assertEquals(resultRows.size(), 5);
-    if (direction1 == RelFieldCollation.Direction.ASCENDING) {
-      Assert.assertEquals(resultRows.get(0), expRow4);
-      Assert.assertEquals(resultRows.get(1), expRow5);
-      Assert.assertEquals(resultRows.get(2), expRow2);
-      Assert.assertEquals(resultRows.get(3), expRow3);
-      Assert.assertEquals(resultRows.get(4), expRow1);
-    } else {
-      Assert.assertEquals(resultRows.get(0), expRow1);
-      Assert.assertEquals(resultRows.get(1), expRow2);
-      Assert.assertEquals(resultRows.get(2), expRow3);
-      Assert.assertEquals(resultRows.get(3), expRow5);
-      Assert.assertEquals(resultRows.get(4), expRow4);
-    }
-
-    receivedBlock = receiveOp.nextBlock();
-    Assert.assertTrue(receivedBlock.isEndOfStreamBlock());
   }
 }

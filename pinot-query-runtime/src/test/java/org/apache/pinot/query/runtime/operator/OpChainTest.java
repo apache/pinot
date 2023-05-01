@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.DataTable;
@@ -33,86 +34,77 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
+
 
 public class OpChainTest {
-  private AutoCloseable _mocks;
-  @Mock
-  private MultiStageOperator _upstreamOperator;
-
   private static int _numOperatorsInitialized = 0;
   private final List<TransferableBlock> _blockList = new ArrayList<>();
 
+  private AutoCloseable _mocks;
   @Mock
-  private MailboxService<TransferableBlock> _mailboxService;
+  private MultiStageOperator _sourceOperator;
   @Mock
-  private VirtualServer _server;
+  private MailboxService _mailboxService1;
   @Mock
-  private KeySelector<Object[], Object[]> _selector;
+  private ReceivingMailbox _mailbox1;
   @Mock
-  private MailboxSendOperator.BlockExchangeFactory _exchangeFactory;
+  private MailboxService _mailboxService2;
+  @Mock
+  private ReceivingMailbox _mailbox2;
   @Mock
   private BlockExchange _exchange;
 
-  @Mock
-  private ReceivingMailbox<TransferableBlock> _mailbox;
-
-
-  @Mock
-  private MailboxService<TransferableBlock> _mailboxService2;
-  @Mock
-  private ReceivingMailbox<TransferableBlock> _mailbox2;
-
+  private VirtualServerAddress _serverAddress;
+  private StageMetadata _receivingStageMetadata;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    _serverAddress = new VirtualServerAddress("localhost", 123, 0);
+    _receivingStageMetadata = new StageMetadata.Builder()
+            .setWorkerMetadataList(Stream.of(_serverAddress).map(
+                s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
+            .build();
 
-    Mockito.when(_exchangeFactory.build(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
-        Mockito.anyLong())).thenReturn(_exchange);
-
-    Mockito.when(_server.getHostname()).thenReturn("mock");
-    Mockito.when(_server.getQueryMailboxPort()).thenReturn(0);
-    Mockito.when(_server.getVirtualId()).thenReturn(0);
-
-    Mockito.when(_mailboxService.getReceivingMailbox(Mockito.any())).thenReturn(_mailbox);
-    Mockito.when(_mailboxService2.getReceivingMailbox(Mockito.any())).thenReturn(_mailbox2);
+    when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);
+    when(_mailboxService2.getReceivingMailbox(any())).thenReturn(_mailbox2);
 
     try {
-      Mockito.doAnswer(invocation -> {
+      doAnswer(invocation -> {
         TransferableBlock arg = invocation.getArgument(0);
         _blockList.add(arg);
         return null;
-      }).when(_exchange).send(Mockito.any(TransferableBlock.class));
+      }).when(_exchange).send(any(TransferableBlock.class));
 
-      Mockito.when(_mailbox2.receive()).then(x -> {
+      when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
           return TransferableBlockUtils.getNoOpTransferableBlock();
         }
         return _blockList.remove(0);
       });
-
-      Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -126,30 +118,26 @@ public class OpChainTest {
 
   @Test
   public void testExecutionTimerStats() {
-    Mockito.when(_upstreamOperator.nextBlock()).then(x -> {
-      Thread.sleep(1000);
+    when(_sourceOperator.nextBlock()).then(x -> {
+      Thread.sleep(100);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     });
-
-    OpChain opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _upstreamOperator, new ArrayList<>());
+    OpChain opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator, new ArrayList<>());
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
+    assertTrue(opChain.getStats().getExecutionTime() >= 100);
 
-    Assert.assertTrue(opChain.getStats().getExecutionTime() >= 1000);
-
-    Mockito.when(_upstreamOperator.nextBlock()).then(x -> {
+    when(_sourceOperator.nextBlock()).then(x -> {
       Thread.sleep(20);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     });
-
-    opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _upstreamOperator, new ArrayList<>());
+    opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator, new ArrayList<>());
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
-
-    Assert.assertTrue(opChain.getStats().getExecutionTime() >= 20);
-    Assert.assertTrue(opChain.getStats().getExecutionTime() < 100);
+    assertTrue(opChain.getStats().getExecutionTime() >= 20);
+    assertTrue(opChain.getStats().getExecutionTime() < 100);
   }
 
   @Test
@@ -162,16 +150,14 @@ public class OpChainTest {
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
 
-    Assert.assertTrue(opChain.getStats().getExecutionTime() >= 1000);
-    Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 1);
-    Assert.assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(dummyMultiStageOperator.getOperatorId()));
+    assertTrue(opChain.getStats().getExecutionTime() >= 1000);
+    assertEquals(opChain.getStats().getOperatorStatsMap().size(), 1);
+    assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(dummyMultiStageOperator.getOperatorId()));
 
     Map<String, String> executionStats =
         opChain.getStats().getOperatorStatsMap().get(dummyMultiStageOperator.getOperatorId()).getExecutionStats();
-    Assert.assertTrue(
-        Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) >= 1000);
-    Assert.assertTrue(
-        Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) <= 2000);
+    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) >= 1000);
+    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) <= 2000);
   }
 
   @Test
@@ -184,8 +170,8 @@ public class OpChainTest {
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
 
-    Assert.assertTrue(opChain.getStats().getExecutionTime() >= 1000);
-    Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
+    assertTrue(opChain.getStats().getExecutionTime() >= 1000);
+    assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
   }
 
   @Test
@@ -194,12 +180,9 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(ImmutableList.of(_server));
-    Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(receivedStageId, stageMetadata);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, senderStageId, new VirtualServerAddress(_server), 1000, 1000,
-            stageMetadataMap, true);
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, Arrays.asList(null, null, _receivingStageMetadata), true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -212,24 +195,23 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, new VirtualServerAddress(_server), 1000,
-            1000, stageMetadataMap, true);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, Arrays.asList(null, null, _receivingStageMetadata), true);
 
     MailboxReceiveOperator secondStageReceiveOp =
-        new MailboxReceiveOperator(secondStageContext, ImmutableList.of(_server),
-            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1, null);
+        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
 
-    Assert.assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
+    assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
     int numOperators = operators.size();
-    Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), numOperators);
+    assertEquals(opChain.getStats().getOperatorStatsMap().size(), numOperators);
     while (!operators.isEmpty()) {
-      Assert.assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operators.pop().getOperatorId()));
+      assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operators.pop().getOperatorId()));
     }
 
     while (!secondStageReceiveOp.nextBlock().isEndOfStreamBlock()) {
       // Drain the mailbox
     }
-    Assert.assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), numOperators + 1);
+    assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), numOperators + 1);
   }
 
   @Test
@@ -238,12 +220,11 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(ImmutableList.of(_server));
-    Map<Integer, StageMetadata> stageMetadataMap = Collections.singletonMap(receivedStageId, stageMetadata);
+    List<StageMetadata> metadataList =
+        Arrays.asList(_receivingStageMetadata, _receivingStageMetadata, _receivingStageMetadata);
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 1, senderStageId, new VirtualServerAddress(_server), 1000, 1000,
-            stageMetadataMap, false);
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, metadataList, false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -254,16 +235,14 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, new VirtualServerAddress(_server), 1000,
-            1000, stageMetadataMap, false);
-
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
+            System.currentTimeMillis() + 1000, metadataList, false);
     MailboxReceiveOperator secondStageReceiveOp =
-        new MailboxReceiveOperator(secondStageContext, ImmutableList.of(_server),
-            RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId, receivedStageId + 1, null);
+        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 
-    Assert.assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
-    Assert.assertEquals(opChain.getStats().getOperatorStatsMap().size(), 2);
-    Assert.assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operators.pop().getOperatorId()));
+    assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
+    assertEquals(opChain.getStats().getOperatorStatsMap().size(), 2);
+    assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operators.pop().getOperatorId()));
 
     while (!secondStageReceiveOp.nextBlock().isEndOfStreamBlock()) {
       // Drain the mailbox
@@ -272,10 +251,10 @@ public class OpChainTest {
     while (!operators.isEmpty()) {
       MultiStageOperator operator = operators.pop();
       if (operator.toExplainString().contains("SEND") || operator.toExplainString().contains("LEAF")) {
-        Assert.assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operator.getOperatorId()));
+        assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operator.getOperatorId()));
       }
     }
-    Assert.assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), 2);
+    assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), 2);
   }
 
   private Stack<MultiStageOperator> getFullOpchain(int receivedStageId, int senderStageId,
@@ -285,10 +264,10 @@ public class OpChainTest {
         new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
     //Mailbox Receive Operator
     try {
-      Mockito.when(_mailbox.receive()).thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1}),
+      when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1}),
           TransferableBlockUtils.getEndOfStreamTransferableBlock());
     } catch (Exception e) {
-      Assert.fail("Exception while mocking mailbox receive: " + e.getMessage());
+      fail("Exception while mocking mailbox receive: " + e.getMessage());
     }
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT intCol FROM tbl");
@@ -300,7 +279,7 @@ public class OpChainTest {
     //Transform operator
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
     TransformOperator transformOp =
-        new TransformOperator(context, leafOp, upStreamSchema, ImmutableList.of(ref0), upStreamSchema);
+        new TransformOperator(context, leafOp, upStreamSchema, Collections.singletonList(ref0), upStreamSchema);
 
     //Filter operator
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
@@ -311,10 +290,7 @@ public class OpChainTest {
 
     //Mailbox Send operator
     MailboxSendOperator sendOperator =
-        new MailboxSendOperator(context, dummyWaitOperator, RelDistribution.Type.HASH_DISTRIBUTED, _selector, null,
-            null, false,
-            server -> new JsonMailboxIdentifier("123", "0@from:1", "0@to:2", senderStageId, receivedStageId),
-            _exchangeFactory, receivedStageId);
+        new MailboxSendOperator(context, dummyWaitOperator, _exchange, null, null, false);
 
     operators.push(leafOp);
     operators.push(transformOp);
@@ -323,7 +299,6 @@ public class OpChainTest {
     operators.push(sendOperator);
     return operators;
   }
-
 
   static class DummyMultiStageOperator extends MultiStageOperator {
 

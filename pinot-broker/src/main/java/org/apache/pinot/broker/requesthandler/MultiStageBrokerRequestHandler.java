@@ -21,15 +21,12 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -54,10 +51,8 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -78,7 +73,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final int _reducerPort;
   private final long _defaultBrokerTimeoutMs;
 
-  private final MailboxService<TransferableBlock> _mailboxService;
+  private final MailboxService _mailboxService;
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
 
@@ -93,7 +88,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // use broker ID as host name, but remove the
       String brokerId = brokerIdFromConfig;
       brokerId = brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) ? brokerId.substring(
-          CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : brokerId;
+          CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH) : brokerId;
       brokerId = StringUtils.split(brokerId, "_").length > 1 ? StringUtils.split(brokerId, "_")[0] : brokerId;
       reducerHostname = brokerId;
     }
@@ -109,7 +104,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // it is OK to ignore the onDataAvailable callback because the broker top-level operators
     // always run in-line (they don't have any scheduler)
-    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> {
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, ignored -> {
     });
 
     // TODO: move this to a startUp() function.
@@ -143,9 +138,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
-  private BrokerResponse handleRequest(long requestId, String query,
-      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  private BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
@@ -163,16 +157,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         case EXPLAIN:
           queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
           String plan = queryPlanResult.getExplainPlan();
-          RelNode explainRelRoot = queryPlanResult.getRelRoot();
-          if (!hasTableAccess(requesterIdentity, getTableNamesFromRelRoot(explainRelRoot), requestId, requestContext)) {
+          Set<String> tableNames = queryPlanResult.getTableNames();
+          if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
             return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
           }
 
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions,
-              requestId);
+          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
     } catch (Exception e) {
@@ -183,7 +176,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     QueryPlan queryPlan = queryPlanResult.getQueryPlan();
-    Set<String> tableNames = getTableNamesFromRelRoot(queryPlanResult.getRelRoot());
+    Set<String> tableNames = queryPlanResult.getTableNames();
 
     // Compilation Time. This includes the time taken for parsing, compiling, create stage plans and assigning workers.
     long compilationEndTimeNs = System.nanoTime();
@@ -198,8 +191,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate QPS quota
     if (hasExceededQPSQuota(tableNames, requestId, requestContext)) {
-      String errorMessage =
-          String.format("Request %d: %s exceeds query quota.", requestId, query);
+      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
@@ -209,7 +201,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
-    for (Integer stageId : queryPlan.getStageMetadataMap().keySet()) {
+    for (Integer stageId : queryPlan.getDispatchablePlanMetadataMap().keySet()) {
       stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
     }
 
@@ -288,18 +280,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return false;
   }
 
-  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    return new HashSet<>(RelOptUtil.findAllTableQualifiedNames(relRoot));
-  }
-
-  private void updatePhaseTimingForTables(Set<String> tableNames,
-      BrokerQueryPhase phase, long time) {
+  private void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
     for (String tableName : tableNames) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
     }
   }
-
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();

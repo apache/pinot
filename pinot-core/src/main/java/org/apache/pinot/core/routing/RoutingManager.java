@@ -38,7 +38,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface RoutingManager {
 
   /**
-   * Get all enabled server instances that are available for routing.
+   * Get all enabled server instances in the cluster.
    *
    * @return all currently enabled server instances.
    */
@@ -67,4 +67,12 @@ public interface RoutingManager {
    * @return time boundary info.
    */
   TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName);
+
+  /**
+   * Returns all enabled server instances for a given table's server tenant.
+   *
+   * @param tableNameWithType name of the table with type
+   * @return all enabled servers for a table's server tenant
+   */
+  Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType);
 }

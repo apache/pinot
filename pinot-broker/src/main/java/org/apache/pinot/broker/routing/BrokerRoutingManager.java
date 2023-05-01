@@ -57,6 +57,8 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -102,11 +104,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
 
+  // Map that contains the tableNameWithType as key and the enabled serverInstances that are tagged with the table's
+  // tenant.
+  private final Map<String, Map<String, ServerInstance>> _tableTenantServersMap = new ConcurrentHashMap<>();
+
   private BaseDataAccessor<ZNRecord> _zkDataAccessor;
   private String _externalViewPathPrefix;
   private String _idealStatePathPrefix;
   private String _instanceConfigsPath;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private HelixManager _helixManager;
 
   private Set<String> _routableServers;
 
@@ -125,6 +132,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
+    _helixManager = helixManager;
   }
 
   @Override
@@ -244,7 +252,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         enabledServers.add(instanceId);
 
         // Always refresh the server instance with the latest instance config in case it changes
-        ServerInstance serverInstance = new ServerInstance(new InstanceConfig(instanceConfigZNRecord));
+        InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
+        ServerInstance serverInstance = new ServerInstance(instanceConfig);
         if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
           newEnabledServers.add(instanceId);
 
@@ -252,6 +261,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           if (_excludedServers.remove(instanceId)) {
             LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
           }
+
+          addNewServerToTableTenantServerMap(instanceId, serverInstance, instanceConfig);
         }
       }
     }
@@ -259,6 +270,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (String instance : _enabledServerInstanceMap.keySet()) {
       if (!enabledServers.contains(instance)) {
         newDisabledServers.add(instance);
+        deleteServerFromTableTenantServerMap(instance);
       }
     }
 
@@ -408,6 +420,9 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
+    // Build a mapping from the table to the list of servers assigned to the table's tenant.
+    buildTableTenantServerMap(tableNameWithType, tableConfig);
+
     String idealStatePath = getIdealStatePath(tableNameWithType);
     IdealState idealState = getIdealState(idealStatePath);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
@@ -545,6 +560,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     } else {
       LOGGER.warn("Routing does not exist for table: {}, skipping removing routing", tableNameWithType);
     }
+
+    if (_tableTenantServersMap.remove(tableNameWithType) != null) {
+      LOGGER.info("Removed tenant servers for table: {}", tableNameWithType);
+    }
   }
 
   /**
@@ -601,6 +620,12 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
     return _enabledServerInstanceMap;
+  }
+
+  @Override
+  public Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType) {
+    return _tableTenantServersMap.containsKey(tableNameWithType) ? _tableTenantServersMap.get(tableNameWithType)
+        : new HashMap<String, ServerInstance>();
   }
 
   private String getIdealStatePath(String tableNameWithType) {
@@ -741,6 +766,57 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         return selectionResult;
       } else {
         return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList(), numPrunedSegments);
+      }
+    }
+  }
+
+  private void buildTableTenantServerMap(String tableNameWithType, TableConfig tableConfig) {
+    String serverTag = getServerTagForTable(tableNameWithType, tableConfig);
+    List<InstanceConfig> allInstanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+    List<InstanceConfig> instanceConfigsWithTag = HelixHelper.getInstancesConfigsWithTag(allInstanceConfigs, serverTag);
+    Map<String, ServerInstance> serverInstances = new HashMap<>();
+    for (InstanceConfig serverInstanceConfig : instanceConfigsWithTag) {
+      serverInstances.put(serverInstanceConfig.getInstanceName(), new ServerInstance(serverInstanceConfig));
+    }
+    _tableTenantServersMap.put(tableNameWithType, serverInstances);
+    LOGGER.info("Built map for table={} with {} server instances.", tableNameWithType, serverInstances.size());
+  }
+
+  private void addNewServerToTableTenantServerMap(String instanceId, ServerInstance serverInstance,
+      InstanceConfig instanceConfig) {
+    List<String> tags = instanceConfig.getTags();
+
+    for (Map.Entry<String, Map<String, ServerInstance>> entry : _tableTenantServersMap.entrySet()) {
+      String tableNameWithType = entry.getKey();
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      String tableServerTag = getServerTagForTable(tableNameWithType, tableConfig);
+
+      Map<String, ServerInstance> tenantServerMap = entry.getValue();
+
+      if (!tenantServerMap.containsKey(instanceId) && tags.contains(tableServerTag)) {
+        tenantServerMap.put(instanceId, serverInstance);
+      }
+    }
+  }
+
+  private String getServerTagForTable(String tableNameWithType, TableConfig tableConfig) {
+    String serverTenantName = tableConfig.getTenantConfig().getServer();
+    String serverTag;
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      serverTag = TagNameUtils.getOfflineTagForTenant(serverTenantName);
+    } else {
+      // Realtime table
+      serverTag = TagNameUtils.getRealtimeTagForTenant(serverTenantName);
+    }
+
+    return serverTag;
+  }
+
+
+  private void deleteServerFromTableTenantServerMap(String server) {
+    for (Map.Entry<String, Map<String, ServerInstance>> entry : _tableTenantServersMap.entrySet()) {
+      if (entry.getValue().remove(server) != null) {
+        LOGGER.info("Removing entry for server={}, table={}", server, entry.getKey());
       }
     }
   }

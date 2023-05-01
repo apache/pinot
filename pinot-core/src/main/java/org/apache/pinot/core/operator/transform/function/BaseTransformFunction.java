@@ -101,6 +101,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   protected List<TransformFunction> _arguments;
 
+  protected void fillResultUnknown(int length) {
+    for (int i = 0; i < length; i++) {
+      _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+    }
+  }
+
   // NOTE: this init has to be called for default getNullBitmap() implementation to be effective.
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {

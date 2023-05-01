@@ -28,9 +28,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.query.planner.ExplainPlanStageVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.AbstractStageNode;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
@@ -38,7 +39,6 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.routing.VirtualServer;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -79,7 +79,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   private static void assertGroupBySingletonAfterJoin(QueryPlan queryPlan, boolean shouldRewrite) throws Exception {
-    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
+    for (Map.Entry<Integer, DispatchablePlanMetadata> e : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
       if (e.getValue().getScannedTables().size() == 0 && !PlannerUtils.isRootStage(e.getKey())) {
         StageNode node = queryPlan.getQueryStageMap().get(e.getKey());
         while (node != null) {
@@ -113,25 +113,31 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
-    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 4);
-    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
+    Assert.assertEquals(queryPlan.getDispatchablePlanMetadataMap().size(), 4);
+    for (Map.Entry<Integer, DispatchablePlanMetadata> e : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
       List<String> tables = e.getValue().getScannedTables();
       if (tables.size() == 1) {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("0@Server_localhost_2", "0@Server_localhost_1")
-                : ImmutableList.of("0@Server_localhost_1"));
+            e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
+                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
+            tables.get(0).equals("a") ? ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]")
+                : ImmutableList.of("localhost@{1,1}|[0]"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toSet()),
-            ImmutableSet.of("0@Server_localhost_1", "0@Server_localhost_2"));
+            e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
+                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
+            ImmutableSet.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(VirtualServer::toString).collect(Collectors.toSet()),
-            ImmutableSet.of("0@Server_localhost_3"));
+            e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
+                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
+            ImmutableSet.of("localhost@{3,3}|[0]"));
       }
     }
   }
@@ -142,7 +148,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "WHERE a.col3 >= 0 AND a.col2 IN ('b') AND b.col3 < 0";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     List<StageNode> intermediateStageRoots =
-        queryPlan.getStageMetadataMap().entrySet().stream().filter(e -> e.getValue().getScannedTables().size() == 0)
+        queryPlan.getDispatchablePlanMetadataMap().entrySet().stream()
+            .filter(e -> e.getValue().getScannedTables().size() == 0)
             .map(e -> queryPlan.getQueryStageMap().get(e.getKey())).collect(Collectors.toList());
     // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
     for (StageNode roots : intermediateStageRoots) {
@@ -154,25 +161,24 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryRoutingManagerCompilation() {
     String query = "SELECT * FROM d_OFFLINE";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    List<StageMetadata> tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+    List<DispatchablePlanMetadata> tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 2);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
 
     query = "SELECT * FROM d_REALTIME";
     queryPlan = _queryEnvironment.planQuery(query);
-    tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+    tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "0@Server_localhost_2");
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 1);
 
     query = "SELECT * FROM d";
     queryPlan = _queryEnvironment.planQuery(query);
-    tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+    tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 2);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
   }
 
   // Test that plan query can be run as multi-thread.
@@ -233,19 +239,21 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "SELECT /*+ aggFinalStage */ col1, COUNT(*) FROM b GROUP BY col1";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     Assert.assertEquals(queryPlan.getQueryStageMap().size(), 2);
-    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 2);
-    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
+    Assert.assertEquals(queryPlan.getDispatchablePlanMetadataMap().size(), 2);
+    for (Map.Entry<Integer, DispatchablePlanMetadata> e : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
       List<String> tables = e.getValue().getScannedTables();
       if (tables.size() != 0) {
         // table scan stages; for tableB it should have only 1
-        Assert.assertEquals(e.getValue().getServerInstances().stream()
-                .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
-            ImmutableList.of("0@Server_localhost_1"));
+        Assert.assertEquals(e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
+                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
+            ImmutableList.of("localhost@{1,1}|[0]"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
-        Assert.assertEquals(e.getValue().getServerInstances().stream()
-                .map(VirtualServer::toString).sorted().collect(Collectors.toList()),
-            ImmutableList.of("0@Server_localhost_1", "0@Server_localhost_2"));
+        Assert.assertEquals(e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
+                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
+            ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       }
     }
   }

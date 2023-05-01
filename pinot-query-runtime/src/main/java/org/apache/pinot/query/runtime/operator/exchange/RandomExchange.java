@@ -36,19 +36,18 @@ class RandomExchange extends BlockExchange {
 
   private final IntFunction<Integer> _rand;
 
-  RandomExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
+  RandomExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
     this(sendingMailboxes, RANDOM::nextInt, splitter);
   }
 
   @VisibleForTesting
-  RandomExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, IntFunction<Integer> rand,
-      BlockSplitter splitter) {
+  RandomExchange(List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand, BlockSplitter splitter) {
     super(sendingMailboxes, splitter);
     _rand = rand;
   }
 
   @Override
-  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+  protected void route(List<SendingMailbox> destinations, TransferableBlock block)
       throws Exception {
     int destinationIdx = _rand.apply(destinations.size());
     sendBlock(destinations.get(destinationIdx), block);

@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.List;
+import java.util.Set;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
@@ -66,7 +67,7 @@ public class StagePlanner {
    * @param relRoot relational plan root.
    * @return dispatchable plan.
    */
-  public QueryPlan makePlan(RelRoot relRoot) {
+  public QueryPlan makePlan(RelRoot relRoot, Set<String> tableNames) {
     RelNode relRootNode = relRoot.rel;
     // Stage ID starts with 1, 0 will be reserved for ROOT stage.
     _stageIdCounter = 1;
@@ -85,11 +86,10 @@ public class StagePlanner {
             RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, globalSenderNode);
 
     // perform physical plan conversion and assign workers to each stage.
-    DispatchablePlanContext physicalPlanContext = new DispatchablePlanContext(
-        _workerManager, _requestId, _plannerContext, relRoot.fields
-    );
-    DispatchablePlanVisitor.INSTANCE.constructDispatchablePlan(globalReceiverNode, physicalPlanContext);
-    QueryPlan queryPlan = physicalPlanContext.getQueryPlan();
+    DispatchablePlanContext dispatchablePlanContext = new DispatchablePlanContext(_workerManager, _requestId,
+        _plannerContext, relRoot.fields, tableNames);
+    QueryPlan queryPlan = DispatchablePlanVisitor.INSTANCE.constructDispatchablePlan(globalReceiverNode,
+        dispatchablePlanContext);
 
     // Run physical optimizations
     runPhysicalOptimizers(queryPlan);

@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SetOpNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
@@ -40,75 +41,101 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   }
 
   /**
-   * Entry point
-   * @param globalReceiverNode
-   * @param physicalPlanContext
+   * Entry point for attaching dispatch metadata to a query plan. It walks through the plan via the global
+   * {@link StageNode} root of the query and:
+   * <ul>
+   *   <li>break down the {@link StageNode}s into Stages that can run on a single worker.</li>
+   *   <li>each stage is represented by a subset of {@link StageNode}s without data exchange.</li>
+   *   <li>attach worker execution information including physical server address, worker ID to each stage.</li>
+   * </ul>
+   *
+   * @param globalReceiverNode the entrypoint of the stage plan.
+   * @param dispatchablePlanContext dispatchable plan context used to record the walk of the stage node tree.
    */
-  public void constructDispatchablePlan(StageNode globalReceiverNode, DispatchablePlanContext physicalPlanContext) {
-    globalReceiverNode.visit(DispatchablePlanVisitor.INSTANCE, physicalPlanContext);
-    // special case for the global mailbox receive node
-    physicalPlanContext.getQueryPlan().getQueryStageMap().put(0, globalReceiverNode);
-    computeWorkerAssignment(globalReceiverNode, physicalPlanContext);
+  public QueryPlan constructDispatchablePlan(StageNode globalReceiverNode,
+      DispatchablePlanContext dispatchablePlanContext) {
+    // 1. start by visiting the stage root.
+    globalReceiverNode.visit(DispatchablePlanVisitor.INSTANCE, dispatchablePlanContext);
+    // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
+    dispatchablePlanContext.getDispatchablePlanStageRootMap().put(0, globalReceiverNode);
+    // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
+    computeWorkerAssignment(globalReceiverNode, dispatchablePlanContext);
+    // 4. convert it into query plan.
+    return finalizeQueryPlan(dispatchablePlanContext);
   }
 
-  private StageMetadata getStageMetadata(StageNode node, DispatchablePlanContext context) {
-    return context.getQueryPlan().getStageMetadataMap().computeIfAbsent(
-        node.getStageId(), (id) -> new StageMetadata());
+  private static QueryPlan finalizeQueryPlan(DispatchablePlanContext dispatchablePlanContext) {
+    return new QueryPlan(dispatchablePlanContext.getResultFields(),
+        dispatchablePlanContext.getDispatchablePlanStageRootMap(),
+        dispatchablePlanContext.getDispatchablePlanMetadataMap());
   }
 
-  private void computeWorkerAssignment(StageNode node, DispatchablePlanContext context) {
+  private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(StageNode node,
+      DispatchablePlanContext context) {
+    return context.getDispatchablePlanMetadataMap().computeIfAbsent(node.getStageId(),
+        (id) -> new DispatchablePlanMetadata());
+  }
+
+  private static void computeWorkerAssignment(StageNode node, DispatchablePlanContext context) {
     int stageId = node.getStageId();
-    context.getWorkerManager().assignWorkerToStage(stageId, context.getQueryPlan().getStageMetadataMap().get(stageId),
-        context.getRequestId(), context.getPlannerContext().getOptions());
+    context.getWorkerManager().assignWorkerToStage(stageId, context.getDispatchablePlanMetadataMap().get(stageId),
+        context.getRequestId(), context.getPlannerContext().getOptions(), context.getTableNames());
   }
 
   @Override
   public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    StageMetadata stageMetadata = getStageMetadata(node, context);
-    stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
     return null;
   }
 
   @Override
   public Void visitWindow(WindowNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    StageMetadata stageMetadata = getStageMetadata(node, context);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
     // TODO: Figure out a way to parallelize Empty OVER() and OVER(ORDER BY) so the computation can be done across
     //       multiple nodes.
     // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
     // distributed as no global ordering is required across partitions.
-    stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
+    return null;
+  }
+
+  @Override
+  public Void visitSetOp(SetOpNode setOpNode, DispatchablePlanContext context) {
+    setOpNode.getInputs().forEach(input -> input.visit(this, context));
+    getOrCreateDispatchablePlanMetadata(setOpNode, context);
     return null;
   }
 
   @Override
   public Void visitFilter(FilterNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitJoin(JoinNode node, DispatchablePlanContext context) {
     node.getInputs().forEach(join -> join.visit(this, context));
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, DispatchablePlanContext context) {
     node.getSender().visit(this, context);
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
 
-    context.getQueryPlan().getQueryStageMap().put(node.getStageId(), node);
+    context.getDispatchablePlanStageRootMap().put(node.getStageId(), node);
     computeWorkerAssignment(node, context);
     return null;
   }
@@ -116,28 +143,28 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
   @Override
   public Void visitProject(ProjectNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    StageMetadata stageMetadata = getStageMetadata(node, context);
-    stageMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
     return null;
   }
 
   @Override
   public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
-    StageMetadata stageMetadata = getStageMetadata(node, context);
-    stageMetadata.addScannedTable(node.getTableName());
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.addScannedTable(node.getTableName());
     return null;
   }
 
   @Override
   public Void visitValue(ValueNode node, DispatchablePlanContext context) {
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 }

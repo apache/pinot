@@ -35,6 +35,7 @@ import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
@@ -201,7 +202,14 @@ public class SegmentConversionUtils {
   }
 
   public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
-      int socketTimeoutMs, @Nullable AuthProvider authProvider)
+      int socketTimeoutMs, @Nullable AuthProvider authProvider) throws Exception {
+    endSegmentReplace(tableNameWithType, uploadURL, null, segmentLineageEntryId,
+        socketTimeoutMs, authProvider);
+  }
+
+  public static void endSegmentReplace(String tableNameWithType, String uploadURL,
+      @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest, String segmentLineageEntryId, int socketTimeoutMs,
+      @Nullable AuthProvider authProvider)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -209,9 +217,11 @@ public class SegmentConversionUtils {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       URI uri = FileUploadDownloadClient
           .getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
-      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, authProvider);
-      LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURL: {}",
-          response.getStatusCode(), response.getResponse(), tableNameWithType, uploadURL);
+      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs,
+          endReplaceSegmentsRequest, authProvider);
+      LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURL: {}, request:"
+              + " {}", response.getStatusCode(), response.getResponse(), tableNameWithType, uploadURL,
+          endReplaceSegmentsRequest);
     }
   }
 }

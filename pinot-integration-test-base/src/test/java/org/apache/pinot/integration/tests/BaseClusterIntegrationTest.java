@@ -262,7 +262,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  protected QueryConfig getQueryconfig() {
+  protected QueryConfig getQueryConfig() {
     // Enable groovy for tables used in the tests
     return new QueryConfig(null, false, null, null);
   }
@@ -318,7 +318,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
@@ -389,7 +389,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
@@ -598,11 +598,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true);
-  }
-
-  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
-    waitForDocsLoaded(timeoutMs, raiseError, getTableName());
+    waitForDocsLoaded(timeoutMs, true, getTableName());
   }
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
@@ -617,7 +613,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           return null;
         }
       }
-    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", raiseError);
+    }, 100L, timeoutMs, String.format("Failed to load %d documents", countStarResult), raiseError);
   }
 
   /**
