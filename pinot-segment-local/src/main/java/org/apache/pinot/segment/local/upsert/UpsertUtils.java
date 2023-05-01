@@ -25,6 +25,8 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.PeekableIntIterator;
@@ -177,10 +179,15 @@ public class UpsertUtils {
 
   public static class MultiComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
     private final PinotSegmentColumnReader[] _comparisonColumnReaders;
+    private final NullValueVectorReader[] _comparisonColumnNullReaders;
 
     public MultiComparisonColumnReader(IndexSegment segment, List<String> comparisonColumns) {
       _comparisonColumnReaders = new PinotSegmentColumnReader[comparisonColumns.size()];
+      _comparisonColumnNullReaders = new NullValueVectorReader[comparisonColumns.size()];
+
       for (int i = 0; i < comparisonColumns.size(); i++) {
+        DataSource dataSource = segment.getDataSource(comparisonColumns.get(i));
+        _comparisonColumnNullReaders[i] = dataSource.getNullValueVector();
         _comparisonColumnReaders[i] = new PinotSegmentColumnReader(segment, comparisonColumns.get(i));
       }
     }
@@ -188,15 +195,19 @@ public class UpsertUtils {
     public Comparable getComparisonValue(int docId) {
       Comparable[] comparisonColumns = new Comparable[_comparisonColumnReaders.length];
 
+      int comparisonIndex = -1;
       for (int i = 0; i < _comparisonColumnReaders.length; i++) {
         PinotSegmentColumnReader columnReader = _comparisonColumnReaders[i];
         Comparable comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
         comparisonColumns[i] = comparisonValue;
+        if (!_comparisonColumnNullReaders[i].isNull(docId)) {
+          comparisonIndex = i;
+        }
       }
 
       // Note that the comparable index is negative here to indicate that this instance could be the argument to
       // ComparisonColumns#compareTo, but should never call compareTo itself.
-      return new ComparisonColumns(comparisonColumns, -1);
+      return new ComparisonColumns(comparisonColumns, comparisonIndex);
     }
 
     @Override
