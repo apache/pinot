@@ -149,5 +149,4 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
         "-action should be either extractFilterColumns or generateData or generateQueries. Please use the -help "
             + "option to see usage examples");
   }
-
 }

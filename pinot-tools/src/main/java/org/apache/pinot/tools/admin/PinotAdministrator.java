@@ -22,7 +22,6 @@ import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.Versions;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
@@ -94,8 +93,6 @@ import picocli.CommandLine;
 public class PinotAdministrator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdministrator.class);
   private static final Map<String, Command> SUBCOMMAND_MAP = new HashMap<>();
-
-  private Utils utils;
 
   static {
     SUBCOMMAND_MAP.put("QuickStart", new QuickStartCommand());

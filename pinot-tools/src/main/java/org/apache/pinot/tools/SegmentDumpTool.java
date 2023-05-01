@@ -162,5 +162,4 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
     dump();
     return true;
   }
-
 }

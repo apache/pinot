@@ -30,8 +30,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "ChangeTableState", description = "Change the state (enable|disable|drop) of Pinot table"
-    , mixinStandardHelpOptions = true)
+@CommandLine.Command(name = "ChangeTableState", description = "Change the state (enable|disable|drop) of Pinot table",
+    mixinStandardHelpOptions = true)
 public class ChangeTableState extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChangeTableState.class);
 

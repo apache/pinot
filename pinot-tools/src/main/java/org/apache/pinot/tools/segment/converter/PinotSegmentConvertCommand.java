@@ -150,5 +150,4 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
       FileUtils.deleteQuietly(tempDir);
     }
   }
-
 }

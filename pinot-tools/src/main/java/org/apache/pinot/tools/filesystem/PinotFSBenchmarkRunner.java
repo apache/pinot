@@ -72,5 +72,4 @@ public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Comma
     }
     return true;
   }
-
 }

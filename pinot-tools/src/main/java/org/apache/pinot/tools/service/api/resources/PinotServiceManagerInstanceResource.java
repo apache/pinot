@@ -78,8 +78,7 @@ public class PinotServiceManagerInstanceResource {
   @Path("/instances")
   @ApiOperation(value = "Get Pinot Instances Status")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Instance Status"),
-      @ApiResponse(code = 500, message = "Internal server error")
+      @ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 500, message = "Internal server error")
   })
   public Map<String, PinotInstanceStatus> getPinotAllInstancesStatus() {
     Map<String, PinotInstanceStatus> results = new HashMap<>();
@@ -94,8 +93,7 @@ public class PinotServiceManagerInstanceResource {
   @Path("/instances/{instanceName}")
   @ApiOperation(value = "Get Pinot Instance Status")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Instance Status"),
-      @ApiResponse(code = 404, message = "Instance Not Found"),
+      @ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 404, message = "Instance Not Found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public PinotInstanceStatus getPinotInstanceStatus(
@@ -138,7 +136,10 @@ public class PinotServiceManagerInstanceResource {
   @Path("/instances/{role}")
   @ApiOperation(value = "Start a Pinot instance")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Pinot instance is started"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Pinot Role Not Found"), @ApiResponse(code = 500, message = "Internal Server Error")
+      @ApiResponse(code = 200, message = "Pinot instance is started"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Pinot Role Not Found"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public PinotInstanceStatus startPinotInstance(
       @ApiParam(value = "A Role of Pinot Instance to start: CONTROLLER/BROKER/SERVER/MINION") @PathParam("role")
