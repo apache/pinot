@@ -1779,7 +1779,7 @@ public class TableConfigUtilsTest {
 
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME).setInstanceAssignmentConfigMap(
-            ImmutableMap.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig)).build();
+            ImmutableMap.of(TableType.OFFLINE.toString(), instanceAssignmentConfig)).build();
     invalidTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
     try {
