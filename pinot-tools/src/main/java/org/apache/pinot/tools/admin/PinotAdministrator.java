@@ -164,10 +164,10 @@ public class PinotAdministrator {
 
   public void execute(String[] args) {
     try {
-      var commandLine = new CommandLine(this);
+      CommandLine commandLine = new CommandLine(this);
       this.getSubCommands().forEach(commandLine::addSubcommand);
       commandLine.setOut(new PrintWriter(_outWriter));
-      var parseResult = commandLine.parseArgs(args);
+      CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
       if (parseResult.hasSubcommand()) {
         _status = commandLine.execute(args);
       } else {
@@ -201,7 +201,8 @@ public class PinotAdministrator {
   public void printUsage(PrintWriter printWriter) {
     printWriter.println("Usage: pinot-admin.sh <subCommand>");
     printWriter.println("Valid subCommands are:");
-    var maxCommandLength = this.getSubCommands().keySet().stream().mapToInt(String::length).max().orElseThrow();
+    int maxCommandLength = this.getSubCommands().keySet().stream().mapToInt(String::length).max()
+        .orElseThrow(() -> new IllegalArgumentException("Unable to print usage, missing SubCommand"));
     for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
       printWriter.println(String.format("\t%" + maxCommandLength + "s\t:" + subCommand.getValue().getDescription(),
           subCommand.getKey()));
@@ -215,7 +216,7 @@ public class PinotAdministrator {
 
   public static void main(String[] args) {
     PluginManager.get().init();
-    var pinotAdministrator = new PinotAdministrator(new PrintWriter(System.out, true), new Versions());
+    PinotAdministrator pinotAdministrator = new PinotAdministrator(new PrintWriter(System.out, true), new Versions());
     pinotAdministrator.execute(args);
     if ((pinotAdministrator._status != 0) && Boolean.parseBoolean(
         System.getProperties().getProperty("pinot.admin.system.exit"))) {
