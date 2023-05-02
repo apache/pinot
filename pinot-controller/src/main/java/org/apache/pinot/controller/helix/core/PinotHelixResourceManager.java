@@ -112,12 +112,15 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
+import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import org.apache.pinot.controller.ControllerConf;
@@ -3170,13 +3173,68 @@ public class PinotHelixResourceManager {
     }
     String rebalanceJobId = rebalanceConfig.getString(RebalanceConfigConstants.JOB_ID);
     Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig ");
+    if (rebalanceConfig.getBoolean(RebalanceConfigConstants.UPDATE_TARGET_TIER,
+        RebalanceConfigConstants.DEFAULT_UPDATE_TARGET_TIER)) {
+      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
+    }
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId, this);
     }
     TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver);
-    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
-    return rebalanceResult;
+    return tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+  }
+
+  /**
+   * Calculate the target tier the segment belongs to and set it in segment ZK metadata as goal state, which can be
+   * checked by servers when loading the segment to put it onto the target storage tier.
+   */
+  @VisibleForTesting
+  void updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
+    List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
+    List<Tier> sortedTiers = tierCfgs == null ? Collections.emptyList()
+        : TierConfigUtils.getSortedTiers(tierCfgs, _helixZkManager);
+    LOGGER.info("For rebalanceId: {}, updating target tiers for segments of table: {} with tierConfigs: {}",
+        rebalanceJobId, tableNameWithType, sortedTiers);
+    for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
+      updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+    }
+  }
+
+  private void updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
+    ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (segmentMetadataZNRecord == null) {
+      LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+      return;
+    }
+    Tier targetTier = null;
+    for (Tier tier : sortedTiers) {
+      TierSegmentSelector tierSegmentSelector = tier.getSegmentSelector();
+      if (tierSegmentSelector.selectSegment(tableNameWithType, segmentName)) {
+        targetTier = tier;
+        break;
+      }
+    }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZNRecord);
+    String targetTierName = null;
+    if (targetTier == null) {
+      if (segmentZKMetadata.getTier() == null) {
+        LOGGER.debug("Segment: {} of table: {} is already set to go to default tier", segmentName, tableNameWithType);
+        return;
+      }
+      LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
+    } else {
+      targetTierName = targetTier.getName();
+      if (targetTierName.equals(segmentZKMetadata.getTier())) {
+        LOGGER.debug("Segment: {} of table: {} is already set to go to target tier: {}", segmentName, tableNameWithType,
+            targetTierName);
+        return;
+      }
+      LOGGER.info("Segment: {} of table: {} is put onto new tier: {}", segmentName, tableNameWithType, targetTierName);
+    }
+    // Update the tier in segment ZK metadata and write it back to ZK.
+    segmentZKMetadata.setTier(targetTierName);
+    updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
   }
 
   /**
