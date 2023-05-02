@@ -71,9 +71,7 @@ public class SegmentUtilsTest {
 
   @Test
   public void testGetPartitionColumnWithoutAnyConfig() {
-    Map<String, InstanceAssignmentConfig> configMap = new HashMap<>();
-    configMap.put(TableType.REALTIME.toString(), _instanceAssignmentConfig);
-
+    // without instanceAssignmentConfigMap
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
     Assert.assertNull(SegmentUtils.getPartitionColumn(tableConfig));
@@ -81,12 +79,10 @@ public class SegmentUtilsTest {
 
   @Test
   public void testGetPartitionColumnWithReplicaGroupConfig() {
-    Map<String, InstanceAssignmentConfig> configMap = new HashMap<>();
-    configMap.put(TableType.REALTIME.toString(), _instanceAssignmentConfig);
-
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
 
+    // setting up ReplicaGroupStrategyConfig for backward compatibility test.
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     tableConfig.setValidationConfig(validationConfig);
