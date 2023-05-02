@@ -78,7 +78,8 @@ public class MutableSegmentDedupeTest {
     TableConfig tableConfig = Mockito.mock(TableConfig.class);
     Mockito.when(tableConfig.getTableName()).thenReturn("testTable_REALTIME");
     Mockito.when(tableConfig.getDedupConfig()).thenReturn(new DedupConfig(true, HashFunction.NONE));
-    return TableDedupMetadataManagerFactory.create(tableConfig, schema, Mockito.mock(TableDataManager.class), Mockito.mock(ServerMetrics.class));
+    return TableDedupMetadataManagerFactory.create(tableConfig, schema, Mockito.mock(TableDataManager.class),
+        Mockito.mock(ServerMetrics.class));
   }
 
   @Test
