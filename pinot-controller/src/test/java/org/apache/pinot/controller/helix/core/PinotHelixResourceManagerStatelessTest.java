@@ -547,6 +547,13 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertThrows(InvalidTableConfigException.class,
         () -> _helixResourceManager.validateTableTenantConfig(offlineTableConfig));
 
+    // A null serverTag has no instances associated with it, so it's invalid.
+    tierConfig = new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+        TierFactory.PINOT_SERVER_STORAGE_TYPE, null, null, null);
+    offlineTableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
+    assertThrows(InvalidTableConfigException.class,
+        () -> _helixResourceManager.validateTableTenantConfig(offlineTableConfig));
+
     // Valid serverTag in tierConfigs
     tierConfig = new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
         TierFactory.PINOT_SERVER_STORAGE_TYPE, SERVER_TENANT_NAME + "_OFFLINE", null, null);
