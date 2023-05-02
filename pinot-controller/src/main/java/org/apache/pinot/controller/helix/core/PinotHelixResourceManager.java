@@ -1642,6 +1642,17 @@ public class PinotHelixResourceManager {
             "Failed to find instances with tag: " + tag + " for table: " + tableNameWithType);
       }
     }
+    // Check if serverTags as configured in tierConfigs are valid.
+    List<TierConfig> tierConfigList = tableConfig.getTierConfigsList();
+    if (CollectionUtils.isNotEmpty(tierConfigList)) {
+      for (TierConfig tierConfig : tierConfigList) {
+        if (getInstancesWithTag(tierConfig.getServerTag()).isEmpty()) {
+          throw new InvalidTableConfigException(
+              String.format("Failed to find instances with tag: %s as used by tier: %s for table: %s",
+                  tierConfig.getServerTag(), tierConfig.getName(), tableNameWithType));
+        }
+      }
+    }
   }
 
   public boolean setZKData(String path, ZNRecord record, int expectedVersion, int accessOption) {
