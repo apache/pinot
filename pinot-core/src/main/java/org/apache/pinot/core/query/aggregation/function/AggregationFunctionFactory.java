@@ -185,6 +185,7 @@ public class AggregationFunctionFactory {
           if (remainingFunctionName.equals("RAWKLLMV")) {
             // PercentileRawKLLMV
             return new PercentileRawKLLMVAggregationFunction(firstArgument, percentile);
+          }
         } else if (numArguments == 3) {
           // Triple arguments percentile (e.g. percentileTDigest(bar, 95, 1000), etc.) where the
           // second argument is a decimal number from 0.0 to 100.0 and third argument is a decimal number indicating
