@@ -51,7 +51,6 @@ public class StarTreeQueryGenerator {
   private static final int MAX_NUM_GROUP_BYS = 3;
   private static final int MAX_NUM_IN_VALUES = 5;
   private static final int SHUFFLE_THRESHOLD = 5 * MAX_NUM_IN_VALUES;
-  private static final Random RANDOM = new Random();
   // Add more comparators here to generate them in the 'WHERE' clause.
   private static final List<String> COMPARATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
 
@@ -60,14 +59,16 @@ public class StarTreeQueryGenerator {
   private final List<String> _metricColumns;
   private final Map<String, List<Object>> _singleValueDimensionValuesMap;
   private final List<String> _aggregationFunctions;
+  private final Random _random;
 
   public StarTreeQueryGenerator(String tableName, List<String> singleValueDimensionColumns, List<String> metricColumns,
-      Map<String, List<Object>> singleValueDimensionValuesMap, List<String> aggregationFunctions) {
+      Map<String, List<Object>> singleValueDimensionValuesMap, List<String> aggregationFunctions, Random random) {
     _tableName = tableName;
     _singleValueDimensionColumns = singleValueDimensionColumns;
     _metricColumns = metricColumns;
     _singleValueDimensionValuesMap = singleValueDimensionValuesMap;
     _aggregationFunctions = aggregationFunctions;
+    _random = random;
   }
 
   /**
@@ -77,7 +78,7 @@ public class StarTreeQueryGenerator {
    * @return aggregation function.
    */
   private String generateAggregation(String metricColumn) {
-    return String.format("%s(%s)", _aggregationFunctions.get(RANDOM.nextInt(_aggregationFunctions.size())),
+    return String.format("%s(%s)", _aggregationFunctions.get(_random.nextInt(_aggregationFunctions.size())),
         metricColumn);
   }
 
@@ -87,11 +88,11 @@ public class StarTreeQueryGenerator {
    * @return aggregation section.
    */
   private String generateAggregations() {
-    int numAggregations = RANDOM.nextInt(MAX_NUM_AGGREGATIONS) + 1;
+    int numAggregations = _random.nextInt(MAX_NUM_AGGREGATIONS) + 1;
     int numMetrics = _metricColumns.size();
     String[] aggregations = new String[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
-      aggregations[i] = generateAggregation(_metricColumns.get(RANDOM.nextInt(numMetrics)));
+      aggregations[i] = generateAggregation(_metricColumns.get(_random.nextInt(numMetrics)));
     }
     return StringUtils.join(aggregations, ", ");
   }
@@ -105,10 +106,10 @@ public class StarTreeQueryGenerator {
   private String generateComparisonPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
 
-    stringBuilder.append(' ').append(COMPARATORS.get(RANDOM.nextInt(COMPARATORS.size()))).append(' ');
+    stringBuilder.append(' ').append(COMPARATORS.get(_random.nextInt(COMPARATORS.size()))).append(' ');
 
     List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
-    Object value = valueArray.get(RANDOM.nextInt(valueArray.size()));
+    Object value = valueArray.get(_random.nextInt(valueArray.size()));
     if (value instanceof String) {
       stringBuilder.append('\'').append(((String) value).replaceAll("'", "''")).append('\'');
     } else {
@@ -128,8 +129,8 @@ public class StarTreeQueryGenerator {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn).append(BETWEEN);
 
     List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
-    Object value1 = valueArray.get(RANDOM.nextInt(valueArray.size()));
-    Object value2 = valueArray.get(RANDOM.nextInt(valueArray.size()));
+    Object value1 = valueArray.get(_random.nextInt(valueArray.size()));
+    Object value2 = valueArray.get(_random.nextInt(valueArray.size()));
 
     Preconditions.checkState((value1 instanceof String && value2 instanceof String) || (value1 instanceof Number
         && value2 instanceof Number));
@@ -163,7 +164,7 @@ public class StarTreeQueryGenerator {
    */
   private String generateInPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
-    if (RANDOM.nextBoolean()) {
+    if (_random.nextBoolean()) {
       stringBuilder.append(IN).append('(');
     } else {
       stringBuilder.append(NOT_IN).append('(');
@@ -171,7 +172,7 @@ public class StarTreeQueryGenerator {
 
     List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
     int size = valueArray.size();
-    int numValues = Math.min(RANDOM.nextInt(MAX_NUM_IN_VALUES) + 1, size);
+    int numValues = Math.min(_random.nextInt(MAX_NUM_IN_VALUES) + 1, size);
     if (size < SHUFFLE_THRESHOLD) {
       // For smaller size values, use shuffle strategy.
       Collections.shuffle(valueArray);
@@ -190,7 +191,7 @@ public class StarTreeQueryGenerator {
       // For larger size values, use random indices strategy.
       Set<Integer> indices = new HashSet<>();
       while (indices.size() < numValues) {
-        indices.add(RANDOM.nextInt(size));
+        indices.add(_random.nextInt(size));
       }
       boolean isFirst = true;
       for (int index : indices) {
@@ -218,7 +219,7 @@ public class StarTreeQueryGenerator {
    */
   @Nullable
   private String generatePredicates() {
-    int numPredicates = RANDOM.nextInt(MAX_NUM_PREDICATES + 1);
+    int numPredicates = _random.nextInt(MAX_NUM_PREDICATES + 1);
     if (numPredicates == 0) {
       return null;
     }
@@ -230,8 +231,8 @@ public class StarTreeQueryGenerator {
       if (i != 0) {
         stringBuilder.append(AND);
       }
-      String dimensionName = _singleValueDimensionColumns.get(RANDOM.nextInt(numDimensions));
-      switch (RANDOM.nextInt(3)) {
+      String dimensionName = _singleValueDimensionColumns.get(_random.nextInt(numDimensions));
+      switch (_random.nextInt(3)) {
         case 0:
           stringBuilder.append(generateComparisonPredicate(dimensionName));
           break;
@@ -251,7 +252,7 @@ public class StarTreeQueryGenerator {
    * Randomly generate the group-by columns, may return {@code null}.
    */
   private String generateGroupByColumns() {
-    int numColumns = RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1);
+    int numColumns = _random.nextInt(MAX_NUM_GROUP_BYS + 1);
     if (numColumns == 0) {
       return null;
     }
