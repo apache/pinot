@@ -749,7 +749,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       throws Exception {
     TierConfig tierConfig =
         new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Collections.singletonList("testSegment"),
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null);
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, SERVER_TENANT_NAME + "_OFFLINE", null, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setTierConfigList(Collections.singletonList(tierConfig)).setServerTenant(SERVER_TENANT_NAME).build();
