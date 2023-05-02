@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.stage.AbstractStageNode;
 import org.apache.pinot.query.planner.stage.StageNodeSerDeUtils;
-import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -87,26 +87,39 @@ public class QueryPlanSerDeUtils {
     }
     builder.setWorkerMetadataList(workerMetadataList);
     builder.putAllCustomProperties(protoStageMetadata.getCustomPropertyMap());
-    Map<Integer, List<MailboxInfo>> mailboxInfoMap = new HashMap<>();
-    for (Map.Entry<Integer, Worker.StageMailboxInfo> entry : protoStageMetadata.getStageMailboxInfoMapMap()
-        .entrySet()) {
-      List<MailboxInfo> mailboxInfoList = new ArrayList<>();
-      for (Worker.MailboxInfo protoMailboxInfo : entry.getValue().getMailboxInfoList()) {
-        mailboxInfoList.add(new MailboxInfo(protoMailboxInfo.getMailboxId(), protoMailboxInfo.getMailboxType(),
-            protoMailboxInfo.getMailboxHost(), protoMailboxInfo.getMailboxPort(),
-            protoMailboxInfo.getCustomPropertyMap()));
-      }
-      mailboxInfoMap.put(entry.getKey(), mailboxInfoList);
-    }
-    builder.setMailBoxInfosMap(mailboxInfoMap);
     return builder.build();
   }
 
   private static WorkerMetadata fromProtoWorkerMetadata(Worker.WorkerMetadata protoWorkerMetadata) {
     WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
     builder.setVirtualServerAddress(protoToAddress(protoWorkerMetadata.getVirtualAddress()));
+    builder.putAllMailBoxInfosMap(fromProtoMailboxMetadataMap(protoWorkerMetadata.getMailboxMetadataMap()));
     builder.putAllCustomProperties(protoWorkerMetadata.getCustomPropertyMap());
     return builder.build();
+  }
+
+  private static Map<Integer, List<MailboxMetadata>> fromProtoMailboxMetadataMap(
+      Map<Integer, Worker.MailboxMetadata> mailboxMetadataMap) {
+    Map<Integer, List<MailboxMetadata>> mailboxMap = new HashMap<>();
+    for (Map.Entry<Integer, Worker.MailboxMetadata> entry : mailboxMetadataMap.entrySet()) {
+      mailboxMap.put(entry.getKey(), fromProtoMailbox(entry.getValue()));
+    }
+    return mailboxMap;
+  }
+
+  private static List<MailboxMetadata> fromProtoMailbox(Worker.MailboxMetadata mailboxMetadata) {
+    List<MailboxMetadata> mailboxMetadataList = new ArrayList<>();
+    for (int i = 0; i < mailboxMetadata.getMailboxIdCount(); i++) {
+      String mailboxId = mailboxMetadata.getMailboxId(i);
+      Map<String, String> customPropertyMap = new HashMap<>();
+      for (Map.Entry<String, String> entry : mailboxMetadata.getCustomPropertyMap().entrySet()) {
+        if (entry.getKey().startsWith(mailboxId)) {
+          customPropertyMap.put(fromMailboxCustomPropertiesKeyPrefix(mailboxId, entry.getKey()), entry.getValue());
+        }
+      }
+      mailboxMetadataList.add(new MailboxMetadata(mailboxId, mailboxMetadata.getVirtualAddress(i), customPropertyMap));
+    }
+    return mailboxMetadataList;
   }
 
   private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {
@@ -121,7 +134,37 @@ public class QueryPlanSerDeUtils {
   private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata) {
     Worker.WorkerMetadata.Builder builder = Worker.WorkerMetadata.newBuilder();
     builder.setVirtualAddress(addressToProto(workerMetadata.getVirtualServerAddress()));
+    builder.putAllMailboxMetadata(toProtoMailboxMap(workerMetadata.getMailBoxInfosMap()));
     builder.putAllCustomProperty(workerMetadata.getCustomProperties());
     return builder.build();
+  }
+
+  private static Map<Integer, Worker.MailboxMetadata> toProtoMailboxMap(
+      Map<Integer, List<MailboxMetadata>> mailBoxInfosMap) {
+    Map<Integer, Worker.MailboxMetadata> mailboxMetadataMap = new HashMap<>();
+    for (Map.Entry<Integer, List<MailboxMetadata>> entry : mailBoxInfosMap.entrySet()) {
+      mailboxMetadataMap.put(entry.getKey(), toProtoMailbox(entry.getValue()));
+    }
+    return mailboxMetadataMap;
+  }
+
+  private static Worker.MailboxMetadata toProtoMailbox(List<MailboxMetadata> mailboxMetadataList) {
+    Worker.MailboxMetadata.Builder builder = Worker.MailboxMetadata.newBuilder();
+    for (MailboxMetadata mailboxMetadata : mailboxMetadataList) {
+      builder.addMailboxId(mailboxMetadata.getMailBoxId());
+      builder.addVirtualAddress(mailboxMetadata.getVirtualAddress().toString());
+      mailboxMetadata.getCustomProperties().entrySet().stream().forEach(
+          entry -> builder.putCustomProperty(
+              toMailboxCustomPropertiesKeyPrefix(mailboxMetadata.getMailBoxId(), entry.getKey()), entry.getValue()));
+    }
+    return builder.build();
+  }
+
+  private static String toMailboxCustomPropertiesKeyPrefix(String mailBoxId, String key) {
+    return String.format("%s.%s", mailBoxId, key);
+  }
+
+  private static String fromMailboxCustomPropertiesKeyPrefix(String mailBoxId, String key) {
+    return key.split(mailBoxId + "\\.")[1];
   }
 }

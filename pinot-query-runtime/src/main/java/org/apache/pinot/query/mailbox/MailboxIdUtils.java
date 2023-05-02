@@ -20,7 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
@@ -43,7 +43,7 @@ public class MailboxIdUtils {
     return new OpChainId(Long.parseLong(parts[0]), Integer.parseInt(parts[4]), Integer.parseInt(parts[3]));
   }
 
-  public static String toMailboxId(long requestId, MailboxInfo mailboxInfo) {
-    return Long.toString(requestId) + SEPARATOR + mailboxInfo.getMailBoxId();
+  public static String toMailboxId(long requestId, MailboxMetadata mailboxMetadata) {
+    return Long.toString(requestId) + SEPARATOR + mailboxMetadata.getMailBoxId();
   }
 }

@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
@@ -50,7 +50,8 @@ public class DispatchablePlanMetadata implements Serializable {
   private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
 
   // used for build mailboxes between workers.
-  private Map<Integer, List<MailboxInfo>> _workerIdToMailboxesMap;
+  // workerId -> {stageId -> mailbox list}
+  private Map<Integer, Map<Integer, List<MailboxMetadata>>> _workerIdToMailboxesMap;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -91,12 +92,16 @@ public class DispatchablePlanMetadata implements Serializable {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
-  public Map<Integer, List<MailboxInfo>> getStageIdToMailBoxIdsMap() {
+  public Map<Integer, Map<Integer, List<MailboxMetadata>>> getWorkerIdToMailBoxIdsMap() {
     return _workerIdToMailboxesMap;
   }
 
-  public void setStageIdToMailBoxIdsMap(Map<Integer, List<MailboxInfo>> stageIdToMailboxesMap) {
-    _workerIdToMailboxesMap = stageIdToMailboxesMap;
+  public void setWorkerIdToMailBoxIdsMap(Map<Integer, Map<Integer, List<MailboxMetadata>>> workerIdToMailboxesMap) {
+    _workerIdToMailboxesMap.putAll(workerIdToMailboxesMap);
+  }
+
+  public void addWorkerIdToMailBoxIdsMap(int stageId, Map<Integer, List<MailboxMetadata>> stageIdToMailboxesMap) {
+    _workerIdToMailboxesMap.put(stageId, stageIdToMailboxesMap);
   }
 
   public Map<QueryServerInstance, List<Integer>> getServerInstanceToWorkerIdMap() {

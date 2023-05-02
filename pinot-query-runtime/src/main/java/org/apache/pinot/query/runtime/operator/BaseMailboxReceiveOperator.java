@@ -28,7 +28,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -56,22 +57,29 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _exchangeType = exchangeType;
 
     long requestId = context.getRequestId();
-    List<MailboxInfo> mailBoxInfos = context.getStageMetadata().getMailBoxInfos(senderStageId);
-    Preconditions.checkState(mailBoxInfos != null && !mailBoxInfos.isEmpty(), "Failed to find mailbox for stage: %s",
+    int workerId = context.getServer().workerId();
+    List<MailboxMetadata> senderMailBoxMetadatas =
+        context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
+    Preconditions.checkState(senderMailBoxMetadatas != null && !senderMailBoxMetadatas.isEmpty(),
+        "Failed to find mailbox for stage: %s",
         senderStageId);
     if (exchangeType == RelDistribution.Type.SINGLETON) {
-      Preconditions.checkState(mailBoxInfos.size() == 1, "Only one mailbox is expected for SINGLETON exchange type");
-      MailboxInfo mailboxInfo = mailBoxInfos.get(0);
-      Preconditions.checkState(mailboxInfo.getMailBoxHost().equals(_mailboxService.getHostname()),
+      Preconditions.checkState(senderMailBoxMetadatas.size() == 1,
+          "Only one mailbox is expected for SINGLETON exchange type");
+      MailboxMetadata mailboxMetadata = senderMailBoxMetadatas.get(0);
+      VirtualServerAddress virtualServerAddress =
+          VirtualServerAddress.parse(mailboxMetadata.getVirtualAddress().toString());
+      Preconditions.checkState(virtualServerAddress.hostname().equals(_mailboxService.getHostname()),
           "Mailbox host mismatch for SINGLETON exchange type");
-      Preconditions.checkState(mailboxInfo.getMailBoxPort() == _mailboxService.getPort(),
+      Preconditions.checkState(virtualServerAddress.port() == _mailboxService.getPort(),
           "Mailbox port mismatch for SINGLETON exchange type");
     }
-    _mailboxIds = mailBoxInfos.stream()
-        .map(mailboxInfo -> MailboxIdUtils.toMailboxId(requestId, mailboxInfo))
+    _mailboxIds = senderMailBoxMetadatas.stream()
+        .map(mailboxMetadata -> MailboxIdUtils.toMailboxId(requestId, mailboxMetadata))
         .collect(Collectors.toList());
-    _mailboxes = mailBoxInfos.stream()
-        .map(mailboxInfo -> _mailboxService.getReceivingMailbox(MailboxIdUtils.toMailboxId(requestId, mailboxInfo)))
+    _mailboxes = senderMailBoxMetadatas.stream()
+        .map(mailboxMetadata -> _mailboxService.getReceivingMailbox(
+            MailboxIdUtils.toMailboxId(requestId, mailboxMetadata)))
         .collect(Collectors.toCollection(ArrayDeque::new));
   }
 

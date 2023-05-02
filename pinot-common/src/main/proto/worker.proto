@@ -78,22 +78,16 @@ message StagePlan {
 message StageMetadata {
   repeated WorkerMetadata workerMetadata = 1;
   map<string, string> customProperty = 2;
-  map<int32, StageMailboxInfo> stageMailboxInfoMap = 3;
 }
 
 message WorkerMetadata {
   string virtualAddress = 1;
-  map<string, string> customProperty = 2;
+  map<int32, MailboxMetadata> mailboxMetadata = 2;
+  map<string, string> customProperty = 3;
 }
 
-message MailboxInfo {
-  string mailboxId = 1;
-  string mailboxType = 2;
-  string mailboxHost = 3;
-  int32 mailboxPort = 4;
-  map<string, string> customProperty = 5;
-}
-
-message StageMailboxInfo {
-  repeated MailboxInfo mailboxInfo = 1;
+message MailboxMetadata {
+  repeated string mailboxId = 1;
+  repeated string virtualAddress = 2;
+  map<string, string> customProperty = 3;
 }

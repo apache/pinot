@@ -38,7 +38,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -88,19 +88,18 @@ public class OpChainTest {
     _serverAddress = new VirtualServerAddress("localhost", 123, 0);
     _receivingStageMetadata = new StageMetadata.Builder()
         .setWorkerMetadataList(Stream.of(_serverAddress).map(
-            s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
-        .setMailBoxInfosMap(ImmutableMap.of(0, Collections.singletonList(
-                new MailboxInfo(org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
-                    "single", _serverAddress.hostname(), _serverAddress.port(), ImmutableMap.of())
-            ),
-            1, Collections.singletonList(
-                new MailboxInfo(org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
-                    "single", _serverAddress.hostname(), _serverAddress.port(), ImmutableMap.of())
-            ),
-            2, Collections.singletonList(
-                new MailboxInfo(org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
-                    "single", _serverAddress.hostname(), _serverAddress.port(), ImmutableMap.of())
-            )))
+            s -> new WorkerMetadata.Builder()
+                .setVirtualServerAddress(s)
+                .addMailBoxInfoMap(0, Collections.singletonList(new MailboxMetadata(
+                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
+                    s.toString(), ImmutableMap.of())))
+                .addMailBoxInfoMap(1, Collections.singletonList(new MailboxMetadata(
+                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
+                    s.toString(), ImmutableMap.of())))
+                .addMailBoxInfoMap(2, Collections.singletonList(new MailboxMetadata(
+                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
+                    s.toString(), ImmutableMap.of())))
+                .build()).collect(Collectors.toList()))
         .build();
 
     when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);

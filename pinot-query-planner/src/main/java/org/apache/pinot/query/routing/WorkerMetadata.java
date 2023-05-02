@@ -42,15 +42,22 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class WorkerMetadata {
   private final VirtualServerAddress _virtualServerAddress;
+  private final Map<Integer, List<MailboxMetadata>> _mailBoxInfosMap;
   private final Map<String, String> _customProperties;
 
-  private WorkerMetadata(VirtualServerAddress virtualServerAddress, Map<String, String> customProperties) {
+  private WorkerMetadata(VirtualServerAddress virtualServerAddress, Map<Integer, List<MailboxMetadata>> mailBoxInfosMap,
+      Map<String, String> customProperties) {
     _virtualServerAddress = virtualServerAddress;
+    _mailBoxInfosMap = mailBoxInfosMap;
     _customProperties = customProperties;
   }
 
   public VirtualServerAddress getVirtualServerAddress() {
     return _virtualServerAddress;
+  }
+
+  public Map<Integer, List<MailboxMetadata>> getMailBoxInfosMap() {
+    return _mailBoxInfosMap;
   }
 
   public Map<String, String> getCustomProperties() {
@@ -60,14 +67,26 @@ public class WorkerMetadata {
   public static class Builder {
     public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
     private VirtualServerAddress _virtualServerAddress;
+    private Map<Integer, List<MailboxMetadata>> _mailBoxInfosMap;
     private Map<String, String> _customProperties;
 
     public Builder() {
+      _mailBoxInfosMap = new HashMap<>();
       _customProperties = new HashMap<>();
     }
 
     public Builder setVirtualServerAddress(VirtualServerAddress virtualServerAddress) {
       _virtualServerAddress = virtualServerAddress;
+      return this;
+    }
+
+    public Builder putAllMailBoxInfosMap(Map<Integer, List<MailboxMetadata>> mailBoxInfosMap) {
+      _mailBoxInfosMap.putAll(mailBoxInfosMap);
+      return this;
+    }
+
+    public Builder addMailBoxInfoMap(Integer stageId, List<MailboxMetadata> mailBoxMetadata) {
+      _mailBoxInfosMap.put(stageId, mailBoxMetadata);
       return this;
     }
 
@@ -82,7 +101,7 @@ public class WorkerMetadata {
     }
 
     public WorkerMetadata build() {
-      return new WorkerMetadata(_virtualServerAddress, _customProperties);
+      return new WorkerMetadata(_virtualServerAddress, _mailBoxInfosMap, _customProperties);
     }
 
     public void putAllCustomProperties(Map<String, String> customPropertyMap) {

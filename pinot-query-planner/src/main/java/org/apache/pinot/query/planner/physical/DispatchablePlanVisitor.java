@@ -61,15 +61,16 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
     computeWorkerAssignment(globalReceiverNode, dispatchablePlanContext);
     // 4. compute the mailbox assignment for each stage.
+    // TODO: refactor this to be a pluggable interface.
     computeMailboxAssignment(dispatchablePlanContext);
     // 5. convert it into query plan.
+    // TODO: refactor this to be a pluggable interface.
     return finalizeQueryPlan(dispatchablePlanContext);
   }
 
   private void computeMailboxAssignment(DispatchablePlanContext dispatchablePlanContext) {
-    dispatchablePlanContext.getDispatchablePlanStageRootMap().values().forEach(stageNode -> {
-      stageNode.visit(MailboxAssignmentVisitor.INSTANCE, dispatchablePlanContext);
-    });
+    dispatchablePlanContext.getDispatchablePlanStageRootMap().get(0).visit(MailboxAssignmentVisitor.INSTANCE,
+        dispatchablePlanContext);
   }
 
   private static QueryPlan finalizeQueryPlan(DispatchablePlanContext dispatchablePlanContext) {
