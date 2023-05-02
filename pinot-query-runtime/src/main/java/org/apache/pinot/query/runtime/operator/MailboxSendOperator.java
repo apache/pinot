@@ -21,20 +21,18 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -89,39 +87,20 @@ public class MailboxSendOperator extends MultiStageOperator {
         exchangeType);
     MailboxService mailboxService = context.getMailboxService();
     long requestId = context.getRequestId();
-    int senderStageId = context.getStageId();
-    int senderWorkerId = context.getServer().workerId();
     long deadlineMs = context.getDeadlineMs();
-    List<WorkerMetadata> receivingMetadataList = context.getStageMetadataList().get(receiverStageId)
-        .getWorkerMetadataList();
+    List<MailboxInfo> receivingMailboxes = context.getStageMetadata().getMailBoxInfos(receiverStageId);
     List<SendingMailbox> sendingMailboxes;
     if (exchangeType == RelDistribution.Type.SINGLETON) {
-      // TODO: this logic should be moved into SingletonExchange
-      VirtualServerAddress singletonReceiver = null;
-      for (WorkerMetadata receivingMetadata : receivingMetadataList) {
-        VirtualServerAddress receiver = receivingMetadata.getVirtualServerAddress();
-        if (receiver.hostname().equals(mailboxService.getHostname())
-            && receiver.port() == mailboxService.getPort()) {
-          Preconditions.checkState(singletonReceiver == null, "Multiple instances found for SINGLETON exchange type");
-          singletonReceiver = receiver;
-        }
-      }
-      Preconditions.checkState(singletonReceiver != null, "Failed to find instance for SINGLETON exchange type");
-      String mailboxId = MailboxIdUtils.toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId,
-          singletonReceiver.workerId());
-      sendingMailboxes = Collections.singletonList(
-          mailboxService.getSendingMailbox(singletonReceiver.hostname(), singletonReceiver.port(), mailboxId,
-              deadlineMs));
-    } else {
-      sendingMailboxes = new ArrayList<>(receivingMetadataList.size());
-      for (WorkerMetadata receivingMetadata : receivingMetadataList) {
-        VirtualServerAddress receiver = receivingMetadata.getVirtualServerAddress();
-        String mailboxId =
-            MailboxIdUtils.toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiver.workerId());
-        sendingMailboxes.add(
-            mailboxService.getSendingMailbox(receiver.hostname(), receiver.port(), mailboxId, deadlineMs));
-      }
+      Preconditions.checkState(receivingMailboxes.size() == 1, "Multiple instances found for SINGLETON exchange type");
+      MailboxInfo singletonMailboxInfo = receivingMailboxes.get(0);
+      Preconditions.checkState(singletonMailboxInfo.getMailBoxHost().equals(mailboxService.getHostname()),
+          "SINGLETON exchange hostname should be the same as mailbox service hostname");
+      Preconditions.checkState(singletonMailboxInfo.getMailBoxPort() == mailboxService.getPort(),
+          "SINGLETON exchange port should be the same as mailbox service port");
     }
+    sendingMailboxes = receivingMailboxes.stream()
+        .map(mailboxInfo -> mailboxService.getSendingMailbox(requestId, mailboxInfo, deadlineMs)).collect(
+            Collectors.toList());
     return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector, TransferableBlockUtils::splitBlock);
   }
 

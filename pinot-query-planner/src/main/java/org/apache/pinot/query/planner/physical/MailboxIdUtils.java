@@ -16,34 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.mailbox;
+package org.apache.pinot.query.planner.physical;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.query.routing.MailboxInfo;
-import org.apache.pinot.query.runtime.operator.OpChainId;
-
-
-// TODO: De-couple mailbox id from query information
 public class MailboxIdUtils {
   private MailboxIdUtils() {
   }
 
   private static final char SEPARATOR = '|';
 
-  @VisibleForTesting
-  public static String toMailboxId(long requestId, int senderStageId, int senderWorkerId, int receiverStageId,
+  public static String toPlanMailboxId(int senderStageId, int senderWorkerId, int receiverStageId,
       int receiverWorkerId) {
-    return Long.toString(requestId) + SEPARATOR + senderStageId + SEPARATOR + senderWorkerId + SEPARATOR
+    return Integer.toString(senderStageId) + SEPARATOR + senderWorkerId + SEPARATOR
         + receiverStageId + SEPARATOR + receiverWorkerId;
-  }
-
-  public static OpChainId toOpChainId(String mailboxId) {
-    String[] parts = StringUtils.split(mailboxId, SEPARATOR);
-    return new OpChainId(Long.parseLong(parts[0]), Integer.parseInt(parts[4]), Integer.parseInt(parts[3]));
-  }
-
-  public static String toMailboxId(long requestId, MailboxInfo mailboxInfo) {
-    return Long.toString(requestId) + SEPARATOR + mailboxInfo.getMailBoxId();
   }
 }

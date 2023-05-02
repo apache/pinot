@@ -118,7 +118,7 @@ public class QueryServerTest extends QueryTestSet {
         // submit the request for testing.
         submitRequest(queryRequest);
 
-        List<StageMetadata> stageMetadataList = queryPlan.getStageMetadataList();
+        StageMetadata stageMetadata = queryPlan.getStageMetadata(stageId);
 
         // ensure mock query runner received correctly deserialized payload.
         QueryRunner mockRunner = _queryRunnerMap.get(
@@ -131,7 +131,7 @@ public class QueryServerTest extends QueryTestSet {
             Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
               StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
               return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot())
-                  && isMetadataMapsEqual(stageId, stageMetadataList, distributedStagePlan.getStageMetadataList());
+                  && isStageMetadataEqual(stageMetadata, distributedStagePlan.getStageMetadata());
             }), Mockito.argThat(requestMetadataMap ->
                 requestIdStr.equals(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))));
             return true;
@@ -144,13 +144,6 @@ public class QueryServerTest extends QueryTestSet {
         Mockito.reset(mockRunner);
       }
     }
-  }
-
-  private boolean isMetadataMapsEqual(int stageId, List<StageMetadata> expectedStageMetadataList,
-      List<StageMetadata> deserializedStageMetadataList) {
-    StageMetadata expected = expectedStageMetadataList.get(stageId);
-    StageMetadata actual = deserializedStageMetadataList.get(stageId);
-    return isStageMetadataEqual(expected, actual);
   }
 
   private boolean isStageMetadataEqual(StageMetadata expected, StageMetadata actual) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,11 +100,26 @@ public class MailboxService {
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
    * data is sent for the first time.
    */
+  @VisibleForTesting
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs) {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs);
+    }
+  }
+
+  /**
+   * Returns a sending mailbox for the given mailbox id. The returned sending mailbox is uninitialized, i.e. it will
+   * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
+   * data is sent for the first time.
+   */
+  public SendingMailbox getSendingMailbox(long requestId, MailboxInfo mailboxInfo, long deadlineMs) {
+    if (_hostname.equals(mailboxInfo.getMailBoxHost()) && _port == mailboxInfo.getMailBoxPort()) {
+      return new InMemorySendingMailbox(MailboxIdUtils.toMailboxId(requestId, mailboxInfo), this, deadlineMs);
+    } else {
+      return new GrpcSendingMailbox(MailboxIdUtils.toMailboxId(requestId, mailboxInfo), _channelManager,
+          mailboxInfo.getMailBoxHost(), mailboxInfo.getMailBoxPort(), deadlineMs);
     }
   }
 

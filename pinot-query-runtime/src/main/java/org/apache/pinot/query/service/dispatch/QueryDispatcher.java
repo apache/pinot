@@ -189,7 +189,7 @@ public class QueryDispatcher {
     VirtualServerAddress server = new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), 0);
     OpChainExecutionContext context =
         new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs,
-            System.currentTimeMillis() + timeoutMs, queryPlan.getStageMetadataList(), traceEnabled);
+            System.currentTimeMillis() + timeoutMs, queryPlan.getStageMetadata(reduceStageId), traceEnabled);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context, reduceNode.getSenderStageId());
     List<DataBlock> resultDataBlocks =
         reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, queryPlan, context.getStats());
@@ -201,7 +201,7 @@ public class QueryDispatcher {
   public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
       VirtualServerAddress serverAddress) {
     return new DistributedStagePlan(stageId, serverAddress, queryPlan.getQueryStageMap().get(stageId),
-        queryPlan.getStageMetadataList());
+        queryPlan.getStageMetadata(stageId));
   }
 
   private static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
@@ -231,8 +231,7 @@ public class QueryDispatcher {
             rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             if (stageStatsAggregator != null) {
               if (queryPlan != null) {
-                StageMetadata stageMetadata = queryPlan.getStageMetadataList()
-                    .get(operatorStats.getStageId());
+                StageMetadata stageMetadata = queryPlan.getStageMetadata(operatorStats.getStageId());
                 OperatorUtils.recordTableName(operatorStats, stageMetadata);
               }
               stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());

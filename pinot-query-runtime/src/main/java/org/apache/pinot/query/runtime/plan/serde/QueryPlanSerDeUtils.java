@@ -19,12 +19,15 @@
 package org.apache.pinot.query.runtime.plan.serde;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.stage.AbstractStageNode;
 import org.apache.pinot.query.planner.stage.StageNodeSerDeUtils;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -44,7 +47,7 @@ public class QueryPlanSerDeUtils {
     DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
     distributedStagePlan.setServer(protoToAddress(stagePlan.getVirtualAddress()));
     distributedStagePlan.setStageRoot(StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot()));
-    distributedStagePlan.getStageMetadataList().addAll(protoListToStageMetadataList(stagePlan.getStageMetadataList()));
+    distributedStagePlan.setStageMetadata(fromProtoStageMetadata(stagePlan.getStageMetadata()));
     return distributedStagePlan;
   }
 
@@ -53,7 +56,7 @@ public class QueryPlanSerDeUtils {
         .setStageId(distributedStagePlan.getStageId())
         .setVirtualAddress(addressToProto(distributedStagePlan.getServer()))
         .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) distributedStagePlan.getStageRoot()))
-        .addAllStageMetadata(stageMetadataListToProtoList(distributedStagePlan.getStageMetadataList())).build();
+        .setStageMetadata(toProtoStageMetadata(distributedStagePlan.getStageMetadata())).build();
   }
 
   private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
@@ -76,14 +79,6 @@ public class QueryPlanSerDeUtils {
     return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
   }
 
-  public static List<StageMetadata> protoListToStageMetadataList(List<Worker.StageMetadata> protoList) {
-    List<StageMetadata> stageMetadataList = new ArrayList<>();
-    for (Worker.StageMetadata protoStageMetadata : protoList) {
-      stageMetadataList.add(fromProtoStageMetadata(protoStageMetadata));
-    }
-    return stageMetadataList;
-  }
-
   private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
     StageMetadata.Builder builder = new StageMetadata.Builder();
     List<WorkerMetadata> workerMetadataList = new ArrayList<>();
@@ -92,6 +87,18 @@ public class QueryPlanSerDeUtils {
     }
     builder.setWorkerMetadataList(workerMetadataList);
     builder.putAllCustomProperties(protoStageMetadata.getCustomPropertyMap());
+    Map<Integer, List<MailboxInfo>> mailboxInfoMap = new HashMap<>();
+    for (Map.Entry<Integer, Worker.StageMailboxInfo> entry : protoStageMetadata.getStageMailboxInfoMapMap()
+        .entrySet()) {
+      List<MailboxInfo> mailboxInfoList = new ArrayList<>();
+      for (Worker.MailboxInfo protoMailboxInfo : entry.getValue().getMailboxInfoList()) {
+        mailboxInfoList.add(new MailboxInfo(protoMailboxInfo.getMailboxId(), protoMailboxInfo.getMailboxType(),
+            protoMailboxInfo.getMailboxHost(), protoMailboxInfo.getMailboxPort(),
+            protoMailboxInfo.getCustomPropertyMap()));
+      }
+      mailboxInfoMap.put(entry.getKey(), mailboxInfoList);
+    }
+    builder.setMailBoxInfosMap(mailboxInfoMap);
     return builder.build();
   }
 
@@ -100,14 +107,6 @@ public class QueryPlanSerDeUtils {
     builder.setVirtualServerAddress(protoToAddress(protoWorkerMetadata.getVirtualAddress()));
     builder.putAllCustomProperties(protoWorkerMetadata.getCustomPropertyMap());
     return builder.build();
-  }
-
-  public static List<Worker.StageMetadata> stageMetadataListToProtoList(List<StageMetadata> stageMetadataList) {
-    List<Worker.StageMetadata> protoList = new ArrayList<>();
-    for (StageMetadata stageMetadata : stageMetadataList) {
-      protoList.add(toProtoStageMetadata(stageMetadata));
-    }
-    return protoList;
   }
 
   private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {

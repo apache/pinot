@@ -173,7 +173,7 @@ public class QueryRunner {
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
           new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, deadlineMs,
-              distributedStagePlan.getServer(), distributedStagePlan.getStageMetadataList(), isTraceEnabled));
+              distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), isTraceEnabled));
       _scheduler.register(rootOperator);
     }
   }
@@ -223,7 +223,7 @@ public class QueryRunner {
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       OpChainExecutionContext opChainExecutionContext =
           new OpChainExecutionContext(_mailboxService, requestId, sendNode.getStageId(),
-              distributedStagePlan.getServer(), timeoutMs, deadlineMs, distributedStagePlan.getStageMetadataList(),
+              distributedStagePlan.getServer(), timeoutMs, deadlineMs, distributedStagePlan.getStageMetadata(),
               isTraceEnabled);
       MultiStageOperator leafStageOperator =
           new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
@@ -247,7 +247,7 @@ public class QueryRunner {
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
       Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore,
       MailboxService mailboxService, long deadlineMs) {
-    StageMetadata stageMetadata = distributedStagePlan.getCurrentStageMetadata();
+    StageMetadata stageMetadata = distributedStagePlan.getStageMetadata();
     WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
     String rawTableName = StageMetadata.getTableName(stageMetadata);
     Map<String, List<String>> tableToSegmentListMap = WorkerMetadata.getTableSegmentsMap(workerMetadata);

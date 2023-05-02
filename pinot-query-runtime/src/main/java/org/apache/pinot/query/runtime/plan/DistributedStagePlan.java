@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -36,19 +34,18 @@ public class DistributedStagePlan {
   private int _stageId;
   private VirtualServerAddress _server;
   private StageNode _stageRoot;
-  private List<StageMetadata> _stageMetadataList;
+  private StageMetadata _stageMetadata;
 
   public DistributedStagePlan(int stageId) {
     _stageId = stageId;
-    _stageMetadataList = new ArrayList<>();
   }
 
   public DistributedStagePlan(int stageId, VirtualServerAddress server, StageNode stageRoot,
-      List<StageMetadata> stageMetadataList) {
+      StageMetadata stageMetadata) {
     _stageId = stageId;
     _server = server;
     _stageRoot = stageRoot;
-    _stageMetadataList = stageMetadataList;
+    _stageMetadata = stageMetadata;
   }
 
   public int getStageId() {
@@ -63,8 +60,8 @@ public class DistributedStagePlan {
     return _stageRoot;
   }
 
-  public List<StageMetadata> getStageMetadataList() {
-    return _stageMetadataList;
+  public StageMetadata getStageMetadata() {
+    return _stageMetadata;
   }
 
   public void setServer(VirtualServerAddress serverAddress) {
@@ -75,11 +72,11 @@ public class DistributedStagePlan {
     _stageRoot = stageRoot;
   }
 
-  public StageMetadata getCurrentStageMetadata() {
-    return _stageMetadataList.get(_stageId);
+  public void setStageMetadata(StageMetadata stageMetadata) {
+    _stageMetadata = stageMetadata;
   }
 
   public WorkerMetadata getCurrentWorkerMetadata() {
-    return getCurrentStageMetadata().getWorkerMetadataList().get(_server.workerId());
+    return _stageMetadata.getWorkerMetadataList().get(_server.workerId());
   }
 }

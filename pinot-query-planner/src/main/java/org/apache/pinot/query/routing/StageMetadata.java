@@ -29,10 +29,13 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
  */
 public class StageMetadata {
   private final List<WorkerMetadata> _workerMetadataList;
+  private final Map<Integer, List<MailboxInfo>> _mailBoxInfosMap;
   private final Map<String, String> _customProperties;
 
-  public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
+  public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<Integer, List<MailboxInfo>> mailBoxInfosMap,
+      Map<String, String> customProperties) {
     _workerMetadataList = workerMetadataList;
+    _mailBoxInfosMap = mailBoxInfosMap;
     _customProperties = customProperties;
   }
 
@@ -44,11 +47,16 @@ public class StageMetadata {
     return _customProperties;
   }
 
+  public List<MailboxInfo> getMailBoxInfos(int stageId) {
+    return _mailBoxInfosMap.get(stageId);
+  }
+
   public static class Builder {
     public static final String TABLE_NAME_KEY = "tableName";
     public static final String TIME_BOUNDARY_COLUMN_KEY = "timeBoundaryInfo.timeColumn";
     public static final String TIME_BOUNDARY_VALUE_KEY = "timeBoundaryInfo.timeValue";
     private List<WorkerMetadata> _workerMetadataList;
+    private Map<Integer, List<MailboxInfo>> _mailBoxInfosMap;
     private Map<String, String> _customProperties;
 
     public Builder() {
@@ -57,6 +65,11 @@ public class StageMetadata {
 
     public Builder setWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
       _workerMetadataList = workerMetadataList;
+      return this;
+    }
+
+    public Builder setMailBoxInfosMap(Map<Integer, List<MailboxInfo>> mailBoxInfosMap) {
+      _mailBoxInfosMap = mailBoxInfosMap;
       return this;
     }
 
@@ -72,7 +85,7 @@ public class StageMetadata {
     }
 
     public StageMetadata build() {
-      return new StageMetadata(_workerMetadataList, _customProperties);
+      return new StageMetadata(_workerMetadataList, _mailBoxInfosMap, _customProperties);
     }
 
     public void putAllCustomProperties(Map<String, String> customPropertyMap) {

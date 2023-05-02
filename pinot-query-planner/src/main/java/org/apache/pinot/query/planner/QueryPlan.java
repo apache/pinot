@@ -65,11 +65,11 @@ public class QueryPlan {
   }
 
   /**
-   * Get the stage metadata information.
+   * Get the stage metadata information based on stageId.
    * @return stage metadata info.
    */
-  public List<StageMetadata> getStageMetadataList() {
-    return _stageMetadataList;
+  public StageMetadata getStageMetadata(int stageId) {
+    return _stageMetadataList.get(stageId);
   }
 
   /**
@@ -129,6 +129,7 @@ public class QueryPlan {
       int stageId = dispatchableEntry.getKey();
       StageMetadata.Builder builder = new StageMetadata.Builder();
       builder.setWorkerMetadataList(Arrays.asList(workerMetadataList));
+      builder.setMailBoxInfosMap(dispatchablePlanMetadata.getStageIdToMailBoxIdsMap());
       if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
         builder.addTableName(dispatchablePlanMetadata.getScannedTables().get(0));
       }

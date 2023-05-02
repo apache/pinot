@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
@@ -48,6 +49,9 @@ public class DispatchablePlanMetadata implements Serializable {
   // same segments on them
   private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
 
+  // used for build mailboxes between workers.
+  private Map<Integer, List<MailboxInfo>> _workerIdToMailboxesMap;
+
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
 
@@ -61,6 +65,7 @@ public class DispatchablePlanMetadata implements Serializable {
     _scannedTables = new ArrayList<>();
     _serverInstanceToWorkerIdMap = new HashMap<>();
     _workerIdToSegmentsMap = new HashMap<>();
+    _workerIdToMailboxesMap = new HashMap<>();
     _timeBoundaryInfo = null;
     _requiresSingletonInstance = false;
   }
@@ -84,6 +89,14 @@ public class DispatchablePlanMetadata implements Serializable {
   public void setWorkerIdToSegmentsMap(
       Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
+  }
+
+  public Map<Integer, List<MailboxInfo>> getStageIdToMailBoxIdsMap() {
+    return _workerIdToMailboxesMap;
+  }
+
+  public void setStageIdToMailBoxIdsMap(Map<Integer, List<MailboxInfo>> stageIdToMailboxesMap) {
+    _workerIdToMailboxesMap = stageIdToMailboxesMap;
   }
 
   public Map<QueryServerInstance, List<Integer>> getServerInstanceToWorkerIdMap() {
@@ -120,8 +133,9 @@ public class DispatchablePlanMetadata implements Serializable {
 
   @Override
   public String toString() {
-    return "DispatchablePlanMetadata{" + "_scannedTables=" + _scannedTables + ", _servers="
-        + _serverInstanceToWorkerIdMap + ", _serverInstanceToSegmentsMap=" + _workerIdToSegmentsMap
+    return "DispatchablePlanMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstanceToWorkerIdMap="
+        + _serverInstanceToWorkerIdMap + ", _workerIdToSegmentsMap=" + _workerIdToSegmentsMap
+        + ", _workerIdToMailboxesMap=" + _workerIdToMailboxesMap
         + ", _timeBoundaryInfo=" + _timeBoundaryInfo + '}';
   }
 }

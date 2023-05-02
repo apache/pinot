@@ -33,20 +33,20 @@ public class PlanRequestContext {
   private final long _timeoutMs;
   private final long _deadlineMs;
   protected final VirtualServerAddress _server;
-  protected final List<StageMetadata> _stageMetadataList;
+  protected final StageMetadata _stageMetadata;
   protected final List<String> _receivingMailboxIds = new ArrayList<>();
   private final OpChainExecutionContext _opChainExecutionContext;
   private final boolean _traceEnabled;
 
   public PlanRequestContext(MailboxService mailboxService, long requestId, int stageId, long timeoutMs, long deadlineMs,
-      VirtualServerAddress server, List<StageMetadata> stageMetadataList, boolean traceEnabled) {
+      VirtualServerAddress server, StageMetadata stageMetadata, boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
     _server = server;
-    _stageMetadataList = stageMetadataList;
+    _stageMetadata = stageMetadata;
     _traceEnabled = traceEnabled;
     _opChainExecutionContext = new OpChainExecutionContext(this);
   }
@@ -71,8 +71,8 @@ public class PlanRequestContext {
     return _server;
   }
 
-  public List<StageMetadata> getStageMetadataList() {
-    return _stageMetadataList;
+  public StageMetadata getStageMetadata() {
+    return _stageMetadata;
   }
 
   public MailboxService getMailboxService() {
