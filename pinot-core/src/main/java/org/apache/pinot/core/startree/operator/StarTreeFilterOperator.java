@@ -212,7 +212,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     // Track whether we have found a leaf node added to the queue. If we have found a leaf node, and traversed to the
     // level of the leave node, we can set globalRemainingPredicateColumns if not already set because we know the leaf
     // node won't split further on other predicate columns.
-    boolean findLeafNode = starTreeRootNode.isLeaf();
+    boolean foundLeafNode = starTreeRootNode.isLeaf();
 
     // Use BFS to traverse the star tree
     Queue<StarTreeNode> queue = new ArrayDeque<>();
@@ -220,7 +220,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     int currentDimensionId = -1;
     Set<String> remainingPredicateColumns = new HashSet<>(_predicateEvaluatorsMap.keySet());
     Set<String> remainingGroupByColumns = new HashSet<>(_groupByColumns);
-    if (findLeafNode) {
+    if (foundLeafNode) {
       globalRemainingPredicateColumns = new HashSet<>(remainingPredicateColumns);
     }
     IntSet matchingDictIds = null;
@@ -232,7 +232,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         String dimension = dimensionNames.get(dimensionId);
         remainingPredicateColumns.remove(dimension);
         remainingGroupByColumns.remove(dimension);
-        if (findLeafNode && globalRemainingPredicateColumns == null) {
+        if (foundLeafNode && globalRemainingPredicateColumns == null) {
           globalRemainingPredicateColumns = new HashSet<>(remainingPredicateColumns);
         }
         matchingDictIds = null;
@@ -300,11 +300,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             if (matchingChildNodes.size() == numChildren - 1) {
               // All the child nodes (except for the star-node) match the predicate, use the star-node
               queue.add(starNode);
-              findLeafNode |= starNode.isLeaf();
+              foundLeafNode |= starNode.isLeaf();
             } else {
               // Some child nodes do not match the predicate, use the matching child nodes
               queue.addAll(matchingChildNodes);
-              findLeafNode |= findLeafChildNode;
+              foundLeafNode |= findLeafChildNode;
             }
           } else {
             // Cannot use the star-node, use the matching child nodes
@@ -312,7 +312,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
               StarTreeNode childNode = childrenIterator.next();
               if (matchingDictIds.contains(childNode.getDimensionValue())) {
                 queue.add(childNode);
-                findLeafNode |= childNode.isLeaf();
+                foundLeafNode |= childNode.isLeaf();
               }
             }
           }
@@ -325,7 +325,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             // Child node might be null because the matching dictionary id might not exist under this branch
             if (childNode != null) {
               queue.add(childNode);
-              findLeafNode |= childNode.isLeaf();
+              foundLeafNode |= childNode.isLeaf();
             }
           }
         }
@@ -335,7 +335,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         if (starNode != null) {
           // Star-node exists, use it
           queue.add(starNode);
-          findLeafNode |= starNode.isLeaf();
+          foundLeafNode |= starNode.isLeaf();
         } else {
           // Star-node does not exist or cannot be used, add all non-star nodes to the queue
           Iterator<? extends StarTreeNode> childrenIterator = starTreeNode.getChildrenIterator();
@@ -343,7 +343,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             StarTreeNode childNode = childrenIterator.next();
             if (childNode.getDimensionValue() != StarTreeNode.ALL) {
               queue.add(childNode);
-              findLeafNode |= childNode.isLeaf();
+              foundLeafNode |= childNode.isLeaf();
             }
           }
         }
