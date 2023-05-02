@@ -53,6 +53,7 @@ import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
+import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
@@ -195,8 +196,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for dedup");
-      _tableDedupMetadataManager = new TableDedupMetadataManager(_tableNameWithType, primaryKeyColumns, _serverMetrics,
-          dedupConfig.getHashFunction());
+      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
     }
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
