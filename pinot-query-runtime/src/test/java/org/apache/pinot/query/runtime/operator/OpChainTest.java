@@ -32,6 +32,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -53,6 +54,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -273,8 +275,9 @@ public class OpChainTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT intCol FROM tbl");
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
         new SelectionResultsBlock(upStreamSchema, Arrays.asList(new Object[]{1}, new Object[]{2})), queryContext));
-    LeafStageTransferableBlockOperator leafOp =
-        new LeafStageTransferableBlockOperator(context, resultsBlockList, upStreamSchema);
+    LeafStageTransferableBlockOperator leafOp = new LeafStageTransferableBlockOperator(context,
+            LeafStageTransferableBlockOperatorTest.getStaticBlockProcessor(resultsBlockList),
+            Collections.singletonList(mock(ServerQueryRequest.class)), upStreamSchema);
 
     //Transform operator
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
