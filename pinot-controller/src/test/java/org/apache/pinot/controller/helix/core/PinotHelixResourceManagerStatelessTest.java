@@ -540,6 +540,19 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Valid tenant config without tagOverrideConfig
     _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
 
+    // Invalid serverTag in tierConfigs
+    TierConfig tierConfig = new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+        TierFactory.PINOT_SERVER_STORAGE_TYPE, "Unknown_OFFLINE", null, null);
+    offlineTableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
+    assertThrows(InvalidTableConfigException.class,
+        () -> _helixResourceManager.validateTableTenantConfig(offlineTableConfig));
+
+    // Valid serverTag in tierConfigs
+    tierConfig = new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+        TierFactory.PINOT_SERVER_STORAGE_TYPE, SERVER_TENANT_NAME + "_OFFLINE", null, null);
+    offlineTableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
+    _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
+
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
