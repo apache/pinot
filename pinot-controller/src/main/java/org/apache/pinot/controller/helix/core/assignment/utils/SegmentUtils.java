@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.utils;
 
-import java.util.Objects;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -36,7 +34,7 @@ public class SegmentUtils {
   public static String getPartitionColumn(TableConfig tableConfig) {
     String partitionColumn = null;
 
-    // check getInstanceAssignmentConfigMap is null or empty,
+/*    // check getInstanceAssignmentConfigMap is null or empty,
     if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
       for (String key : tableConfig.getInstanceAssignmentConfigMap().keySet()) {
         //check getInstanceAssignmentConfigMap has the key of TableType
@@ -46,7 +44,7 @@ public class SegmentUtils {
               getReplicaGroupPartitionConfig().getPartitionColumn();
         }
       }
-    }
+    }*/
 
     // check, if partitionColumn is not empty, return the value.
     if (!StringUtils.isEmpty(partitionColumn)) {

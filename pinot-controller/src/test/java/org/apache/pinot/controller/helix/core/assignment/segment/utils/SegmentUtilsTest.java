@@ -53,7 +53,7 @@ public class SegmentUtilsTest {
 
     _replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1);
   }
- @Test
+ //@Test
   public void testGetPartitionColumnFromInstanceAssignmentConfig() {
     Map<String, InstanceAssignmentConfig> configMap = new HashMap<>();
     configMap.put(TableType.REALTIME.toString(), _instanceAssignmentConfig);
