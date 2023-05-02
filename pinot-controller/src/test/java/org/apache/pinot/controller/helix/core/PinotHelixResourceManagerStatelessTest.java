@@ -540,6 +540,26 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Valid tenant config without tagOverrideConfig
     _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
 
+    // Invalid serverTag in tierConfigs
+    TierConfig tierConfig = new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+        TierFactory.PINOT_SERVER_STORAGE_TYPE, "Unknown_OFFLINE", null, null);
+    offlineTableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
+    assertThrows(InvalidTableConfigException.class,
+        () -> _helixResourceManager.validateTableTenantConfig(offlineTableConfig));
+
+    // A null serverTag has no instances associated with it, so it's invalid.
+    tierConfig = new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+        TierFactory.PINOT_SERVER_STORAGE_TYPE, null, null, null);
+    offlineTableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
+    assertThrows(InvalidTableConfigException.class,
+        () -> _helixResourceManager.validateTableTenantConfig(offlineTableConfig));
+
+    // Valid serverTag in tierConfigs
+    tierConfig = new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+        TierFactory.PINOT_SERVER_STORAGE_TYPE, SERVER_TENANT_NAME + "_OFFLINE", null, null);
+    offlineTableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
+    _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
+
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -736,7 +756,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       throws Exception {
     TierConfig tierConfig =
         new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Collections.singletonList("testSegment"),
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null);
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, SERVER_TENANT_NAME + "_OFFLINE", null, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setTierConfigList(Collections.singletonList(tierConfig)).setServerTenant(SERVER_TENANT_NAME).build();
