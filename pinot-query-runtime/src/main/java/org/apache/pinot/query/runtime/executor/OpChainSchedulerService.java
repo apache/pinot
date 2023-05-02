@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,14 +153,13 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   }
 
   /**
-   * This method should be called whenever data is available in a given mailbox.
-   * Implementations of this method should be idempotent, it may be called in the
-   * scenario that no mail is available.
+   * This method should be called whenever data is available for an {@link OpChain} to consume.
+   * Implementations of this method should be idempotent, it may be called in the scenario that no data is available.
    *
-   * @param mailboxId the identifier of the mailbox that now has data
+   * @param opChainId the identifier of the operator chain
    */
-  public final void onDataAvailable(String mailboxId) {
-    _scheduler.onDataAvailable(mailboxId);
+  public final void onDataAvailable(OpChainId opChainId) {
+    _scheduler.onDataAvailable(opChainId);
   }
 
   // TODO: remove this method after we pipe down the proper executor pool to the v1 engine
