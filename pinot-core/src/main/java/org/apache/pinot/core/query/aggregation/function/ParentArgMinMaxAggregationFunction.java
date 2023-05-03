@@ -191,10 +191,19 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
               new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.INT, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.INT;
           break;
-        case TIMESTAMP:
+        case BOOLEAN:
+          argMinMaxWrapperMeasuringColumnSets.add(
+              new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.BOOLEAN, blockValSet));
+          measuringColTypes[i] = DataSchema.ColumnDataType.INT;
+          break;
         case LONG:
           argMinMaxWrapperMeasuringColumnSets.add(
               new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.LONG, blockValSet));
+          measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
+          break;
+        case TIMESTAMP:
+          argMinMaxWrapperMeasuringColumnSets.add(
+              new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
           break;
         case FLOAT:
@@ -238,9 +247,19 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
                 new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.INT, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.INT;
             break;
+          case BOOLEAN:
+            argMinMaxWrapperProjectionColumnSets.add(
+                new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.BOOLEAN, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.INT;
+            break;
           case LONG:
             argMinMaxWrapperProjectionColumnSets.add(
                 new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.LONG, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
+            break;
+          case TIMESTAMP:
+            argMinMaxWrapperProjectionColumnSets.add(
+                new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
             break;
           case FLOAT:
@@ -256,6 +275,11 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
           case STRING:
             argMinMaxWrapperProjectionColumnSets.add(
                 new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.STRING, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.STRING;
+            break;
+          case JSON:
+            argMinMaxWrapperProjectionColumnSets.add(
+                new ArgMinMaxWrapperValSet(true, DataSchema.ColumnDataType.JSON, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.STRING;
             break;
           case BYTES:
@@ -279,9 +303,19 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
                 new ArgMinMaxWrapperValSet(false, DataSchema.ColumnDataType.INT_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.INT_ARRAY;
             break;
+          case BOOLEAN:
+            argMinMaxWrapperProjectionColumnSets.add(
+                new ArgMinMaxWrapperValSet(false, DataSchema.ColumnDataType.BOOLEAN_ARRAY, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.INT_ARRAY;
+            break;
           case LONG:
             argMinMaxWrapperProjectionColumnSets.add(
                 new ArgMinMaxWrapperValSet(false, DataSchema.ColumnDataType.LONG_ARRAY, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
+            break;
+          case TIMESTAMP:
+            argMinMaxWrapperProjectionColumnSets.add(
+                new ArgMinMaxWrapperValSet(false, DataSchema.ColumnDataType.TIMESTAMP_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
             break;
           case FLOAT:

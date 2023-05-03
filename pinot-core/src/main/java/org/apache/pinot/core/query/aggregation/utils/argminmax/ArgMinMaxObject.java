@@ -187,23 +187,23 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
         switch (_keySchema.getColumnDataType(i)) {
           case INT:
           case BOOLEAN:
-            extremumKeys[i] = _immutableKeys.getInt(i, 0);
+            extremumKeys[i] = _immutableKeys.getInt(0, i);
             break;
           case LONG:
           case TIMESTAMP:
-            extremumKeys[i] = _immutableKeys.getLong(i, 0);
+            extremumKeys[i] = _immutableKeys.getLong(0, i);
             break;
           case FLOAT:
-            extremumKeys[i] = _immutableKeys.getFloat(i, 0);
+            extremumKeys[i] = _immutableKeys.getFloat(0, i);
             break;
           case DOUBLE:
-            extremumKeys[i] = _immutableKeys.getDouble(i, 0);
+            extremumKeys[i] = _immutableKeys.getDouble(0, i);
             break;
           case STRING:
-            extremumKeys[i] = _immutableKeys.getString(i, 0);
+            extremumKeys[i] = _immutableKeys.getString(0, i);
             break;
           case BIG_DECIMAL:
-            extremumKeys[i] = _immutableKeys.getBigDecimal(i, 0);
+            extremumKeys[i] = _immutableKeys.getBigDecimal(0, i);
             break;
           default:
             throw new IllegalStateException("Unsupported data type: " + _keySchema.getColumnDataType(i));

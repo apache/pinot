@@ -65,6 +65,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
   private static final String LONG_COLUMN = "longColumn";
   private static final String FLOAT_COLUMN = "floatColumn";
   private static final String DOUBLE_COLUMN = "doubleColumn";
+  private static final String MV_DOUBLE_COLUMN = "mvDoubleColumn";
   private static final String MV_INT_COLUMN = "mvIntColumn";
   private static final String MV_BYTES_COLUMN = "mvBytesColumn";
   private static final String MV_STRING_COLUMN = "mvStringColumn";
@@ -73,6 +74,9 @@ public class ArgMinMaxTest extends BaseQueriesTest {
   private static final String GROUP_BY_MV_INT_COLUMN = "groupByMVIntColumn";
   private static final String GROUP_BY_INT_COLUMN2 = "groupByIntColumn2";
   private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
+  private static final String TIMESTAMP_COLUMN = "timestampColumn";
+  private static final String BOOLEAN_COLUMN = "booleanColumn";
+
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addMultiValueDimension(MV_INT_COLUMN, DataType.INT)
@@ -82,7 +86,11 @@ public class ArgMinMaxTest extends BaseQueriesTest {
       .addSingleValueDimension(GROUP_BY_INT_COLUMN, DataType.INT)
       .addMultiValueDimension(GROUP_BY_MV_INT_COLUMN, DataType.INT)
       .addSingleValueDimension(GROUP_BY_INT_COLUMN2, DataType.INT)
-      .addSingleValueDimension(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL).build();
+      .addSingleValueDimension(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
+      .addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP)
+      .addSingleValueDimension(BOOLEAN_COLUMN, DataType.BOOLEAN)
+      .addMultiValueDimension(MV_DOUBLE_COLUMN, DataType.DOUBLE)
+      .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
@@ -134,6 +142,9 @@ public class ArgMinMaxTest extends BaseQueriesTest {
       }
       record.putValue(GROUP_BY_INT_COLUMN2, j);
       record.putValue(BIG_DECIMAL_COLUMN, new BigDecimal(-i * i + 1200 * i));
+      record.putValue(TIMESTAMP_COLUMN, 1683138373879L - i);
+      record.putValue(BOOLEAN_COLUMN, i % 2);
+      record.putValue(MV_DOUBLE_COLUMN, Arrays.asList((double) i, (double) i * i, (double) i * i * i));
       records.add(record);
     }
 
@@ -173,7 +184,9 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     query = "SELECT arg_max(intColumn, longColumn), arg_max(intColumn, floatColumn), "
         + "arg_max(intColumn, doubleColumn), arg_min(intColumn, mvIntColumn), "
         + "arg_min(intColumn, mvStringColumn), arg_min(intColumn, intColumn), "
-        + "argmax(bigDecimalColumn, bigDecimalColumn), argmax(bigDecimalColumn, doubleColumn) FROM testTable";
+        + "arg_max(bigDecimalColumn, bigDecimalColumn), arg_max(bigDecimalColumn, doubleColumn),"
+        + "arg_min(timestampColumn, timestampColumn), arg_max(bigDecimalColumn, mvDoubleColumn)"
+        + " FROM testTable";
 
     brokerResponse = getBrokerResponse(query);
     resultTable = brokerResponse.getResultTable();
@@ -187,6 +200,8 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(resultTable.getDataSchema().getColumnName(5), "argmin(intColumn,intColumn)");
     assertEquals(resultTable.getDataSchema().getColumnName(6), "argmax(bigDecimalColumn,bigDecimalColumn)");
     assertEquals(resultTable.getDataSchema().getColumnName(7), "argmax(bigDecimalColumn,doubleColumn)");
+    assertEquals(resultTable.getDataSchema().getColumnName(8), "argmin(timestampColumn,timestampColumn)");
+    assertEquals(resultTable.getDataSchema().getColumnName(9), "argmax(bigDecimalColumn,mvDoubleColumn)");
 
     assertEquals(rows.size(), 2);
     assertEquals(rows.get(0)[0], 999L);
@@ -205,9 +220,25 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[6], "360000");
     assertEquals(rows.get(0)[7], 600D);
     assertEquals(rows.get(1)[7], 600D);
+    assertEquals(rows.get(0)[8], 1683138373879L - 1999L);
+    assertEquals(rows.get(1)[8], 1683138373879L - 1999L);
+    assertEquals(rows.get(0)[9], new Double[]{600D, 600D * 600D, 600D * 600D * 600D});
+    assertEquals(rows.get(1)[9], new Double[]{600D, 600D * 600D, 600D * 600D * 600D});
+
+    // Inter segment data type test for boolean column
+    query = "SELECT arg_max(booleanColumn, booleanColumn) FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+
+    assertEquals(rows.size(), 2000);
+    for (int i = 0; i < 2000; i++) {
+      assertEquals(rows.get(i)[0], 1);
+    }
 
     // Inter segment mix aggregation function with different result length
-    // Inter segment string column comparison test
+    // Inter segment string column comparison test, with dedupe
     query = "SELECT sum(intColumn), argmin(stringColumn, doubleColumn), argmin(stringColumn, stringColumn), "
         + "argmin(stringColumn, doubleColumn, doubleColumn) FROM testTable";
 
@@ -254,12 +285,43 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[0], "a22");
     assertEquals(rows.get(1)[1], "a");
 
-    //   TODO: The following query results in an exception, fix the support for multi-value bytes
+    //   TODO: The following query throws an exception, requires support for multi-value bytes column
+    //   TODO: serialization in DataBlock
     //   query = "SELECT arg_min(intColumn, mvBytesColumn) FROM testTable";
     //
     //   brokerResponse = getBrokerResponse(query);
     //   resultTable = brokerResponse.getResultTable();
     //   rows = resultTable.getRows();
+  }
+
+  @Test
+  public void testAggregationDedupe() {
+    // Inter segment dedupe test1 without dedupe
+    String query = "SELECT  "
+        + "argmin(booleanColumn, bigDecimalColumn, intColumn) FROM testTable WHERE doubleColumn <= 1200";
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+
+    assertEquals(rows.size(), 4);
+
+    assertEquals(rows.get(0)[0], 0);
+    assertEquals(rows.get(1)[0], 1200);
+    assertEquals(rows.get(2)[0], 0);
+    assertEquals(rows.get(3)[0], 1200);
+    // test1, with dedupe
+    query = "SELECT  "
+        + "argmin(booleanColumn, bigDecimalColumn, doubleColumn, intColumn) FROM testTable WHERE doubleColumn <= 1200";
+
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+
+    assertEquals(rows.size(), 2);
+
+    assertEquals(rows.get(0)[0], 0);
+    assertEquals(rows.get(1)[0], 0);
   }
 
   @Test
