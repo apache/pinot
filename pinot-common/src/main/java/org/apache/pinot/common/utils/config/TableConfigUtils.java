@@ -29,8 +29,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -443,5 +446,37 @@ public class TableConfigUtils {
       InstancePartitionsType instancePartitionsType) {
     return hasPreConfiguredInstancePartitions(tableConfig)
         && tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType);
+  }
+
+  /**
+   * Get the partition column from InstanceAssignmentConfigUtils
+   * @param tableConfig table config
+   * @return partition column
+   */
+  public static String getPartitionColumn(TableConfig tableConfig) {
+    String partitionColumn = null;
+
+    // check getInstanceAssignmentConfigMap is null or empty,
+    if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+      for (String key : tableConfig.getInstanceAssignmentConfigMap().keySet()) {
+        //check getInstanceAssignmentConfigMap has the key of TableType
+        if (Objects.equals(key, tableConfig.getTableType().toString())) {
+          // if true, set the partitionColumn value.
+          partitionColumn = tableConfig.getInstanceAssignmentConfigMap().get(key).
+              getReplicaGroupPartitionConfig().getPartitionColumn();
+        }
+      }
+    }
+
+    // check, if partitionColumn is not empty, return the value.
+    if (!StringUtils.isEmpty(partitionColumn)) {
+      return partitionColumn;
+    }
+
+    // for backward-compatibility, If partitionColumn value isn't there in InstanceReplicaGroupPartitionConfig
+    // check ReplicaGroupStrategyConfig for partitionColumn
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    return replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
   }
 }
