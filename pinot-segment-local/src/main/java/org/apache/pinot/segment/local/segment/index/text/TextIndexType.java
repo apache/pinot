@@ -194,12 +194,11 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     }
     if (config.getFstType() == FSTType.NATIVE) {
       return new NativeMutableTextIndex(context.getFieldSpec().getName());
-    } else {
-      if (context.getConsumerDir() == null) {
-        throw new IllegalArgumentException("A consumer directory is required");
-      }
-      return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
-          context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude());
     }
+    if (context.getConsumerDir() == null) {
+      throw new IllegalArgumentException("A consumer directory is required");
+    }
+    return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
+        context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude());
   }
 }
