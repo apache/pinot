@@ -3,8 +3,6 @@
   "tableType": "REALTIME",
   "segmentsConfig": {
     "timeColumnName": "created_at_timestamp",
-    "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "365",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "githubEvents",
