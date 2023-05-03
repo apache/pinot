@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexUtil;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
@@ -271,9 +272,8 @@ public class ForwardIndexType
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
       if (isSingleValue) {
-        String allocationContext =
-            buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
-                V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        String allocationContext = IndexUtil.buildAllocationContext(context.getSegmentName(),
+            context.getFieldSpec().getName(), V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
         if (storedType.isFixedWidth()) {
           return new FixedByteSVMutableForwardIndex(false, storedType, context.getCapacity(),
               context.getMemoryManager(), allocationContext);
@@ -293,7 +293,7 @@ public class ForwardIndexType
         // TODO: Add support for variable width (bytes, string, big decimal) MV RAW column types
         assert storedType.isFixedWidth();
         String allocationContext =
-            buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+            IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
                 V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
@@ -302,12 +302,12 @@ public class ForwardIndexType
       }
     } else {
       if (isSingleValue) {
-        String allocationContext = buildAllocationContext(segmentName, column,
+        String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
         return new FixedByteSVMutableForwardIndex(true, FieldSpec.DataType.INT, context.getCapacity(),
             context.getMemoryManager(), allocationContext);
       } else {
-        String allocationContext = buildAllocationContext(segmentName, column,
+        String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),

@@ -66,6 +66,7 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.IndexUtil;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
@@ -443,7 +444,7 @@ public class DictionaryIndexType
     //  copied from). Decide if we want to actually use 10% as the comment said or 21% as we were doing
     int estimatedCardinality = (int) (context.getEstimatedCardinality() * 1.21);
     String dictionaryAllocationContext =
-        buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
+        IndexUtil.buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
     return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
         dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
   }
