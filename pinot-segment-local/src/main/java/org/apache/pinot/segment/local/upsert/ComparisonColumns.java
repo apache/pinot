@@ -52,7 +52,7 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
       Comparable comparisonValue = _values[i];
       Comparable otherComparisonValue = other.getValues()[i];
       if (otherComparisonValue == null) {
-        comparisonResult = 1;
+        continue;
       } else {
         comparisonResult = comparisonValue.compareTo(otherComparisonValue);
       }
