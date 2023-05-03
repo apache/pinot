@@ -245,12 +245,14 @@ public class MemoryEstimator {
     }
 
     try {
+      int invertedColumnsCount = countInvertedColumns();
+
       for (int i = 0; i < numHours.length; i++) {
         int numHoursToConsume = numHours[i];
         if (numHoursToConsume > retentionHours) {
           continue;
         }
-        long secondsToConsume = numHoursToConsume * 3600;
+        long secondsToConsume = numHoursToConsume * 3600L;
         // consuming for _numHoursSampleSegmentConsumed, gives size sampleCompletedSegmentSizeBytes
         // hence, consuming for numHoursToConsume would give:
         long completedSegmentSizeBytes =
@@ -261,7 +263,8 @@ public class MemoryEstimator {
         int totalDocs = (int) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _totalDocsInSampleSegment);
         long memoryForConsumingSegmentPerPartition = getMemoryForConsumingSegmentPerPartition(statsFile, totalDocs);
 
-        memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
+        memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(
+            memoryForConsumingSegmentPerPartition, invertedColumnsCount);
 
         int numActiveSegmentsPerPartition = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
         long activeMemoryForCompletedSegmentsPerPartition =
@@ -372,18 +375,21 @@ public class MemoryEstimator {
    * @param totalMemoryForConsumingSegment
    * @return
    */
-  private long getMemoryForInvertedIndex(long totalMemoryForConsumingSegment) {
+  private long getMemoryForInvertedIndex(long totalMemoryForConsumingSegment, int invertedColumnsCount) {
     // TODO: better way to estimate inverted indexes memory utilization
     long totalInvertedIndexSizeBytes = 0;
-    Map<String, IndexConfig> invertedConfig = StandardIndexes.inverted().getConfig(_tableConfig, _schema);
-    long invertedIndexes = invertedConfig.values().stream()
-        .filter(IndexConfig::isEnabled)
-        .count();
-    if (invertedIndexes > 0) {
+    if (invertedColumnsCount > 0) {
       long memoryForEachColumn = totalMemoryForConsumingSegment / _segmentMetadata.getAllColumns().size();
-      totalInvertedIndexSizeBytes = (long) (memoryForEachColumn * 0.3 * invertedIndexes);
+      totalInvertedIndexSizeBytes = (long) (memoryForEachColumn * 0.3 * invertedColumnsCount);
     }
     return totalInvertedIndexSizeBytes;
+  }
+
+  private int countInvertedColumns() {
+    Map<String, IndexConfig> invertedConfig = StandardIndexes.inverted().getConfig(_tableConfig, _schema);
+    return (int) invertedConfig.values().stream()
+        .filter(IndexConfig::isEnabled)
+        .count();
   }
 
   /**
