@@ -32,7 +32,6 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * TODO: implement mutable indexes.
  * @param <C> the class that represents how this object is configured.
  * @param <IR> the {@link IndexReader} subclass that should be used to read indexes of this type.
  * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
