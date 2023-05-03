@@ -67,7 +67,7 @@ public class DictionaryIndexConfig extends IndexConfig {
       return false;
     }
     DictionaryIndexConfig that = (DictionaryIndexConfig) o;
-    return _onHeap == that._onHeap && _useVarLengthDictionary == that._useVarLengthDictionary;
+    return super.equals(that) && _onHeap == that._onHeap && _useVarLengthDictionary == that._useVarLengthDictionary;
   }
 
   @Override

@@ -20,9 +20,12 @@ package org.apache.pinot.segment.local.segment.index.dictionary;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -39,6 +42,24 @@ public class DictionaryIndexTypeTest {
 
     protected void assertEquals(DictionaryIndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.dictionary()), expected);
+    }
+
+    protected <T extends Throwable> void assertThrows(Class<T> throwableClass, @Nullable Consumer<T> postCheck) {
+      try {
+        getActualConfig("dimInt", StandardIndexes.dictionary());
+        Assert.fail("Throwable " + throwableClass + " was expected to be thrown but it wasn't");
+      } catch (AssertionError error) {
+        throw error;
+      } catch (Throwable t) {
+        if (throwableClass.isInstance(t)) {
+          if (postCheck != null) {
+            postCheck.accept((T) t);
+          }
+        } else {
+          throw new AssertionError(
+              "Unexpected exception found. Expected " + throwableClass + " but " + t.getClass() + " was thrown", t);
+        }
+      }
     }
 
     @Test
@@ -75,6 +96,34 @@ public class DictionaryIndexTypeTest {
           JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
       );
       assertEquals(DictionaryIndexConfig.DISABLED);
+    }
+
+    @Test
+    public void testSortedColumn()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setSortedColumn(Lists.newArrayList("dimInt"));
+      assertEquals(DictionaryIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void testSortedAndNoDictionary()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setSortedColumn(Lists.newArrayList("dimInt"));
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
+      );
+      assertEquals(DictionaryIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void testSortedAndNoDictionaryButConfigured()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setSortedColumn(Lists.newArrayList("dimInt"));
+      _tableConfig.getIndexingConfig().setVarLengthDictionaryColumns(Lists.newArrayList("dimInt"));
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
+      );
+      assertEquals(new DictionaryIndexConfig(false, true));
     }
 
     @Test
@@ -151,7 +200,7 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void newDisabled()
+    public void newNull()
         throws IOException {
       addFieldIndexConfig(""
           + " {\n"
@@ -160,7 +209,7 @@ public class DictionaryIndexTypeTest {
           + "      \"dictionary\": null\n"
           + "    }\n"
           + " }");
-      assertEquals(DictionaryIndexConfig.DISABLED);
+      assertEquals(DictionaryIndexConfig.DEFAULT);
     }
 
     @Test
@@ -221,6 +270,40 @@ public class DictionaryIndexTypeTest {
           + "    }\n"
           + " }");
       assertEquals(new DictionaryIndexConfig(false, true));
+    }
+
+    @Test
+    public void newSortedAndDisabled()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {\n"
+          + "      \"dictionary\": {\n"
+          + "        \"disabled\": true"
+          + "      }\n"
+          + "    }\n"
+          + " }");
+      _tableConfig.getIndexingConfig().setSortedColumn(Lists.newArrayList("dimInt"));
+
+      assertThrows(IllegalStateException.class,
+          (ex) -> Assert.assertEquals(ex.getMessage(), "Cannot disable dictionary in sorted column dimInt"));
+    }
+
+    @Test
+    public void newSortedAndEnabled()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {\n"
+          + "      \"dictionary\": {\n"
+          + "        \"disabled\": false"
+          + "      }\n"
+          + "    }\n"
+          + " }");
+      _tableConfig.getIndexingConfig().setSortedColumn(Lists.newArrayList("dimInt"));
+      assertEquals(DictionaryIndexConfig.DEFAULT);
     }
 
     @Test

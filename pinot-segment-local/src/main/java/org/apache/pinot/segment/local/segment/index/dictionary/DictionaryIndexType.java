@@ -106,8 +106,10 @@ public class DictionaryIndexType
     Set<String> noDictionaryCols = indexLoadingConfig.getNoDictionaryColumns();
     Set<String> onHeapCols = indexLoadingConfig.getOnHeapDictionaryColumns();
     Set<String> varLengthCols = indexLoadingConfig.getVarLengthDictionaryColumns();
+    List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
+
     for (String column : indexLoadingConfig.getAllKnownColumns()) {
-      if (noDictionaryCols.contains(column)) {
+      if (noDictionaryCols.contains(column) && !sortedColumns.contains(column)) {
         result.put(column, DictionaryIndexConfig.disabled());
       } else {
         result.put(column, new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column)));
@@ -167,11 +169,57 @@ public class DictionaryIndexType
           .collect(Collectors.toMap(Function.identity(), valueCalculator));
     };
 
-    return fromNoDictConf
-        .withFallbackAlternative(fromNoDictCol)
-        .withFallbackAlternative(fromFieldConfigList)
-        .withFallbackAlternative(fromIndexingConfig)
-        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()));
+    ColumnConfigDeserializer<DictionaryIndexConfig> oldConfig = (tableConfig, schema) -> {
+      Map<String, DictionaryIndexConfig> deserialized = fromNoDictConf
+          .withFallbackAlternative(fromNoDictCol)
+          .withFallbackAlternative(fromFieldConfigList)
+          .withFallbackAlternative(fromIndexingConfig)
+          .deserialize(tableConfig, schema);
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      if (indexingConfig == null) {
+        return deserialized;
+      }
+      List<String> sortedColumn = indexingConfig.getSortedColumn();
+      if (sortedColumn == null) {
+        return deserialized;
+      }
+      Set<String> varLengthDictionaryColumns = indexingConfig.getVarLengthDictionaryColumns() == null
+          ? Collections.emptySet()
+          : new HashSet<>(indexingConfig.getVarLengthDictionaryColumns());
+      Set<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns() == null
+          ? Collections.emptySet()
+          : new HashSet<>(indexingConfig.getOnHeapDictionaryColumns());
+      for (String column : sortedColumn) {
+        if (deserialized.get(column) != null && deserialized.get(column).isDisabled()) {
+          DictionaryIndexConfig dictConf = new DictionaryIndexConfig(onHeapDictionaryColumns.contains(column),
+              varLengthDictionaryColumns.contains(column));
+          deserialized.put(column, dictConf);
+        }
+      }
+      return deserialized;
+    };
+
+    ColumnConfigDeserializer<DictionaryIndexConfig> newConfig = (tableConfig, schema) -> {
+      Map<String, DictionaryIndexConfig> deserialized =
+          IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
+              .deserialize(tableConfig, schema);
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      if (indexingConfig == null) {
+        return deserialized;
+      }
+      List<String> sortedColumn = indexingConfig.getSortedColumn();
+      if (sortedColumn == null) {
+        return deserialized;
+      }
+      for (String column : sortedColumn) {
+        if (deserialized.get(column) != null && deserialized.get(column).isDisabled()) {
+          throw new IllegalStateException("Cannot disable dictionary in sorted column " + column);
+        }
+      }
+      return deserialized;
+    };
+
+    return oldConfig.withExclusiveAlternative(newConfig);
   }
 
   @Override
