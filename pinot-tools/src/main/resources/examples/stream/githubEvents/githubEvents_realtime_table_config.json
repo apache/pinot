@@ -4,7 +4,7 @@
   "segmentsConfig": {
     "timeColumnName": "created_at_timestamp",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "365",
+    "retentionTimeValue": "5475",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "githubEvents",
