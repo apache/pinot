@@ -57,8 +57,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
-import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
-
 
 public class ForwardIndexType
     extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
@@ -306,14 +304,15 @@ public class ForwardIndexType
       if (isSingleValue) {
         String allocationContext = buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        return new FixedByteSVMutableForwardIndex(true, INT, context.getCapacity(), context.getMemoryManager(),
-            allocationContext);
+        return new FixedByteSVMutableForwardIndex(true, FieldSpec.DataType.INT, context.getCapacity(),
+            context.getMemoryManager(), allocationContext);
       } else {
         String allocationContext = buildAllocationContext(segmentName, column,
             V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
-            context.getCapacity(), Integer.BYTES, context.getMemoryManager(), allocationContext, true, INT);
+            context.getCapacity(), Integer.BYTES, context.getMemoryManager(), allocationContext, true,
+            FieldSpec.DataType.INT);
       }
     }
   }
