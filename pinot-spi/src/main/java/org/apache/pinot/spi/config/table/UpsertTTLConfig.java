@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 /**
@@ -37,38 +38,36 @@ import javax.annotation.Nullable;
 public class UpsertTTLConfig {
 
   @JsonPropertyDescription("ttl time unit, supported time units are DAYS, HOURS, MINUTES, SECONDS, MILLISECONDS")
-  private String _ttlTimeUnit;
+  private TimeUnit _ttlTimeUnit;
   @JsonPropertyDescription("ttl time value")
-  private String _ttlTimeValue;
+  private long _ttlTimeValue;
 
   @JsonCreator
-  public UpsertTTLConfig(@JsonProperty("ttlTimeUnit") @Nullable String ttlTimeUnit,
-      @JsonProperty("ttlTimeValue") @Nullable String ttlTimeValue) {
+  public UpsertTTLConfig(@JsonProperty("ttlTimeUnit") @Nullable TimeUnit ttlTimeUnit,
+      @JsonProperty("ttlTimeValue") @Nullable long ttlTimeValue) {
     _ttlTimeUnit = ttlTimeUnit;
     _ttlTimeValue = ttlTimeValue;
   }
 
-  public String getTtlTimeUnit() {
+  public TimeUnit getTtlTimeUnit() {
     return _ttlTimeUnit;
   }
 
-  public String getTtlTimeValue() {
+  public long getTtlTimeValue() {
     return _ttlTimeValue;
   }
 
   public void setTtlTimeUnit(String ttlTimeUnit) {
-    _ttlTimeUnit = ttlTimeUnit;
+    _ttlTimeUnit = TimeUtils.timeUnitFromString(ttlTimeUnit);
   }
 
-  public void setTtlTimeValue(String ttlTimeValue) {
+  public void setTtlTimeValue(long ttlTimeValue) {
     _ttlTimeValue = ttlTimeValue;
   }
 
   public long getTtlInMs() {
     try {
-      TimeUnit timeUnit = TimeUnit.valueOf(_ttlTimeUnit.toUpperCase());
-      long timeValue = Long.parseLong(_ttlTimeValue);
-      return timeUnit.toMillis(timeValue);
+      return _ttlTimeUnit.toMillis(_ttlTimeValue);
     } catch (Exception e) {
       throw new IllegalArgumentException(
           String.format("Failed to init upsert TTL handler with ttl value: %s and ttl unit: %s", _ttlTimeValue,

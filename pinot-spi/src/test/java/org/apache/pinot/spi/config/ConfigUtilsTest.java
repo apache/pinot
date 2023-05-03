@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.UpsertTTLConfig;
@@ -125,9 +126,8 @@ public class ConfigUtilsTest {
     Assert.assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(),
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES);
 
-    UpsertTTLConfig upsertTTLConfig = new UpsertTTLConfig("HOURS", "1");
+    UpsertTTLConfig upsertTTLConfig = new UpsertTTLConfig(TimeUnit.HOURS, 1);
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableTTL(true);
     upsertConfig.setUpsertTTLConfig(upsertTTLConfig);
     ConfigUtils.applyConfigWithEnvVariables(environment, upsertConfig);
   }

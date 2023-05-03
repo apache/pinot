@@ -406,7 +406,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   private void verifyRemoveExpiredPrimaryKeys() {
-    UpsertTTLConfig ttlConfig = new UpsertTTLConfig("MILLISECONDS", "10");
+    UpsertTTLConfig ttlConfig = new UpsertTTLConfig(TimeUnit.MILLISECONDS, 10);
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList("timeCol"), HashFunction.NONE, null, ttlConfig, false, mock(ServerMetrics.class));
@@ -442,7 +442,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   private void verifyPersistSnapshotForStableSegment() {
-    UpsertTTLConfig ttlConfig = new UpsertTTLConfig("MILLISECONDS", "10");
+    UpsertTTLConfig ttlConfig = new UpsertTTLConfig(TimeUnit.MILLISECONDS, 10);
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList("timeCol"), HashFunction.NONE, null, ttlConfig, false, mock(ServerMetrics.class));
@@ -465,7 +465,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addSegment(segment1, validDocIds1,
         getRecordInfoList(numRecords, primaryKeys, timestamps).iterator());
     assertEquals(nonPersistedSegmentsQueue.size(), 1);
-    assertEquals(nonPersistedSegmentsQueue.peek().getEndtime(), 120);
+    assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 120);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment1);
 
     // add the second segment
@@ -475,7 +475,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addSegment(segment2, validDocIds2,
         getRecordInfoList(2, new int[]{0, 1}, new int[]{130, 130}).iterator());
     assertEquals(nonPersistedSegmentsQueue.size(), 2);
-    assertEquals(nonPersistedSegmentsQueue.peek().getEndtime(), 120);
+    assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 120);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment1);
 
     // add the third segment
@@ -485,17 +485,17 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addSegment(segment3, validDocIds3,
         getRecordInfoList(2, new int[]{0, 1}, new int[]{100, 100}).iterator());
     assertEquals(nonPersistedSegmentsQueue.size(), 3);
-    assertEquals(nonPersistedSegmentsQueue.peek().getEndtime(), 100);
+    assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 100);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment3);
 
     upsertMetadataManager.persistSnapshotForStableSegment(120);
     assertEquals(nonPersistedSegmentsQueue.size(), 2);
-    assertEquals(nonPersistedSegmentsQueue.peek().getEndtime(), 120);
+    assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 120);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment1);
 
     upsertMetadataManager.persistSnapshotForStableSegment(130);
     assertEquals(nonPersistedSegmentsQueue.size(), 1);
-    assertEquals(nonPersistedSegmentsQueue.peek().getEndtime(), 130);
+    assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 130);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment2);
   }
 

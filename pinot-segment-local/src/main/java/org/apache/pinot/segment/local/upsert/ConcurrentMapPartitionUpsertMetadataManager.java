@@ -58,7 +58,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   // keep track of all segments that haven't reach stable state to persist snapshot
   @VisibleForTesting
-  final PriorityBlockingQueue<SegmentInfo> _nonPersistedSegmentsQueue = new PriorityBlockingQueue<>();
+  PriorityBlockingQueue<SegmentInfo> _nonPersistedSegmentsQueue = null;
 
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
@@ -69,6 +69,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       boolean enableSnapshot, ServerMetrics serverMetrics) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, hashFunction, partialUpsertHandler,
         upsertTTLConfig, enableSnapshot, serverMetrics);
+    if (upsertTTLConfig != null && upsertTTLConfig.getTtlInMs() > 0) {
+      _nonPersistedSegmentsQueue = new PriorityBlockingQueue<>();
+    }
   }
 
   @Override
@@ -86,7 +89,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       long endTime = segment.getSegmentMetadata().getEndTime();
       TimeUnit timeUnit = segment.getSegmentMetadata().getTimeUnit();
       long endTimeMs = timeUnit.toMillis(endTime);
-      _nonPersistedSegmentsQueue.add(new SegmentInfo(segment, endTimeMs));
+      if (_nonPersistedSegmentsQueue != null) {
+        _nonPersistedSegmentsQueue.add(new SegmentInfo(segment, endTimeMs));
+      }
     }
 
     AtomicInteger numKeysInWrongSegment = new AtomicInteger();
@@ -187,7 +192,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               }
               return recordLocation;
             });
-        if (_upsertTTLConfig != null && _upsertTTLConfig.getTtlInMs() > 0) {
+        if (_nonPersistedSegmentsQueue != null) {
           _nonPersistedSegmentsQueue.remove(new SegmentInfo(segment, segment.getSegmentMetadata().getEndTime()));
         }
       }
@@ -213,7 +218,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       assert recordLocation.getComparisonValue() != null;
       if (recordLocation.getComparisonValue().compareTo(expiredTimestamp) < 0) {
-        _primaryKeyToRecordLocationMap.remove(primaryKey);
+        _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
       }
     });
   }
@@ -232,10 +237,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
    */
   @Override
   public void doPersistSnapshotForStableSegment(long expiredTimestamp) {
+    if (_nonPersistedSegmentsQueue == null) {
+      throw new RuntimeException(
+          String.format("Caught exception while persisting snapshot: segments queue not initialized, table: %s",
+              _tableNameWithType));
+    }
     if (_nonPersistedSegmentsQueue.size() == 0) {
       return;
     }
-    while (_nonPersistedSegmentsQueue.peek()._endtime < expiredTimestamp) {
+    while (_nonPersistedSegmentsQueue.peek()._endTimeMs < expiredTimestamp) {
       IndexSegment segment = _nonPersistedSegmentsQueue.poll()._segment;
 
       MutableRoaringBitmap validDocIds =
@@ -337,24 +347,24 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @VisibleForTesting
   static class SegmentInfo implements Comparable<SegmentInfo> {
     private final IndexSegment _segment;
-    private final long _endtime;
+    private final long _endTimeMs;
 
-    public SegmentInfo(IndexSegment indexSegment, long endtime) {
+    public SegmentInfo(IndexSegment indexSegment, long endTimeMs) {
       _segment = indexSegment;
-      _endtime = endtime;
+      _endTimeMs = endTimeMs;
     }
 
     public IndexSegment getSegment() {
       return _segment;
     }
 
-    public long getEndtime() {
-      return _endtime;
+    public long getEndTimeMs() {
+      return _endTimeMs;
     }
 
     @Override
     public int compareTo(SegmentInfo si) {
-      return Long.compare(_endtime, si._endtime);
+      return Long.compare(_endTimeMs, si._endTimeMs);
     }
   }
 }

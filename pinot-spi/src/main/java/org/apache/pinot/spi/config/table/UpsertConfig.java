@@ -57,9 +57,6 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
-  @JsonPropertyDescription("Whether to use TTL to reduce upsert metadata memory footprint")
-  private boolean _enableTTL;
-
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
 
@@ -104,10 +101,6 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
-  }
-
-  public boolean isEnableTTL() {
-    return _enableTTL;
   }
 
   @Nullable
@@ -171,10 +164,6 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setEnableSnapshot(boolean enableSnapshot) {
     _enableSnapshot = enableSnapshot;
-  }
-
-  public void setEnableTTL(boolean enableTTL) {
-    _enableTTL = enableTTL;
   }
 
   public void setMetadataManagerClass(String metadataManagerClass) {

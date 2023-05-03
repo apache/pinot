@@ -73,7 +73,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
               _comparisonColumns);
     }
 
-    if (upsertConfig.isEnableTTL() && upsertConfig.getUpsertTTLConfig() != null) {
+    if (upsertConfig.getUpsertTTLConfig() != null) {
       _upsertTTLConfig = upsertConfig.getUpsertTTLConfig();
     }
     _enableSnapshot = upsertConfig.isEnableSnapshot();

@@ -1218,7 +1218,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           downloadSegmentAndReplace(segmentZKMetadata);
           break;
       }
-      if (_tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig().isEnableTTL()) {
+      if (_tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig().getUpsertTTLConfig() != null) {
         // If upsert TTL is enabled, we need to
         // (1) There are multiple servers consuming the same segment but only one of them will commit. All servers need
         // to do PK cleanup and persist snapshots for stable segments.
