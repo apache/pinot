@@ -19,7 +19,6 @@
 package org.apache.pinot.client;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.Future;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -37,8 +36,8 @@ public class PreparedStatementTest {
   public void testPreparedStatementWithDynamicBroker() {
     // Create a connection with dynamic broker selector.
     BrokerSelector mockBrokerSelector = Mockito.mock(BrokerSelector.class);
-    Mockito.when(mockBrokerSelector.selectBroker(Mockito.anyList()))
-        .thenAnswer(i -> ((List<String>) i.getArgument(0)).get(0));
+    Mockito.when(mockBrokerSelector.selectBroker(Mockito.anyString()))
+        .thenAnswer(i -> i.getArgument(0));
     Connection connection = new Connection(mockBrokerSelector, _dummyPinotClientTransport);
 
     PreparedStatement preparedStatement = connection.prepareStatement("SELECT foo FROM bar WHERE baz = ?");

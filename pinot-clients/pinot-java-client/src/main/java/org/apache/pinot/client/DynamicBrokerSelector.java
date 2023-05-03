@@ -87,7 +87,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   @Nullable
   @Override
-  public String selectBroker(List<String> tableNames) {
+  public String selectBroker(String... tableNames) {
     if (tableNames != null) {
       List<List<String>> commonBrokers = new ArrayList<>();
       // getting list of brokers hosting the table.

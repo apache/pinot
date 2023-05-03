@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
@@ -118,7 +117,7 @@ public class Connection {
    */
   public ResultSetGroup execute(@Nullable String tableName, String query)
       throws PinotClientException {
-    List<String> tableNames = (tableName == null) ? resolveTableName(query) : Arrays.asList(tableName);
+    String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query for table: " + tableName);
@@ -177,7 +176,7 @@ public class Connection {
    */
   public Future<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
       throws PinotClientException {
-    List<String> tableNames = (tableName == null) ? resolveTableName(query) : Arrays.asList(tableName);
+    String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);
     return new ResultSetGroupFuture(_transport.executeQueryAsync(brokerHostPort, query));
   }
@@ -188,14 +187,15 @@ public class Connection {
    * @return name of all the tables used in a sql query.
    */
   @Nullable
-  private static List<String> resolveTableName(String query) {
+  private static String[] resolveTableName(String query) {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      return CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+      List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+      return tableNames.toArray(String[]::new);
     } catch (Exception e) {
       LOGGER.error("Cannot parse table name from query: {}", query, e);
-      return null;
     }
+    return null;
   }
 
   /**

@@ -189,7 +189,7 @@ public class BrokerCache {
     _brokerData = getBrokerData(responses);
   }
 
-  public String getBroker(List<String> tableNames) {
+  public String getBroker(String... tableNames) {
     List<String> brokers;
     if (tableNames == null) {
       brokers = _brokerData.getBrokers();

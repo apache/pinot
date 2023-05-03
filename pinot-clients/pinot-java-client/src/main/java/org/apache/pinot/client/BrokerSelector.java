@@ -26,7 +26,7 @@ public interface BrokerSelector {
    * @param tableNames
    * @return
    */
-  String selectBroker(List<String> tableNames);
+  String selectBroker(String... tableNames);
 
   /**
    * Returns list of all brokers.

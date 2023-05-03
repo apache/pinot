@@ -55,7 +55,7 @@ public class ControllerBasedBrokerSelector implements BrokerSelector {
 
 
   @Override
-  public String selectBroker(List<String> tableNames) {
+  public String selectBroker(String... tableNames) {
     return _brokerCache.getBroker(tableNames);
   }
 
