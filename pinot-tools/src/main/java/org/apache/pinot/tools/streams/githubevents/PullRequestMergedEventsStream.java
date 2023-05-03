@@ -70,7 +70,8 @@ public class PullRequestMergedEventsStream {
     try {
       if (schemaFilePath == null) {
         ClassLoader classLoader = PullRequestMergedEventsStream.class.getClassLoader();
-        URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
+        URL resource = classLoader.getResource(
+            "examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_schema.json");
         Preconditions.checkNotNull(resource);
         pinotSchema = new File(resource.getFile());
       } else {
