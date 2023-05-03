@@ -191,7 +191,7 @@ public class Connection {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
       List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-      return tableNames.toArray(String[]::new);
+      return tableNames.toArray(new String[0]);
     } catch (Exception e) {
       LOGGER.error("Cannot parse table name from query: {}", query, e);
     }
