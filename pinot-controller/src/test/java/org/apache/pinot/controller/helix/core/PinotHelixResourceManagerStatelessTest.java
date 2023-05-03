@@ -805,17 +805,17 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom = Collections.emptyList();
     List<String> segmentsTo = Arrays.asList("s20", "s21");
     String lineageEntryId =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom, segmentsTo, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom, segmentsTo, false, null);
     assertThrows(RuntimeException.class,
         () -> _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId,
-            new EndReplaceSegmentsRequest(Arrays.asList("s9", "s6"))));
+            new EndReplaceSegmentsRequest(Arrays.asList("s9", "s6"), null)));
     // Try after new segments added to the table
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s20"), "downloadUrl");
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s21"), "downloadUrl");
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId,
-        new EndReplaceSegmentsRequest(Arrays.asList("s21")));
+        new EndReplaceSegmentsRequest(Arrays.asList("s21"), null));
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds(), Collections.singleton(lineageEntryId));
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), segmentsFrom);
@@ -847,7 +847,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom1 = Collections.emptyList();
     List<String> segmentsTo1 = Arrays.asList("s5", "s6");
     String lineageEntryId1 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom1, segmentsTo1, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom1, segmentsTo1, false, null);
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds(), Collections.singleton(lineageEntryId1));
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId1).getSegmentsFrom(), segmentsFrom1);
@@ -857,15 +857,15 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Check invalid segmentsTo
     assertThrows(IllegalStateException.class,
         () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"),
-            Arrays.asList("s3", "s4"), false));
+            Arrays.asList("s3", "s4"), false, null));
     assertThrows(IllegalStateException.class,
         () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"),
-            Collections.singletonList("s2"), false));
+            Collections.singletonList("s2"), false, null));
 
     // Check invalid segmentsFrom
     assertThrows(IllegalStateException.class,
         () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s6"),
-            Collections.singletonList("s7"), false));
+            Collections.singletonList("s7"), false, null));
 
     // Invalid table
     assertThrows(RuntimeException.class,
@@ -898,7 +898,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom2 = Arrays.asList("s1", "s2");
     List<String> segmentsTo2 = Arrays.asList("merged_t1_0", "merged_t1_1");
     String lineageEntryId2 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom2, segmentsTo2, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom2, segmentsTo2, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertSetEquals(segmentLineage.getLineageEntryIds(), lineageEntryId1, lineageEntryId2);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), segmentsFrom2);
@@ -914,10 +914,10 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Revert the entry with partial data uploaded without forceRevert
     assertThrows(RuntimeException.class,
-        () -> _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId2, false));
+        () -> _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId2, false, null));
 
     // Revert the entry with partial data uploaded with forceRevert
-    _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId2, true);
+    _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId2, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.REVERTED);
 
@@ -930,7 +930,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom3 = Arrays.asList("s1", "s2");
     List<String> segmentsTo3 = Arrays.asList("merged_t2_0", "merged_t2_1");
     String lineageEntryId3 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom3, segmentsTo3, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom3, segmentsTo3, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertSetEquals(segmentLineage.getLineageEntryIds(), lineageEntryId1, lineageEntryId2, lineageEntryId3);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsFrom(), segmentsFrom3);
@@ -945,11 +945,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom4 = Arrays.asList("s1", "s2");
     List<String> segmentsTo4 = Arrays.asList("merged_t3_0", "merged_t3_1");
     assertThrows(RuntimeException.class,
-        () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom4, segmentsTo4, false));
+        () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom4, segmentsTo4, false, null));
 
     // Test force clean up case
     String lineageEntryId4 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom4, segmentsTo4, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom4, segmentsTo4, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertSetEquals(segmentLineage.getLineageEntryIds(), lineageEntryId1, lineageEntryId2, lineageEntryId3,
         lineageEntryId4);
@@ -985,7 +985,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom5 = Collections.emptyList();
     List<String> segmentsTo5 = Arrays.asList("s7", "s8");
     String lineageEntryId5 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom5, segmentsTo5, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom5, segmentsTo5, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertSetEquals(segmentLineage.getLineageEntryIds(), lineageEntryId1, lineageEntryId2, lineageEntryId3,
         lineageEntryId4, lineageEntryId5);
@@ -998,7 +998,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom6 = Collections.emptyList();
     List<String> segmentsTo6 = Arrays.asList("s7", "s8");
     String lineageEntryId6 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom6, segmentsTo6, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom6, segmentsTo6, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertSetEquals(segmentLineage.getLineageEntryIds(), lineageEntryId1, lineageEntryId2, lineageEntryId3,
         lineageEntryId4, lineageEntryId6);
@@ -1015,7 +1015,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom7 = Collections.emptyList();
     List<String> segmentsTo7 = Arrays.asList("s9", "s10");
     String lineageEntryId7 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom7, segmentsTo7, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom7, segmentsTo7, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 6);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getState(), LineageEntryState.IN_PROGRESS);
@@ -1039,7 +1039,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom8 = Arrays.asList("s9", "s10");
     List<String> segmentsTo8 = Arrays.asList("s11", "s12");
     String lineageEntryId8 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom8, segmentsTo8, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom8, segmentsTo8, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 7);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getSegmentsFrom(), segmentsFrom8);
@@ -1055,7 +1055,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom9 = Arrays.asList("s0", "s9");
     List<String> segmentsTo9 = Arrays.asList("s13", "s14");
     String lineageEntryId9 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom9, segmentsTo9, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom9, segmentsTo9, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 8);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getState(), LineageEntryState.REVERTED);
@@ -1081,7 +1081,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom10 = Arrays.asList("s13", "s14");
     List<String> segmentsTo10 = Collections.emptyList();
     String lineageEntryId10 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom10, segmentsTo10, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom10, segmentsTo10, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 9);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getState(), LineageEntryState.IN_PROGRESS);
@@ -1121,7 +1121,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom1 = Arrays.asList("s0", "s1", "s2");
     List<String> segmentsTo1 = Arrays.asList("s3", "s4", "s5");
     String lineageEntryId1 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom1, segmentsTo1, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom1, segmentsTo1, false, null);
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds(), Collections.singleton(lineageEntryId1));
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId1).getSegmentsFrom(), segmentsFrom1);
@@ -1153,7 +1153,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom2 = Arrays.asList("s3", "s4", "s5");
     List<String> segmentsTo2 = Arrays.asList("s6", "s7", "s8");
     String lineageEntryId2 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom2, segmentsTo2, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom2, segmentsTo2, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), segmentsFrom2);
@@ -1164,7 +1164,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Reverting the first entry should fail
     assertThrows(RuntimeException.class,
-        () -> _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId1, false));
+        () -> _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId1, false, null));
 
     // Add partial segments to indicate incomplete protocol
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
@@ -1180,7 +1180,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom3 = Arrays.asList("s3", "s4", "s5");
     List<String> segmentsTo3 = Arrays.asList("s9", "s10", "s11");
     String lineageEntryId3 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom3, segmentsTo3, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom3, segmentsTo3, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 3);
 
@@ -1215,7 +1215,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Call revert segment replacements (s3, s4, s5) <- (s9, s10, s11) to check if the revertReplaceSegments correctly
     // deleted (s9, s10, s11).
-    _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId3, false);
+    _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId3, false, null);
     assertEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).size(), 3);
     assertSetEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true), "s3", "s4", "s5");
 
@@ -1231,7 +1231,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom4 = Arrays.asList("s3", "s4", "s5");
     List<String> segmentsTo4 = Arrays.asList("s12", "s13", "s14");
     String lineageEntryId4 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom4, segmentsTo4, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom4, segmentsTo4, true, null);
     assertSetEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false), "s3", "s4", "s5");
 
     // Upload the new segments (s12, s13, s14)
@@ -1251,7 +1251,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom5 = Collections.emptyList();
     List<String> segmentsTo5 = Arrays.asList("s15", "s16");
     String lineageEntryId5 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom5, segmentsTo5, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom5, segmentsTo5, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getSegmentsFrom(), segmentsFrom5);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getSegmentsTo(), segmentsTo5);
@@ -1266,7 +1266,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom6 = Collections.emptyList();
     List<String> segmentsTo6 = Arrays.asList("s17", "s18");
     String lineageEntryId6 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom6, segmentsTo6, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom6, segmentsTo6, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getState(), LineageEntryState.IN_PROGRESS);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getState(), LineageEntryState.IN_PROGRESS);
@@ -1287,7 +1287,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom7 = Arrays.asList("s17", "s18");
     List<String> segmentsTo7 = Arrays.asList("s19", "s20");
     String lineageEntryId7 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom7, segmentsTo7, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom7, segmentsTo7, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId7).getSegmentsFrom(), segmentsFrom7);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId7).getSegmentsTo(), segmentsTo7);
@@ -1302,7 +1302,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom8 = Arrays.asList("s14", "s17");
     List<String> segmentsTo8 = Arrays.asList("s21", "s22");
     String lineageEntryId8 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom8, segmentsTo8, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom8, segmentsTo8, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId7).getState(), LineageEntryState.REVERTED);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getState(), LineageEntryState.IN_PROGRESS);
@@ -1324,7 +1324,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom9 = Arrays.asList("s21", "s22");
     List<String> segmentsTo9 = Arrays.asList("s23", "s24");
     String lineageEntryId9 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom9, segmentsTo9, false);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom9, segmentsTo9, false, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsFrom(), segmentsFrom9);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsTo(), segmentsTo9);
@@ -1341,7 +1341,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> segmentsFrom10 = Arrays.asList("s21", "s22");
     List<String> segmentsTo10 = Arrays.asList("s24", "s25");
     String lineageEntryId10 =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom10, segmentsTo10, true);
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom10, segmentsTo10, true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsFrom(), segmentsFrom9);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsTo(), Collections.singletonList("s23"));

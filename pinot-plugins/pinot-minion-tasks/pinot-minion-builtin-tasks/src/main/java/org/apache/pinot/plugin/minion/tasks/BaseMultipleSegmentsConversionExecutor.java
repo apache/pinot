@@ -148,7 +148,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
               .collect(Collectors.toList());
       String lineageEntryId =
           SegmentConversionUtils.startSegmentReplace(context.getTableNameWithType(), context.getUploadURL(),
-              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), context.getAuthProvider());
+              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo, null), context.getAuthProvider());
       context.setCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID, lineageEntryId);
     }
   }

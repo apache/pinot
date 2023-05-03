@@ -70,6 +70,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
@@ -630,7 +631,8 @@ public class PinotSegmentUploadDownloadRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     try {
       String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
-          startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup);
+          startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
+          startReplaceSegmentsRequest.getCustomMap());
       return Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
@@ -646,11 +648,10 @@ public class PinotSegmentUploadDownloadRestletResource {
   public Response endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Fields belonging to end replace segment request")
-        EndReplaceSegmentsRequest endReplaceSegmentsRequest,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
-      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId
-      ) {
+      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
+      @ApiParam(value = "Fields belonging to end replace segment request", required = false)
+          EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -681,7 +682,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Segment lineage entry id to revert", required = true) @QueryParam("segmentLineageEntryId")
           String segmentLineageEntryId,
       @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
-      @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert) {
+      @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
+      @ApiParam(value = "Fields belonging to revert replace segment request", required = false)
+          RevertReplaceSegmentsRequest revertReplaceSegmentsRequest) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -692,7 +695,8 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       // Check that the segment lineage entry id is valid
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-      _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert);
+      _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
+          revertReplaceSegmentsRequest);
       return Response.ok().build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
