@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,12 +56,12 @@ public class MailboxService {
   private final String _hostname;
   private final int _port;
   private final PinotConfiguration _config;
-  private final Consumer<String> _receiveMailCallback;
+  private final Consumer<OpChainId> _receiveMailCallback;
   private final ChannelManager _channelManager = new ChannelManager();
 
   private GrpcMailboxServer _grpcMailboxServer;
 
-  public MailboxService(String hostname, int port, PinotConfiguration config, Consumer<String> receiveMailCallback) {
+  public MailboxService(String hostname, int port, PinotConfiguration config, Consumer<OpChainId> receiveMailCallback) {
     _hostname = hostname;
     _port = port;
     _config = config;
