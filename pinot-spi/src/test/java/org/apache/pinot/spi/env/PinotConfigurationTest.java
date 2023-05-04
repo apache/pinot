@@ -207,6 +207,21 @@ public class PinotConfigurationTest {
     new PinotConfiguration(new PinotFSSpec());
   }
 
+  @Test
+  public void assertPropertyInterpolation() {
+    Map<String, Object> configs = new HashMap<>();
+    configs.put("config.property.1", "${sys:PINOT_CONFIGURATION_TEST_VAR}");
+
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(configs);
+
+    System.setProperty("PINOT_CONFIGURATION_TEST_VAR", "val1");
+
+    Assert.assertEquals(pinotConfiguration.getProperty("config.property.1"), "val1");
+    Assert.assertEquals(pinotConfiguration.getProperty("config.property.1", "defaultVal"), "val1");
+
+    System.clearProperty("PINOT_CONFIGURATION_TEST_VAR");
+  }
+
   private void copyClasspathResource(String classpathResource, String target)
       throws IOException {
     try (InputStream inputStream = PinotConfigurationTest.class.getResourceAsStream(classpathResource)) {
