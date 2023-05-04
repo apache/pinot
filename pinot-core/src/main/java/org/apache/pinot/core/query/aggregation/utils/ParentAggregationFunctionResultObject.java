@@ -20,8 +20,14 @@ package org.apache.pinot.core.query.aggregation.utils;
 
 import java.io.Serializable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter;
 
 
+/**
+ * Interface for the result of a parent aggregation function, as can be used to populate the results of corresponding
+ * of child aggregation functions. Each child aggregation function will have a corresponding column in the result
+ * schema, please see {@link ParentAggregationResultRewriter} for more details.
+ */
 public interface ParentAggregationFunctionResultObject
     extends Comparable<ParentAggregationFunctionResultObject>, Serializable {
 

@@ -42,16 +42,18 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.fail;
 
 
 /**
- * Queries test for histogram queries.
+ * Queries test for argMin/argMax functions.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ArgMinMaxTest extends BaseQueriesTest {
@@ -287,11 +289,15 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     //   TODO: The following query throws an exception, requires support for multi-value bytes column
     //   TODO: serialization in DataBlock
-    //   query = "SELECT arg_min(intColumn, mvBytesColumn) FROM testTable";
-    //
-    //   brokerResponse = getBrokerResponse(query);
-    //   resultTable = brokerResponse.getResultTable();
-    //   rows = resultTable.getRows();
+    query = "SELECT arg_min(intColumn, mvBytesColumn) FROM testTable";
+
+    try {
+      brokerResponse = getBrokerResponse(query);
+      fail("remove this test case, now mvBytesColumn works correctly in serialization");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage()
+          .contains("java.lang.IllegalArgumentException: Unsupported type of value: byte[][]"));
+    }
   }
 
   @Test

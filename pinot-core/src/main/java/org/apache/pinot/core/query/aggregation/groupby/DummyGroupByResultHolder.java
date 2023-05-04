@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 /**
  * Placeholder GroupByResultHolder that does noop
+ * This is used for ChildAggregationFunction
  */
 public class DummyGroupByResultHolder implements GroupByResultHolder {
   @Override

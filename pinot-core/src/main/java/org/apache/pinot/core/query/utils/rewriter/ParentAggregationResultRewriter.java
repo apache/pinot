@@ -30,13 +30,14 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
+ * Used in aggregation and group-by queries with aggregation functions.
  * Use the result of parent aggregation functions to populate the result of child aggregation functions.
  * This implementation is based on the column names of the result schema.
  * The result column name of a parent aggregation function has the following format:
  * CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + aggregationFunctionType + FunctionID
  * The result column name of corresponding child aggregation function has the following format:
- * aggregationFunctionType + FunctionID + CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX
- * + childFunctionKey
+ * CHILD_AGGREGATION_NAME_PREFIX + aggregationFunctionType + operands + CHILD_AGGREGATION_SEPERATOR
+ * + aggregationFunctionType + parent FunctionID + CHILD_KEY_SEPERATOR + column key in parent function
  * This approach will not work with `AS` clauses as they alter the column names.
  * TODO: Add support for `AS` clauses.
  */
@@ -44,7 +45,7 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
   public ParentAggregationResultRewriter() {
   }
 
-  public static Map<String, ChildFunctionMapping> createChildFunctionMapping(DataSchema schema, Object[] row) {
+  private static Map<String, ChildFunctionMapping> createChildFunctionMapping(DataSchema schema, Object[] row) {
     Map<String, ChildFunctionMapping> childFunctionMapping = new HashMap<>();
     for (int i = 0; i < schema.size(); i++) {
       String columnName = schema.getColumnName(i);
@@ -66,6 +67,11 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
   }
 
   public RewriterResult rewrite(DataSchema dataSchema, List<Object[]> rows) {
+    // If there are no rows, return the original schema and rows
+    if (rows.isEmpty()) {
+      return new RewriterResult(dataSchema, rows);
+    }
+
     int numParentAggregationFunctions = 0;
     // Count the number of parent aggregation functions
     for (int i = 0; i < dataSchema.size(); i++) {
@@ -74,7 +80,7 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
       }
     }
 
-    if (numParentAggregationFunctions == 0 || rows.isEmpty()) {
+    if (numParentAggregationFunctions == 0) {
       // no change to the result
       return new RewriterResult(dataSchema, rows);
     }
@@ -175,10 +181,19 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
   }
 
   /**
-   * Mapping from child function key to the
-   * parent result object,
-   * offset of the parent result column in original result row,
-   * and the nested offset of the child function result in the parent data block
+   * Mapping from child function key to
+   * 1. the parent result object,
+   * 2. offset of the parent result column in original result row,
+   * 3. the nested offset of the child function result in the parent data block
+   *
+   * For example, for a list of aggregation functions result:
+   *            0                      1                    2                   3
+   *            |                      |                    |                   |
+   * "child_argmin(a, b, x) ,child_argmin(a, b, y), child_argmin(a, b, z), parent_argmin(a, b, x, y, z)"
+   *                                                                                           |  |  |
+   *                                                                                           0  1  2
+   * offset of the parent of child_argmin(a, b, y) is 3
+   * nested offset is child_argmin(a, b, y) is 1
    */
   private static class ChildFunctionMapping {
     private final ParentAggregationFunctionResultObject _parent;

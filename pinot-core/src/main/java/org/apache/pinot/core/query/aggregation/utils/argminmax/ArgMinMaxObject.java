@@ -39,58 +39,75 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
 
   // if the object is created but not yet populated, this happens e.g. when a server has no data for
   // the query and returns a default value
-  public static final int NOT_NULL_OBJECT = 1;
-  public static final int IS_NULL_OBJECT = 0;
+  enum ObjectNullState {
+    NULL(0),
+    NON_NULL(1);
+
+    final int _state;
+
+    ObjectNullState(int i) {
+      _state = i;
+    }
+
+    int getState() {
+      return _state;
+    }
+  }
+
   // if the object contains non null values
   private boolean _isNull;
 
-  // if the value is stored in a mutable list, this is true only when the Object is deserialized
-  // from a byte buffer
+  // if the value is stored in a mutable list, this is false only when the Object is deserialized from a byte buffer
+  // if the object is mutable, it means that the object is read only and the values are stored in
+  // _immutableMeasuringKeys and _immutableProjectionVals, otherwise we read and write from _extremumMeasuringKeys
+  // and _extremumProjectionValues
   private boolean _mutable;
 
   // the schema of the measuring columns
-  private final DataSchema _keySchema;
+  private final DataSchema _measuringSchema;
   // the schema of the projection columns
-  private final DataSchema _valSchema;
+  private final DataSchema _projectionSchema;
 
-  // the size of the extremum key cols and value clos
-  private final int _sizeOfExtremumKeys;
-  private final int _sizeOfExtremumVals;
+  // the size of the extremum key cols and value cols
+  private final int _sizeOfExtremumMeasuringKeys;
+  private final int _sizeOfExtremumProjectionVals;
 
-  // the current extremum keys
-  private Comparable[] _extremumKeys = null;
-  // the current extremum values
-  private final List<Object[]> _extremumValues = new ArrayList<>();
+  // the current extremum keys, keys are the extremum values of the measuring columns,
+  // used for comparison
+  private Comparable[] _extremumMeasuringKeys = null;
+  // the current extremum values, values are the values of the projection columns
+  // associated with the minimum measuring column, used for projection
+  private final List<Object[]> _extremumProjectionValues = new ArrayList<>();
 
   // used for ser/de
-  private DataBlock _immutableKeys;
-  private DataBlock _immutableVals;
+  private DataBlock _immutableMeasuringKeys;
+  private DataBlock _immutableProjectionVals;
 
-  public ArgMinMaxObject(DataSchema keySchema, DataSchema valSchema) {
+  public ArgMinMaxObject(DataSchema measuringSchema, DataSchema projectionSchema) {
     _isNull = true;
     _mutable = true;
 
-    _keySchema = keySchema;
-    _valSchema = valSchema;
+    _measuringSchema = measuringSchema;
+    _projectionSchema = projectionSchema;
 
-    _sizeOfExtremumKeys = _keySchema.size();
-    _sizeOfExtremumVals = _valSchema.size();
+    _sizeOfExtremumMeasuringKeys = _measuringSchema.size();
+    _sizeOfExtremumProjectionVals = _projectionSchema.size();
   }
 
   public ArgMinMaxObject(ByteBuffer byteBuffer)
       throws IOException {
     _mutable = false;
-    _isNull = byteBuffer.getInt() == IS_NULL_OBJECT;
+    _isNull = byteBuffer.getInt() == ObjectNullState.NULL.getState();
     byteBuffer = byteBuffer.slice();
-    _immutableKeys = DataBlockUtils.getDataBlock(byteBuffer);
+    _immutableMeasuringKeys = DataBlockUtils.getDataBlock(byteBuffer);
     byteBuffer = byteBuffer.slice();
-    _immutableVals = DataBlockUtils.getDataBlock(byteBuffer);
+    _immutableProjectionVals = DataBlockUtils.getDataBlock(byteBuffer);
 
-    _keySchema = _immutableKeys.getDataSchema();
-    _valSchema = _immutableVals.getDataSchema();
+    _measuringSchema = _immutableMeasuringKeys.getDataSchema();
+    _projectionSchema = _immutableProjectionVals.getDataSchema();
 
-    _sizeOfExtremumKeys = _keySchema.size();
-    _sizeOfExtremumVals = _valSchema.size();
+    _sizeOfExtremumMeasuringKeys = _measuringSchema.size();
+    _sizeOfExtremumProjectionVals = _projectionSchema.size();
   }
 
   public static ArgMinMaxObject fromBytes(byte[] bytes)
@@ -111,16 +128,17 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     if (_isNull) {
       // serialize the null object with schemas
-      dataOutputStream.writeInt(IS_NULL_OBJECT);
-      _immutableKeys = DataBlockBuilder.buildFromRows(Collections.emptyList(), _keySchema);
-      _immutableVals = DataBlockBuilder.buildFromRows(Collections.emptyList(), _valSchema);
+      dataOutputStream.writeInt(ObjectNullState.NULL.getState());
+      _immutableMeasuringKeys = DataBlockBuilder.buildFromRows(Collections.emptyList(), _measuringSchema);
+      _immutableProjectionVals = DataBlockBuilder.buildFromRows(Collections.emptyList(), _projectionSchema);
     } else {
-      dataOutputStream.writeInt(NOT_NULL_OBJECT);
-      _immutableKeys = DataBlockBuilder.buildFromRows(Collections.singletonList(_extremumKeys), _keySchema);
-      _immutableVals = DataBlockBuilder.buildFromRows(_extremumValues, _valSchema);
+      dataOutputStream.writeInt(ObjectNullState.NON_NULL.getState());
+      _immutableMeasuringKeys =
+          DataBlockBuilder.buildFromRows(Collections.singletonList(_extremumMeasuringKeys), _measuringSchema);
+      _immutableProjectionVals = DataBlockBuilder.buildFromRows(_extremumProjectionValues, _projectionSchema);
     }
-    dataOutputStream.write(_immutableKeys.toBytes());
-    dataOutputStream.write(_immutableVals.toBytes());
+    dataOutputStream.write(_immutableMeasuringKeys.toBytes());
+    dataOutputStream.write(_immutableProjectionVals.toBytes());
     return byteArrayOutputStream.toByteArray();
   }
 
@@ -131,16 +149,17 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
    * = 0: new key is the same as the current extremum
    * < 0: current key is still the extremum
    */
-  public int compareAndSetKey(List<ArgMinMaxWrapperValSet> argMinMaxWrapperValSets, int offset, boolean isMax) {
+  public int compareAndSetKey(List<ArgMinMaxMeasuringValSetWrapper> argMinMaxWrapperValSets, int offset,
+      boolean isMax) {
     Preconditions.checkState(_mutable, "Cannot compare and set key after the object is serialized");
     if (!_isNull) {
-      for (int i = 0; i < _sizeOfExtremumKeys; i++) {
-        ArgMinMaxWrapperValSet argMinMaxWrapperValSet = argMinMaxWrapperValSets.get(i);
-        int result = argMinMaxWrapperValSet.compare(offset, _extremumKeys[i]);
+      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
+        ArgMinMaxMeasuringValSetWrapper argMinMaxWrapperValSet = argMinMaxWrapperValSets.get(i);
+        int result = argMinMaxWrapperValSet.compare(offset, _extremumMeasuringKeys[i]);
         if (result != 0) {
           if (isMax ? result < 0 : result > 0) {
-            for (int j = 0; j < _sizeOfExtremumKeys; j++) {
-              _extremumKeys[j] = argMinMaxWrapperValSets.get(j).getComparable(offset);
+            for (int j = 0; j < _sizeOfExtremumMeasuringKeys; j++) {
+              _extremumMeasuringKeys[j] = argMinMaxWrapperValSets.get(j).getComparable(offset);
             }
             return 1;
           }
@@ -149,9 +168,9 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
       }
     } else {
       _isNull = false;
-      _extremumKeys = new Comparable[_sizeOfExtremumKeys];
-      for (int i = 0; i < _sizeOfExtremumKeys; i++) {
-        _extremumKeys[i] = argMinMaxWrapperValSets.get(i).getComparable(offset);
+      _extremumMeasuringKeys = new Comparable[_sizeOfExtremumMeasuringKeys];
+      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
+        _extremumMeasuringKeys[i] = argMinMaxWrapperValSets.get(i).getComparable(offset);
       }
     }
     return 0;
@@ -161,52 +180,52 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
    * Used during segment processing with compareAndSetKey
    * Set the vals to the new vals if the key is replaced.
    */
-  public void setToNewVal(List<ArgMinMaxWrapperValSet> argMinMaxWrapperValSets, int offset) {
-    _extremumValues.clear();
-    addVal(argMinMaxWrapperValSets, offset);
+  public void setToNewVal(List<ArgMinMaxProjectionValSetWrapper> argMinMaxProjectionValSetWrappers, int offset) {
+    _extremumProjectionValues.clear();
+    addVal(argMinMaxProjectionValSetWrappers, offset);
   }
 
   /**
    * Used during segment processing with compareAndSetKey
    * Add the vals to the list of vals if the key is the same.
    */
-  public void addVal(List<ArgMinMaxWrapperValSet> argMinMaxWrapperValSets, int offset) {
-    Object[] val = new Object[_valSchema.size()];
-    for (int i = 0; i < _valSchema.size(); i++) {
-      val[i] = argMinMaxWrapperValSets.get(i).getValue(offset);
+  public void addVal(List<ArgMinMaxProjectionValSetWrapper> argMinMaxProjectionValSetWrappers, int offset) {
+    Object[] val = new Object[_projectionSchema.size()];
+    for (int i = 0; i < _projectionSchema.size(); i++) {
+      val[i] = argMinMaxProjectionValSetWrappers.get(i).getValue(offset);
     }
-    _extremumValues.add(val);
+    _extremumProjectionValues.add(val);
   }
 
   public Comparable[] getExtremumKey() {
     if (_mutable) {
-      return _extremumKeys;
+      return _extremumMeasuringKeys;
     } else {
-      Comparable[] extremumKeys = new Comparable[_sizeOfExtremumKeys];
-      for (int i = 0; i < _sizeOfExtremumKeys; i++) {
-        switch (_keySchema.getColumnDataType(i)) {
+      Comparable[] extremumKeys = new Comparable[_sizeOfExtremumMeasuringKeys];
+      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
+        switch (_measuringSchema.getColumnDataType(i)) {
           case INT:
           case BOOLEAN:
-            extremumKeys[i] = _immutableKeys.getInt(0, i);
+            extremumKeys[i] = _immutableMeasuringKeys.getInt(0, i);
             break;
           case LONG:
           case TIMESTAMP:
-            extremumKeys[i] = _immutableKeys.getLong(0, i);
+            extremumKeys[i] = _immutableMeasuringKeys.getLong(0, i);
             break;
           case FLOAT:
-            extremumKeys[i] = _immutableKeys.getFloat(0, i);
+            extremumKeys[i] = _immutableMeasuringKeys.getFloat(0, i);
             break;
           case DOUBLE:
-            extremumKeys[i] = _immutableKeys.getDouble(0, i);
+            extremumKeys[i] = _immutableMeasuringKeys.getDouble(0, i);
             break;
           case STRING:
-            extremumKeys[i] = _immutableKeys.getString(0, i);
+            extremumKeys[i] = _immutableMeasuringKeys.getString(0, i);
             break;
           case BIG_DECIMAL:
-            extremumKeys[i] = _immutableKeys.getBigDecimal(0, i);
+            extremumKeys[i] = _immutableMeasuringKeys.getBigDecimal(0, i);
             break;
           default:
-            throw new IllegalStateException("Unsupported data type: " + _keySchema.getColumnDataType(i));
+            throw new IllegalStateException("Unsupported data type: " + _measuringSchema.getColumnDataType(i));
         }
       }
       return extremumKeys;
@@ -219,41 +238,41 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
   @Override
   public Object getField(int rowId, int colId) {
     if (_mutable) {
-      return _extremumValues.get(rowId)[colId];
+      return _extremumProjectionValues.get(rowId)[colId];
     } else {
-      switch (_valSchema.getColumnDataType(colId)) {
+      switch (_projectionSchema.getColumnDataType(colId)) {
         case BOOLEAN:
         case INT:
-          return _immutableVals.getInt(rowId, colId);
+          return _immutableProjectionVals.getInt(rowId, colId);
         case TIMESTAMP:
         case LONG:
-          return _immutableVals.getLong(rowId, colId);
+          return _immutableProjectionVals.getLong(rowId, colId);
         case FLOAT:
-          return _immutableVals.getFloat(rowId, colId);
+          return _immutableProjectionVals.getFloat(rowId, colId);
         case DOUBLE:
-          return _immutableVals.getDouble(rowId, colId);
+          return _immutableProjectionVals.getDouble(rowId, colId);
         case JSON:
         case STRING:
-          return _immutableVals.getString(rowId, colId);
+          return _immutableProjectionVals.getString(rowId, colId);
         case BYTES:
-          return _immutableVals.getBytes(rowId, colId);
+          return _immutableProjectionVals.getBytes(rowId, colId);
         case BIG_DECIMAL:
-          return _immutableVals.getBigDecimal(rowId, colId);
+          return _immutableProjectionVals.getBigDecimal(rowId, colId);
         case BOOLEAN_ARRAY:
         case INT_ARRAY:
-          return _immutableVals.getIntArray(rowId, colId);
+          return _immutableProjectionVals.getIntArray(rowId, colId);
         case TIMESTAMP_ARRAY:
         case LONG_ARRAY:
-          return _immutableVals.getLongArray(rowId, colId);
+          return _immutableProjectionVals.getLongArray(rowId, colId);
         case FLOAT_ARRAY:
-          return _immutableVals.getFloatArray(rowId, colId);
+          return _immutableProjectionVals.getFloatArray(rowId, colId);
         case DOUBLE_ARRAY:
-          return _immutableVals.getDoubleArray(rowId, colId);
+          return _immutableProjectionVals.getDoubleArray(rowId, colId);
         case STRING_ARRAY:
         case BYTES_ARRAY:
-          return _immutableVals.getStringArray(rowId, colId);
+          return _immutableProjectionVals.getStringArray(rowId, colId);
         default:
-          throw new IllegalStateException("Unsupported data type: " + _valSchema.getColumnDataType(colId));
+          throw new IllegalStateException("Unsupported data type: " + _projectionSchema.getColumnDataType(colId));
       }
     }
   }
@@ -272,7 +291,7 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
       int result;
       Comparable[] key = getExtremumKey();
       Comparable[] otherKey = other.getExtremumKey();
-      for (int i = 0; i < _sizeOfExtremumKeys; i++) {
+      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
         result = key[i].compareTo(otherKey[i]);
         if (result != 0) {
           // If the keys are not equal, return the object with the extremum key
@@ -288,19 +307,19 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
         // If the result is immutable, we need to copy the values from the serialized result to the mutable result
         _mutable = true;
         for (int i = 0; i < getNumberOfRows(); i++) {
-          Object[] val = new Object[_sizeOfExtremumVals];
-          for (int j = 0; j < _sizeOfExtremumVals; j++) {
+          Object[] val = new Object[_sizeOfExtremumProjectionVals];
+          for (int j = 0; j < _sizeOfExtremumProjectionVals; j++) {
             val[j] = getField(i, j);
           }
-          _extremumValues.add(val);
+          _extremumProjectionValues.add(val);
         }
       }
       for (int i = 0; i < other.getNumberOfRows(); i++) {
-        Object[] val = new Object[_sizeOfExtremumVals];
-        for (int j = 0; j < _sizeOfExtremumVals; j++) {
+        Object[] val = new Object[_sizeOfExtremumProjectionVals];
+        for (int j = 0; j < _sizeOfExtremumProjectionVals; j++) {
           val[j] = other.getField(i, j);
         }
-        _extremumValues.add(val);
+        _extremumProjectionValues.add(val);
       }
       return this;
     }
@@ -312,9 +331,9 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
   @Override
   public int getNumberOfRows() {
     if (_mutable) {
-      return _extremumValues.size();
+      return _extremumProjectionValues.size();
     } else {
-      return _immutableVals.getNumberOfRows();
+      return _immutableProjectionVals.getNumberOfRows();
     }
   }
 
@@ -324,7 +343,7 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
   @Override
   public DataSchema getSchema() {
     // the final parent aggregation result only cares about the projection columns
-    return _valSchema;
+    return _projectionSchema;
   }
 
   @Override

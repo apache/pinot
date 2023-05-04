@@ -215,7 +215,7 @@ public class ObjectSerDeUtils {
         return ObjectType.VarianceTuple;
       } else if (value instanceof PinotFourthMoment) {
         return ObjectType.PinotFourthMoment;
-      } else if (value instanceof org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxObject) {
+      } else if (value instanceof ArgMinMaxObject) {
         return ObjectType.ArgMinMaxObject;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());

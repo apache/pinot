@@ -38,12 +38,15 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * This rewriter rewrites ARG_MIN/ARG_MAX function, so that the functions with the same measuring expressions
  * are consolidated and added as a single function with a list of projection expressions. For example, the query
  * "SELECT ARG_MIN(col1, col2, col3), ARG_MIN(col1, col2, col4) FROM myTable" will be consolidated to a single
- * function "PARENT_ARG_MIN(#0, 2, col1, col2, col3, col4)". and added to the end of the selection list.
+ * function "PARENT_ARG_MIN(0, 2, col1, col2, col3, col4)". and added to the end of the selection list.
  * While the original ARG_MIN(col1, col2, col3) and ARG_MIN(col1, col2, col4) will be rewritten to
- * CHILD_ARG_MIN(#0, col3, col1, col2, col3) and CHILD_ARG_MIN(#0, col4, col1, col2, col4) respectively.
- * The 2 new parameters for CHILD_ARG_MIN are the function ID and the projection expression,
- * used as column key for result column filler.
- * Latter, the aggregation, result of the consolidated function will be filled into the corresponding
+ * CHILD_ARG_MIN(0, col3, col1, col2, col3) and CHILD_ARG_MIN(0, col4, col1, col2, col4) respectively.
+ * The 2 new parameters for CHILD_ARG_MIN are the function ID (0) and the projection column (col1/col4),
+ * used as column key in the parent aggregation result, during result rewriting.
+ * PARENT_ARG_MIN(0, 2, col1, col2, col3, col4) means a parent aggregation function with function ID 0,
+ * 2 measuring columns (col1, col2), 2 projection columns (col3, col4). The function ID is unique for each
+ * consolidated function with the same function type and measuring columns.
+ * Later, the aggregation, result of the consolidated function will be filled into the corresponding
  * columns of the original ARG_MIN/ARG_MAX. For more syntax details please refer to ParentAggregationFunction,
  * ChildAggregationFunction and ChildAggregationResultRewriter.
  */
@@ -86,13 +89,13 @@ public class ArgMinMaxRewriter implements QueryRewriter {
   /**
    * This method appends the consolidated ARG_MIN/ARG_MAX functions to the end of the selection list.
    * The consolidated function call will be in the following format:
-   * ARG_MAX(functionID, numMeasuringColumns, measuringColumn1, measuringColumn2, ...,
-   *  projectionColumn1, projectionColumn2, ...)
-   *  where functionID is the ID of the consolidated function, numMeasuringColumns is the number of measuring
-   *  columns, measuringColumn1, measuringColumn2, ... are the measuring columns, and projectionColumn1,
-   *  projectionColumn2, ... are the projection columns.
-   *  The number of projection columns is the same as the number of ARG_MIN/ARG_MAX functions with the same
-   *  measuring columns.
+   * ARG_MAX(functionID, numMeasuringColumns, measuringColumn1, measuringColumn2, ... projectionColumn1,
+   * projectionColumn2, ...)
+   * where functionID is the ID of the consolidated function, numMeasuringColumns is the number of measuring
+   * columns, measuringColumn1, measuringColumn2, ... are the measuring columns, and projectionColumn1,
+   * projectionColumn2, ... are the projection columns.
+   * The number of projection columns is the same as the number of ARG_MIN/ARG_MAX functions with the same
+   * measuring columns.
    */
   private void appendParentArgMinMaxFunctions(boolean isMax, List<Expression> selectList,
       HashMap<List<Expression>, Set<Expression>> argMinMaxFunctionMap,
@@ -131,7 +134,7 @@ public class ArgMinMaxRewriter implements QueryRewriter {
       return true;
     }
     String functionName = function.getOperator();
-    if (!(functionName.equals("argmin") || functionName.equals("argmax"))) {
+    if (!(functionName.equals(ARG_MIN) || functionName.equals(ARG_MAX))) {
       return true;
     }
     List<Expression> operands = function.getOperands();
@@ -141,7 +144,7 @@ public class ArgMinMaxRewriter implements QueryRewriter {
     }
     Expression argMinMaxProjectionExpression = operands.get(operands.size() - 1);
 
-    if (functionName.equals("argmin")) {
+    if (functionName.equals(ARG_MIN)) {
       return updateArgMinMaxFunctionMap(argMinMaxMeasuringExpressions, argMinMaxProjectionExpression, argMinFunctionMap,
           argMinFunctionIDMap, function);
     } else {
@@ -155,11 +158,11 @@ public class ArgMinMaxRewriter implements QueryRewriter {
    * function ID.
    * @return true if the function is not duplicated, false otherwise.
    */
-  boolean updateArgMinMaxFunctionMap(List<Expression> argMinMaxMeasuringExpressions,
+  private boolean updateArgMinMaxFunctionMap(List<Expression> argMinMaxMeasuringExpressions,
       Expression argMinMaxProjectionExpression, HashMap<List<Expression>, Set<Expression>> argMinMaxFunctionMap,
-      HashMap<List<Expression>, Integer> argMaxFunctionIDMap, Function function) {
-    int size = argMaxFunctionIDMap.size();
-    int id = argMaxFunctionIDMap.computeIfAbsent(argMinMaxMeasuringExpressions, (k) -> size);
+      HashMap<List<Expression>, Integer> argMinMaxFunctionIDMap, Function function) {
+    int size = argMinMaxFunctionIDMap.size();
+    int id = argMinMaxFunctionIDMap.computeIfAbsent(argMinMaxMeasuringExpressions, (k) -> size);
 
     AtomicBoolean added = new AtomicBoolean(true);
 

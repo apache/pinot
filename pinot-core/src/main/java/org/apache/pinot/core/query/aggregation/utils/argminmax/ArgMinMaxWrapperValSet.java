@@ -22,26 +22,28 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 
 
+/**
+ * Wrapper class for the value sets of the column to do argmin/max on.
+ * This class is used for type-generic implementation of argmin/max.
+ */
 public class ArgMinMaxWrapperValSet {
-  private final DataSchema.ColumnDataType _dataType;
+  protected final DataSchema.ColumnDataType _dataType;
   boolean _isSingleValue;
-
   int[] _intValues;
   long[] _longValues;
   float[] _floatValues;
   double[] _doublesValues;
   Object[] _objectsValues;
-
   int[][] _intValuesMV;
   long[][] _longValuesMV;
   float[][] _floatValuesMV;
   double[][] _doublesValuesMV;
   Object[][] _objectsValuesMV;
 
-  public ArgMinMaxWrapperValSet(boolean isSingleValue, DataSchema.ColumnDataType dataType, BlockValSet blockValSet) {
+  public ArgMinMaxWrapperValSet(
+      DataSchema.ColumnDataType dataType, boolean isSingleValue) {
     _dataType = dataType;
     _isSingleValue = isSingleValue;
-    setNewBlock(blockValSet);
   }
 
   public void setNewBlock(BlockValSet blockValSet) {
@@ -100,80 +102,5 @@ public class ArgMinMaxWrapperValSet {
           throw new IllegalStateException("Unsupported data type: " + _dataType);
       }
     }
-  }
-
-  public Comparable getComparable(int i) {
-    switch (_dataType) {
-      case INT:
-      case BOOLEAN:
-        return _intValues[i];
-      case LONG:
-      case TIMESTAMP:
-        return _longValues[i];
-      case FLOAT:
-        return _floatValues[i];
-      case DOUBLE:
-        return _doublesValues[i];
-      case STRING:
-      case BIG_DECIMAL:
-        return (Comparable) _objectsValues[i];
-      default:
-        throw new IllegalStateException("Unsupported data type: " + _dataType);
-    }
-  }
-
-  public Object getValue(int i) {
-    switch (_dataType) {
-      case INT:
-      case BOOLEAN:
-        return _intValues[i];
-      case LONG:
-      case TIMESTAMP:
-        return _longValues[i];
-      case FLOAT:
-        return _floatValues[i];
-      case DOUBLE:
-        return _doublesValues[i];
-      case STRING:
-      case BIG_DECIMAL:
-      case BYTES:
-      case JSON:
-          return _objectsValues[i];
-      case INT_ARRAY:
-        return _intValuesMV[i];
-      case LONG_ARRAY:
-      case TIMESTAMP_ARRAY:
-        return _longValuesMV[i];
-      case FLOAT_ARRAY:
-        return _floatValuesMV[i];
-      case DOUBLE_ARRAY:
-        return _doublesValuesMV[i];
-      case STRING_ARRAY:
-      case BYTES_ARRAY:
-        return _objectsValuesMV[i];
-      default:
-        throw new IllegalStateException("Unsupported data type: " + _dataType);
-    }
-  }
-
-  public int compare(int i, Object o) {
-      switch (_dataType) {
-        case INT:
-        case BOOLEAN:
-          return Integer.compare((Integer) o, _intValues[i]);
-        case LONG:
-        case TIMESTAMP:
-          return Long.compare((Long) o, _longValues[i]);
-        case FLOAT:
-          return Float.compare((Float) o, _floatValues[i]);
-        case DOUBLE:
-          return Double.compare((Double) o, _doublesValues[i]);
-        case STRING:
-          return ((String) o).compareTo((String) _objectsValues[i]);
-        case BIG_DECIMAL:
-          return ((java.math.BigDecimal) o).compareTo((java.math.BigDecimal) _objectsValues[i]);
-        default:
-          throw new IllegalStateException("Unsupported data type in comparison" + _dataType);
-      }
   }
 }

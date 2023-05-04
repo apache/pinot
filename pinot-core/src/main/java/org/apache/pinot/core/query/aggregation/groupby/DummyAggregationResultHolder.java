@@ -23,6 +23,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 
 /**
  * Placeholder AggregationResultHolder that does noop
+ * This is used for ChildAggregationFunction
  */
 public class DummyAggregationResultHolder implements AggregationResultHolder {
   @Override

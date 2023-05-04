@@ -32,6 +32,15 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
+/**
+ * Child aggregation function is used for a result placeholder during the query processing,
+ * It holds the position of the original aggregation function in the query
+ * and use its name to denote which parent aggregation function it belongs to.
+ * The name also serves as the key to retrieve the result from the parent aggregation function
+ * result holder.
+ * Please look at getResultColumnName() for the detailed format of the name.
+ * Please look at ArgMinMaxRewriter as an example of how a child aggregation function is created.
+ */
 public abstract class ChildAggregationFunction implements AggregationFunction<Long, Long> {
 
   private static final int CHILD_AGGREGATION_FUNCTION_ID_OFFSET = 0;
