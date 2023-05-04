@@ -21,10 +21,10 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -92,24 +92,23 @@ public class MailboxSendOperator extends MultiStageOperator {
     long deadlineMs = context.getDeadlineMs();
 
     int workerId = context.getServer().workerId();
-    List<MailboxMetadata> receiverMailboxMetadatas =
+    MailboxMetadata receiverMailboxMetadatas =
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(receiverStageId);
-    List<SendingMailbox> sendingMailboxes;
     if (exchangeType == RelDistribution.Type.SINGLETON) {
-      Preconditions.checkState(receiverMailboxMetadatas.size() == 1,
+      Preconditions.checkState(receiverMailboxMetadatas.getMailBoxIdList().size() == 1,
           "Multiple instances found for SINGLETON exchange type");
-      MailboxMetadata singletonMailboxMetadata = receiverMailboxMetadatas.get(0);
-      VirtualServerAddress virtualServerAddress = singletonMailboxMetadata.getVirtualAddress();
+      VirtualServerAddress virtualServerAddress = receiverMailboxMetadatas.getVirtualAddress(0);
       Preconditions.checkState(virtualServerAddress.hostname().equals(mailboxService.getHostname()),
           "SINGLETON exchange hostname should be the same as mailbox service hostname");
       Preconditions.checkState(virtualServerAddress.port() == mailboxService.getPort(),
           "SINGLETON exchange port should be the same as mailbox service port");
     }
-    sendingMailboxes = receiverMailboxMetadatas.stream().map(
-        mailboxMetadata -> mailboxService.getSendingMailbox(mailboxMetadata.getVirtualAddress().hostname(),
-            mailboxMetadata.getVirtualAddress().port(), MailboxIdUtils.toMailboxId(requestId, mailboxMetadata),
-            deadlineMs)).collect(Collectors.toList());
-
+    List<String> sendingMailboxIds = MailboxIdUtils.toMailboxIds(requestId, receiverMailboxMetadatas);
+    List<SendingMailbox> sendingMailboxes = new ArrayList<>(sendingMailboxIds.size());
+    for (int i = 0; i < receiverMailboxMetadatas.getMailBoxIdList().size(); i++) {
+      sendingMailboxes.add(mailboxService.getSendingMailbox(receiverMailboxMetadatas.getVirtualAddress(i).hostname(),
+          receiverMailboxMetadatas.getVirtualAddress(i).port(), sendingMailboxIds.get(i), deadlineMs));
+    }
     return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector, TransferableBlockUtils::splitBlock);
   }
 

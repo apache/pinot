@@ -42,10 +42,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class WorkerMetadata {
   private final VirtualServerAddress _virtualServerAddress;
-  private final Map<Integer, List<MailboxMetadata>> _mailBoxInfosMap;
+  private final Map<Integer, MailboxMetadata> _mailBoxInfosMap;
   private final Map<String, String> _customProperties;
 
-  private WorkerMetadata(VirtualServerAddress virtualServerAddress, Map<Integer, List<MailboxMetadata>> mailBoxInfosMap,
+  private WorkerMetadata(VirtualServerAddress virtualServerAddress, Map<Integer, MailboxMetadata> mailBoxInfosMap,
       Map<String, String> customProperties) {
     _virtualServerAddress = virtualServerAddress;
     _mailBoxInfosMap = mailBoxInfosMap;
@@ -56,7 +56,7 @@ public class WorkerMetadata {
     return _virtualServerAddress;
   }
 
-  public Map<Integer, List<MailboxMetadata>> getMailBoxInfosMap() {
+  public Map<Integer, MailboxMetadata> getMailBoxInfosMap() {
     return _mailBoxInfosMap;
   }
 
@@ -67,7 +67,7 @@ public class WorkerMetadata {
   public static class Builder {
     public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
     private VirtualServerAddress _virtualServerAddress;
-    private Map<Integer, List<MailboxMetadata>> _mailBoxInfosMap;
+    private Map<Integer, MailboxMetadata> _mailBoxInfosMap;
     private Map<String, String> _customProperties;
 
     public Builder() {
@@ -80,12 +80,12 @@ public class WorkerMetadata {
       return this;
     }
 
-    public Builder putAllMailBoxInfosMap(Map<Integer, List<MailboxMetadata>> mailBoxInfosMap) {
+    public Builder putAllMailBoxInfosMap(Map<Integer, MailboxMetadata> mailBoxInfosMap) {
       _mailBoxInfosMap.putAll(mailBoxInfosMap);
       return this;
     }
 
-    public Builder addMailBoxInfoMap(Integer stageId, List<MailboxMetadata> mailBoxMetadata) {
+    public Builder addMailBoxInfoMap(Integer stageId, MailboxMetadata mailBoxMetadata) {
       _mailBoxInfosMap.put(stageId, mailBoxMetadata);
       return this;
     }

@@ -18,31 +18,54 @@
  */
 package org.apache.pinot.query.routing;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 
 /**
- * {@code MailboxMetadata} wraps around the mailbox information of connected stages.
- *
+ * {@code MailboxMetadata} wraps around a list of mailboxes information from/to one connected stage.
+ *  It contains the following information:
+ *  <ul>
+ *    <li>MailboxId: the unique id of the mailbox</li>
+ *    <li>VirtualAddress: the virtual address of the mailbox</li>
+ *    <li>CustomProperties: the custom properties of the mailbox</li>
+ *  </ul>
  */
 public class MailboxMetadata {
-  private final String _mailBoxId;
-  private final VirtualServerAddress _virtualAddress;
+  private final List<String> _mailBoxIdList;
+  private final List<VirtualServerAddress> _virtualAddressList;
   private final Map<String, String> _customProperties;
 
-  public MailboxMetadata(String mailBoxId, String virtualAddress, Map<String, String> customProperties) {
-    _mailBoxId = mailBoxId;
-    _virtualAddress = VirtualServerAddress.parse(virtualAddress);
+  public MailboxMetadata() {
+    _mailBoxIdList = new ArrayList<>();
+    _virtualAddressList = new ArrayList<>();
+    _customProperties = new HashMap<>();
+  }
+
+  public MailboxMetadata(List<String> mailBoxIdList, List<VirtualServerAddress> virtualAddressList,
+      Map<String, String> customProperties) {
+    _mailBoxIdList = mailBoxIdList;
+    _virtualAddressList = virtualAddressList;
     _customProperties = customProperties;
   }
 
-  public String getMailBoxId() {
-    return _mailBoxId;
+  public List<String> getMailBoxIdList() {
+    return _mailBoxIdList;
   }
 
-  public VirtualServerAddress getVirtualAddress() {
-    return _virtualAddress;
+  public String getMailBoxId(int index) {
+    return _mailBoxIdList.get(index);
+  }
+
+  public List<VirtualServerAddress> getVirtualAddressList() {
+    return _virtualAddressList;
+  }
+
+  public VirtualServerAddress getVirtualAddress(int index) {
+    return _virtualAddressList.get(index);
   }
 
   public Map<String, String> getCustomProperties() {
@@ -51,12 +74,12 @@ public class MailboxMetadata {
 
   @Override
   public String toString() {
-    return _mailBoxId + "@" + _virtualAddress.toString() + "#" + _customProperties.toString();
+    return _mailBoxIdList + "@" + _virtualAddressList.toString() + "#" + _customProperties.toString();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_mailBoxId, _virtualAddress, _customProperties);
+    return Objects.hash(_mailBoxIdList, _virtualAddressList, _customProperties);
   }
 
   @Override
@@ -68,8 +91,8 @@ public class MailboxMetadata {
       return false;
     }
     MailboxMetadata that = (MailboxMetadata) o;
-    return Objects.equals(_mailBoxId, that._mailBoxId)
-        && Objects.equals(_virtualAddress, that._virtualAddress)
+    return Objects.equals(_mailBoxIdList, that._mailBoxIdList)
+        && Objects.equals(_virtualAddressList, that._virtualAddressList)
         && _customProperties.equals(that._customProperties);
   }
 }

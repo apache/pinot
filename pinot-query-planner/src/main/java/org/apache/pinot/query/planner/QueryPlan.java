@@ -119,7 +119,7 @@ public class QueryPlan {
           VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerEntry.getKey(), workerId);
           WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
           builder.setVirtualServerAddress(virtualServerAddress);
-          Map<Integer, List<MailboxMetadata>> stageToMailboxMetadata =
+          Map<Integer, MailboxMetadata> stageToMailboxMetadata =
               dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap().get(workerId);
           builder.putAllMailBoxInfosMap(stageToMailboxMetadata);
           if (dispatchablePlanMetadata.getScannedTables().size() == 1) {

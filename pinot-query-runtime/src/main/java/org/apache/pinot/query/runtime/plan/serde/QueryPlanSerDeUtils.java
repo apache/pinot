@@ -98,28 +98,25 @@ public class QueryPlanSerDeUtils {
     return builder.build();
   }
 
-  private static Map<Integer, List<MailboxMetadata>> fromProtoMailboxMetadataMap(
+  private static Map<Integer, MailboxMetadata> fromProtoMailboxMetadataMap(
       Map<Integer, Worker.MailboxMetadata> mailboxMetadataMap) {
-    Map<Integer, List<MailboxMetadata>> mailboxMap = new HashMap<>();
+    Map<Integer, MailboxMetadata> mailboxMap = new HashMap<>();
     for (Map.Entry<Integer, Worker.MailboxMetadata> entry : mailboxMetadataMap.entrySet()) {
       mailboxMap.put(entry.getKey(), fromProtoMailbox(entry.getValue()));
     }
     return mailboxMap;
   }
 
-  private static List<MailboxMetadata> fromProtoMailbox(Worker.MailboxMetadata mailboxMetadata) {
-    List<MailboxMetadata> mailboxMetadataList = new ArrayList<>();
-    for (int i = 0; i < mailboxMetadata.getMailboxIdCount(); i++) {
-      String mailboxId = mailboxMetadata.getMailboxId(i);
-      Map<String, String> customPropertyMap = new HashMap<>();
-      for (Map.Entry<String, String> entry : mailboxMetadata.getCustomPropertyMap().entrySet()) {
-        if (entry.getKey().startsWith(mailboxId)) {
-          customPropertyMap.put(fromMailboxCustomPropertiesKeyPrefix(mailboxId, entry.getKey()), entry.getValue());
-        }
-      }
-      mailboxMetadataList.add(new MailboxMetadata(mailboxId, mailboxMetadata.getVirtualAddress(i), customPropertyMap));
+  private static MailboxMetadata fromProtoMailbox(Worker.MailboxMetadata protoMailboxMetadata) {
+    List<String> mailboxIds = new ArrayList<>();
+    List<VirtualServerAddress> virtualAddresses = new ArrayList<>();
+    for (int i = 0; i < protoMailboxMetadata.getMailboxIdCount(); i++) {
+      mailboxIds.add(protoMailboxMetadata.getMailboxId(i));
+      virtualAddresses.add(protoToAddress(protoMailboxMetadata.getVirtualAddress(i)));
     }
-    return mailboxMetadataList;
+    MailboxMetadata mailboxMetadata =
+        new MailboxMetadata(mailboxIds, virtualAddresses, protoMailboxMetadata.getCustomPropertyMap());
+    return mailboxMetadata;
   }
 
   private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {
@@ -140,31 +137,21 @@ public class QueryPlanSerDeUtils {
   }
 
   private static Map<Integer, Worker.MailboxMetadata> toProtoMailboxMap(
-      Map<Integer, List<MailboxMetadata>> mailBoxInfosMap) {
+      Map<Integer, MailboxMetadata> mailBoxInfosMap) {
     Map<Integer, Worker.MailboxMetadata> mailboxMetadataMap = new HashMap<>();
-    for (Map.Entry<Integer, List<MailboxMetadata>> entry : mailBoxInfosMap.entrySet()) {
+    for (Map.Entry<Integer, MailboxMetadata> entry : mailBoxInfosMap.entrySet()) {
       mailboxMetadataMap.put(entry.getKey(), toProtoMailbox(entry.getValue()));
     }
     return mailboxMetadataMap;
   }
 
-  private static Worker.MailboxMetadata toProtoMailbox(List<MailboxMetadata> mailboxMetadataList) {
+  private static Worker.MailboxMetadata toProtoMailbox(MailboxMetadata mailboxMetadata) {
     Worker.MailboxMetadata.Builder builder = Worker.MailboxMetadata.newBuilder();
-    for (MailboxMetadata mailboxMetadata : mailboxMetadataList) {
-      builder.addMailboxId(mailboxMetadata.getMailBoxId());
-      builder.addVirtualAddress(mailboxMetadata.getVirtualAddress().toString());
-      mailboxMetadata.getCustomProperties().entrySet().stream().forEach(
-          entry -> builder.putCustomProperty(
-              toMailboxCustomPropertiesKeyPrefix(mailboxMetadata.getMailBoxId(), entry.getKey()), entry.getValue()));
+    for (int i = 0; i < mailboxMetadata.getMailBoxIdList().size(); i++) {
+      builder.addMailboxId(mailboxMetadata.getMailBoxId(i));
+      builder.addVirtualAddress(mailboxMetadata.getVirtualAddress(i).toString());
     }
+    builder.putAllCustomProperty(mailboxMetadata.getCustomProperties());
     return builder.build();
-  }
-
-  private static String toMailboxCustomPropertiesKeyPrefix(String mailBoxId, String key) {
-    return String.format("%s.%s", mailBoxId, key);
-  }
-
-  private static String fromMailboxCustomPropertiesKeyPrefix(String mailBoxId, String key) {
-    return key.split(mailBoxId + "\\.")[1];
   }
 }

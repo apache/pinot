@@ -51,7 +51,7 @@ public class DispatchablePlanMetadata implements Serializable {
 
   // used for build mailboxes between workers.
   // workerId -> {stageId -> mailbox list}
-  private Map<Integer, Map<Integer, List<MailboxMetadata>>> _workerIdToMailboxesMap;
+  private Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -92,15 +92,15 @@ public class DispatchablePlanMetadata implements Serializable {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
-  public Map<Integer, Map<Integer, List<MailboxMetadata>>> getWorkerIdToMailBoxIdsMap() {
+  public Map<Integer, Map<Integer, MailboxMetadata>> getWorkerIdToMailBoxIdsMap() {
     return _workerIdToMailboxesMap;
   }
 
-  public void setWorkerIdToMailBoxIdsMap(Map<Integer, Map<Integer, List<MailboxMetadata>>> workerIdToMailboxesMap) {
+  public void setWorkerIdToMailBoxIdsMap(Map<Integer, Map<Integer, MailboxMetadata>> workerIdToMailboxesMap) {
     _workerIdToMailboxesMap.putAll(workerIdToMailboxesMap);
   }
 
-  public void addWorkerIdToMailBoxIdsMap(int stageId, Map<Integer, List<MailboxMetadata>> stageIdToMailboxesMap) {
+  public void addWorkerIdToMailBoxIdsMap(int stageId, Map<Integer, MailboxMetadata> stageIdToMailboxesMap) {
     _workerIdToMailboxesMap.put(stageId, stageIdToMailboxesMap);
   }
 

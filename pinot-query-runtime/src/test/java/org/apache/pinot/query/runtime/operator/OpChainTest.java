@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +39,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -90,15 +92,15 @@ public class OpChainTest {
         .setWorkerMetadataList(Stream.of(_serverAddress).map(
             s -> new WorkerMetadata.Builder()
                 .setVirtualServerAddress(s)
-                .addMailBoxInfoMap(0, Collections.singletonList(new MailboxMetadata(
-                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
-                    s.toString(), ImmutableMap.of())))
-                .addMailBoxInfoMap(1, Collections.singletonList(new MailboxMetadata(
-                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
-                    s.toString(), ImmutableMap.of())))
-                .addMailBoxInfoMap(2, Collections.singletonList(new MailboxMetadata(
-                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0),
-                    s.toString(), ImmutableMap.of())))
+                .addMailBoxInfoMap(0, new MailboxMetadata(
+                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
+                    ImmutableList.of(s), ImmutableMap.of()))
+                .addMailBoxInfoMap(1, new MailboxMetadata(
+                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
+                    ImmutableList.of(s), ImmutableMap.of()))
+                .addMailBoxInfoMap(2, new MailboxMetadata(
+                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
+                    ImmutableList.of(s), ImmutableMap.of()))
                 .build()).collect(Collectors.toList()))
         .build();
 

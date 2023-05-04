@@ -19,6 +19,8 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
@@ -43,7 +45,9 @@ public class MailboxIdUtils {
     return new OpChainId(Long.parseLong(parts[0]), Integer.parseInt(parts[4]), Integer.parseInt(parts[3]));
   }
 
-  public static String toMailboxId(long requestId, MailboxMetadata mailboxMetadata) {
-    return Long.toString(requestId) + SEPARATOR + mailboxMetadata.getMailBoxId();
+  public static List<String> toMailboxIds(long requestId, MailboxMetadata senderMailBoxMetadatas) {
+    return senderMailBoxMetadatas.getMailBoxIdList().stream()
+        .map(mailboxIdFromBroker -> Long.toString(requestId) + SEPARATOR + mailboxIdFromBroker)
+        .collect(Collectors.toList());
   }
 }

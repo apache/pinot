@@ -78,35 +78,34 @@ public class MailboxReceiveOperatorTest {
         .setWorkerMetadataList(Stream.of(server1, server2).map(
                 s -> new WorkerMetadata.Builder()
                     .setVirtualServerAddress(s)
-                    .addMailBoxInfoMap(0, ImmutableList.of(
+                    .addMailBoxInfoMap(0,
                         new MailboxMetadata(
-                            org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
-                            server1.toString(), ImmutableMap.of()),
+                            ImmutableList.of(
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 1, 0, 0)),
+                            ImmutableList.of(server1, server2), ImmutableMap.of()))
+                    .addMailBoxInfoMap(1,
                         new MailboxMetadata(
-                            org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 1, 0, 0),
-                            server2.toString(), ImmutableMap.of())))
-                    .addMailBoxInfoMap(1, ImmutableList.of(
-                        new MailboxMetadata(
-                            org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
-                            server1.toString(), ImmutableMap.of()),
-                        new MailboxMetadata(
-                            org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 1, 0, 0),
-                            server2.toString(), ImmutableMap.of())))
+                            ImmutableList.of(
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 1, 0, 0)),
+                            ImmutableList.of(server1, server2), ImmutableMap.of()))
                     .build())
             .collect(Collectors.toList()))
-
         .build();
     // sending stage is 0, receiving stage is 1
     _stageMetadata1 = new StageMetadata.Builder()
         .setWorkerMetadataList(Stream.of(server1).map(
             s -> new WorkerMetadata.Builder()
                 .setVirtualServerAddress(s)
-                .addMailBoxInfoMap(0, ImmutableList.of(new MailboxMetadata(
-                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
-                    server1.toString(), ImmutableMap.of())))
-                .addMailBoxInfoMap(1, ImmutableList.of(new MailboxMetadata(
-                    org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
-                    server1.toString(), ImmutableMap.of())))
+                .addMailBoxInfoMap(0, new MailboxMetadata(
+                    ImmutableList.of(
+                        org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0)),
+                    ImmutableList.of(server1), ImmutableMap.of()))
+                .addMailBoxInfoMap(1, new MailboxMetadata(
+                    ImmutableList.of(
+                        org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0)),
+                    ImmutableList.of(server1), ImmutableMap.of()))
                 .build()).collect(Collectors.toList()))
         .build();
   }

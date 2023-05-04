@@ -58,28 +58,23 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
     long requestId = context.getRequestId();
     int workerId = context.getServer().workerId();
-    List<MailboxMetadata> senderMailBoxMetadatas =
+    MailboxMetadata senderMailBoxMetadatas =
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
-    Preconditions.checkState(senderMailBoxMetadatas != null && !senderMailBoxMetadatas.isEmpty(),
+    Preconditions.checkState(senderMailBoxMetadatas != null && !senderMailBoxMetadatas.getMailBoxIdList().isEmpty(),
         "Failed to find mailbox for stage: %s",
         senderStageId);
     if (exchangeType == RelDistribution.Type.SINGLETON) {
-      Preconditions.checkState(senderMailBoxMetadatas.size() == 1,
+      Preconditions.checkState(senderMailBoxMetadatas.getMailBoxIdList().size() == 1,
           "Only one mailbox is expected for SINGLETON exchange type");
-      MailboxMetadata mailboxMetadata = senderMailBoxMetadatas.get(0);
-      VirtualServerAddress virtualServerAddress =
-          VirtualServerAddress.parse(mailboxMetadata.getVirtualAddress().toString());
+      VirtualServerAddress virtualServerAddress = senderMailBoxMetadatas.getVirtualAddressList().get(0);
       Preconditions.checkState(virtualServerAddress.hostname().equals(_mailboxService.getHostname()),
           "Mailbox host mismatch for SINGLETON exchange type");
       Preconditions.checkState(virtualServerAddress.port() == _mailboxService.getPort(),
           "Mailbox port mismatch for SINGLETON exchange type");
     }
-    _mailboxIds = senderMailBoxMetadatas.stream()
-        .map(mailboxMetadata -> MailboxIdUtils.toMailboxId(requestId, mailboxMetadata))
-        .collect(Collectors.toList());
-    _mailboxes = senderMailBoxMetadatas.stream()
-        .map(mailboxMetadata -> _mailboxService.getReceivingMailbox(
-            MailboxIdUtils.toMailboxId(requestId, mailboxMetadata)))
+    _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
+    _mailboxes = _mailboxIds.stream()
+        .map(mailboxId -> _mailboxService.getReceivingMailbox(mailboxId))
         .collect(Collectors.toCollection(ArrayDeque::new));
   }
 
