@@ -132,14 +132,15 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
    */
   public String getNormalizedDate(Object timeValue) {
     if (_inputTimeUnit != null) {
-      return new DateTime(_inputTimeUnit.toMillis(Long.parseLong(timeValue.toString()))).toString(_outputSDF.getDateTimeFormatter());
+      return new DateTime(_inputTimeUnit.toMillis(Long.parseLong(timeValue.toString()))).toString(
+          _outputSDF.getDateTimeFormatter());
     } else {
       try {
-        return _inputSDF.getDateTimeFormatter().parseDateTime(timeValue.toString()).toString(_outputSDF.getDateTimeFormatter());
+        return _inputSDF.getDateTimeFormatter().parseDateTime(timeValue.toString())
+            .toString(_outputSDF.getDateTimeFormatter());
       } catch (Exception e) {
-        throw new RuntimeException(String
-            .format("Caught exception while parsing simple date format: %s with value: %s", _inputSDF.getSdfPattern(),
-                timeValue), e);
+        throw new RuntimeException(String.format("Caught exception while parsing simple date format: %s with value: %s",
+            _inputSDF.getSdfPattern(), timeValue), e);
       }
     }
   }
