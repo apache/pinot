@@ -45,6 +45,18 @@ public interface IndexReaderFactory<R extends IndexReader> {
     protected abstract R createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata, C indexConfig)
         throws IOException, IndexReaderConstraintException;
 
+    /**
+     * Sometimes the index configuration indicates that the index should be disabled but the reader actually contains
+     * a buffer for the index type.
+     *
+     * By default, the buffer has priority over the configuration, so in case we have a buffer we would create an index
+     * even if the configuration says otherwise. In case some index wants to use their own behavior, this method can
+     * be overloaded.
+     */
+    protected boolean isBufferOverConfig() {
+      return true;
+    }
+
     @Override
     public R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
         ColumnMetadata metadata)
@@ -57,16 +69,17 @@ public interface IndexReaderFactory<R extends IndexReader> {
         indexConf = fieldIndexConfigs.getConfig(indexType);
       }
 
-      if (indexConf == null || !indexConf.isEnabled()) { //it is either not enabled or the default value is null
+      String columnName = metadata.getColumnName();
+      if (indexConf.isDisabled() && (!isBufferOverConfig() || !segmentReader.hasIndexFor(columnName, indexType))) {
         return null;
       }
 
-      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), indexType);
+      PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, indexType);
       try {
         return createIndexReader(buffer, metadata, indexConf);
       } catch (RuntimeException ex) {
         throw new RuntimeException(
-            "Cannot read index " + indexType + " for column " + metadata.getColumnName(), ex);
+            "Cannot read index " + indexType + " for column " + columnName + " with config " + indexConf, ex);
       }
     }
   }
