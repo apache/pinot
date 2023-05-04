@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -39,6 +40,12 @@ public class StartReplaceSegmentsRequest {
   private final List<String> _segmentsTo;
   private final Map<String, String> _customMap;
 
+  public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
+      @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo) {
+    this(segmentsFrom, segmentsTo, null);
+  }
+
+  @JsonCreator
   public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
       @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo,
       @JsonProperty("customMap") @Nullable Map<String, String> customMap) {
