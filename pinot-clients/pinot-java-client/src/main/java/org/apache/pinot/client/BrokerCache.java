@@ -24,6 +24,7 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -190,16 +191,15 @@ public class BrokerCache {
   }
 
   public String getBroker(String... tableNames) {
-    List<String> brokers;
-    if (tableNames == null) {
-      brokers = _brokerData.getBrokers();
-    } else {
-       List<List<String>> brokersHostingTables = new ArrayList<>();
-       for (String table: tableNames) {
-         brokersHostingTables.add(_brokerData.getTableToBrokerMap().get(table));
-       }
+    List<String> brokers = null;
+    if (tableNames != null) {
        // returning list of common brokers hosting all the tables.
-       brokers = BrokerSelectorUtils.getTablesCommonBrokers(brokersHostingTables);
+       brokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+           _brokerData.getTableToBrokerMap());
+    }
+
+    if (brokers == null || brokers.isEmpty()) {
+      brokers = _brokerData.getBrokers();
     }
     return brokers.get(_random.nextInt(brokers.size()));
   }

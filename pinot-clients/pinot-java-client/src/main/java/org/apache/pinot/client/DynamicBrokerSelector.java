@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -89,13 +90,9 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   @Override
   public String selectBroker(String... tableNames) {
     if (tableNames != null) {
-      List<List<String>> commonBrokers = new ArrayList<>();
-      // getting list of brokers hosting the table.
-      for (String table: tableNames) {
-        commonBrokers.add(getBrokerListForTable(table));
-      }
       // getting list of brokers hosting all the tables.
-      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(commonBrokers);
+      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+          _tableToBrokerListMapRef.get());
       if (list != null && !list.isEmpty()) {
         return list.get(RANDOM.nextInt(list.size()));
       }
@@ -127,27 +124,5 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   @Override
   public void handleDataDeleted(String dataPath) {
     refresh();
-  }
-
-  /**
-   *
-   * @param table for which list of brokers required.
-   * @return list of brokers hosting the table.
-   */
-  private List<String> getBrokerListForTable(String table) {
-    String tableName =
-        table.replace(ExternalViewReader.OFFLINE_SUFFIX, "").replace(ExternalViewReader.REALTIME_SUFFIX, "");
-    List<String> list = _tableToBrokerListMapRef.get().get(tableName);
-    if (list != null && !list.isEmpty()) {
-      return list;
-    }
-
-    // In case tableName is formatted as <db>.<table>
-    int idx = tableName.indexOf('.');
-    if (idx > 0) {
-      tableName = tableName.substring(idx + 1);
-    }
-    list = _tableToBrokerListMapRef.get().get(tableName);
-    return list;
   }
 }

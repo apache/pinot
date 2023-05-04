@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.client.utils;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import org.apache.pinot.client.ExternalViewReader;
 
 
 public class BrokerSelectorUtils {
@@ -29,13 +32,29 @@ public class BrokerSelectorUtils {
 
   /**
    *
-   * @param tablesBrokersList: List of brokers hosting each table in the list.
+   * @param tableNames: List of table names.
+   * @param brokerData: map holding data for table hosting on brokers.
    * @return list of common brokers hosting all the tables.
    */
-  public static List<String> getTablesCommonBrokers(List<List<String>> tablesBrokersList) {
-    // check whether tablesBrokersList is null or elements in list are null or not.
-    if (tablesBrokersList == null || tablesBrokersList.stream().anyMatch(Objects::isNull)) {
-     return null;
+  public static List<String> getTablesCommonBrokers(List<String> tableNames, Map<String, List<String>> brokerData) {
+    List<List<String>> tablesBrokersList = new ArrayList<>();
+    for (String name: tableNames) {
+      String tableName = getTableNameWithoutSuffix(name);
+      int idx = tableName.indexOf('.');
+
+      if (brokerData.containsKey(tableName)) {
+        tablesBrokersList.add(brokerData.get(tableName));
+      } else if (idx > 0) {
+        // In case tableName is formatted as <db>.<table>
+        tableName = tableName.substring(idx + 1);
+        tablesBrokersList.add(brokerData.get(tableName));
+      }
+    }
+
+    // return null if tablesBrokersList is empty or contains null
+    if (tablesBrokersList.isEmpty()
+        || tablesBrokersList.stream().anyMatch(Objects::isNull)) {
+      return null;
     }
 
     List<String> commonBrokers = tablesBrokersList.get(0);
@@ -43,5 +62,11 @@ public class BrokerSelectorUtils {
       commonBrokers.retainAll(tablesBrokersList.get(i));
     }
     return commonBrokers;
+  }
+
+  private static String getTableNameWithoutSuffix(String tableName) {
+    return
+        tableName.replace(ExternalViewReader.OFFLINE_SUFFIX, "").
+            replace(ExternalViewReader.REALTIME_SUFFIX, "");
   }
 }
