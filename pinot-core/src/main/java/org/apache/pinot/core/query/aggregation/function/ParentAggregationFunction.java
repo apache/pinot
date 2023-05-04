@@ -50,14 +50,15 @@ public abstract class ParentAggregationFunction<I, F extends ParentAggregationFu
   // e.g. if the parent aggregation function is "argmax(0,3,a,b,c,x,y,z)", the name of the column is
   // "pinotparentaggregationargmax0"
   @Override
-  public String getResultColumnName() {
+  public final String getResultColumnName() {
     return CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX
         + getType().getName().toLowerCase()
         + _arguments.get(PARENT_AGGREGATION_FUNCTION_ID_OFFSET).getLiteral().getIntValue();
   }
 
-  public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
+  public final String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX)
+        .append("_").append(getType().getName()).append('(');
     int numArguments = _arguments.size();
     if (numArguments > 0) {
       stringBuilder.append(_arguments.get(0).toString());

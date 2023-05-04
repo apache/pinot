@@ -19,11 +19,9 @@
 package org.apache.pinot.sql.parsers.rewriter;
 
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
 
 
 public class ArgMinMaxRewriterTest {
@@ -49,19 +47,30 @@ public class ArgMinMaxRewriterTest {
             + "PINOT_PARENT_AGGREGATION_ARG_MAX(0,2,col1,col2,col6) FROM myTable");
   }
 
+  @Test
+  public void testQueryRewriteWithOrderBy() {
+    testQueryRewrite("SELECT ARG_MIN(col1,col2,col5), ARG_MIN(col1,col3,col6),"
+            + "ARG_MIN(col3,col1,col6) FROM myTable GROUP BY col3 "
+            + "ORDER BY col3 DESC",
+        "SELECT PINOT_CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5), "
+            + "PINOT_CHILD_AGGREGATION_ARG_MIN(1,col6,col1,col3,col6),"
+            + "PINOT_CHILD_AGGREGATION_ARG_MIN(2,col6,col3,col1,col6),"
+            + "PINOT_PARENT_AGGREGATION_ARG_MIN(1,2,col1,col3,col6),"
+            + "PINOT_PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col5),"
+            + "PINOT_PARENT_AGGREGATION_ARG_MIN(2,2,col3,col1,col6)"
+            + "FROM myTable GROUP BY col3 ORDER BY col3 DESC");
+
+    testQueryRewrite("SELECT ARG_MIN(col1,col2,col5), ARG_MAX(col1,col2,col5) FROM myTable GROUP BY col3 "
+            + "ORDER BY ADD(co1, co3) DESC",
+        "SELECT PINOT_CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5),"
+            + "PINOT_CHILD_AGGREGATION_ARG_MAX(0,col5,col1,col2,col5),"
+            + "PINOT_PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col5), "
+            + "PINOT_PARENT_AGGREGATION_ARG_MAX(0,2,col1,col2,col5) "
+            + "FROM myTable GROUP BY col3 ORDER BY ADD(co1, co3) DESC");
+  }
+
   private void testQueryRewrite(String original, String expected) {
     assertEquals(QUERY_REWRITER.rewrite(CalciteSqlParser.compileToPinotQuery(original)),
         CalciteSqlParser.compileToPinotQuery(expected));
-  }
-
-  public void testUnsupportedQueries() {
-    testUnsupportedQuery("SELECT col1 FROM foo GROUP BY col1, col2");
-    testUnsupportedQuery("SELECT col1, col2 FROM foo GROUP BY col1");
-    testUnsupportedQuery("SELECT col1 + col2 FROM foo GROUP BY col1, col2");
-  }
-
-  private void testUnsupportedQuery(String query) {
-    assertThrows(SqlCompilationException.class,
-        () -> QUERY_REWRITER.rewrite(CalciteSqlParser.compileToPinotQuery(query)));
   }
 }

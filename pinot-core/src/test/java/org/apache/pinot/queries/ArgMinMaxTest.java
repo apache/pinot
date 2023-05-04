@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
@@ -49,6 +50,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -78,6 +80,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
   private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
   private static final String TIMESTAMP_COLUMN = "timestampColumn";
   private static final String BOOLEAN_COLUMN = "booleanColumn";
+  private static final String JSON_COLUMN = "jsonColumn";
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
@@ -92,6 +95,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
       .addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP)
       .addSingleValueDimension(BOOLEAN_COLUMN, DataType.BOOLEAN)
       .addMultiValueDimension(MV_DOUBLE_COLUMN, DataType.DOUBLE)
+      .addSingleValueDimension(JSON_COLUMN, DataType.JSON)
       .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
@@ -147,6 +151,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
       record.putValue(TIMESTAMP_COLUMN, 1683138373879L - i);
       record.putValue(BOOLEAN_COLUMN, i % 2);
       record.putValue(MV_DOUBLE_COLUMN, Arrays.asList((double) i, (double) i * i, (double) i * i * i));
+      record.putValue(JSON_COLUMN, "{\"name\":\"John\", \"age\":" + i + ", \"car\":null}");
       records.add(record);
     }
 
@@ -187,7 +192,8 @@ public class ArgMinMaxTest extends BaseQueriesTest {
         + "arg_max(intColumn, doubleColumn), arg_min(intColumn, mvIntColumn), "
         + "arg_min(intColumn, mvStringColumn), arg_min(intColumn, intColumn), "
         + "arg_max(bigDecimalColumn, bigDecimalColumn), arg_max(bigDecimalColumn, doubleColumn),"
-        + "arg_min(timestampColumn, timestampColumn), arg_max(bigDecimalColumn, mvDoubleColumn)"
+        + "arg_min(timestampColumn, timestampColumn), arg_max(bigDecimalColumn, mvDoubleColumn),"
+        + "arg_max(bigDecimalColumn, jsonColumn)"
         + " FROM testTable";
 
     brokerResponse = getBrokerResponse(query);
@@ -204,6 +210,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(resultTable.getDataSchema().getColumnName(7), "argmax(bigDecimalColumn,doubleColumn)");
     assertEquals(resultTable.getDataSchema().getColumnName(8), "argmin(timestampColumn,timestampColumn)");
     assertEquals(resultTable.getDataSchema().getColumnName(9), "argmax(bigDecimalColumn,mvDoubleColumn)");
+    assertEquals(resultTable.getDataSchema().getColumnName(10), "argmax(bigDecimalColumn,jsonColumn)");
 
     assertEquals(rows.size(), 2);
     assertEquals(rows.get(0)[0], 999L);
@@ -226,6 +233,8 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[8], 1683138373879L - 1999L);
     assertEquals(rows.get(0)[9], new Double[]{600D, 600D * 600D, 600D * 600D * 600D});
     assertEquals(rows.get(1)[9], new Double[]{600D, 600D * 600D, 600D * 600D * 600D});
+    assertEquals(rows.get(0)[10], "{\"name\":\"John\",\"age\":600,\"car\":null}");
+    assertEquals(rows.get(1)[10], "{\"name\":\"John\",\"age\":600,\"car\":null}");
 
     // Inter segment data type test for boolean column
     query = "SELECT arg_max(booleanColumn, booleanColumn) FROM testTable";
@@ -270,6 +279,35 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(3)[2], "a11");
     assertNull(rows.get(3)[3]);
 
+    // Test transformation function inside argmax/argmin, for both projection and measuring
+    // the max of 3000x-x^2 is 2250000, which is the max of 3000x-x^2
+    query = "SELECT sum(intColumn), argmax(3000 * doubleColumn - intColumn * intColumn, doubleColumn),"
+        + "argmax(3000 * doubleColumn - intColumn * intColumn, 3000 * doubleColumn - intColumn * intColumn),"
+        + "argmax(3000 * doubleColumn - intColumn * intColumn, doubleColumn), "
+        + "argmin(replace(stringColumn, \'a\', \'bb\'), replace(stringColumn, \'a\', \'bb\'))"
+        + "FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+
+    assertEquals(rows.size(), 4);
+
+    assertEquals(rows.get(0)[0], 7996000D);
+    assertEquals(rows.get(0)[1], 1500D);
+    assertEquals(rows.get(0)[2], 2250000D);
+    assertEquals(rows.get(0)[3], "bb11");
+    assertNull(rows.get(1)[0]);
+    assertEquals(rows.get(1)[1], 1500D);
+    assertEquals(rows.get(1)[2], 2250000D);
+    assertEquals(rows.get(1)[3], "bb11");
+    assertNull(rows.get(2)[0]);
+    assertNull(rows.get(2)[1]);
+    assertEquals(rows.get(2)[3], "bb11");
+    assertNull(rows.get(3)[0]);
+    assertNull(rows.get(3)[1]);
+    assertEquals(rows.get(3)[3], "bb11");
+
     // Inter segment mix aggregation function with CASE statement
     query = "SELECT argmin(CASE WHEN stringColumn = 'a33' THEN 'b' WHEN stringColumn = 'a22' THEN 'a' ELSE 'c' END"
         + ", stringColumn), argmin(CASE WHEN stringColumn = 'a33' THEN 'b' WHEN stringColumn = 'a22' THEN 'a' "
@@ -287,15 +325,15 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[0], "a22");
     assertEquals(rows.get(1)[1], "a");
 
-    //   TODO: The following query throws an exception, requires support for multi-value bytes column
-    //   TODO: serialization in DataBlock
+    //   TODO: The following query throws an exception,
+    //   TODO: requires fix for multi-value bytes column serialization in DataBlock
     query = "SELECT arg_min(intColumn, mvBytesColumn) FROM testTable";
 
     try {
       brokerResponse = getBrokerResponse(query);
       fail("remove this test case, now mvBytesColumn works correctly in serialization");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage()
+      assertTrue(e.getMessage()
           .contains("java.lang.IllegalArgumentException: Unsupported type of value: byte[][]"));
     }
   }
@@ -426,6 +464,73 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     assertNull(rows.get(19)[0]);
     assertEquals(rows.get(19)[1], 0D);
+
+    // MV inter segment group by with projection on MV column
+    query = "SELECT groupByMVIntColumn, arg_min(intColumn, mvIntColumn), "
+        + "arg_max(intColumn, mvStringColumn) FROM testTable GROUP BY groupByMVIntColumn";
+
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 20);
+
+    assertEquals(rows.get(18)[0], 0);
+    assertEquals(rows.get(18)[1], new Object[]{0, 1, 2});
+    assertEquals(rows.get(18)[2], new Object[]{"a1999", "a19991", "a19992"});
+  }
+
+  @Test
+  public void testGroupByInterSegmentWithValueIn() {
+    // MV VALUE_IN segment group by
+    String query =
+        "SELECT stringColumn, arg_min(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)), "
+            + "arg_max(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)) "
+            + "FROM testTable WHERE mvIntColumn in (16,17,18,19,20,21,22,23,24,25,26,27) GROUP BY stringColumn";
+
+    BrokerResponse brokerResponse = getBrokerResponse(query);
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 14);
+    assertEquals(rows.get(4)[0], "a33");
+    assertEquals(rows.get(4)[1], new Object[]{20, 21, 22});
+    assertEquals(rows.get(4)[2], new Object[]{27});
+
+    //   TODO: The following query throws an exception,
+    //   TODO: requires fix for empty int arrays ser/de in DataBlock
+    try {
+      query =
+          "SELECT stringColumn, arg_min(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)), "
+              + "arg_max(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)) "
+              + "FROM testTable GROUP BY stringColumn";
+
+      brokerResponse = getBrokerResponse(query);
+      resultTable = brokerResponse.getResultTable();
+      rows = resultTable.getRows();
+      assertEquals(rows.size(), 14);
+      assertEquals(rows.get(4)[0], "a33");
+      assertEquals(rows.get(4)[1], new Object[]{20, 21, 22});
+      assertEquals(rows.get(4)[2], new Object[]{27});
+      fail();
+    } catch (Exception e) {
+      assertTrue(e.toString().contains("java.lang.NullPointerException"));
+    }
+  }
+
+  @Test
+  public void explainPlanTest() {
+    String query = "EXPLAIN PLAN FOR SELECT groupByMVIntColumn, arg_min(intColumn, mvIntColumn), "
+        + "arg_min(intColumn, doubleColumn, mvStringColumn) FROM testTable GROUP BY groupByMVIntColumn";
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
+    Assert.assertTrue(groupByExplainPlan
+        .toString().contains("pinotchildaggregation_argMin('0', mvIntColumn, intColumn, mvIntColumn)"));
+    Assert.assertTrue(groupByExplainPlan
+        .toString()
+        .contains("pinotchildaggregation_argMin('1', mvStringColumn, intColumn, doubleColumn, mvStringColumn)"));
+    Assert.assertTrue(groupByExplainPlan
+        .toString().contains("pinotparentaggregation_argMin('0', '1', intColumn, mvIntColumn)"));
+    Assert.assertTrue(groupByExplainPlan
+        .toString().contains("pinotparentaggregation_argMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test
@@ -439,6 +544,38 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     List<Object[]> rows = resultTable.getRows();
 
     assertEquals(rows.size(), 0);
+  }
+
+  @Test
+  public void testAlias() {
+    // Using argmin/argmax with alias will fail, since the alias will not be resolved by the rewriter
+    try {
+      String query = "SELECT groupByIntColumn, arg_max(intColumn, longColumn) AS"
+          + " argmax1 FROM testTable GROUP BY groupByIntColumn";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      List<Object[]> rows = resultTable.getRows();
+      fail();
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Aggregation function: argmax(intColumn,longColumn) "
+          + "is only supported in selection without alias."));
+    }
+  }
+
+  @Test
+  public void testOrderBy() {
+    // Using argmin/argmax with order by will fail, since the ordering on a multi-row projection is not well-defined
+    try {
+      String query = "SELECT groupByIntColumn, arg_max(intColumn, longColumn) FROM testTable "
+          + "GROUP BY groupByIntColumn ORDER BY arg_max(intColumn, longColumn)";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      List<Object[]> rows = resultTable.getRows();
+      fail();
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Aggregation function: argmax(intColumn,longColumn) "
+          + "is only supported in selection without alias."));
+    }
   }
 
   @AfterClass

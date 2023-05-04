@@ -145,8 +145,9 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
   }
 
   @Override
-  public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
+  public final String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX)
+        .append("_").append(getType().getName()).append('(');
     int numArguments = getInputExpressions().size();
     if (numArguments > 0) {
       stringBuilder.append(getInputExpressions().get(0).toString());

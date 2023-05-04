@@ -333,6 +333,10 @@ public class AggregationFunctionFactory {
             return new ChildArgMinMaxAggregationFunction(arguments, true);
           case PINOTCHILDAGGREGATIONARGMIN:
             return new ChildArgMinMaxAggregationFunction(arguments, false);
+          case ARGMAX:
+          case ARGMIN:
+            throw new IllegalArgumentException("Aggregation function: " + function
+                + " is only supported in selection without alias.");
           default:
             throw new IllegalArgumentException();
         }
