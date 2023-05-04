@@ -137,7 +137,6 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
-
     Set<Long> inValues = Sets.newHashSet(_longSVValues[2], _longSVValues[7], _longSVValues[11]);
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
