@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -328,19 +329,16 @@ public class CaseTransformFunction extends BaseTransformFunction {
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
+    Map<Integer, int[]> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        TransformFunction transformFunction = _thenStatements.get(i);
-        int[] intValues = transformFunction.transformToIntValuesSV(valueBlock);
-        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          if (selected[docId] == i) {
-            unselectedDocs.clear(docId);
-            _intValuesSV[docId] = intValues[docId];
-          }
-        }
-        if (unselectedDocs.isEmpty()) {
-          break;
-        }
+        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToIntValuesSV(valueBlock));
+      }
+    }
+    for (int docId = 0; docId < numDocs; docId++) {
+      if (selected[docId] >= 0) {
+        _intValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        unselectedDocs.clear(docId);
       }
     }
     if (!unselectedDocs.isEmpty()) {

@@ -108,7 +108,6 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
     int[][] data = new int[width][length];
-    BitSet filledData = new BitSet(); // indicates whether certain column has be filled in data.
     for (int i = 0; i < length; i++) {
       boolean hasNonNullValue = false;
       for (int j = 0; j < width; j++) {
@@ -116,8 +115,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
           continue;
         }
-        if (!filledData.get(j)) {
-          filledData.set(j);
+        if (data[j] == null) {
           data[j] = _transformFunctions[j].transformToIntValuesSV(valueBlock);
         }
         hasNonNullValue = true;
