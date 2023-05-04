@@ -123,6 +123,8 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
    * The name of the column as follows:
    * CHILD_AGGREGATION_NAME_PREFIX + actual function type + operands + CHILD_AGGREGATION_SEPERATOR
    * + actual function type + parent aggregation function id + CHILD_KEY_SEPERATOR + column key in parent function
+   * e.g. if the child aggregation function is "argmax(0,a,b,x)", the name of the column is
+   * "pinotchildaggregationargmax(a,b,x)@argmax0_x"
    */
   @Override
   public final String getResultColumnName() {
