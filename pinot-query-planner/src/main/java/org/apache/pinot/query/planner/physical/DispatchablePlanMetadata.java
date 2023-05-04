@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
@@ -48,6 +49,10 @@ public class DispatchablePlanMetadata implements Serializable {
   // same segments on them
   private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
 
+  // used for build mailboxes between workers.
+  // workerId -> {stageId -> mailbox list}
+  private Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
+
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
 
@@ -61,6 +66,7 @@ public class DispatchablePlanMetadata implements Serializable {
     _scannedTables = new ArrayList<>();
     _serverInstanceToWorkerIdMap = new HashMap<>();
     _workerIdToSegmentsMap = new HashMap<>();
+    _workerIdToMailboxesMap = new HashMap<>();
     _timeBoundaryInfo = null;
     _requiresSingletonInstance = false;
   }
@@ -84,6 +90,18 @@ public class DispatchablePlanMetadata implements Serializable {
   public void setWorkerIdToSegmentsMap(
       Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
+  }
+
+  public Map<Integer, Map<Integer, MailboxMetadata>> getWorkerIdToMailBoxIdsMap() {
+    return _workerIdToMailboxesMap;
+  }
+
+  public void setWorkerIdToMailBoxIdsMap(Map<Integer, Map<Integer, MailboxMetadata>> workerIdToMailboxesMap) {
+    _workerIdToMailboxesMap.putAll(workerIdToMailboxesMap);
+  }
+
+  public void addWorkerIdToMailBoxIdsMap(int stageId, Map<Integer, MailboxMetadata> stageIdToMailboxesMap) {
+    _workerIdToMailboxesMap.put(stageId, stageIdToMailboxesMap);
   }
 
   public Map<QueryServerInstance, List<Integer>> getServerInstanceToWorkerIdMap() {
@@ -120,8 +138,9 @@ public class DispatchablePlanMetadata implements Serializable {
 
   @Override
   public String toString() {
-    return "DispatchablePlanMetadata{" + "_scannedTables=" + _scannedTables + ", _servers="
-        + _serverInstanceToWorkerIdMap + ", _serverInstanceToSegmentsMap=" + _workerIdToSegmentsMap
+    return "DispatchablePlanMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstanceToWorkerIdMap="
+        + _serverInstanceToWorkerIdMap + ", _workerIdToSegmentsMap=" + _workerIdToSegmentsMap
+        + ", _workerIdToMailboxesMap=" + _workerIdToMailboxesMap
         + ", _timeBoundaryInfo=" + _timeBoundaryInfo + '}';
   }
 }

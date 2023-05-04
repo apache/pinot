@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.List;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -38,13 +37,13 @@ public class OpChainExecutionContext {
   private final VirtualServerAddress _server;
   private final long _timeoutMs;
   private final long _deadlineMs;
-  private final List<StageMetadata> _stageMetadataList;
+  private final StageMetadata _stageMetadata;
   private final OpChainId _id;
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long timeoutMs, long deadlineMs, List<StageMetadata> stageMetadataList,
+      VirtualServerAddress server, long timeoutMs, long deadlineMs, StageMetadata stageMetadata,
       boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
@@ -52,7 +51,7 @@ public class OpChainExecutionContext {
     _server = server;
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
-    _stageMetadataList = stageMetadataList;
+    _stageMetadata = stageMetadata;
     _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
     _traceEnabled = traceEnabled;
@@ -61,7 +60,7 @@ public class OpChainExecutionContext {
   public OpChainExecutionContext(PlanRequestContext planRequestContext) {
     this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
         planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
-        planRequestContext.getStageMetadataList(), planRequestContext.isTraceEnabled());
+        planRequestContext.getStageMetadata(), planRequestContext.isTraceEnabled());
   }
 
   public MailboxService getMailboxService() {
@@ -88,8 +87,8 @@ public class OpChainExecutionContext {
     return _deadlineMs;
   }
 
-  public List<StageMetadata> getStageMetadataList() {
-    return _stageMetadataList;
+  public StageMetadata getStageMetadata() {
+    return _stageMetadata;
   }
 
   public OpChainId getId() {

@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -65,11 +66,11 @@ public class QueryPlan {
   }
 
   /**
-   * Get the stage metadata information.
+   * Get the stage metadata information based on stageId.
    * @return stage metadata info.
    */
-  public List<StageMetadata> getStageMetadataList() {
-    return _stageMetadataList;
+  public StageMetadata getStageMetadata(int stageId) {
+    return _stageMetadataList.get(stageId);
   }
 
   /**
@@ -118,6 +119,9 @@ public class QueryPlan {
           VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerEntry.getKey(), workerId);
           WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
           builder.setVirtualServerAddress(virtualServerAddress);
+          Map<Integer, MailboxMetadata> stageToMailboxMetadata =
+              dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap().get(workerId);
+          builder.putAllMailBoxInfosMap(stageToMailboxMetadata);
           if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
             builder.addTableSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap().get(workerId));
           }
