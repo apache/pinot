@@ -325,8 +325,8 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[0], "a22");
     assertEquals(rows.get(1)[1], "a");
 
-    //   TODO: The following query throws an exception,
-    //   TODO: requires fix for multi-value bytes column serialization in DataBlock
+    // TODO: The following query throws an exception,
+    //       requires fix for multi-value bytes column serialization in DataBlock
     query = "SELECT arg_min(intColumn, mvBytesColumn) FROM testTable";
 
     try {
@@ -495,25 +495,21 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(4)[1], new Object[]{20, 21, 22});
     assertEquals(rows.get(4)[2], new Object[]{27});
 
-    //   TODO: The following query throws an exception,
-    //   TODO: requires fix for empty int arrays ser/de in DataBlock
-    try {
-      query =
-          "SELECT stringColumn, arg_min(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)), "
-              + "arg_max(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)) "
-              + "FROM testTable GROUP BY stringColumn";
+    //  TODO: The following query works because whenever we find an empty array in the result, we use null
+    //        (see ArgMinMaxProjectionValSetWrapper). Ideally, we should be able to serialize empty array.
+    //        requires fix for empty int arrays ser/de in DataBlock
+    query =
+        "SELECT stringColumn, arg_min(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)), "
+            + "arg_max(intColumn, VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27)) "
+            + "FROM testTable GROUP BY stringColumn";
 
-      brokerResponse = getBrokerResponse(query);
-      resultTable = brokerResponse.getResultTable();
-      rows = resultTable.getRows();
-      assertEquals(rows.size(), 14);
-      assertEquals(rows.get(4)[0], "a33");
-      assertEquals(rows.get(4)[1], new Object[]{20, 21, 22});
-      assertEquals(rows.get(4)[2], new Object[]{27});
-      fail();
-    } catch (Exception e) {
-      assertTrue(e.toString().contains("java.lang.NullPointerException"));
-    }
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 20);
+    assertEquals(rows.get(8)[0], "a33");
+    assertEquals(rows.get(8)[1], new Object[]{20, 21, 22});
+    assertEquals(rows.get(8)[2], new Object[]{});
   }
 
   @Test

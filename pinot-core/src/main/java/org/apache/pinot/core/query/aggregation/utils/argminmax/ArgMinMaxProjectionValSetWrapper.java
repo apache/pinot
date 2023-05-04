@@ -52,17 +52,17 @@ public class ArgMinMaxProjectionValSetWrapper extends ArgMinMaxWrapperValSet {
       case JSON:
           return _objectsValues[i];
       case INT_ARRAY:
-        return _intValuesMV[i];
+        return _intValuesMV[i].length == 0 ? null : _intValuesMV[i];
       case LONG_ARRAY:
       case TIMESTAMP_ARRAY:
-        return _longValuesMV[i];
+        return _longValuesMV[i].length == 0 ? null : _longValuesMV[i];
       case FLOAT_ARRAY:
-        return _floatValuesMV[i];
+        return _floatValuesMV[i].length == 0 ? null : _floatValuesMV[i];
       case DOUBLE_ARRAY:
-        return _doublesValuesMV[i];
+        return _doublesValuesMV[i].length == 0 ? null : _doublesValuesMV[i];
       case STRING_ARRAY:
       case BYTES_ARRAY:
-        return _objectsValuesMV[i];
+        return _objectsValuesMV[i].length == 0 ? null : _objectsValuesMV[i];
       default:
         throw new IllegalStateException("Unsupported data type: " + _dataType);
     }
