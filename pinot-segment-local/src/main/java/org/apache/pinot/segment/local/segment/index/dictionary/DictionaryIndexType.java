@@ -402,6 +402,15 @@ public class DictionaryIndexType
           throws IOException, IndexReaderConstraintException {
       return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
     }
+
+    @Override
+    public Dictionary createIndexReader(SegmentDirectory.Reader segmentReader,
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+        throws IOException, IndexReaderConstraintException {
+      //  Contrary to other indexes, Dictionary doesn't really care about its config
+      //  if there is a buffer for this index, it is read even if the config explicitly ask to disable it.
+      return createIndexReader(segmentReader, fieldIndexConfigs, metadata, true);
+    }
   }
 
   @Override

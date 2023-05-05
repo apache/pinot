@@ -156,13 +156,15 @@ public class InvertedIndexType
      */
     @Override
     public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata, boolean prioritizeBuffer)
         throws IOException, IndexReaderConstraintException {
-      if (fieldIndexConfigs == null || !fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
+      boolean disabled = fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isDisabled();
+      String columnName = metadata.getColumnName();
+      if (disabled && (!prioritizeBuffer || !segmentReader.hasIndexFor(columnName, StandardIndexes.inverted()))) {
         return null;
       }
       if (!metadata.hasDictionary()) {
-        throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "
+        throw new IllegalStateException("Column " + columnName + " cannot be indexed by an inverted "
             + "index if it has no dictionary");
       }
       if (metadata.isSorted() && metadata.isSingleValue()) {

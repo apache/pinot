@@ -33,7 +33,9 @@ import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -103,26 +105,32 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
     return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
   }
 
-  private static class ReaderFactory implements IndexReaderFactory<NullValueVectorReader> {
+  private static class ReaderFactory extends IndexReaderFactory.Default<IndexConfig, NullValueVectorReader> {
 
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 
     private ReaderFactory() {
     }
 
-    @Nullable
+    @Override
+    protected IndexType<IndexConfig, NullValueVectorReader, ?> getIndexType() {
+      return StandardIndexes.nullValueVector();
+    }
+
+    @Override
+    protected NullValueVectorReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+        IndexConfig indexConfig)
+        throws IOException, IndexReaderConstraintException {
+      return new NullValueVectorReaderImpl(dataBuffer);
+    }
+
     @Override
     public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
-          throws IOException {
-      // TODO: Change this behavior and make it closer to other indexes.
-      //  For historical and test reasons, NullValueIndexType doesn't really care about its config
+        throws IOException, IndexReaderConstraintException {
+      //  Contrary to other indexes, null value doesn't really care about its config
       //  if there is a buffer for this index, it is read even if the config explicitly ask to disable it.
-      if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector())) {
-        return null;
-      }
-      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector());
-      return new NullValueVectorReaderImpl(buffer);
+      return createIndexReader(segmentReader, fieldIndexConfigs, metadata, true);
     }
   }
 

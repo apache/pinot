@@ -49,6 +49,7 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
@@ -160,26 +161,28 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     @Nullable
     @Override
     public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata, boolean prioritizeBuffer)
           throws IndexReaderConstraintException {
       if (fieldIndexConfigs == null) {
         return null;
       }
+      String columnName = metadata.getColumnName();
+      IndexType<TextIndexConfig, TextIndexReader, TextIndexCreator> indexType = StandardIndexes.text();
       if (metadata.getDataType() != FieldSpec.DataType.STRING) {
-        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.text(),
+        throw new IndexReaderConstraintException(columnName, indexType,
             "Text index is currently only supported on STRING type columns");
       }
       File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
-      FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(segmentDir, metadata.getColumnName());
+      FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(segmentDir, columnName);
       if (textIndexFSTType == FSTType.NATIVE) {
         // TODO: Support loading native text index from a PinotDataBuffer
-        return new NativeTextIndexReader(metadata.getColumnName(), segmentDir);
+        return new NativeTextIndexReader(columnName, segmentDir);
       }
-      TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
-      if (!indexConfig.isEnabled()) {
+      TextIndexConfig indexConf = fieldIndexConfigs.getConfig(indexType);
+      if (indexConf.isDisabled() && (!prioritizeBuffer || !segmentReader.hasIndexFor(columnName, indexType))) {
         return null;
       }
-      return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
+      return new LuceneTextIndexReader(columnName, segmentDir, metadata.getTotalDocs(), indexConf);
     }
   }
 

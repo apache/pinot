@@ -30,13 +30,23 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 public interface IndexReaderFactory<R extends IndexReader> {
 
   /**
+   *
+   * @param prioritizeBuffer if true, ignores the disabled property of the related config in case the reader actually
+   *                         contains a buffer for the index.
    * @throws IndexReaderConstraintException if the constraints of the index reader are not matched. For example, some
    * indexes may require the column to be dictionary based.
    */
   @Nullable
   R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-      ColumnMetadata metadata)
+      ColumnMetadata metadata, boolean prioritizeBuffer)
       throws IOException, IndexReaderConstraintException;
+
+  @Nullable
+  default R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+      ColumnMetadata metadata)
+      throws IOException, IndexReaderConstraintException {
+    return createIndexReader(segmentReader, fieldIndexConfigs, metadata, false);
+  }
 
   abstract class Default<C extends IndexConfig, R extends IndexReader> implements IndexReaderFactory<R> {
 
@@ -45,32 +55,15 @@ public interface IndexReaderFactory<R extends IndexReader> {
     protected abstract R createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata, C indexConfig)
         throws IOException, IndexReaderConstraintException;
 
-    /**
-     * Sometimes the index configuration indicates that the index should be disabled but the reader actually contains
-     * a buffer for the index type.
-     *
-     * By default, the buffer has priority over the configuration, so in case we have a buffer we would create an index
-     * even if the configuration says otherwise. In case some index wants to use their own behavior, this method can
-     * be overloaded.
-     */
-    protected boolean isBufferOverConfig() {
-      return true;
-    }
-
     @Override
     public R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-        ColumnMetadata metadata)
+        ColumnMetadata metadata, boolean prioritizeBuffer)
         throws IOException, IndexReaderConstraintException {
       IndexType<C, R, ?> indexType = getIndexType();
-      C indexConf;
-      if (fieldIndexConfigs == null) {
-        indexConf = getIndexType().getDefaultConfig();
-      } else {
-        indexConf = fieldIndexConfigs.getConfig(indexType);
-      }
+      C indexConf = fieldIndexConfigs.getConfig(indexType);
 
       String columnName = metadata.getColumnName();
-      if (indexConf.isDisabled() && (!isBufferOverConfig() || !segmentReader.hasIndexFor(columnName, indexType))) {
+      if (indexConf.isDisabled() && (!prioritizeBuffer || !segmentReader.hasIndexFor(columnName, indexType))) {
         return null;
       }
 
