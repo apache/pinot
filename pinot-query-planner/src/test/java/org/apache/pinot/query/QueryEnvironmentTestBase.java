@@ -55,6 +55,8 @@ public class QueryEnvironmentTestBase {
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
+        .addMultiValueDimension("col5", FieldSpec.DataType.STRING, "")
+        .addMultiValueDimension("col6", FieldSpec.DataType.INT, 0)
         .setSchemaName("defaultSchemaName");
     TABLE_SCHEMAS.put("a_REALTIME", SCHEMA_BUILDER.setSchemaName("a").build());
     TABLE_SCHEMAS.put("b_REALTIME", SCHEMA_BUILDER.setSchemaName("b").build());

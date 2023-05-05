@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.stage.UncollectNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -127,6 +128,11 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
       input.visit(this, context.next(false, context._host, context._workerId));
     }
     return context._builder;
+  }
+
+  @Override
+  public StringBuilder visitUncollect(UncollectNode uncollectNode, Context context) {
+    return visitSimpleNode(uncollectNode, context);
   }
 
   @Override
