@@ -255,8 +255,6 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
-        env:
-          PINOT_JAVA_VERSION: ${{ matrix.java }}
 
   presto-driver-build:
     if: github.repository == 'apache/pinot'

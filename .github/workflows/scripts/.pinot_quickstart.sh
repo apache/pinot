@@ -88,7 +88,7 @@ cd "${DIST_BIN_DIR}"
 # Test standalone pinot. Configure JAVA_OPTS for smaller memory, and don't use System.exit
 export JAVA_OPTS="-Xms1G -Dlog4j2.configurationFile=conf/log4j2.xml"
 
-if [ "$PINOT_JAVA_VERSION" -ge "11" ]; then
+if [ "$JAVA_VER" -gt 15 ]; then
   JAVA_OPTS="${JAVA_OPTS} --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
 fi
 
