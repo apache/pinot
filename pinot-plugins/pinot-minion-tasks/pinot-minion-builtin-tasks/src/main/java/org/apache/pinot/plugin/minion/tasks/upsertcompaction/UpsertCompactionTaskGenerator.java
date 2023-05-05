@@ -53,9 +53,7 @@ import org.slf4j.LoggerFactory;
 @TaskGenerator
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
-  private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
-  private static final String DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = "5000000";
   private static final String DEFAULT_INVALID_RECORDS_THRESHOLD = "100000";
   @Override
   public String getTaskType() {
@@ -119,38 +117,34 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       } catch (InvalidConfigException e) {
         throw new RuntimeException(e);
       }
-      Map<Integer, List<String>> selectedPartitions = new HashMap<>();
+      Map<Integer, List<String>> selectedSegments = new HashMap<>();
       for (Map.Entry<Integer, List<String>> partitionEntry : partitionToSegmentNames.entrySet()) {
         List<String> segments = partitionEntry.getValue();
-        List<String> urls = new ArrayList<>(completedSegments.size());
+        Map<String, String> urlToSegment = new HashMap<>();
         for (String segment : segments) {
           String server = segmentToServer.get(segment);
           String endpoint = serverToEndpoints.get(server);
           String url = String.format("%s/tables/%s/segments/%s/invalidRecordCount",
             endpoint, tableNameWithType, segment);
-          urls.add(url);
+          urlToSegment.put(url, segment);
         }
         // request the urls from the server
         CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(
               Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager(), serverToEndpoints.inverse());
         CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-              completionServiceHelper.doMultiGetRequest(urls, tableNameWithType, true, 3000);
-        Map<String, String> segmentToInvalidRecordCount = new HashMap<>();
+              completionServiceHelper.doMultiGetRequest(
+                  new ArrayList<>(urlToSegment.keySet()), tableNameWithType, true, 3000);
         for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-          String invalidRecordCount = streamResponse.getValue();
-          segmentToInvalidRecordCount.put(streamResponse.getKey(), invalidRecordCount);
-        }
-        for (Map.Entry<String, String> countEntry : segmentToInvalidRecordCount.entrySet()) {
-          int invalidRecordCount = Integer.parseInt(countEntry.getValue());
+          int invalidRecordCount = Integer.parseInt(streamResponse.getValue());
           if (invalidRecordCount > invalidRecordsThreshold) {
-            selectedPartitions.put(partitionEntry.getKey(), segments);
-            break;
+            String segmentName = urlToSegment.get(streamResponse.getKey());
+            selectedSegments.computeIfAbsent(partitionEntry.getKey(), k -> new ArrayList<>()).add(segmentName);
           }
         }
       }
 
       int numTaskConfigsForTable = 0;
-      for (Map.Entry<Integer, List<String>> entry : selectedPartitions.entrySet()) {
+      for (Map.Entry<Integer, List<String>> entry : selectedSegments.entrySet()) {
         List<String> completedSegmentNames = entry.getValue();
         PinotTaskConfig pinotTaskConfig =
             getPinotTaskConfig(tableNameWithType, compactionConfigs, completedSegmentNames);
@@ -182,20 +176,12 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
     configs.put(MinionConstants.SEGMENT_NAME_KEY,
         StringUtils.join(completedSegmentNames, MinionConstants.SEGMENT_NAME_SEPARATOR));
-    configs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, compactionConfigs.getOrDefault(
-            UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, DEFAULT_BUCKET_PERIOD));
-    configs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, compactionConfigs.getOrDefault(
-        UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT));
-    configs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, compactionConfigs.getOrDefault(
-        UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, DEFAULT_INVALID_RECORDS_THRESHOLD));
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs);
     return pinotTaskConfig;
   }
 
   private static final String[] VALID_CONFIG_KEYS = {
-      UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY,
       UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY,
-      UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
       UpsertCompactionTask.INVALID_RECORDS_THRESHOLD,
   };
 
