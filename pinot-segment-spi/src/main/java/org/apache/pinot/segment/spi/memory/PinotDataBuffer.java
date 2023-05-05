@@ -152,7 +152,6 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public static PinotBufferFactory createDefaultFactory() {
     String factoryClassName;
-    // TODO: If chronicle is going to be in their own package, use another way to get the runtime version
     if (JavaVersion.VERSION < 17) {
       LOGGER.info("Using LArray as buffer on JVM version {}", System.getProperty("java.version"));
       factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
