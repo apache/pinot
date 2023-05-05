@@ -1096,7 +1096,7 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>3.9.0</version>
+        <version>3.12.4</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1355,6 +1355,7 @@
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
+            <argLine>--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED</argLine>
           </configuration>
         </plugin>
         <plugin>
