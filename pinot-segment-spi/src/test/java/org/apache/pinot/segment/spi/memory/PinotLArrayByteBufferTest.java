@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.memory;
 
 import org.apache.pinot.segment.spi.utils.JavaVersion;
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 
 
@@ -34,8 +35,8 @@ public class PinotLArrayByteBufferTest extends PinotDataBufferTest {
 
   @BeforeClass
   public void abortOnModernJava() {
-    if (JavaVersion.VERSION > 11) {
-//      throw new SkipException("Skipping LArray tests because they cannot run in Java " + JavaVersion.VERSION);
+    if (JavaVersion.VERSION > 15) {
+      throw new SkipException("Skipping LArray tests because they cannot run in Java " + JavaVersion.VERSION);
     }
   }
 }
