@@ -1210,6 +1210,18 @@
         <artifactId>test-clock</artifactId>
         <version>1.0.2</version>
         <scope>test</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <!-- Older versions fail with Java >= 16 -->
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>1.18.26</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
