@@ -28,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -59,7 +60,7 @@ import static org.testng.Assert.fail;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ArgMinMaxTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "HistogramQueriesTest");
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ArgMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -320,10 +321,10 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     assertEquals(rows.size(), 4);
 
-    assertEquals(rows.get(0)[0], "a22");
-    assertEquals(rows.get(0)[1], "a");
-    assertEquals(rows.get(1)[0], "a22");
-    assertEquals(rows.get(1)[1], "a");
+    for (int i = 0; i < 4; i++) {
+      assertEquals(rows.get(i)[0], "a22");
+      assertEquals(rows.get(i)[1], "a");
+    }
 
     // TODO: The following query throws an exception,
     //       requires fix for multi-value bytes column serialization in DataBlock
@@ -354,6 +355,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[0], 1200);
     assertEquals(rows.get(2)[0], 0);
     assertEquals(rows.get(3)[0], 1200);
+
     // test1, with dedupe
     query = "SELECT  "
         + "argmin(booleanColumn, bigDecimalColumn, doubleColumn, intColumn) FROM testTable WHERE doubleColumn <= 1200";
@@ -366,6 +368,20 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     assertEquals(rows.get(0)[0], 0);
     assertEquals(rows.get(1)[0], 0);
+
+    // test2, with dedupe
+    query = "SELECT  "
+        + "argmin(booleanColumn, bigDecimalColumn, 0-doubleColumn, intColumn) FROM testTable WHERE doubleColumn <= "
+        + "1200";
+
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+
+    assertEquals(rows.size(), 2);
+
+    assertEquals(rows.get(0)[0], 1200);
+    assertEquals(rows.get(1)[0], 1200);
   }
 
   @Test
@@ -379,11 +395,14 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
     assertNull(rows.get(0)[0]);
     assertNull(rows.get(0)[1]);
     assertEquals(resultTable.getDataSchema().getColumnName(0), "argmax(intColumn,longColumn)");
     assertEquals(resultTable.getDataSchema().getColumnName(1),
         "argmin(case(equals(stringColumn,'a33'),equals(stringColumn,'a22'),'b','a','c'),stringColumn)");
+    Assert.assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
   }
 
   @Test
@@ -397,17 +416,11 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     assertEquals(rows.size(), 10);
 
-    assertEquals(rows.get(0)[0], 1);
-    assertEquals(rows.get(0)[1], 996L);
-
-    assertNull(rows.get(1)[0]);
-    assertEquals(rows.get(1)[1], 996L);
-
-    assertNull(rows.get(9)[0]);
-    assertEquals(rows.get(9)[1], 995L);
-
-    assertEquals(rows.get(6)[0], 4);
-    assertEquals(rows.get(6)[1], 999L);
+    for (int i = 0; i < 10; i++) {
+      int group = ((i + 2) / 2) % 5;
+      assertEquals(rows.get(i)[0], i % 2 == 0 ? group : null);
+      assertEquals(rows.get(i)[1], 995L + group);
+    }
 
     // Simple inter segment group by with limit
     query =
@@ -420,11 +433,11 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     assertEquals(rows.size(), 24);
 
-    assertEquals(rows.get(0)[0], 1);
-    assertEquals(rows.get(0)[1], 0D);
-
-    assertNull(rows.get(1)[0]);
-    assertEquals(rows.get(1)[1], 0D);
+    for (int i = 0; i < 22; i++) {
+      double group = Math.pow(2, i / 2);
+      assertEquals(rows.get(i)[0], i % 2 == 0 ? (int) group : null);
+      assertEquals(rows.get(i)[1], group - 1);
+    }
 
     assertEquals(rows.get(22)[0], 2048);
     assertEquals(rows.get(22)[1], 1999D);
@@ -441,23 +454,11 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     assertEquals(rows.size(), 20);
 
-    assertEquals(rows.get(0)[0], 1);
-    assertEquals(rows.get(0)[1], 0D);
-
-    assertNull(rows.get(1)[0]);
-    assertEquals(rows.get(1)[1], 0D);
-
-    assertEquals(rows.get(2)[0], 2);
-    assertEquals(rows.get(2)[1], 1D);
-
-    assertNull(rows.get(3)[0]);
-    assertEquals(rows.get(3)[1], 1D);
-
-    assertEquals(rows.get(16)[0], 9);
-    assertEquals(rows.get(16)[1], 8D);
-
-    assertNull(rows.get(17)[0]);
-    assertEquals(rows.get(17)[1], 8D);
+    for (int i = 0; i < 18; i++) {
+      int group = i / 2 + 1;
+      assertEquals(rows.get(i)[0], i % 2 == 0 ? group : null);
+      assertEquals(rows.get(i)[1], (double) group - 1);
+    }
 
     assertEquals(rows.get(18)[0], 0);
     assertEquals(rows.get(18)[1], 0D);
@@ -473,6 +474,13 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
     assertEquals(rows.size(), 20);
+
+    for (int i = 0; i < 18; i++) {
+      int group = i / 2 + 1;
+      assertEquals(rows.get(i)[0], i % 2 == 0 ? group : null);
+      assertEquals(rows.get(i)[1], new Object[]{group - 1, group, group + 1});
+      assertEquals(rows.get(i)[2], new Object[]{"a199" + group, "a199" + group + 1, "a199" + group + 2});
+    }
 
     assertEquals(rows.get(18)[0], 0);
     assertEquals(rows.get(18)[1], new Object[]{0, 1, 2});
@@ -539,6 +547,28 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
 
+    assertEquals(resultTable.getDataSchema().getColumnName(0), "groupByIntColumn");
+    assertEquals(resultTable.getDataSchema().getColumnName(1), "argmax(intColumn,longColumn)");
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    assertEquals(rows.size(), 0);
+
+    // Simple inter segment group by with no documents after filtering
+    query = "SELECT groupByIntColumn, arg_max(intColumn, longColumn), sum(longColumn), arg_min(intColumn, longColumn)"
+        + " FROM testTable "
+        + " where intColumn > 10000 GROUP BY groupByIntColumn";
+
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+    assertEquals(resultTable.getDataSchema().getColumnName(0), "groupByIntColumn");
+    assertEquals(resultTable.getDataSchema().getColumnName(1), "argmax(intColumn,longColumn)");
+    assertEquals(resultTable.getDataSchema().getColumnName(2), "sum(longColumn)");
+    assertEquals(resultTable.getDataSchema().getColumnName(3), "argmin(intColumn,longColumn)");
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     assertEquals(rows.size(), 0);
   }
 

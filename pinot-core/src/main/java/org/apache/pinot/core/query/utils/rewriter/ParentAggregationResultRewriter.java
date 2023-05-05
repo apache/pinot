@@ -67,10 +67,6 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
   }
 
   public RewriterResult rewrite(DataSchema dataSchema, List<Object[]> rows) {
-    // If there are no rows, return the original schema and rows
-    if (rows.isEmpty()) {
-      return new RewriterResult(dataSchema, rows);
-    }
 
     int numParentAggregationFunctions = 0;
     // Count the number of parent aggregation functions
@@ -85,8 +81,11 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
       return new RewriterResult(dataSchema, rows);
     }
 
-    // Create a mapping from the child aggregation function name to the child aggregation function
-    Map<String, ChildFunctionMapping> childFunctionMapping = createChildFunctionMapping(dataSchema, rows.get(0));
+    Map<String, ChildFunctionMapping> childFunctionMapping = null;
+    if (!rows.isEmpty()) {
+      // Create a mapping from the child aggregation function name to the child aggregation function
+      childFunctionMapping = createChildFunctionMapping(dataSchema, rows.get(0));
+    }
 
     String[] newColumnNames = new String[dataSchema.size() - numParentAggregationFunctions];
     DataSchema.ColumnDataType[] newColumnDataTypes
@@ -121,6 +120,12 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
         String[] s = childAggregationFunctionNameWithKey
             .split(CommonConstants.RewriterConstants.CHILD_AGGREGATION_SEPERATOR);
         newColumnNames[j] = s[0];
+
+        if (childFunctionMapping == null) {
+          newColumnDataTypes[j] = DataSchema.ColumnDataType.STRING;
+          j++;
+          continue;
+        }
         ChildFunctionMapping childFunction = childFunctionMapping.get(s[1]);
         newColumnDataTypes[j] = childFunction.getParent().getSchema()
             .getColumnDataType(childFunction.getNestedOffset());
