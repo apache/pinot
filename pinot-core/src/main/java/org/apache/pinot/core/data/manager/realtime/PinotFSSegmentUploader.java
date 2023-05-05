@@ -26,6 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -46,10 +48,12 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   private final String _segmentStoreUriStr;
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private final int _timeoutInMs;
+  private final ServerMetrics _serverMetrics;
 
-  public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis) {
+  public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics) {
     _segmentStoreUriStr = segmentStoreDirUri;
     _timeoutInMs = timeoutMillis;
+    _serverMetrics = serverMetrics;
   }
 
   public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
@@ -61,6 +65,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     Callable<URI> uploadTask = () -> {
       URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
           segmentName.getSegmentName() + UUID.randomUUID().toString()));
+      long startTime = System.currentTimeMillis();
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
         // Check and delete any existing segment file.
@@ -71,6 +76,10 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         return destUri;
       } catch (Exception e) {
         LOGGER.warn("Failed copy segment tar file {} to segment store {}: {}", segmentFile.getName(), destUri, e);
+      } finally {
+        long duration = System.currentTimeMillis() - startTime;
+        _serverMetrics.addTimedTableValue(segmentName.getTableName(), ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
+            TimeUnit.MILLISECONDS);
       }
       return null;
     };

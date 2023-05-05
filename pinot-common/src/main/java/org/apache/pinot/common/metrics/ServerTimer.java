@@ -41,6 +41,8 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   // Query cost (response serialization cpu time) for query processing on server
   RESPONSE_SER_CPU_TIME_NS("nanoseconds", false),
 
+  SEGMENT_UPLOAD_TIME_MS("milliseconds", false),
+
   // Total query cost (thread cpu time + system activities cpu time + response serialization cpu time) for query
   // processing on server
   TOTAL_CPU_TIME_NS("nanoseconds", false);

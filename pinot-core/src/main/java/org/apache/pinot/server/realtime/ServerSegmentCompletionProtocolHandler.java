@@ -159,7 +159,7 @@ public class ServerSegmentCompletionProtocolHandler {
     try {
       segmentUploader =
           new Server2ControllerSegmentUploader(LOGGER, _fileUploadDownloadClient, url, params.getSegmentName(),
-              _segmentUploadRequestTimeoutMs, _serverMetrics, _authProvider);
+              _segmentUploadRequestTimeoutMs, _serverMetrics, _authProvider, _rawTableName);
     } catch (URISyntaxException e) {
       LOGGER.error("Segment commit upload url error: ", e);
       return SegmentCompletionProtocol.RESP_NOT_SENT;
