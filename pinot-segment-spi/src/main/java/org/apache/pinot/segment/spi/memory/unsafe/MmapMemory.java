@@ -83,6 +83,8 @@ public class MmapMemory implements Memory {
   }
 
   private static class MapSection {
+    public static final MapSection EMPTY = new MapSection(0, () -> {
+    });
     private final long _address;
     private final UnmapFun _unmapFun;
 
@@ -185,6 +187,10 @@ public class MmapMemory implements Memory {
     default MapSection map(File file, boolean readOnly, long offset, long size) throws IOException {
       String mode = readOnly ? "r" : "rw";
       try (RandomAccessFile raf = new RandomAccessFile(file, mode); FileChannel fc = raf.getChannel()) {
+        if (size == 0) {
+          return MapSection.EMPTY;
+        }
+
         long allocationGranule = Unsafer.UNSAFE.pageSize();
         int pagePosition = (int) (offset % allocationGranule);
 
@@ -207,7 +213,7 @@ public class MmapMemory implements Memory {
         MapSection map0Section = map0(fc, readOnly, mapPosition, mapSize);
         return new MapSection(map0Section.getAddress() + pagePosition, map0Section.getUnmapFun());
       } catch (InvocationTargetException | IllegalAccessException e) {
-        throw new RuntimeException("Cannot map ");
+        throw new RuntimeException("Cannot map file " + file + " from address " + offset + " with size " + size, e);
       }
     }
 
