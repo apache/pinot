@@ -29,6 +29,8 @@ public class DirectMemory implements Memory {
   public DirectMemory(long size) {
     _address = Unsafer.UNSAFE.allocateMemory(size);
     _size = size;
+
+    Unsafer.UNSAFE.setMemory(_address, _size, (byte) 0);
   }
 
   @Override
