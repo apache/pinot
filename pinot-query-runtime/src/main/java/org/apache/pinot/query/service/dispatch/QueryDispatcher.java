@@ -170,7 +170,8 @@ public class QueryDispatcher {
           if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
             throw new RuntimeException(
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", resp.getStageId(),
-                    resp.getVirtualServer(), response));
+                    resp.getVirtualServer(),
+                    response.getMetadataOrDefault(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, "null")));
           }
           successfulDispatchCalls++;
         }

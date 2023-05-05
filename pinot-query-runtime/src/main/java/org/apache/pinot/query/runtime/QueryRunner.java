@@ -198,50 +198,19 @@ public class QueryRunner {
 
   private void runLeafStage(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap,
       long timeoutMs, long deadlineMs, long requestId) {
-    // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
-    // and package it here for return. But we should really use a MailboxSendOperator directly put into the
-    // server executor.
-    MailboxSendOperator mailboxSendOperator = null;
-    try {
-      boolean isTraceEnabled =
-          Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
-      long leafStageStartMillis = System.currentTimeMillis();
-      List<ServerPlanRequestContext> serverQueryRequests =
-          constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService,
-              deadlineMs);
-
-      // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
-      List<InstanceResponseBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
-      for (ServerPlanRequestContext requestContext : serverQueryRequests) {
-        ServerQueryRequest request = new ServerQueryRequest(requestContext.getInstanceRequest(),
-            new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
-        serverQueryResults.add(processServerQuery(request, getQueryWorkerLeafExecutorService()));
-      }
-      LOGGER.debug(
-          "RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId() + " Leaf stage v1 processing time:"
-              + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
-      MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
-      OpChainExecutionContext opChainExecutionContext =
-          new OpChainExecutionContext(_mailboxService, requestId, sendNode.getPlanFragmentId(),
-              distributedStagePlan.getServer(), timeoutMs, deadlineMs, distributedStagePlan.getStageMetadata(),
-              isTraceEnabled);
-      MultiStageOperator leafStageOperator =
-          new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
-      mailboxSendOperator =
-          new MailboxSendOperator(opChainExecutionContext, leafStageOperator, sendNode.getExchangeType(),
-              sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
-              sendNode.isSortOnSender(), sendNode.getReceiverStageId());
-      int blockCounter = 0;
-      while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
-        LOGGER.debug("Acquired transferable block: {}", blockCounter++);
-      }
-      mailboxSendOperator.close();
-    } catch (Exception e) {
-      LOGGER.error(String.format("Error running leafStage for requestId=%s", requestId), e);
-      if (mailboxSendOperator != null) {
-        mailboxSendOperator.cancel(e);
-      }
+    boolean isTraceEnabled =
+        Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
+    List<ServerPlanRequestContext> serverPlanRequestContexts =
+        constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService,
+            deadlineMs);
+    List<ServerQueryRequest> serverQueryRequests = new ArrayList<>(serverPlanRequestContexts.size());
+    for (ServerPlanRequestContext requestContext : serverPlanRequestContexts) {
+      serverQueryRequests.add(new ServerQueryRequest(requestContext.getInstanceRequest(),
+          new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis()));
     }
+    getQueryRunnerExecutorService().submit(() -> {
+      processServerQuery(requestId, timeoutMs, deadlineMs, isTraceEnabled, distributedStagePlan, serverQueryRequests);
+    });
   }
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
@@ -280,15 +249,45 @@ public class QueryRunner {
     return requests;
   }
 
-  private InstanceResponseBlock processServerQuery(ServerQueryRequest serverQueryRequest,
-      ExecutorService executorService) {
+  private void processServerQuery(long requestId, long timeoutMs, long deadlineMs, boolean isTraceEnabled,
+      DistributedStagePlan distributedStagePlan, List<ServerQueryRequest> serverQueryRequests) {
+    MailboxSendOperator mailboxSendOperator = null;
     try {
-      return _serverExecutor.execute(serverQueryRequest, executorService);
+      // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
+      List<InstanceResponseBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
+      for (ServerQueryRequest request : serverQueryRequests) {
+        InstanceResponseBlock result;
+        try {
+          result = _serverExecutor.execute(request, getQueryWorkerLeafExecutorService());
+        } catch (Exception e) {
+          InstanceResponseBlock errorResponse = new InstanceResponseBlock();
+          errorResponse.getExceptions().put(QueryException.QUERY_EXECUTION_ERROR_CODE,
+              e.getMessage() + QueryException.getTruncatedStackTrace(e));
+          result = errorResponse;
+        }
+        serverQueryResults.add(result);
+      }
+      MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
+      OpChainExecutionContext opChainExecutionContext =
+          new OpChainExecutionContext(_mailboxService, requestId, sendNode.getPlanFragmentId(),
+              distributedStagePlan.getServer(), timeoutMs, deadlineMs, distributedStagePlan.getStageMetadata(),
+              isTraceEnabled);
+      MultiStageOperator leafStageOperator =
+          new LeafStageTransferableBlockOperator(opChainExecutionContext, serverQueryResults, sendNode.getDataSchema());
+      mailboxSendOperator =
+          new MailboxSendOperator(opChainExecutionContext, leafStageOperator, sendNode.getExchangeType(),
+              sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
+              sendNode.isSortOnSender(), sendNode.getReceiverStageId());
+      int blockCounter = 0;
+      while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
+        LOGGER.debug("Acquired transferable block: {}", blockCounter++);
+      }
+      mailboxSendOperator.close();
     } catch (Exception e) {
-      InstanceResponseBlock errorResponse = new InstanceResponseBlock();
-      errorResponse.getExceptions()
-          .put(QueryException.QUERY_EXECUTION_ERROR_CODE, e.getMessage() + QueryException.getTruncatedStackTrace(e));
-      return errorResponse;
+      LOGGER.error(String.format("Error running leafStage for requestId=%s", requestId), e);
+      if (mailboxSendOperator != null) {
+        mailboxSendOperator.cancel(e);
+      }
     }
   }
 

@@ -80,8 +80,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
       }
       try {
         // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-        _contentObserver.onNext(toMailboxContent(
-            TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by sender", t))));
+        _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
+            new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t))));
         _contentObserver.onCompleted();
       } catch (Exception e) {
         // Exception can be thrown if the stream is already closed, so we simply ignore it
