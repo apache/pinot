@@ -223,7 +223,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
-    brokerResponse.setRequestId(String.format("%s:%d__%d", _reducerHostname, _reducerPort, requestId));
+    brokerResponse.setRequestId(String.valueOf(requestId));
 
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {
