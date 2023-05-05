@@ -119,7 +119,7 @@ public abstract class CommonsConfigurationUtils {
   }
 
   private static Object mapValue(String key, Configuration configuration) {
-    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1).<Object>map(
+    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 0).<Object>map(
         values -> Arrays.stream(values).collect(Collectors.joining(",")))
         .orElseGet(() -> configuration.getProperty(key));
   }

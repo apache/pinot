@@ -218,6 +218,8 @@ public class PinotConfigurationTest {
 
     Assert.assertEquals(pinotConfiguration.getProperty("config.property.1"), "val1");
     Assert.assertEquals(pinotConfiguration.getProperty("config.property.1", "defaultVal"), "val1");
+    Map<String, Object> properties = pinotConfiguration.toMap();
+    Assert.assertEquals(properties.get("config.property.1"), "val1");
 
     System.clearProperty("PINOT_CONFIGURATION_TEST_VAR");
   }

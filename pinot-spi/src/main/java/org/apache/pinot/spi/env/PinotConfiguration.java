@@ -354,10 +354,7 @@ public class PinotConfiguration {
    * @return the property String value. Fallback to default value if missing.
    */
   public String getProperty(String name, String defaultValue) {
-    if (!_configuration.containsKey(relaxPropertyName(name))) {
-      return defaultValue;
-    }
-    return getProperty(name, _configuration);
+    return _configuration.getString(relaxPropertyName(name), defaultValue);
   }
 
   private <T> T getProperty(String name, T defaultValue, Class<T> returnType) {
