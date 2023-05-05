@@ -42,7 +42,9 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
       /*
        - iterate over all columns
        - if any value in _values is greater than its counterpart in _other._values, keep _values as-is and return 1
-       - if all values in _values are less than those in _other._values, keep _values as-is and return -1
+       - if any value in _values is less than its counterpart  in _other._values _and_ none are greater than their
+         counterpart in _other._values, keep _values as-is and return -1
+           - i.e. no value in _this_ is greater than its counterpart in _other
        - if all values between the two sets of Comparables are equal (compareTo == 0), keep _values as-is and return 0
        */
     int comparisonResult;
