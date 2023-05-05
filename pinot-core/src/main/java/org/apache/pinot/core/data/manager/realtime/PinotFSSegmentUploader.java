@@ -26,12 +26,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,8 +80,9 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       } catch (Exception e) {
         LOGGER.warn("Failed copy segment tar file {} to segment store {}: {}", segmentFile.getName(), destUri, e);
       } finally {
+        String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
         long duration = System.currentTimeMillis() - startTime;
-        _serverMetrics.addTimedTableValue(segmentName.getTableName(), ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
+        _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
             TimeUnit.MILLISECONDS);
       }
       return null;
@@ -91,6 +95,10 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     } catch (InterruptedException e) {
       LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
       Thread.currentThread().interrupt();
+    } catch (TimeoutException e) {
+      _serverMetrics.addMeteredTableValue(segmentName.getTableName(), ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
+      LOGGER.warn("Timed out waiting to upload segment: {} for table: {}",
+          segmentName.getSegmentName(), segmentName.getTableName());
     } catch (Exception e) {
       LOGGER
           .warn("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName, e);
