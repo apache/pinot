@@ -35,6 +35,8 @@ public interface StageNode extends Serializable {
 
   int getStageId();
 
+  void setStageId(int stageId);
+
   List<StageNode> getInputs();
 
   void addInput(StageNode stageNode);

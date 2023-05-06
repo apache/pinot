@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.ExchangeNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -85,6 +86,11 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
     Set<Integer> newPartitionKeys = new HashSet<>();
     setOpNode.getInputs().forEach(input -> newPartitionKeys.addAll(input.visit(this, context)));
     return newPartitionKeys;
+  }
+
+  @Override
+  public Set<Integer> visitExchange(ExchangeNode exchangeNode, Void context) {
+    throw new UnsupportedOperationException("Exchange not yet supported!");
   }
 
   @Override

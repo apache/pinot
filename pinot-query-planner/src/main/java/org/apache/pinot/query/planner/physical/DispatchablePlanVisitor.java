@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.physical;
 
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.ExchangeNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -116,6 +117,11 @@ public class DispatchablePlanVisitor implements StageNodeVisitor<Void, Dispatcha
     setOpNode.getInputs().forEach(input -> input.visit(this, context));
     getOrCreateDispatchablePlanMetadata(setOpNode, context);
     return null;
+  }
+
+  @Override
+  public Void visitExchange(ExchangeNode exchangeNode, DispatchablePlanContext context) {
+    throw new UnsupportedOperationException("ExchangeNode should not be visited by DispatchablePlanVisitor");
   }
 
   @Override
