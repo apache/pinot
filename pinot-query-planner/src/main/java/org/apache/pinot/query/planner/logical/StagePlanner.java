@@ -63,12 +63,11 @@ public class StagePlanner {
   public QueryPlan makePlan(RelRoot relRoot, Set<String> tableNames) {
     RelNode relRootNode = relRoot.rel;
 
-    // walk the plan and create stages.
+    // Walk through RelNode tree and construct a StageNode tree.
     StageNode globalStageRoot = relNodeToStageNode(relRootNode);
-    // Split the exchange nodes to mailbox receive/send nodes.
-    globalStageRoot = globalStageRoot.visit(ExchangeNodeSplitterVisitor.INSTANCE, null);
-    // Assign stage IDs to each StageNode.
-    globalStageRoot.visit(StageIdAssigner.INSTANCE, new StageIdAssigner.Context());
+
+    // Fragment the stage tree into multiple stages.
+    globalStageRoot = globalStageRoot.visit(StageFragmenter.INSTANCE, new StageFragmenter.Context());
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
