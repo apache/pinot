@@ -18,18 +18,26 @@
  */
 package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
+import java.net.URL;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.event.DefaultMinionEventObserver;
+import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 
 /**
  * Tests for {@link SegmentGenerationAndPushTaskGeneratorTest}
@@ -77,5 +85,53 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
             "abcd"));
     ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 1);
+  }
+
+  @Test
+  public void testConfig() throws Exception {
+    URL resourcesLoc = SegmentGenerationAndPushTaskGeneratorTest.class.getClassLoader().getResource(".");
+    SegmentGenerationAndPushTaskExecutor executor = new SegmentGenerationAndPushTaskExecutor();
+    Schema schema = new Schema.SchemaBuilder().build();
+    // FieldUtils.writeField(executor, "_pinotTaskConfig", new PinotTaskConfig("",
+    // Map.of()), true);
+    FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
+    Map<String, String> configMap = Map.ofEntries(
+        Pair.of(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc.toString() + "dummyTable.json"),
+        Pair.of(BatchConfigProperties.INPUT_FORMAT, ""),
+        Pair.of(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass"),
+        Pair.of(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass"),
+        Pair.of(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop1", "value1"),
+        Pair.of(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop.2", "value2"),
+        Pair.of(BatchConfigProperties.AUTH_TOKEN, "not_used"),
+        Pair.of(BatchConfigProperties.TABLE_NAME, "not_used"),
+        Pair.of(BatchConfigProperties.SCHEMA, schema.toSingleLineJsonString()),
+        Pair.of(BatchConfigProperties.SCHEMA_URI, "not_used"),
+        Pair.of(BatchConfigProperties.TABLE_CONFIGS,
+            new String(SegmentGenerationAndPushTaskGeneratorTest.class.getClassLoader()
+                .getResourceAsStream("dummyTable.json").readAllBytes())),
+        Pair.of(BatchConfigProperties.TABLE_CONFIGS_URI, "not_used"),
+        Pair.of(BatchConfigProperties.SEQUENCE_ID, "42"),
+        Pair.of(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT, "true"),
+        Pair.of(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputtext"),
+        Pair.of(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".prop.seg.1", "valseg1"),
+        Pair.of(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".propseg2", "valseg2"),
+        Pair.of(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true"));
+
+    SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, Paths.get(resourcesLoc.toURI()).toFile());
+    Assert.assertEquals(spec.getSequenceId(), 42);
+    Assert.assertEquals("file:" + spec.getInputFilePath(), resourcesLoc.toString() + "input/dummyTable.json");
+    Assert.assertEquals(spec.getRecordReaderSpec().getClassName(), "AReaderClass");
+    Assert.assertEquals(spec.getRecordReaderSpec().getConfigClassName(), "AReaderConfigClass");
+    Assert.assertEqualsDeep(spec.getRecordReaderSpec().getConfigs(), Map.ofEntries(
+        Pair.of("prop1", "value1"),
+        Pair.of("prop.2", "value2")
+    ));
+    Assert.assertEquals(spec.isFailOnEmptySegment(), true);
+    Assert.assertEquals(spec.getSegmentNameGeneratorSpec().getType(), "inputtext");
+    Assert.assertEqualsDeep(spec.getSegmentNameGeneratorSpec().getConfigs(), Map.ofEntries(
+        Pair.of("prop.seg.1", "valseg1"),
+        Pair.of("propseg2", "valseg2"),
+        Pair.of(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME, "true")
+    ));
   }
 }
