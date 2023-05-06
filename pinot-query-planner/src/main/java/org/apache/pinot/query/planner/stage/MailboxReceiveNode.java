@@ -81,6 +81,10 @@ public class MailboxReceiveNode extends AbstractStageNode {
     _sender = sender;
   }
 
+  public void setSenderStageId(Integer senderStageId) {
+    _senderStageId = senderStageId;
+  }
+
   public int getSenderStageId() {
     return _senderStageId;
   }

@@ -38,6 +38,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.ExchangeNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -187,6 +188,11 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   public Void visitSetOp(SetOpNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     return null;
+  }
+
+  @Override
+  public Void visitExchange(ExchangeNode exchangeNode, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Exchange not yet supported!");
   }
 
   @Override

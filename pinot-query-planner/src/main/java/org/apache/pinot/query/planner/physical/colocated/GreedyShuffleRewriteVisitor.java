@@ -35,6 +35,7 @@ import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.ExchangeNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -255,6 +256,11 @@ public class GreedyShuffleRewriteVisitor implements StageNodeVisitor<Set<Colocat
   @Override
   public Set<ColocationKey> visitSetOp(SetOpNode setOpNode, GreedyShuffleRewriteContext context) {
     return ImmutableSet.of();
+  }
+
+  @Override
+  public Set<ColocationKey> visitExchange(ExchangeNode exchangeNode, GreedyShuffleRewriteContext context) {
+    throw new UnsupportedOperationException("ExchangeNode should not be visited by this visitor");
   }
 
   @Override

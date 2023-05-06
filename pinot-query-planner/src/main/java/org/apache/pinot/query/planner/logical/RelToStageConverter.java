@@ -20,10 +20,14 @@ package org.apache.pinot.query.planner.logical;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.SortExchange;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -32,6 +36,7 @@ import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
+import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -40,6 +45,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.ExchangeNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
@@ -88,9 +94,28 @@ public final class RelToStageConverter {
       return convertLogicalWindow((LogicalWindow) node, currentStageId);
     } else if (node instanceof SetOp) {
       return convertLogicalSetOp((SetOp) node, currentStageId);
+    } else if (node instanceof Exchange) {
+      return convertLogicalExchange((Exchange) node, currentStageId);
     } else {
       throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
     }
+  }
+
+  private static StageNode convertLogicalExchange(Exchange node, int currentStageId) {
+    RelCollation collation = null;
+    boolean isSortOnSender = false;
+    boolean isSortOnReceiver = false;
+    if (node instanceof SortExchange) {
+      collation = ((SortExchange) node).getCollation();
+      if (node instanceof PinotLogicalSortExchange) {
+        // These flags only take meaning if the collation is not null or empty
+        isSortOnSender = ((PinotLogicalSortExchange) node).isSortOnSender();
+        isSortOnReceiver = ((PinotLogicalSortExchange) node).isSortOnReceiver();
+      }
+    }
+    List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
+    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), node.getDistribution(), fieldCollations,
+        isSortOnSender, isSortOnReceiver);
   }
 
   private static StageNode convertLogicalSetOp(SetOp node, int currentStageId) {

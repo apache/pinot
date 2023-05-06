@@ -28,7 +28,7 @@ import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
 public abstract class AbstractStageNode implements StageNode, ProtoSerializable {
 
-  protected final int _stageId;
+  protected int _stageId;
   protected final List<StageNode> _inputs;
   protected DataSchema _dataSchema;
 
@@ -45,6 +45,11 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
   @Override
   public int getStageId() {
     return _stageId;
+  }
+
+  @Override
+  public void setStageId(int stageId) {
+    _stageId = stageId;
   }
 
   @Override

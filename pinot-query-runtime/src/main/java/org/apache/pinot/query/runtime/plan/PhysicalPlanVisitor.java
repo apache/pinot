@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.plan;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.ExchangeNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -128,6 +129,11 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
       default:
         throw new IllegalStateException();
     }
+  }
+
+  @Override
+  public MultiStageOperator visitExchange(ExchangeNode exchangeNode, PlanRequestContext context) {
+    throw new UnsupportedOperationException("ExchangeNode should not be visited");
   }
 
   @Override

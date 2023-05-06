@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.ExchangeNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -127,6 +128,11 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
       input.visit(this, context.next(false, context._host, context._workerId));
     }
     return context._builder;
+  }
+
+  @Override
+  public StringBuilder visitExchange(ExchangeNode exchangeNode, Context context) {
+    throw new UnsupportedOperationException("ExchangeNode should not be visited");
   }
 
   @Override

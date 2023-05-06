@@ -87,6 +87,9 @@ public final class StageNodeSerDeUtils {
         return new WindowNode(stageId);
       case "SetOpNode":
         return new SetOpNode(stageId);
+      case "ExchangeNode":
+        throw new IllegalArgumentException(
+            "ExchangeNode should be already split into MailboxSendNode and MailboxReceiveNode");
       default:
         throw new IllegalArgumentException("Unknown node name: " + nodeName);
     }

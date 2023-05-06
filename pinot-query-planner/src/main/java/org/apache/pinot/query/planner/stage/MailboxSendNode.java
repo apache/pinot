@@ -77,6 +77,10 @@ public class MailboxSendNode extends AbstractStageNode {
     return _receiverStageId;
   }
 
+  public void setReceiverStageId(int receiverStageId) {
+    _receiverStageId = receiverStageId;
+  }
+
   public void setExchangeType(RelDistribution.Type exchangeType) {
     _exchangeType = exchangeType;
   }
