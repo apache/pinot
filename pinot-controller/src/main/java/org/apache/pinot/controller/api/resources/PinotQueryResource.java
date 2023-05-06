@@ -182,7 +182,7 @@ public class PinotQueryResource {
     List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
     if (tableConfigList == null || tableConfigList.size() == 0) {
       return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR, new Exception(
-          "Unable to find table in cluster")).toString();
+          "Unable to find table in cluster, table does not exist")).toString();
     }
 
     // When routing a query, there should be at least one common broker tenant for the table. However, the server
