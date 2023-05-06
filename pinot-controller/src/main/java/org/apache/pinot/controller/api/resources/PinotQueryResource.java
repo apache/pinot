@@ -181,7 +181,7 @@ public class PinotQueryResource {
 
     List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
     if (tableConfigList == null || tableConfigList.size() == 0) {
-      return QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, new Exception(
+      return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR, new Exception(
           "Unable to find table in cluster")).toString();
     }
 
