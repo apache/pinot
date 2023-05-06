@@ -88,7 +88,7 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
   }
 
   @Test
-  public void testConfig() throws Exception {
+  public void testGenerateTaskSpec() throws Exception {
     URL resourcesLoc = SegmentGenerationAndPushTaskGeneratorTest.class.getClassLoader().getResource(".");
     SegmentGenerationAndPushTaskExecutor executor = new SegmentGenerationAndPushTaskExecutor();
     Schema schema = new Schema.SchemaBuilder().build();
