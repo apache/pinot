@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
@@ -29,7 +29,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class AggregateNode extends AbstractStageNode {
+public class AggregateNode extends AbstractPlanNode {
   public static final RelHint FINAL_STAGE_HINT = RelHint.builder(
       PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE).build();
   public static final RelHint INTERMEDIATE_STAGE_HINT = RelHint.builder(
@@ -41,13 +41,14 @@ public class AggregateNode extends AbstractStageNode {
   @ProtoProperties
   private List<RexExpression> _groupSet;
 
-  public AggregateNode(int stageId) {
-    super(stageId);
+  public AggregateNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
-  public AggregateNode(int stageId, DataSchema dataSchema, List<AggregateCall> aggCalls, List<RexExpression> groupSet,
+  public AggregateNode(int planFragmentId, DataSchema dataSchema, List<AggregateCall> aggCalls,
+      List<RexExpression> groupSet,
       List<RelHint> relHints) {
-    super(stageId, dataSchema);
+    super(planFragmentId, dataSchema);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = groupSet;
     _relHints = relHints;
@@ -81,7 +82,7 @@ public class AggregateNode extends AbstractStageNode {
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitAggregate(this, context);
   }
 }

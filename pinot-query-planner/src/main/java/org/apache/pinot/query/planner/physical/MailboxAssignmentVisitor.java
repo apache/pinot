@@ -21,10 +21,10 @@ package org.apache.pinot.query.planner.physical;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.query.planner.stage.DefaultPostOrderTraversalVisitor;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -34,12 +34,12 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
   public static final MailboxAssignmentVisitor INSTANCE = new MailboxAssignmentVisitor();
 
   @Override
-  public Void process(StageNode node, DispatchablePlanContext context) {
+  public Void process(PlanNode node, DispatchablePlanContext context) {
     if (node instanceof MailboxSendNode || node instanceof MailboxReceiveNode) {
       int receiverStageId =
-          isMailboxReceiveNode(node) ? node.getStageId() : ((MailboxSendNode) node).getReceiverStageId();
+          isMailboxReceiveNode(node) ? node.getPlanFragmentId() : ((MailboxSendNode) node).getReceiverStageId();
       int senderStageId =
-          isMailboxReceiveNode(node) ? ((MailboxReceiveNode) node).getSenderStageId() : node.getStageId();
+          isMailboxReceiveNode(node) ? ((MailboxReceiveNode) node).getSenderStageId() : node.getPlanFragmentId();
       DispatchablePlanMetadata receiverStagePlanMetadata =
           context.getDispatchablePlanMetadataMap().get(receiverStageId);
       DispatchablePlanMetadata senderStagePlanMetadata = context.getDispatchablePlanMetadataMap().get(senderStageId);
@@ -71,20 +71,21 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
     return null;
   }
 
-  private static boolean isMailboxReceiveNode(StageNode node) {
+  private static boolean isMailboxReceiveNode(PlanNode node) {
     return node instanceof MailboxReceiveNode;
   }
 
-  private MailboxMetadata getMailboxMetadata(DispatchablePlanMetadata stagePlanMetadata, int stageId, int workerId) {
+  private MailboxMetadata getMailboxMetadata(DispatchablePlanMetadata dispatchablePlanMetadata, int planFragmentId,
+      int workerId) {
     Map<Integer, Map<Integer, MailboxMetadata>> workerIdToMailBoxIdsMap =
-        stagePlanMetadata.getWorkerIdToMailBoxIdsMap();
+        dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap();
     if (!workerIdToMailBoxIdsMap.containsKey(workerId)) {
       workerIdToMailBoxIdsMap.put(workerId, new HashMap<>());
     }
-    Map<Integer, MailboxMetadata> stageToMailboxMetadataMap = workerIdToMailBoxIdsMap.get(workerId);
-    if (!stageToMailboxMetadataMap.containsKey(stageId)) {
-      stageToMailboxMetadataMap.put(stageId, new MailboxMetadata());
+    Map<Integer, MailboxMetadata> planFragmentToMailboxMetadataMap = workerIdToMailBoxIdsMap.get(workerId);
+    if (!planFragmentToMailboxMetadataMap.containsKey(planFragmentId)) {
+      planFragmentToMailboxMetadataMap.put(planFragmentId, new MailboxMetadata());
     }
-    return stageToMailboxMetadataMap.get(stageId);
+    return planFragmentToMailboxMetadataMap.get(planFragmentId);
   }
 }

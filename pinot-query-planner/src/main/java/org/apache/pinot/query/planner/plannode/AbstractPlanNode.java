@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,40 +26,40 @@ import org.apache.pinot.query.planner.serde.ProtoSerializable;
 import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
 
-public abstract class AbstractStageNode implements StageNode, ProtoSerializable {
+public abstract class AbstractPlanNode implements PlanNode, ProtoSerializable {
 
-  protected int _stageId;
-  protected final List<StageNode> _inputs;
+  protected int _planFragmentId;
+  protected final List<PlanNode> _inputs;
   protected DataSchema _dataSchema;
 
-  public AbstractStageNode(int stageId) {
-    this(stageId, null);
+  public AbstractPlanNode(int planFragmentId) {
+    this(planFragmentId, null);
   }
 
-  public AbstractStageNode(int stageId, DataSchema dataSchema) {
-    _stageId = stageId;
+  public AbstractPlanNode(int planFragmentId, DataSchema dataSchema) {
+    _planFragmentId = planFragmentId;
     _dataSchema = dataSchema;
     _inputs = new ArrayList<>();
   }
 
   @Override
-  public int getStageId() {
-    return _stageId;
+  public int getPlanFragmentId() {
+    return _planFragmentId;
   }
 
   @Override
-  public void setStageId(int stageId) {
-    _stageId = stageId;
+  public void setPlanFragmentId(int planFragmentId) {
+    _planFragmentId = planFragmentId;
   }
 
   @Override
-  public List<StageNode> getInputs() {
+  public List<PlanNode> getInputs() {
     return _inputs;
   }
 
   @Override
-  public void addInput(StageNode stageNode) {
-    _inputs.add(stageNode);
+  public void addInput(PlanNode planNode) {
+    _inputs.add(planNode);
   }
 
   @Override

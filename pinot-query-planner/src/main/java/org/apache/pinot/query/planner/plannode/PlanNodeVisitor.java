@@ -16,26 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
+import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
 import org.apache.pinot.query.planner.QueryPlan;
 
 
 /**
- * {@code StageNodeVisitor} is a skeleton class that allows for implementations of {@code StageNode}
- * tree traversals using the {@link StageNode#visit(StageNodeVisitor, Object)} method. There is no
+ * {@code PlanNodeVisitor} is a skeleton class that allows for implementations of {@code PlanNode}
+ * tree traversals using the {@link PlanNode#visit(PlanNodeVisitor, Object)} method. There is no
  * enforced traversal order, and should be implemented by subclasses.
  *
  * <p>It is recommended that implementors use private constructors and static methods to access main
- * functionality (see {@link org.apache.pinot.query.planner.ExplainPlanStageVisitor#explain(QueryPlan)}
+ * functionality (see {@link ExplainPlanPlanVisitor#explain(QueryPlan)}
  * as an example of a usage of this pattern.
  *
- * @param <T> the return type for all visits
- * @param <C> a Context that will be passed as the second parameter to {@code StageNode#visit},
+ * @param <T> the return type for all visitsPlanNodeVisitor
+ * @param <C> a Context that will be passed as the second parameter to {@code PlanNode#visit},
  *            implementors can decide how they want to use this context (e.g. whether or not
  *            it can be modified in place or whether it's an immutable context)
  */
-public interface StageNodeVisitor<T, C> {
+public interface PlanNodeVisitor<T, C> {
 
   T visitAggregate(AggregateNode node, C context);
 

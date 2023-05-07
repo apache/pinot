@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
@@ -27,28 +27,28 @@ public final class StageNodeSerDeUtils {
     // do not instantiate.
   }
 
-  public static AbstractStageNode deserializeStageNode(Plan.StageNode protoNode) {
-    AbstractStageNode stageNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
-    stageNode.setDataSchema(extractDataSchema(protoNode));
-    stageNode.fromObjectField(protoNode.getObjectField());
+  public static AbstractPlanNode deserializeStageNode(Plan.StageNode protoNode) {
+    AbstractPlanNode planNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
+    planNode.setDataSchema(extractDataSchema(protoNode));
+    planNode.fromObjectField(protoNode.getObjectField());
     for (Plan.StageNode protoChild : protoNode.getInputsList()) {
-      stageNode.addInput(deserializeStageNode(protoChild));
+      planNode.addInput(deserializeStageNode(protoChild));
     }
-    return stageNode;
+    return planNode;
   }
 
-  public static Plan.StageNode serializeStageNode(AbstractStageNode stageNode) {
+  public static Plan.StageNode serializeStageNode(AbstractPlanNode planNode) {
     Plan.StageNode.Builder builder = Plan.StageNode.newBuilder()
-        .setStageId(stageNode.getStageId())
-        .setNodeName(stageNode.getClass().getSimpleName())
-        .setObjectField(stageNode.toObjectField());
-    DataSchema dataSchema = stageNode.getDataSchema();
+        .setStageId(planNode.getPlanFragmentId())
+        .setNodeName(planNode.getClass().getSimpleName())
+        .setObjectField(planNode.toObjectField());
+    DataSchema dataSchema = planNode.getDataSchema();
     for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       builder.addColumnNames(dataSchema.getColumnName(i));
       builder.addColumnDataTypes(dataSchema.getColumnDataType(i).name());
     }
-    for (StageNode childNode : stageNode.getInputs()) {
-      builder.addInputs(serializeStageNode((AbstractStageNode) childNode));
+    for (PlanNode childNode : planNode.getInputs()) {
+      builder.addInputs(serializeStageNode((AbstractPlanNode) childNode));
     }
     return builder.build();
   }
@@ -63,30 +63,30 @@ public final class StageNodeSerDeUtils {
     return new DataSchema(columnNames, columnDataTypes);
   }
 
-  private static AbstractStageNode newNodeInstance(String nodeName, int stageId) {
+  private static AbstractPlanNode newNodeInstance(String nodeName, int planFragmentId) {
     switch (nodeName) {
       case "TableScanNode":
-        return new TableScanNode(stageId);
+        return new TableScanNode(planFragmentId);
       case "JoinNode":
-        return new JoinNode(stageId);
+        return new JoinNode(planFragmentId);
       case "ProjectNode":
-        return new ProjectNode(stageId);
+        return new ProjectNode(planFragmentId);
       case "FilterNode":
-        return new FilterNode(stageId);
+        return new FilterNode(planFragmentId);
       case "AggregateNode":
-        return new AggregateNode(stageId);
+        return new AggregateNode(planFragmentId);
       case "SortNode":
-        return new SortNode(stageId);
+        return new SortNode(planFragmentId);
       case "MailboxSendNode":
-        return new MailboxSendNode(stageId);
+        return new MailboxSendNode(planFragmentId);
       case "MailboxReceiveNode":
-        return new MailboxReceiveNode(stageId);
+        return new MailboxReceiveNode(planFragmentId);
       case "ValueNode":
-        return new ValueNode(stageId);
+        return new ValueNode(planFragmentId);
       case "WindowNode":
-        return new WindowNode(stageId);
+        return new WindowNode(planFragmentId);
       case "SetOpNode":
-        return new SetOpNode(stageId);
+        return new SetOpNode(planFragmentId);
       case "ExchangeNode":
         throw new IllegalArgumentException(
             "ExchangeNode should be already split into MailboxSendNode and MailboxReceiveNode");

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -32,9 +32,9 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class MailboxReceiveNode extends AbstractStageNode {
+public class MailboxSendNode extends AbstractPlanNode {
   @ProtoProperties
-  private int _senderStageId;
+  private int _receiverStageId;
   @ProtoProperties
   private RelDistribution.Type _exchangeType;
   @ProtoProperties
@@ -45,26 +45,21 @@ public class MailboxReceiveNode extends AbstractStageNode {
   private List<RelFieldCollation.Direction> _collationDirections;
   @ProtoProperties
   private boolean _isSortOnSender;
-  @ProtoProperties
-  private boolean _isSortOnReceiver;
 
-  // this is only available during planning and should not be relied
-  // on in any post-serialization code
-  private transient StageNode _sender;
-
-  public MailboxReceiveNode(int stageId) {
-    super(stageId);
+  public MailboxSendNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
-  public MailboxReceiveNode(int stageId, DataSchema dataSchema, int senderStageId,
+  public MailboxSendNode(int planFragmentId, DataSchema dataSchema, int receiverStageId,
       RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object[]> partitionKeySelector,
-      @Nullable List<RelFieldCollation> fieldCollations, boolean isSortOnSender, boolean isSortOnReceiver,
-      StageNode sender) {
-    super(stageId, dataSchema);
-    _senderStageId = senderStageId;
+      @Nullable List<RelFieldCollation> fieldCollations, boolean isSortOnSender) {
+    super(planFragmentId, dataSchema);
+    _receiverStageId = receiverStageId;
     _exchangeType = exchangeType;
     _partitionKeySelector = partitionKeySelector;
-    if (!CollectionUtils.isEmpty(fieldCollations)) {
+    // TODO: Support ordering here if the 'fieldCollations' aren't empty and 'sortOnSender' is true
+    Preconditions.checkState(!isSortOnSender, "Ordering is not yet supported on Mailbox Send");
+    if (!CollectionUtils.isEmpty(fieldCollations) && isSortOnSender) {
       _collationKeys = new ArrayList<>(fieldCollations.size());
       _collationDirections = new ArrayList<>(fieldCollations.size());
       for (RelFieldCollation fieldCollation : fieldCollations) {
@@ -76,17 +71,14 @@ public class MailboxReceiveNode extends AbstractStageNode {
       _collationDirections = Collections.emptyList();
     }
     _isSortOnSender = isSortOnSender;
-    Preconditions.checkState(!isSortOnSender, "Input shouldn't be sorted as ordering on send is not yet implemented!");
-    _isSortOnReceiver = isSortOnReceiver;
-    _sender = sender;
   }
 
-  public void setSenderStageId(Integer senderStageId) {
-    _senderStageId = senderStageId;
+  public int getReceiverStageId() {
+    return _receiverStageId;
   }
 
-  public int getSenderStageId() {
-    return _senderStageId;
+  public void setReceiverStageId(int receiverStageId) {
+    _receiverStageId = receiverStageId;
   }
 
   public void setExchangeType(RelDistribution.Type exchangeType) {
@@ -113,21 +105,13 @@ public class MailboxReceiveNode extends AbstractStageNode {
     return _isSortOnSender;
   }
 
-  public boolean isSortOnReceiver() {
-    return _isSortOnReceiver;
-  }
-
-  public StageNode getSender() {
-    return _sender;
-  }
-
   @Override
   public String explain() {
-    return "MAIL_RECEIVE(" + _exchangeType + ")";
+    return "MAIL_SEND(" + _exchangeType + ")";
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
-    return visitor.visitMailboxReceive(this, context);
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitMailboxSend(this, context);
   }
 }

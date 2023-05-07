@@ -25,13 +25,13 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 
 
 /**
- * {@code StageMetadata} is used to send stage-level info about how to execute a stage physically.
+ * {@code PlanFragmentMetadata} is used to send plan fragment-level info about how to execute a stage physically.
  */
-public class StageMetadata {
+public class PlanFragmentMetadata {
   private final List<WorkerMetadata> _workerMetadataList;
   private final Map<String, String> _customProperties;
 
-  public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
+  public PlanFragmentMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
     _workerMetadataList = workerMetadataList;
     _customProperties = customProperties;
   }
@@ -71,8 +71,8 @@ public class StageMetadata {
       return this;
     }
 
-    public StageMetadata build() {
-      return new StageMetadata(_workerMetadataList, _customProperties);
+    public PlanFragmentMetadata build() {
+      return new PlanFragmentMetadata(_workerMetadataList, _customProperties);
     }
 
     public void putAllCustomProperties(Map<String, String> customPropertyMap) {
@@ -80,11 +80,11 @@ public class StageMetadata {
     }
   }
 
-  public static String getTableName(StageMetadata metadata) {
+  public static String getTableName(PlanFragmentMetadata metadata) {
     return metadata.getCustomProperties().get(Builder.TABLE_NAME_KEY);
   }
 
-  public static TimeBoundaryInfo getTimeBoundary(StageMetadata metadata) {
+  public static TimeBoundaryInfo getTimeBoundary(PlanFragmentMetadata metadata) {
     String timeColumn = metadata.getCustomProperties().get(Builder.TIME_BOUNDARY_COLUMN_KEY);
     String timeValue = metadata.getCustomProperties().get(Builder.TIME_BOUNDARY_VALUE_KEY);
     return timeColumn != null && timeValue != null ? new TimeBoundaryInfo(timeColumn, timeValue) : null;

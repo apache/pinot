@@ -44,22 +44,22 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.ExchangeNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SetOpNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
-import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The {@code StageNodeConverter} converts a logical {@link RelNode} to a {@link StageNode}.
+ * The {@code StageNodeConverter} converts a logical {@link RelNode} to a {@link PlanNode}.
  */
 public final class RelToStageConverter {
 
@@ -75,7 +75,7 @@ public final class RelToStageConverter {
    * @param node relational node
    * @return stage node.
    */
-  public static StageNode toStageNode(RelNode node, int currentStageId) {
+  public static PlanNode toStageNode(RelNode node, int currentStageId) {
     if (node instanceof LogicalTableScan) {
       return convertLogicalTableScan((LogicalTableScan) node, currentStageId);
     } else if (node instanceof LogicalJoin) {
@@ -101,7 +101,7 @@ public final class RelToStageConverter {
     }
   }
 
-  private static StageNode convertLogicalExchange(Exchange node, int currentStageId) {
+  private static PlanNode convertLogicalExchange(Exchange node, int currentStageId) {
     RelCollation collation = null;
     boolean isSortOnSender = false;
     boolean isSortOnReceiver = false;
@@ -118,47 +118,47 @@ public final class RelToStageConverter {
         isSortOnSender, isSortOnReceiver);
   }
 
-  private static StageNode convertLogicalSetOp(SetOp node, int currentStageId) {
+  private static PlanNode convertLogicalSetOp(SetOp node, int currentStageId) {
     return new SetOpNode(SetOpNode.SetOpType.fromObject(node), currentStageId, toDataSchema(node.getRowType()),
         node.all);
   }
 
-  private static StageNode convertLogicalValues(LogicalValues node, int currentStageId) {
+  private static PlanNode convertLogicalValues(LogicalValues node, int currentStageId) {
     return new ValueNode(currentStageId, toDataSchema(node.getRowType()), node.tuples);
   }
 
-  private static StageNode convertLogicalWindow(LogicalWindow node, int currentStageId) {
+  private static PlanNode convertLogicalWindow(LogicalWindow node, int currentStageId) {
     return new WindowNode(currentStageId, node.groups, node.constants, toDataSchema(node.getRowType()));
   }
 
-  private static StageNode convertLogicalSort(LogicalSort node, int currentStageId) {
+  private static PlanNode convertLogicalSort(LogicalSort node, int currentStageId) {
     int fetch = RexExpressionUtils.getValueAsInt(node.fetch);
     int offset = RexExpressionUtils.getValueAsInt(node.offset);
     return new SortNode(currentStageId, node.getCollation().getFieldCollations(), fetch, offset,
         toDataSchema(node.getRowType()));
   }
 
-  private static StageNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
+  private static PlanNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
     return new AggregateNode(currentStageId, toDataSchema(node.getRowType()), node.getAggCallList(),
         RexExpression.toRexInputRefs(node.getGroupSet()), node.getHints());
   }
 
-  private static StageNode convertLogicalProject(LogicalProject node, int currentStageId) {
+  private static PlanNode convertLogicalProject(LogicalProject node, int currentStageId) {
     return new ProjectNode(currentStageId, toDataSchema(node.getRowType()), node.getProjects());
   }
 
-  private static StageNode convertLogicalFilter(LogicalFilter node, int currentStageId) {
+  private static PlanNode convertLogicalFilter(LogicalFilter node, int currentStageId) {
     return new FilterNode(currentStageId, toDataSchema(node.getRowType()), node.getCondition());
   }
 
-  private static StageNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
+  private static PlanNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
     String tableName = node.getTable().getQualifiedName().get(0);
     List<String> columnNames =
         node.getRowType().getFieldList().stream().map(RelDataTypeField::getName).collect(Collectors.toList());
     return new TableScanNode(currentStageId, toDataSchema(node.getRowType()), tableName, columnNames);
   }
 
-  private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
+  private static PlanNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
     JoinRelType joinType = node.getJoinType();
 
     // Parse out all equality JOIN conditions

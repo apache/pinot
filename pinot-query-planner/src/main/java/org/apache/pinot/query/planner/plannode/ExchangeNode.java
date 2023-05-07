@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
@@ -29,7 +29,7 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
  * ExchangeNode represents the exchange stage in the query plan.
  * It is used to exchange the data between the instances.
  */
-public class ExchangeNode extends AbstractStageNode {
+public class ExchangeNode extends AbstractPlanNode {
 
   @ProtoProperties
   private RelDistribution.Type _exchangeType;
@@ -46,8 +46,8 @@ public class ExchangeNode extends AbstractStageNode {
   @ProtoProperties
   private List<RelFieldCollation> _collations;
 
-  public ExchangeNode(int stageId) {
-    super(stageId);
+  public ExchangeNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
   public ExchangeNode(int currentStageId, DataSchema dataSchema, RelDistribution distribution,
@@ -67,7 +67,7 @@ public class ExchangeNode extends AbstractStageNode {
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitExchange(this, context);
   }
 

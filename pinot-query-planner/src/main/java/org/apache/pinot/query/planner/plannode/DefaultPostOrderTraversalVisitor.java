@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 /**
  * A base implementation of a visitor pattern where the children of a given node are visited first and after that the
  * node is processed (post-order traversal).
  */
-public abstract class DefaultPostOrderTraversalVisitor<T, C> implements StageNodeVisitor<T, C> {
+public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNodeVisitor<T, C> {
 
-  public abstract T process(StageNode stageNode, C context);
+  public abstract T process(PlanNode planNode, C context);
 
   @Override
   public T visitAggregate(AggregateNode node, C context) {

@@ -28,17 +28,17 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.query.planner.ExplainPlanStageVisitor;
+import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
-import org.apache.pinot.query.planner.stage.AbstractStageNode;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -78,10 +78,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  private static void assertGroupBySingletonAfterJoin(QueryPlan queryPlan, boolean shouldRewrite) throws Exception {
+  private static void assertGroupBySingletonAfterJoin(QueryPlan queryPlan, boolean shouldRewrite)
+      throws Exception {
     for (Map.Entry<Integer, DispatchablePlanMetadata> e : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
-      if (e.getValue().getScannedTables().size() == 0 && !PlannerUtils.isRootStage(e.getKey())) {
-        StageNode node = queryPlan.getQueryStageMap().get(e.getKey());
+      if (e.getValue().getScannedTables().size() == 0 && !PlannerUtils.isRootPlanFragment(e.getKey())) {
+        PlanNode node = queryPlan.getQueryStageMap().get(e.getKey());
         while (node != null) {
           if (node instanceof JoinNode) {
             // JOIN is exchanged with hash distribution (data shuffle)
@@ -120,22 +121,22 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
             e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
             tables.get(0).equals("a") ? ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]")
                 : ImmutableList.of("localhost@{1,1}|[0]"));
-      } else if (!PlannerUtils.isRootStage(e.getKey())) {
+      } else if (!PlannerUtils.isRootPlanFragment(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
             e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
             ImmutableSet.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
             e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
             ImmutableSet.of("localhost@{3,3}|[0]"));
       }
@@ -147,12 +148,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
         + "WHERE a.col3 >= 0 AND a.col2 IN ('b') AND b.col3 < 0";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    List<StageNode> intermediateStageRoots =
+    List<PlanNode> intermediateStageRoots =
         queryPlan.getDispatchablePlanMetadataMap().entrySet().stream()
             .filter(e -> e.getValue().getScannedTables().size() == 0)
             .map(e -> queryPlan.getQueryStageMap().get(e.getKey())).collect(Collectors.toList());
     // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
-    for (StageNode roots : intermediateStageRoots) {
+    for (PlanNode roots : intermediateStageRoots) {
       assertNodeTypeNotIn(roots, ImmutableList.of(ProjectNode.class, FilterNode.class));
     }
   }
@@ -162,21 +163,24 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "SELECT * FROM d_OFFLINE";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     List<DispatchablePlanMetadata> tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
-        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+        .filter(planFragmentMetadata -> planFragmentMetadata.getScannedTables().size() != 0)
+        .collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
 
     query = "SELECT * FROM d_REALTIME";
     queryPlan = _queryEnvironment.planQuery(query);
     tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
-        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+        .filter(planFragmentMetadata -> planFragmentMetadata.getScannedTables().size() != 0)
+        .collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 1);
 
     query = "SELECT * FROM d";
     queryPlan = _queryEnvironment.planQuery(query);
     tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
-        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+        .filter(planFragmentMetadata -> planFragmentMetadata.getScannedTables().size() != 0)
+        .collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
   }
@@ -245,13 +249,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       if (tables.size() != 0) {
         // table scan stages; for tableB it should have only 1
         Assert.assertEquals(e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
             ImmutableList.of("localhost@{1,1}|[0]"));
-      } else if (!PlannerUtils.isRootStage(e.getKey())) {
+      } else if (!PlannerUtils.isRootPlanFragment(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(e.getValue().getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
             ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       }
@@ -262,16 +266,16 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   // Test Utils.
   // --------------------------------------------------------------------------
 
-  private static void assertNodeTypeNotIn(StageNode node, List<Class<? extends AbstractStageNode>> bannedNodeType) {
+  private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends AbstractPlanNode>> bannedNodeType) {
     Assert.assertFalse(isOneOf(bannedNodeType, node));
-    for (StageNode child : node.getInputs()) {
+    for (PlanNode child : node.getInputs()) {
       assertNodeTypeNotIn(child, bannedNodeType);
     }
   }
 
-  private static boolean isOneOf(List<Class<? extends AbstractStageNode>> allowedNodeTypes,
-      StageNode node) {
-    for (Class<? extends AbstractStageNode> allowedNodeType : allowedNodeTypes) {
+  private static boolean isOneOf(List<Class<? extends AbstractPlanNode>> allowedNodeTypes,
+      PlanNode node) {
+    for (Class<? extends AbstractPlanNode> allowedNodeType : allowedNodeTypes) {
       if (node.getClass() == allowedNodeType) {
         return true;
       }
@@ -281,7 +285,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @DataProvider(name = "testQueryExceptionDataProvider")
   private Object[][] provideQueriesWithException() {
-    return new Object[][] {
+    return new Object[][]{
         // wrong table is being used after JOIN
         new Object[]{"SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3", "Table 'b' not found"},
         // non-agg column not being grouped
@@ -291,8 +295,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // AT TIME ZONE should fail
         new Object[]{"SELECT a.col1 AT TIME ZONE 'PST' FROM a", "No match found for function signature AT_TIME_ZONE"},
         // CASE WHEN with non-consolidated result type at compile time.
-        new Object[]{"SELECT SUM(CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 "
-            + "WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN '5' ELSE 0 END) FROM a", "while converting CASE WHEN"},
+        new Object[]{
+            "SELECT SUM(CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 "
+                + "WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN '5' ELSE 0 END) FROM a", "while converting CASE WHEN"
+        },
     };
   }
 

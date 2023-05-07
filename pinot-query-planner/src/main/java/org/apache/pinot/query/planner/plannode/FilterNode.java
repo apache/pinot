@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.common.utils.DataSchema;
@@ -24,12 +24,12 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class FilterNode extends AbstractStageNode {
+public class FilterNode extends AbstractPlanNode {
   @ProtoProperties
   private RexExpression _condition;
 
-  public FilterNode(int stageId) {
-    super(stageId);
+  public FilterNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
   public FilterNode(int currentStageId, DataSchema dataSchema, RexNode condition) {
@@ -47,7 +47,7 @@ public class FilterNode extends AbstractStageNode {
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitFilter(this, context);
   }
 }

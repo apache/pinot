@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +26,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class SortNode extends AbstractStageNode {
+public class SortNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _collationKeys;
   @ProtoProperties
@@ -36,12 +36,13 @@ public class SortNode extends AbstractStageNode {
   @ProtoProperties
   private int _offset;
 
-  public SortNode(int stageId) {
-    super(stageId);
+  public SortNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
-  public SortNode(int stageId, List<RelFieldCollation> fieldCollations, int fetch, int offset, DataSchema dataSchema) {
-    super(stageId, dataSchema);
+  public SortNode(int planFragmentId, List<RelFieldCollation> fieldCollations, int fetch, int offset,
+      DataSchema dataSchema) {
+    super(planFragmentId, dataSchema);
     _collationDirections = new ArrayList<>(fieldCollations.size());
     _collationKeys = new ArrayList<>(fieldCollations.size());
     _fetch = fetch;
@@ -76,7 +77,7 @@ public class SortNode extends AbstractStageNode {
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitSort(this, context);
   }
 }

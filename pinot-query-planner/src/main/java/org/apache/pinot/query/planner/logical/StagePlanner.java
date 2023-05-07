@@ -29,14 +29,14 @@ import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanVisitor;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
 /**
- * QueryPlanMaker walks top-down from {@link RelRoot} and construct a forest of trees with {@link StageNode}.
+ * QueryPlanMaker walks top-down from {@link RelRoot} and construct a forest of trees with {@link PlanNode}.
  *
  * This class is non-threadsafe. Do not reuse the stage planner for multiple query plans.
  */
@@ -64,19 +64,20 @@ public class StagePlanner {
     RelNode relRootNode = relRoot.rel;
 
     // Walk through RelNode tree and construct a StageNode tree.
-    StageNode globalStageRoot = relNodeToStageNode(relRootNode);
+    PlanNode globalStageRoot = relNodeToStageNode(relRootNode);
 
     // Fragment the stage tree into multiple stages.
     globalStageRoot = globalStageRoot.visit(StageFragmenter.INSTANCE, new StageFragmenter.Context());
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
-    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalStageRoot.getDataSchema(),
-        0, RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false);
+    PlanNode globalSenderNode =
+        new MailboxSendNode(globalStageRoot.getPlanFragmentId(), globalStageRoot.getDataSchema(),
+            0, RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false);
     globalSenderNode.addInput(globalStageRoot);
 
-    StageNode globalReceiverNode =
-        new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getStageId(),
+    PlanNode globalReceiverNode =
+        new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getPlanFragmentId(),
             RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, globalSenderNode);
 
     // perform physical plan conversion and assign workers to each stage.
@@ -93,13 +94,13 @@ public class StagePlanner {
 
   // non-threadsafe
   // TODO: add dataSchema (extracted from RelNode schema) to the StageNode.
-  private StageNode relNodeToStageNode(RelNode node) {
-    StageNode stageNode = RelToStageConverter.toStageNode(node, -1);
+  private PlanNode relNodeToStageNode(RelNode node) {
+    PlanNode planNode = RelToStageConverter.toStageNode(node, -1);
     List<RelNode> inputs = node.getInputs();
     for (RelNode input : inputs) {
-      stageNode.addInput(relNodeToStageNode(input));
+      planNode.addInput(relNodeToStageNode(input));
     }
-    return stageNode;
+    return planNode;
   }
 
   // TODO: Switch to Worker SPI to avoid multiple-places where workers are assigned.

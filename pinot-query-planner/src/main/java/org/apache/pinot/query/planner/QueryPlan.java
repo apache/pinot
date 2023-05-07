@@ -23,10 +23,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
-import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -45,32 +45,32 @@ import org.apache.pinot.query.routing.WorkerMetadata;
  */
 public class QueryPlan {
   private final List<Pair<Integer, String>> _queryResultFields;
-  private final Map<Integer, StageNode> _queryStageMap;
-  private final List<StageMetadata> _stageMetadataList;
+  private final Map<Integer, PlanNode> _queryStageMap;
+  private final List<PlanFragmentMetadata> _planFragmentMetadataList;
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
 
-  public QueryPlan(List<Pair<Integer, String>> fields, Map<Integer, StageNode> queryStageMap,
+  public QueryPlan(List<Pair<Integer, String>> fields, Map<Integer, PlanNode> queryStageMap,
       Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
     _queryResultFields = fields;
     _queryStageMap = queryStageMap;
     _dispatchablePlanMetadataMap = dispatchablePlanMetadataMap;
-    _stageMetadataList = constructStageMetadataList(_dispatchablePlanMetadataMap);
+    _planFragmentMetadataList = constructStageMetadataList(_dispatchablePlanMetadataMap);
   }
 
   /**
    * Get the map between stageID and the stage plan root node.
    * @return stage plan map.
    */
-  public Map<Integer, StageNode> getQueryStageMap() {
+  public Map<Integer, PlanNode> getQueryStageMap() {
     return _queryStageMap;
   }
 
   /**
-   * Get the stage metadata information based on stageId.
+   * Get the stage metadata information based on planFragmentId.
    * @return stage metadata info.
    */
-  public StageMetadata getStageMetadata(int stageId) {
-    return _stageMetadataList.get(stageId);
+  public PlanFragmentMetadata getStageMetadata(int planFragmentId) {
+    return _planFragmentMetadataList.get(planFragmentId);
   }
 
   /**
@@ -93,21 +93,21 @@ public class QueryPlan {
    * Explains the {@code QueryPlan}
    *
    * @return a human-readable tree explaining the query plan
-   * @see ExplainPlanStageVisitor#explain(QueryPlan)
+   * @see ExplainPlanPlanVisitor#explain(QueryPlan)
    * @apiNote this is <b>NOT</b> identical to the SQL {@code EXPLAIN PLAN FOR} functionality
    *          and is instead intended to be used by developers debugging during feature
    *          development
    */
   public String explain() {
-    return ExplainPlanStageVisitor.explain(this);
+    return ExplainPlanPlanVisitor.explain(this);
   }
 
   /**
    * Convert the {@link DispatchablePlanMetadata} into dispatchable info for each stage/worker.
    */
-  private static List<StageMetadata> constructStageMetadataList(
+  private static List<PlanFragmentMetadata> constructStageMetadataList(
       Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
-    StageMetadata[] stageMetadataList = new StageMetadata[dispatchablePlanMetadataMap.size()];
+    PlanFragmentMetadata[] planFragmentMetadataList = new PlanFragmentMetadata[dispatchablePlanMetadataMap.size()];
     for (Map.Entry<Integer, DispatchablePlanMetadata> dispatchableEntry : dispatchablePlanMetadataMap.entrySet()) {
       DispatchablePlanMetadata dispatchablePlanMetadata = dispatchableEntry.getValue();
 
@@ -119,9 +119,9 @@ public class QueryPlan {
           VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerEntry.getKey(), workerId);
           WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
           builder.setVirtualServerAddress(virtualServerAddress);
-          Map<Integer, MailboxMetadata> stageToMailboxMetadata =
+          Map<Integer, MailboxMetadata> planFragmentToMailboxMetadata =
               dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap().get(workerId);
-          builder.putAllMailBoxInfosMap(stageToMailboxMetadata);
+          builder.putAllMailBoxInfosMap(planFragmentToMailboxMetadata);
           if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
             builder.addTableSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap().get(workerId));
           }
@@ -130,8 +130,8 @@ public class QueryPlan {
       }
 
       // construct the stageMetadata
-      int stageId = dispatchableEntry.getKey();
-      StageMetadata.Builder builder = new StageMetadata.Builder();
+      int planFragmentId = dispatchableEntry.getKey();
+      PlanFragmentMetadata.Builder builder = new PlanFragmentMetadata.Builder();
       builder.setWorkerMetadataList(Arrays.asList(workerMetadataList));
       if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
         builder.addTableName(dispatchablePlanMetadata.getScannedTables().get(0));
@@ -139,8 +139,8 @@ public class QueryPlan {
       if (dispatchablePlanMetadata.getTimeBoundaryInfo() != null) {
         builder.addTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
       }
-      stageMetadataList[stageId] = builder.build();
+      planFragmentMetadataList[planFragmentId] = builder.build();
     }
-    return Arrays.asList(stageMetadataList);
+    return Arrays.asList(planFragmentMetadataList);
   }
 }

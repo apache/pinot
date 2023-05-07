@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import java.io.Serializable;
 import java.util.List;
@@ -24,22 +24,22 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
- * Stage Node is a serializable version of the {@link org.apache.calcite.rel.RelNode}.
+ * PlanNode is a serializable version of the {@link org.apache.calcite.rel.RelNode}.
  *
- * TODO: stage node currently uses java.io.Serializable as its serialization format.
+ * TODO: PlanNode currently uses java.io.Serializable as its serialization format.
  * We should experiment with other type of serialization format for better performance.
  * Essentially what we need is a way to exclude the planner context from the RelNode but only keeps the
- * constructed relational content because we will no longer revisit the planner after stage is created.
+ * constructed relational content because we will no longer revisit the planner after PlanFragment is created.
  */
-public interface StageNode extends Serializable {
+public interface PlanNode extends Serializable {
 
-  int getStageId();
+  int getPlanFragmentId();
 
-  void setStageId(int stageId);
+  void setPlanFragmentId(int planFragmentId);
 
-  List<StageNode> getInputs();
+  List<PlanNode> getInputs();
 
-  void addInput(StageNode stageNode);
+  void addInput(PlanNode planNode);
 
   DataSchema getDataSchema();
 
@@ -47,5 +47,5 @@ public interface StageNode extends Serializable {
 
   String explain();
 
-  <T, C> T visit(StageNodeVisitor<T, C> visitor, C context);
+  <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context);
 }
