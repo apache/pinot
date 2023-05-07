@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,7 +28,7 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class JoinNode extends AbstractStageNode {
+public class JoinNode extends AbstractPlanNode {
   @ProtoProperties
   private JoinRelType _joinRelType;
   @ProtoProperties
@@ -40,13 +40,13 @@ public class JoinNode extends AbstractStageNode {
   @ProtoProperties
   private List<String> _rightColumnNames;
 
-  public JoinNode(int stageId) {
-    super(stageId);
+  public JoinNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
-  public JoinNode(int stageId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
+  public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
       JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause) {
-    super(stageId, dataSchema);
+    super(planFragmentId, dataSchema);
     _leftColumnNames = Arrays.asList(leftSchema.getColumnNames());
     _rightColumnNames = Arrays.asList(rightSchema.getColumnNames());
     _joinRelType = joinRelType;
@@ -80,7 +80,7 @@ public class JoinNode extends AbstractStageNode {
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitJoin(this, context);
   }
 

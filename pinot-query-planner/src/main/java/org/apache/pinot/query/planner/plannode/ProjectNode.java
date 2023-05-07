@@ -16,44 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class TableScanNode extends AbstractStageNode {
+public class ProjectNode extends AbstractPlanNode {
   @ProtoProperties
-  private String _tableName;
-  @ProtoProperties
-  private List<String> _tableScanColumns;
+  private List<RexExpression> _projects;
 
-  public TableScanNode(int stageId) {
-    super(stageId);
+  public ProjectNode(int planFragmentId) {
+    super(planFragmentId);
+  }
+  public ProjectNode(int currentStageId, DataSchema dataSchema, List<RexNode> projects) {
+    super(currentStageId, dataSchema);
+    _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
   }
 
-  public TableScanNode(int stageId, DataSchema dataSchema, String tableName, List<String> tableScanColumns) {
-    super(stageId, dataSchema);
-    _tableName = tableName;
-    _tableScanColumns = tableScanColumns;
-  }
-
-  public String getTableName() {
-    return _tableName;
-  }
-
-  public List<String> getTableScanColumns() {
-    return _tableScanColumns;
+  public List<RexExpression> getProjects() {
+    return _projects;
   }
 
   @Override
   public String explain() {
-    return "TABLE SCAN (" + _tableName + ")";
+    return "PROJECT";
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
-    return visitor.visitTableScan(this, context);
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitProject(this, context);
   }
 }

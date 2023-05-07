@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -33,19 +33,19 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 public class DistributedStagePlan {
   private int _stageId;
   private VirtualServerAddress _server;
-  private StageNode _stageRoot;
-  private StageMetadata _stageMetadata;
+  private PlanNode _stageRoot;
+  private PlanFragmentMetadata _planFragmentMetadata;
 
   public DistributedStagePlan(int stageId) {
     _stageId = stageId;
   }
 
-  public DistributedStagePlan(int stageId, VirtualServerAddress server, StageNode stageRoot,
-      StageMetadata stageMetadata) {
+  public DistributedStagePlan(int stageId, VirtualServerAddress server, PlanNode stageRoot,
+      PlanFragmentMetadata planFragmentMetadata) {
     _stageId = stageId;
     _server = server;
     _stageRoot = stageRoot;
-    _stageMetadata = stageMetadata;
+    _planFragmentMetadata = planFragmentMetadata;
   }
 
   public int getStageId() {
@@ -56,27 +56,27 @@ public class DistributedStagePlan {
     return _server;
   }
 
-  public StageNode getStageRoot() {
+  public PlanNode getStageRoot() {
     return _stageRoot;
   }
 
-  public StageMetadata getStageMetadata() {
-    return _stageMetadata;
+  public PlanFragmentMetadata getStageMetadata() {
+    return _planFragmentMetadata;
   }
 
   public void setServer(VirtualServerAddress serverAddress) {
     _server = serverAddress;
   }
 
-  public void setStageRoot(StageNode stageRoot) {
+  public void setStageRoot(PlanNode stageRoot) {
     _stageRoot = stageRoot;
   }
 
-  public void setStageMetadata(StageMetadata stageMetadata) {
-    _stageMetadata = stageMetadata;
+  public void setStageMetadata(PlanFragmentMetadata planFragmentMetadata) {
+    _planFragmentMetadata = planFragmentMetadata;
   }
 
   public WorkerMetadata getCurrentWorkerMetadata() {
-    return _stageMetadata.getWorkerMetadataList().get(_server.workerId());
+    return _planFragmentMetadata.getWorkerMetadataList().get(_server.workerId());
   }
 }

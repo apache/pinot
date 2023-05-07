@@ -22,96 +22,96 @@ import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.ExchangeNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SetOpNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.StageNodeVisitor;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
-import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-public class StageFragmenter implements StageNodeVisitor<StageNode, StageFragmenter.Context> {
+public class StageFragmenter implements PlanNodeVisitor<PlanNode, StageFragmenter.Context> {
   public static final StageFragmenter INSTANCE = new StageFragmenter();
 
-  private StageNode process(StageNode node, Context context) {
-    node.setStageId(context._currentStageId);
-    List<StageNode> inputs = node.getInputs();
+  private PlanNode process(PlanNode node, Context context) {
+    node.setPlanFragmentId(context._currentStageId);
+    List<PlanNode> inputs = node.getInputs();
     for (int i = 0; i < inputs.size(); i++) {
-      context._previousStageId = node.getStageId();
+      context._previousStageId = node.getPlanFragmentId();
       inputs.set(i, inputs.get(i).visit(this, context));
     }
     return node;
   }
 
   @Override
-  public StageNode visitAggregate(AggregateNode node, Context context) {
+  public PlanNode visitAggregate(AggregateNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitFilter(FilterNode node, Context context) {
+  public PlanNode visitFilter(FilterNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitJoin(JoinNode node, Context context) {
+  public PlanNode visitJoin(JoinNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitMailboxReceive(MailboxReceiveNode node, Context context) {
+  public PlanNode visitMailboxReceive(MailboxReceiveNode node, Context context) {
     throw new UnsupportedOperationException("MailboxReceiveNode should not be visited by StageFragmenter");
   }
 
   @Override
-  public StageNode visitMailboxSend(MailboxSendNode node, Context context) {
+  public PlanNode visitMailboxSend(MailboxSendNode node, Context context) {
     throw new UnsupportedOperationException("MailboxSendNode should not be visited by StageFragmenter");
   }
 
   @Override
-  public StageNode visitProject(ProjectNode node, Context context) {
+  public PlanNode visitProject(ProjectNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitSort(SortNode node, Context context) {
+  public PlanNode visitSort(SortNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitTableScan(TableScanNode node, Context context) {
+  public PlanNode visitTableScan(TableScanNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitValue(ValueNode node, Context context) {
+  public PlanNode visitValue(ValueNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitWindow(WindowNode node, Context context) {
+  public PlanNode visitWindow(WindowNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitSetOp(SetOpNode node, Context context) {
+  public PlanNode visitSetOp(SetOpNode node, Context context) {
     return process(node, context);
   }
 
   @Override
-  public StageNode visitExchange(ExchangeNode node, Context context) {
+  public PlanNode visitExchange(ExchangeNode node, Context context) {
     int nodeStageId = context._previousStageId;
 
     context._currentStageId++;
-    StageNode nextStageRoot = node.getInputs().get(0).visit(this, context);
+    PlanNode nextStageRoot = node.getInputs().get(0).visit(this, context);
 
     List<Integer> distributionKeys = node.getDistributionKeys();
     RelDistribution.Type exchangeType = node.getDistributionType();
@@ -122,10 +122,10 @@ public class StageFragmenter implements StageNodeVisitor<StageNode, StageFragmen
     KeySelector<Object[], Object[]> keySelector = exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
         ? new FieldSelectionKeySelector(distributionKeys) : null;
 
-    StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
+    PlanNode mailboxSender = new MailboxSendNode(nextStageRoot.getPlanFragmentId(), nextStageRoot.getDataSchema(),
         nodeStageId, exchangeType, keySelector, node.getCollations(), node.isSortOnSender());
-    StageNode mailboxReceiver = new MailboxReceiveNode(nodeStageId, nextStageRoot.getDataSchema(),
-        nextStageRoot.getStageId(), exchangeType, keySelector,
+    PlanNode mailboxReceiver = new MailboxReceiveNode(nodeStageId, nextStageRoot.getDataSchema(),
+        nextStageRoot.getPlanFragmentId(), exchangeType, keySelector,
         node.getCollations(), node.isSortOnSender(), node.isSortOnReceiver(), mailboxSender);
     mailboxSender.addInput(nextStageRoot);
 
@@ -134,7 +134,7 @@ public class StageFragmenter implements StageNodeVisitor<StageNode, StageFragmen
 
   public static class Context {
 
-    // Stage ID starts with 1, 0 will be reserved for ROOT stage.
+    // Stage ID starts with 1, 0 will be reserved for ROOT PlanFragment.
     Integer _currentStageId = 1;
     Integer _previousStageId = 1;
   }

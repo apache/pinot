@@ -16,39 +16,49 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class ProjectNode extends AbstractStageNode {
+public class ValueNode extends AbstractPlanNode {
   @ProtoProperties
-  private List<RexExpression> _projects;
+  private List<List<RexExpression>> _literalRows;
 
-  public ProjectNode(int stageId) {
-    super(stageId);
+  public ValueNode(int planFragmentId) {
+    super(planFragmentId);
   }
-  public ProjectNode(int currentStageId, DataSchema dataSchema, List<RexNode> projects) {
+
+  public ValueNode(int currentStageId, DataSchema dataSchema,
+      ImmutableList<ImmutableList<RexLiteral>> literalTuples) {
     super(currentStageId, dataSchema);
-    _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    _literalRows = new ArrayList<>();
+    for (List<RexLiteral> literalTuple : literalTuples) {
+      List<RexExpression> literalRow = new ArrayList<>();
+      for (RexLiteral literal : literalTuple) {
+        literalRow.add(RexExpression.toRexExpression(literal));
+      }
+      _literalRows.add(literalRow);
+    }
   }
 
-  public List<RexExpression> getProjects() {
-    return _projects;
+  public List<List<RexExpression>> getLiteralRows() {
+    return _literalRows;
   }
 
   @Override
   public String explain() {
-    return "PROJECT";
+    return "LITERAL";
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
-    return visitor.visitProject(this, context);
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitValue(this, context);
   }
 }

@@ -23,20 +23,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.ExchangeNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SetOpNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.StageNodeVisitor;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
-import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
@@ -46,7 +46,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  * <p>It is currently not used programmatically and cannot be accessed by the user. Instead,
  * it is intended for use in manual debugging (e.g. setting breakpoints and calling QueryPlan#explain()).
  */
-public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, ExplainPlanStageVisitor.Context> {
+public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, ExplainPlanPlanVisitor.Context> {
 
   private final QueryPlan _queryPlan;
 
@@ -80,23 +80,23 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
    *
    * @return a query plan associated with
    */
-  public static String explainFrom(QueryPlan queryPlan, StageNode node, QueryServerInstance rootServer) {
-    final ExplainPlanStageVisitor visitor = new ExplainPlanStageVisitor(queryPlan);
+  public static String explainFrom(QueryPlan queryPlan, PlanNode node, QueryServerInstance rootServer) {
+    final ExplainPlanPlanVisitor visitor = new ExplainPlanPlanVisitor(queryPlan);
     return node
         .visit(visitor, new Context(rootServer, 0, "", "", new StringBuilder()))
         .toString();
   }
 
-  private ExplainPlanStageVisitor(QueryPlan queryPlan) {
+  private ExplainPlanPlanVisitor(QueryPlan queryPlan) {
     _queryPlan = queryPlan;
   }
 
-  private StringBuilder appendInfo(StageNode node, Context context) {
-    int stage = node.getStageId();
+  private StringBuilder appendInfo(PlanNode node, Context context) {
+    int planFragmentId = node.getPlanFragmentId();
     context._builder
         .append(context._prefix)
         .append('[')
-        .append(stage)
+        .append(planFragmentId)
         .append("]@")
         .append(context._host.getHostname())
         .append(':')
@@ -106,7 +106,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     return context._builder;
   }
 
-  private StringBuilder visitSimpleNode(StageNode node, Context context) {
+  private StringBuilder visitSimpleNode(PlanNode node, Context context) {
     appendInfo(node, context).append('\n');
     return node.getInputs().get(0).visit(this, context.next(false, context._host, context._workerId));
   }
@@ -124,7 +124,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   @Override
   public StringBuilder visitSetOp(SetOpNode setOpNode, Context context) {
     appendInfo(setOpNode, context).append('\n');
-    for (StageNode input : setOpNode.getInputs()) {
+    for (PlanNode input : setOpNode.getInputs()) {
       input.visit(this, context.next(false, context._host, context._workerId));
     }
     return context._builder;
@@ -195,7 +195,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
         .getServerInstanceToWorkerIdMap();
     context._builder.append("->");
     String receivers = servers.entrySet().stream()
-        .map(ExplainPlanStageVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+        .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
         .map(s -> "[" + receiverStageId + "]@" + s)
         .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
@@ -216,7 +216,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     return appendInfo(node, context)
         .append(' ')
         .append(_queryPlan.getDispatchablePlanMetadataMap()
-            .get(node.getStageId())
+            .get(node.getPlanFragmentId())
             .getWorkerIdToSegmentsMap()
             .get(context._host))
         .append('\n');

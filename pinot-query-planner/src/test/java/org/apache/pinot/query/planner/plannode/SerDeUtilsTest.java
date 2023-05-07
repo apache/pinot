@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -35,13 +35,13 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
   public void testQueryStagePlanSerDe(String query)
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    for (StageNode stageNode : queryPlan.getQueryStageMap().values()) {
-      Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) stageNode);
-      StageNode deserializedStageNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);
-      Assert.assertTrue(isObjectEqual(stageNode, deserializedStageNode));
-      Assert.assertEquals(deserializedStageNode.getStageId(), stageNode.getStageId());
-      Assert.assertEquals(deserializedStageNode.getDataSchema(), stageNode.getDataSchema());
-      Assert.assertEquals(deserializedStageNode.getInputs().size(), stageNode.getInputs().size());
+    for (PlanNode planNode : queryPlan.getQueryStageMap().values()) {
+      Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) planNode);
+      PlanNode deserializedPlanNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);
+      Assert.assertTrue(isObjectEqual(planNode, deserializedPlanNode));
+      Assert.assertEquals(deserializedPlanNode.getPlanFragmentId(), planNode.getPlanFragmentId());
+      Assert.assertEquals(deserializedPlanNode.getDataSchema(), planNode.getDataSchema());
+      Assert.assertEquals(deserializedPlanNode.getInputs().size(), planNode.getInputs().size());
     }
   }
 

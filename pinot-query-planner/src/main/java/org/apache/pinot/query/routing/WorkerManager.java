@@ -62,9 +62,9 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
-  public void assignWorkerToStage(int stageId, DispatchablePlanMetadata dispatchablePlanMetadata, long requestId,
+  public void assignWorkerToStage(int planFragmentId, DispatchablePlanMetadata dispatchablePlanMetadata, long requestId,
       Map<String, String> options, Set<String> tableNames) {
-    if (PlannerUtils.isRootStage(stageId)) {
+    if (PlannerUtils.isRootPlanFragment(planFragmentId)) {
       // --- ROOT STAGE / BROKER REDUCE STAGE ---
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
@@ -177,7 +177,7 @@ public class WorkerManager {
   }
 
   /**
-   * Acquire routing table for items listed in {@link org.apache.pinot.query.planner.stage.TableScanNode}.
+   * Acquire routing table for items listed in {@link org.apache.pinot.query.planner.plannode.TableScanNode}.
    *
    * @param logicalTableName it can either be a hybrid table name or a physical table name with table type.
    * @return keyed-map from table type(s) to routing table(s).

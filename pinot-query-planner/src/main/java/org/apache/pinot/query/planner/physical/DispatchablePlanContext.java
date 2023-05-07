@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
@@ -37,7 +37,7 @@ public class DispatchablePlanContext {
 
   private final PlannerContext _plannerContext;
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
-  private final Map<Integer, StageNode> _dispatchablePlanStageRootMap;
+  private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap;
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
       List<Pair<Integer, String>> resultFields, Set<String> tableNames) {
@@ -75,7 +75,7 @@ public class DispatchablePlanContext {
     return _dispatchablePlanMetadataMap;
   }
 
-  public Map<Integer, StageNode> getDispatchablePlanStageRootMap() {
+  public Map<Integer, PlanNode> getDispatchablePlanStageRootMap() {
     return _dispatchablePlanStageRootMap;
   }
 }

@@ -51,7 +51,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.ImmutableIntList;
-import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
 
 
 /**
@@ -95,8 +95,9 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   }
 
   /**
-   * Split the AGG into 2 stages, both with the same AGG type,
-   * Pinot internal stage optimization can use the info of the input data type to infer whether it should generate
+   * Split the AGG into 2 plan fragments, both with the same AGG type,
+   * Pinot internal plan fragment optimization can use the info of the input data type to infer whether it should
+   * generate
    * the "intermediate-stage AGG operator" or a "leaf-stage AGG operator"
    * @see org.apache.pinot.core.query.aggregation.function.AggregationFunction
    *

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import com.clearspring.analytics.util.Preconditions;
 import java.util.ArrayList;
@@ -31,7 +31,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class WindowNode extends AbstractStageNode {
+public class WindowNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _groupSet;
   @ProtoProperties
@@ -61,12 +61,13 @@ public class WindowNode extends AbstractStageNode {
     RANGE
   }
 
-  public WindowNode(int stageId) {
-    super(stageId);
+  public WindowNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
-  public WindowNode(int stageId, List<Window.Group> windowGroups, List<RexLiteral> constants, DataSchema dataSchema) {
-    super(stageId, dataSchema);
+  public WindowNode(int planFragmentId, List<Window.Group> windowGroups, List<RexLiteral> constants,
+      DataSchema dataSchema) {
+    super(planFragmentId, dataSchema);
     // Only a single Window Group should exist per WindowNode.
     Preconditions.checkState(windowGroups.size() == 1,
         String.format("Only a single window group is allowed! Number of window groups: %d", windowGroups.size()));
@@ -110,7 +111,7 @@ public class WindowNode extends AbstractStageNode {
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitWindow(this, context);
   }
 

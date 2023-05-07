@@ -41,7 +41,7 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -82,13 +82,13 @@ public class OpChainTest {
   private BlockExchange _exchange;
 
   private VirtualServerAddress _serverAddress;
-  private StageMetadata _receivingStageMetadata;
+  private PlanFragmentMetadata _receivingPlanFragmentMetadata;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
     _serverAddress = new VirtualServerAddress("localhost", 123, 0);
-    _receivingStageMetadata = new StageMetadata.Builder()
+    _receivingPlanFragmentMetadata = new PlanFragmentMetadata.Builder()
         .setWorkerMetadataList(Stream.of(_serverAddress).map(
             s -> new WorkerMetadata.Builder()
                 .setVirtualServerAddress(s)
@@ -197,7 +197,7 @@ public class OpChainTest {
     int senderStageId = 1;
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+            System.currentTimeMillis() + 1000, _receivingPlanFragmentMetadata, true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -211,7 +211,7 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+            System.currentTimeMillis() + 1000, _receivingPlanFragmentMetadata, true);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -237,7 +237,7 @@ public class OpChainTest {
     int senderStageId = 1;
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+            System.currentTimeMillis() + 1000, _receivingPlanFragmentMetadata, false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -249,7 +249,7 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+            System.currentTimeMillis() + 1000, _receivingPlanFragmentMetadata, false);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 

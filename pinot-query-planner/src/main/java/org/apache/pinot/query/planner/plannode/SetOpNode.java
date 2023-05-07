@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.stage;
+package org.apache.pinot.query.planner.plannode;
 
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.logical.LogicalIntersect;
@@ -29,7 +29,7 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
 /**
  * Set operation node is used to represent UNION, INTERSECT, EXCEPT.
  */
-public class SetOpNode extends AbstractStageNode {
+public class SetOpNode extends AbstractPlanNode {
 
   @ProtoProperties
   private SetOpType _setOpType;
@@ -37,12 +37,12 @@ public class SetOpNode extends AbstractStageNode {
   @ProtoProperties
   private boolean _all;
 
-  public SetOpNode(int stageId) {
-    super(stageId);
+  public SetOpNode(int planFragmentId) {
+    super(planFragmentId);
   }
 
-  public SetOpNode(SetOpType setOpType, int stageId, DataSchema dataSchema, boolean all) {
-    super(stageId, dataSchema);
+  public SetOpNode(SetOpType setOpType, int planFragmentId, DataSchema dataSchema, boolean all) {
+    super(planFragmentId, dataSchema);
     _setOpType = setOpType;
     _all = all;
   }
@@ -61,7 +61,7 @@ public class SetOpNode extends AbstractStageNode {
   }
 
   @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+  public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitSetOp(this, context);
   }
 
