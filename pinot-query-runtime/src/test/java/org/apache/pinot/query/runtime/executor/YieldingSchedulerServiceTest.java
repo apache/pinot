@@ -41,13 +41,13 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.clearInvocations;
 
 
-public class OpChainSchedulerServiceTest {
+public class YieldingSchedulerServiceTest {
 
   private ExecutorService _executor;
   private AutoCloseable _mocks;
 
   private MultiStageOperator _operatorA;
-  private OpChainScheduler _scheduler;
+  private YieldingScheduler _scheduler;
 
   @BeforeClass
   public void beforeClass() {
@@ -63,7 +63,7 @@ public class OpChainSchedulerServiceTest {
   @BeforeMethod
   public void beforeMethod() {
     _operatorA = Mockito.mock(MultiStageOperator.class);
-    _scheduler = Mockito.mock(OpChainScheduler.class);
+    _scheduler = Mockito.mock(YieldingScheduler.class);
     clearInvocations(_scheduler);
     clearInvocations(_operatorA);
   }
@@ -84,7 +84,7 @@ public class OpChainSchedulerServiceTest {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenAnswer(inv -> {
@@ -105,7 +105,7 @@ public class OpChainSchedulerServiceTest {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenAnswer(inv -> {
@@ -126,7 +126,7 @@ public class OpChainSchedulerServiceTest {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
@@ -157,7 +157,7 @@ public class OpChainSchedulerServiceTest {
       }
       return null;
     });
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     schedulerService.startAsync().awaitRunning();
 
@@ -171,7 +171,7 @@ public class OpChainSchedulerServiceTest {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -193,7 +193,7 @@ public class OpChainSchedulerServiceTest {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenReturn(
@@ -219,7 +219,7 @@ public class OpChainSchedulerServiceTest {
       Thread.sleep(100);
       return opChain;
     });
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
 
@@ -260,7 +260,7 @@ public class OpChainSchedulerServiceTest {
     initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenReturn(opChain).thenReturn(null);
-    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
+    YieldingSchedulerService schedulerService = new YieldingSchedulerService(_scheduler, _executor);
 
     CountDownLatch cancelLatch = new CountDownLatch(1);
     CountDownLatch deregisterLatch = new CountDownLatch(1);

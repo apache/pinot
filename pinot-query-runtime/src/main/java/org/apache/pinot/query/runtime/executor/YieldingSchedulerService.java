@@ -33,13 +33,13 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class provides the implementation for scheduling multistage queries on a single node based
- * on the {@link OpChainScheduler} logic that is passed in. Multistage queries support partial execution
+ * on the {@link YieldingScheduler} logic that is passed in. Multistage queries support partial execution
  * and will return a NOOP metadata block as a "yield" signal, indicating that the next operator
- * chain ({@link OpChainScheduler#next} will be requested.
+ * chain ({@link YieldingScheduler#next} will be requested.
  */
 @SuppressWarnings("UnstableApiUsage")
-public class OpChainSchedulerService extends AbstractExecutionThreadService {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
+public class YieldingSchedulerService extends AbstractExecutionThreadService implements SchedulerService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(YieldingSchedulerService.class);
   /**
    * Default time scheduler is allowed to wait for a runnable OpChain to be available.
    */
@@ -50,15 +50,15 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    */
   private static final long DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
 
-  private final OpChainScheduler _scheduler;
+  private final YieldingScheduler _scheduler;
   private final ExecutorService _workerPool;
   private final Cache<Long, Long> _cancelledRequests;
 
-  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
+  public YieldingSchedulerService(YieldingScheduler scheduler, ExecutorService workerPool) {
     this(scheduler, workerPool, DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS);
   }
 
-  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long cancelRetentionMs) {
+  public YieldingSchedulerService(YieldingScheduler scheduler, ExecutorService workerPool, long cancelRetentionMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
     _cancelledRequests = CacheBuilder.newBuilder().expireAfterWrite(cancelRetentionMs, TimeUnit.MILLISECONDS).build();
@@ -134,6 +134,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    *
    * @param operatorChain the chain to register
    */
+  @Override
   public final void register(OpChain operatorChain) {
     operatorChain.getStats().queued();
     _scheduler.register(operatorChain);
@@ -148,6 +149,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    *
    * @param requestId requestId to be cancelled.
    */
+  @Override
   public final void cancel(long requestId) {
     _cancelledRequests.put(requestId, requestId);
   }
@@ -158,13 +160,21 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    *
    * @param opChainId the identifier of the operator chain
    */
+  @Override
   public final void onDataAvailable(OpChainId opChainId) {
     _scheduler.onDataAvailable(opChainId);
   }
 
-  // TODO: remove this method after we pipe down the proper executor pool to the v1 engine
-  public ExecutorService getWorkerPool() {
-    return _workerPool;
+  @Override
+  public void start()
+      throws Exception {
+    this.startAsync().awaitRunning(30, TimeUnit.SECONDS);
+  }
+
+  @Override
+  public void stop()
+      throws Exception {
+    this.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);;
   }
 
   private void closeOpChain(OpChain opChain) {

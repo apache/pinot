@@ -20,7 +20,6 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -119,7 +118,7 @@ public class QueryServerEnclosure {
   public void shutDown() {
     try {
       _queryRunner.shutDown();
-    } catch (TimeoutException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }

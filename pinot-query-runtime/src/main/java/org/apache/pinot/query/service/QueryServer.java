@@ -22,9 +22,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -64,7 +62,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       }
       _queryRunner.start();
       _server.start();
-    } catch (IOException | TimeoutException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
@@ -77,7 +75,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         _server.shutdown();
         _server.awaitTermination();
       }
-    } catch (InterruptedException | TimeoutException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
