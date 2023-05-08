@@ -59,6 +59,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   ServerGauge(String unit, boolean global) {
     this(unit, global, "");
   }
+
   ServerGauge(String unit, boolean global, String description) {
     _unit = unit;
     _global = global;

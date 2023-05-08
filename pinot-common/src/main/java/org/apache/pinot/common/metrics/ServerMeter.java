@@ -106,6 +106,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   ServerMeter(String unit, boolean global) {
     this(unit, global, "");
   }
+
   ServerMeter(String unit, boolean global, String description) {
     _unit = unit;
     _global = global;
