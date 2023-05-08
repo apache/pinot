@@ -91,17 +91,21 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     try {
       URI segmentLocation = future.get(_timeoutInMs, TimeUnit.MILLISECONDS);
       LOGGER.info("Successfully upload segment {} to {}.", segmentName, segmentLocation);
+      _serverMetrics.addMeteredTableValue(rawTableName,
+          segmentLocation == null ? ServerMeter.SEGMENT_UPLOAD_FAILURE : ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
       return segmentLocation;
     } catch (InterruptedException e) {
       LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
+      // Emit a separate metric for timeout since this is relatively more common than other errors.
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
       LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
     } catch (Exception e) {
       LOGGER
           .warn("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName, e);
     }
+    _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
 
     return null;
   }

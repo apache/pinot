@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -66,11 +67,14 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile);
     if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS) {
       try {
-        return new URI(response.getSegmentLocation());
+        URI uri = new URI(response.getSegmentLocation());
+        _serverMetrics.addMeteredTableValue(_rawTableName, ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
+        return uri;
       } catch (URISyntaxException e) {
         _segmentLogger.error("Error in segment location format: ", e);
       }
     }
+    _serverMetrics.addMeteredTableValue(_rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
     return null;
   }
 
