@@ -290,8 +290,8 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
       ExpressionContext measuringColumn = _measuringColumns.get(i);
       BlockValSet blockValSet = blockValSetMap.get(measuringColumn);
       Preconditions.checkState(blockValSet.isSingleValue(), "ArgMinMax only supports single-valued"
-          + "measuring columns");
-      switch (blockValSet.getValueType().getStoredType()) {
+          + " measuring columns");
+      switch (blockValSet.getValueType()) {
         case INT:
           argMinMaxWrapperMeasuringColumnSets.add(
               new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.INT, blockValSet));

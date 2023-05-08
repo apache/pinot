@@ -176,6 +176,37 @@ public class ArgMinMaxTest extends BaseQueriesTest {
   }
 
   @Test
+  public void invalidParamTest() {
+    String query = "SELECT arg_max(intColumn) FROM testTable";
+    try {
+      getBrokerResponse(query);
+      fail("Should have failed for invalid params");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Invalid number of arguments for argmax"));
+    }
+
+    query = "SELECT arg_max() FROM testTable";
+    try {
+      getBrokerResponse(query);
+      fail("Should have failed for invalid params");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Invalid number of arguments for argmax"));
+    }
+
+    query = "SELECT arg_max(mvDoubleColumn, mvDoubleColumn) FROM testTable";
+    BrokerResponse brokerResponse = getBrokerResponse(query);
+    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
+        "java.lang.IllegalStateException: ArgMinMax only supports single-valued measuring columns"
+    ));
+
+    query = "SELECT arg_max(jsonColumn, mvDoubleColumn) FROM testTable";
+    brokerResponse = getBrokerResponse(query);
+    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
+        "Cannot compute ArgMinMax measuring on non-comparable type: JSON"
+    ));
+  }
+
+  @Test
   public void testAggregationInterSegment() {
     // Simple inter segment aggregation test
     String query = "SELECT arg_max(intColumn, longColumn) FROM testTable";
@@ -527,14 +558,14 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("childaggregation_argMin('0', mvIntColumn, intColumn, mvIntColumn)"));
+        .toString().contains("child_argMin('0', mvIntColumn, intColumn, mvIntColumn)"));
     Assert.assertTrue(groupByExplainPlan
         .toString()
-        .contains("childaggregation_argMin('1', mvStringColumn, intColumn, doubleColumn, mvStringColumn)"));
+        .contains("child_argMin('1', mvStringColumn, intColumn, doubleColumn, mvStringColumn)"));
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parentaggregation_argMin('0', '1', intColumn, mvIntColumn)"));
+        .toString().contains("parent_argMin('0', '1', intColumn, mvIntColumn)"));
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parentaggregation_argMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
+        .toString().contains("parent_argMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test

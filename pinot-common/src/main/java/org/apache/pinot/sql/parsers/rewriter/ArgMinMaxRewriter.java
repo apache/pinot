@@ -138,6 +138,10 @@ public class ArgMinMaxRewriter implements QueryRewriter {
       return true;
     }
     List<Expression> operands = function.getOperands();
+    if (operands.size() < 2) {
+      throw new IllegalStateException("Invalid number of arguments for " + functionName + ", argmin/argmax should "
+          + "have at least 2 arguments, got: " + operands.size());
+    }
     List<Expression> argMinMaxMeasuringExpressions = new ArrayList<>();
     for (int i = 0; i < operands.size() - 1; i++) {
       argMinMaxMeasuringExpressions.add(operands.get(i));
