@@ -53,6 +53,20 @@ public interface SegmentAssignment {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap);
 
   /**
+   * Assigns segment to instances. Consider tier configuration if the latter is provided.
+   *
+   * @param segmentName Name of the segment to be assigned
+   * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+   * @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
+   * @param sortedTiers List of Tiers sorted as per priority
+   * @param tierInstancePartitionsMap Map from tierName to instance partitions
+   * @return List of instances to assign the segment to
+   */
+  List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap);
+
+  /**
    * Rebalances the segment assignment for a table.
    *
    * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)

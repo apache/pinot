@@ -139,6 +139,39 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
   }
 
   @Test
+  public void testTieredAssignment() {
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    for (String segmentName : SEGMENTS) {
+      List<String> instancesAssigned =
+          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap,
+              _sortedTiers, _tierInstancePartitionsMap);
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+    }
+
+    // There should be 100 segments assigned
+    assertEquals(currentAssignment.size(), NUM_SEGMENTS);
+
+    // segments 0-49 remain unchanged
+    for (int i = 0; i < 49; i++) {
+      String segmentName = SEGMENT_NAME_PREFIX + i;
+      assertEquals(currentAssignment.get(segmentName), currentAssignment.get(segmentName));
+    }
+    // segments 50-69 go to tierA
+    // segments 70-99 go to tierB
+    int expectedOnTierA = 20;
+    int expectedOnTierB = 30;
+    for (int i = 50; i < 100; i++) {
+      String segmentName = SEGMENT_NAME_PREFIX + i;
+      if (i < 70) {
+        Assert.assertTrue(INSTANCES_TIER_A.containsAll(currentAssignment.get(segmentName).keySet()));
+      } else {
+        Assert.assertTrue(INSTANCES_TIER_B.containsAll(currentAssignment.get(segmentName).keySet()));
+      }
+    }
+  }
+
+  @Test
   public void testTableBalanced() {
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (String segmentName : SEGMENTS) {

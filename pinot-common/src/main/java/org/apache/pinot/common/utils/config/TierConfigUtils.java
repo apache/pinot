@@ -22,12 +22,17 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.FixedTierSegmentSelector;
+import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
@@ -61,6 +66,33 @@ public final class TierConfigUtils {
 
   public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
     return getDataDirForTier(tableConfig, tierName, Collections.emptyMap());
+  }
+
+  /**
+   * Compute default instance partitions for every configured tier
+   *
+   * @return a map with tier names as keys, and default instance partitions as values
+   */
+  public static Map<String, InstancePartitions> getTierToInstancePartitionsMap(String tableNameWithType,
+      @Nullable List<Tier> sortedTiers, HelixManager helixManager) {
+    if (sortedTiers == null) {
+      return null;
+    }
+
+    Map<String, InstancePartitions> tierToInstancePartitionsMap = new HashMap<>();
+    for (Tier tier : sortedTiers) {
+      LOGGER.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
+          tableNameWithType);
+
+      final PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
+      final InstancePartitions tierInstancePartitions =
+          InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableNameWithType,
+              tier.getName(), storage.getServerTag());
+
+      tierToInstancePartitionsMap.put(tier.getName(), tierInstancePartitions);
+    }
+
+    return tierToInstancePartitionsMap;
   }
 
   public static String getDataDirForTier(TableConfig tableConfig, String tierName,

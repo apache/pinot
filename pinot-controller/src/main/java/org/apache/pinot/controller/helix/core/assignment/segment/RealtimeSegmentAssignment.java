@@ -34,6 +34,8 @@ import org.apache.pinot.controller.helix.core.assignment.segment.strategy.Segmen
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -72,6 +74,7 @@ import org.apache.pinot.spi.utils.RebalanceConfigConstants;
  * </ul>
  */
 public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
+  private final Logger _logger = LoggerFactory.getLogger(getClass());
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
@@ -100,6 +103,14 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _tableNameWithType);
     return instancesAssigned;
+  }
+
+  @Override
+  public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> unusedSortedTiers,
+      @Nullable Map<String, InstancePartitions> unusedTierInstancePartitionsMap) {
+    _logger.warn("Tiered assignment of CONSUMING segments is not supported, switching to default assignment");
+    return assignSegment(segmentName, currentAssignment, instancePartitionsMap);
   }
 
   /**

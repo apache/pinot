@@ -32,19 +32,63 @@ import org.apache.pinot.controller.helix.core.assignment.segment.strategy.Segmen
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Segment assignment for offline table.
  */
 public class OfflineSegmentAssignment extends BaseSegmentAssignment {
+  private final Logger _logger = LoggerFactory.getLogger(getClass());
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    // Fallback to default assignment
     InstancePartitions instancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
     Preconditions.checkState(instancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
         _tableNameWithType);
+    return doAssignSegment(segmentName, currentAssignment, instancePartitions);
+  }
+
+  @Override
+  public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap) {
+
+    _logger.info("Assigning segment: {} based on tier configuration for table: {}", segmentName, _tableNameWithType);
+
+    // Check if a new segment is eligible for any tier already
+    final Tier tier = SegmentAssignmentUtils.findTierForNewSegment(_tableNameWithType, sortedTiers, segmentName);
+    if (tier != null && tierInstancePartitionsMap.containsKey(tier.getName())) {
+      _logger.info("Segment: {} qualifies for tier: {}", segmentName, tier.getName());
+
+      // Finally delegate assignment to regular code
+      final InstancePartitions tierInstancePartitions = tierInstancePartitionsMap.get(tier.getName());
+      _logger.info("Assigning segment: {} with tier instance partitions: {} for table: {}", segmentName,
+          tierInstancePartitions, _tableNameWithType);
+
+      final List<String> instancesAssigned = doAssignSegment(segmentName, currentAssignment, tierInstancePartitions);
+      _logger.info("Assigned segment: {} to tier instances: {} for table: {}", segmentName, instancesAssigned,
+          _tableNameWithType);
+      return instancesAssigned;
+    }
+
+    // Fallback to default assignment
+    return assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+  }
+
+  /**
+   * Assign segment to the specified instance partitions
+   *
+   * @param segmentName Name of the segment
+   * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+   * @param instancePartitions Instance partitions for the table
+   * @return
+   */
+  protected List<String> doAssignSegment(String segmentName,
+      Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions) {
     // Gets Segment assignment strategy for instance partitions
     SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
         .getSegmentAssignmentStrategy(_helixManager, _tableConfig, InstancePartitionsType.OFFLINE.toString(),

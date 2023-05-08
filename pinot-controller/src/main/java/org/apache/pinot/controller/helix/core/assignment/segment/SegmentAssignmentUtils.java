@@ -30,6 +30,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -406,6 +407,25 @@ public class SegmentAssignmentUtils {
     public Map<String, Map<String, String>> getNonTierSegmentAssignment() {
       return _nonTierSegmentAssignment;
     }
+  }
+
+  /**
+   * Checks tiers one-by-one to return the first one for which a newly registered segment qualifies
+   * @param tableNameWithType table to which the segment assignment belongs
+   * @param sortedTiers list of tiers, pre-sorted as per desired order by caller
+   * @param segmentName name of the new segment
+   * @return tier for which the segment qualifies, or null if segment doesn't belong to any tier
+   */
+  public static Tier findTierForNewSegment(String tableNameWithType, @Nullable List<Tier> sortedTiers,
+      String segmentName) {
+    if (CollectionUtils.isNotEmpty(sortedTiers)) {
+      for (Tier tier : sortedTiers) {
+        if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentName)) {
+          return tier;
+        }
+      }
+    }
+    return null;
   }
 
   /**
