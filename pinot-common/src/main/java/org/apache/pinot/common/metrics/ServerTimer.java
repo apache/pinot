@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.metrics;
 
-import java.util.Arrays;
 import org.apache.pinot.common.Utils;
 
 
@@ -81,5 +80,4 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   public String getDescription() {
     return _description;
   }
-
 }
