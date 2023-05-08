@@ -157,7 +157,7 @@ private static final int NUM_DOCS = 3_000_000;
     serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
     serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.40f);
+        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.25f);
     serverConf.setProperty(
         CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
@@ -225,7 +225,6 @@ private static final int NUM_DOCS = 3_000_000;
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
     LOGGER.info("testDigestOOM: {}", queryResponse);
-//    System.out.println(queryResponse.get("exceptions").toString());
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
