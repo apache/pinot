@@ -131,11 +131,11 @@ public class QueryRunner {
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-      _queryWorkerIntermExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+      _queryWorkerIntermExecutorService = Executors.newCachedThreadPool(
           new NamedThreadFactory("query_intermediate_worker_on_" + _port + "_port"));
       _queryWorkerLeafExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("query_leaf_worker_on_" + _port + "_port"));
-      _queryRunnerExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
+      _queryRunnerExecutorService = Executors.newCachedThreadPool(
           new NamedThreadFactory("query_runner_on_" + _port + "_port"));
       _yieldingScheduler = new YieldingSchedulerService(new RoundRobinScheduler(releaseMs),
           getQueryWorkerIntermExecutorService());
