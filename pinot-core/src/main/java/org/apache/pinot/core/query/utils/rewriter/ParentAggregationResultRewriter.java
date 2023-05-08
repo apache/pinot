@@ -171,11 +171,7 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
               newRow[fieldIter] = null;
             }
           } else { // If the field is a regular column, extract the value from the row, only the first row has value
-            if (rowIter == 0) {
-              newRow[fieldIter] = row[aggregationFunctionIndexMapping.get(fieldIter)];
-            } else {
-              newRow[fieldIter] = null;
-            }
+            newRow[fieldIter] = row[aggregationFunctionIndexMapping.get(fieldIter)];
           }
         }
         newRowsBuffer.add(newRow);

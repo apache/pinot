@@ -265,17 +265,17 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(0)[2], "a11");
     assertEquals(rows.get(0)[3], 8D);
 
-    assertNull(rows.get(1)[0]);
+    assertEquals(rows.get(1)[0], 7996000D);
     assertEquals(rows.get(1)[1], 18D);
     assertEquals(rows.get(1)[2], "a11");
     assertEquals(rows.get(1)[3], 8D);
 
-    assertNull(rows.get(2)[0]);
+    assertEquals(rows.get(2)[0], 7996000D);
     assertEquals(rows.get(2)[1], 8D);
     assertEquals(rows.get(2)[2], "a11");
     assertNull(rows.get(2)[3]);
 
-    assertNull(rows.get(3)[0]);
+    assertEquals(rows.get(3)[0], 7996000D);
     assertEquals(rows.get(3)[1], 18D);
     assertEquals(rows.get(3)[2], "a11");
     assertNull(rows.get(3)[3]);
@@ -298,14 +298,14 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(0)[1], 1500D);
     assertEquals(rows.get(0)[2], 2250000D);
     assertEquals(rows.get(0)[3], "bb11");
-    assertNull(rows.get(1)[0]);
+    assertEquals(rows.get(1)[0], 7996000D);
     assertEquals(rows.get(1)[1], 1500D);
     assertEquals(rows.get(1)[2], 2250000D);
     assertEquals(rows.get(1)[3], "bb11");
-    assertNull(rows.get(2)[0]);
+    assertEquals(rows.get(2)[0], 7996000D);
     assertNull(rows.get(2)[1]);
     assertEquals(rows.get(2)[3], "bb11");
-    assertNull(rows.get(3)[0]);
+    assertEquals(rows.get(3)[0], 7996000D);
     assertNull(rows.get(3)[1]);
     assertEquals(rows.get(3)[3], "bb11");
 
@@ -418,7 +418,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     for (int i = 0; i < 10; i++) {
       int group = ((i + 2) / 2) % 5;
-      assertEquals(rows.get(i)[0], i % 2 == 0 ? group : null);
+      assertEquals(rows.get(i)[0], group);
       assertEquals(rows.get(i)[1], 995L + group);
     }
 
@@ -435,14 +435,14 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     for (int i = 0; i < 22; i++) {
       double group = Math.pow(2, i / 2);
-      assertEquals(rows.get(i)[0], i % 2 == 0 ? (int) group : null);
+      assertEquals(rows.get(i)[0], (int) group);
       assertEquals(rows.get(i)[1], group - 1);
     }
 
     assertEquals(rows.get(22)[0], 2048);
     assertEquals(rows.get(22)[1], 1999D);
 
-    assertNull(rows.get(23)[0]);
+    assertEquals(rows.get(23)[0], 2048);
     assertEquals(rows.get(23)[1], 1999D);
 
     // MV inter segment group by
@@ -456,14 +456,14 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     for (int i = 0; i < 18; i++) {
       int group = i / 2 + 1;
-      assertEquals(rows.get(i)[0], i % 2 == 0 ? group : null);
+      assertEquals(rows.get(i)[0], group);
       assertEquals(rows.get(i)[1], (double) group - 1);
     }
 
     assertEquals(rows.get(18)[0], 0);
     assertEquals(rows.get(18)[1], 0D);
 
-    assertNull(rows.get(19)[0]);
+    assertEquals(rows.get(19)[0], 0);
     assertEquals(rows.get(19)[1], 0D);
 
     // MV inter segment group by with projection on MV column
@@ -477,7 +477,7 @@ public class ArgMinMaxTest extends BaseQueriesTest {
 
     for (int i = 0; i < 18; i++) {
       int group = i / 2 + 1;
-      assertEquals(rows.get(i)[0], i % 2 == 0 ? group : null);
+      assertEquals(rows.get(i)[0], group);
       assertEquals(rows.get(i)[1], new Object[]{group - 1, group, group + 1});
       assertEquals(rows.get(i)[2], new Object[]{"a199" + group, "a199" + group + 1, "a199" + group + 2});
     }
