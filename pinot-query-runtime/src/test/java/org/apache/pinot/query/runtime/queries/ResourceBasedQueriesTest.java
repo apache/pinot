@@ -54,6 +54,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -92,6 +93,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
+        boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
@@ -110,10 +112,14 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         for (GenericRow row : genericRows) {
           if (row == SEGMENT_BREAKER_ROW) {
-            factory1.addSegment(tableNameWithType, rows1);
-            factory2.addSegment(tableNameWithType, rows2);
-            rows1 = new ArrayList<>();
-            rows2 = new ArrayList<>();
+            if (allowEmptySegment || rows1.size() > 0) {
+              factory1.addSegment(tableNameWithType, rows1);
+              rows1 = new ArrayList<>();
+            }
+            if (allowEmptySegment || rows2.size() > 0) {
+              factory2.addSegment(tableNameWithType, rows2);
+              rows2 = new ArrayList<>();
+            }
           } else {
             long partition = 0;
             if (partitionColumns == null) {
@@ -130,8 +136,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             }
           }
         }
-        factory1.addSegment(tableNameWithType, rows1);
-        factory2.addSegment(tableNameWithType, rows2);
+        if (allowEmptySegment || rows1.size() > 0) {
+          factory1.addSegment(tableNameWithType, rows1);
+        }
+        if (allowEmptySegment || rows2.size() > 0) {
+          factory2.addSegment(tableNameWithType, rows2);
+        }
       }
 
       boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null);
@@ -348,8 +358,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
     Set<String> validTestCases = new HashSet<>();
-    validTestCases.add("basic_test");
-    validTestCases.add("framework_test");
+    validTestCases.add("metadata_test");
 
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
       String testCaseName = testCaseEntry.getKey();
@@ -377,10 +386,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           if (queryCase._expectedNumSegments != null) {
             segmentCount = queryCase._expectedNumSegments;
           } else {
-            for (String tableName : testCaseEntry.getValue()._tables.keySet()) {
-              segmentCount +=
-                  _tableToSegmentMap.getOrDefault(testCaseName + "_" + tableName + "_OFFLINE", new HashSet<>()).size();
-            }
+            throw new RuntimeException("Unable to test metadata without expected num segments configuration!");
           }
 
           Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
@@ -468,5 +474,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       }
     }
     return testCaseMap;
+  }
+
+  private static Object extractExtraProps(Map<String, Object> extraProps, String propKey) {
+    if (extraProps == null) {
+      return null;
+    }
+    return extraProps.getOrDefault(propKey, null);
   }
 }

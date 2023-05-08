@@ -60,9 +60,7 @@
       },
       {
         "description": "Correlated subquery test",
-        "sql": "SELECT {tbl1}.col1 FROM {tbl1} WHERE {tbl1}.col2 > (SELECT 0.5 * SUM({tbl2}.col3) FROM {tbl2} WHERE {tbl1}.col2 = {tbl1}.col2 AND {tbl1}.col1 = {tbl2}.col1)",
-        "expectedNumSegments": 8,
-        "comment": "This correlated subquery test is decorrelated to 2 JOINs, so one table is scanned twice, hence expected to scan 8 segments"
+        "sql": "SELECT {tbl1}.col1 FROM {tbl1} WHERE {tbl1}.col2 > (SELECT 0.5 * SUM({tbl2}.col3) FROM {tbl2} WHERE {tbl1}.col2 = {tbl1}.col2 AND {tbl1}.col1 = {tbl2}.col1)"
       }
     ],
     "extraProps": {

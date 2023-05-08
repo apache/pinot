@@ -60,7 +60,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
-    _receivingMailbox.setErrorBlock(
-        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by sender", t)));
+    _receivingMailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
+        new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t)));
   }
 }
