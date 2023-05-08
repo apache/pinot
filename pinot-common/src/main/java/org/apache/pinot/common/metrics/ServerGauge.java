@@ -27,7 +27,7 @@ import org.apache.pinot.common.Utils;
  */
 public enum ServerGauge implements AbstractMetrics.Gauge {
   VERSION("version", true),
-  DOCUMENT_COUNT("documents", false),
+  DOCUMENT_COUNT("documents", false, "Document Count"),
   SEGMENT_COUNT("segments", false),
   LLC_PARTITION_CONSUMING("state", false),
   HIGHEST_STREAM_OFFSET_CONSUMED("messages", false),
@@ -54,10 +54,16 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   private final String _unit;
   private final boolean _global;
 
+  private final String _description;
+
   ServerGauge(String unit, boolean global) {
+    this(unit, global, "");
+  }
+  ServerGauge(String unit, boolean global, String description) {
     _unit = unit;
     _global = global;
     _gaugeName = Utils.toCamelCase(name().toLowerCase());
+    _description = description;
   }
 
   @Override
@@ -78,5 +84,10 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  @Override
+  public String getDescription() {
+    return _description;
   }
 }

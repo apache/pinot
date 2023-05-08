@@ -85,9 +85,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
   // Netty connection metrics
-  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
+  NETTY_CONNECTION_BYTES_RECEIVED("bytes", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
-  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_BYTES_SENT("bytes", true),
 
   // GRPC related metrics
   GRPC_QUERIES("grpcQueries", true),
@@ -101,11 +101,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   private final String _meterName;
   private final String _unit;
   private final boolean _global;
+  private final String _description;
 
   ServerMeter(String unit, boolean global) {
+    this(unit, global, "");
+  }
+  ServerMeter(String unit, boolean global, String description) {
     _unit = unit;
     _global = global;
     _meterName = Utils.toCamelCase(name().toLowerCase());
+    _description = description;
   }
 
   @Override
@@ -126,5 +131,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  @Override
+  public String getDescription() {
+    return _description;
   }
 }

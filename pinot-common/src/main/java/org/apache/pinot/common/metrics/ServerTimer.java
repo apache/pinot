@@ -47,10 +47,16 @@ public enum ServerTimer implements AbstractMetrics.Timer {
 
   private final String _timerName;
   private final boolean _global;
+  private final String _description;
 
   ServerTimer(String unit, boolean global) {
+    this(unit, global, "");
+  }
+
+  ServerTimer(String unit, boolean global, String description) {
     _global = global;
     _timerName = Utils.toCamelCase(name().toLowerCase());
+    _description = description;
   }
 
   @Override
@@ -66,5 +72,10 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  @Override
+  public String getDescription() {
+    return _description;
   }
 }

@@ -79,4 +79,10 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
   protected ServerGauge[] getGauges() {
     return ServerGauge.values();
   }
+
+  public static void main(String[] args) {
+    for (ServerMeter meter: ServerMeter.values()) {
+      System.out.println("|" + meter.getMeterName() + "( in " + meter.getUnit() + ") |" + meter.getDescription());
+    }
+  }
 }
