@@ -65,6 +65,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
           segmentName.getSegmentName());
       return null;
     }
+    final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
     Callable<URI> uploadTask = () -> {
       URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
           segmentName.getSegmentName() + UUID.randomUUID().toString()));
@@ -80,7 +81,6 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       } catch (Exception e) {
         LOGGER.warn("Failed copy segment tar file {} to segment store {}: {}", segmentFile.getName(), destUri, e);
       } finally {
-        String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
         long duration = System.currentTimeMillis() - startTime;
         _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
             TimeUnit.MILLISECONDS);
@@ -96,9 +96,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      _serverMetrics.addMeteredTableValue(segmentName.getTableName(), ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
-      LOGGER.warn("Timed out waiting to upload segment: {} for table: {}",
-          segmentName.getSegmentName(), segmentName.getTableName());
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
+      LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
     } catch (Exception e) {
       LOGGER
           .warn("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName, e);
