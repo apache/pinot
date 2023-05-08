@@ -26,10 +26,10 @@ import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
- * An interface that defines different scheduling strategies to work with the {@link YieldingSchedulerService}.
+ * An interface that defines different scheduling strategies to work with the {@link OpChainSchedulerService}.
  */
 @ThreadSafe
-public interface YieldingScheduler {
+public interface OpChainScheduler {
   /**
    * Registers a new OpChain with the scheduler.
    * @param operatorChain the operator chain to register
@@ -46,7 +46,7 @@ public interface YieldingScheduler {
   void deregister(OpChain operatorChain);
 
   /**
-   * Used by {@link YieldingSchedulerService} to indicate that a given OpChain can be suspended until it receives some
+   * Used by {@link OpChainSchedulerService} to indicate that a given OpChain can be suspended until it receives some
    * data. Note that this method is only used by the scheduler service to "indicate" that an OpChain can be suspended.
    * The decision on whether to actually suspend or not can be taken by the scheduler.
    */
@@ -61,7 +61,7 @@ public interface YieldingScheduler {
   void onDataAvailable(OpChainId opChainId);
 
   /**
-   * Returns an OpChain that is ready to be run by {@link YieldingSchedulerService}, waiting for the given time if
+   * Returns an OpChain that is ready to be run by {@link OpChainSchedulerService}, waiting for the given time if
    * there are no such OpChains ready yet. Will return null if there's no ready OpChains even after the specified time.
    *
    * @param time non-negative value that determines the time the scheduler will wait for new OpChains to be ready.

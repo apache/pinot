@@ -86,7 +86,7 @@ import org.slf4j.LoggerFactory;
  * </p>
  */
 @ThreadSafe
-public class RoundRobinScheduler implements YieldingScheduler {
+public class RoundRobinScheduler implements OpChainScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoundRobinScheduler.class);
   private static final String AVAILABLE_RELEASE_THREAD_NAME = "round-robin-scheduler-release-thread";
 

@@ -31,17 +31,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ThreadPoolSchedulerService implements SchedulerService {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ThreadPoolSchedulerService.class);
+public class LeafSchedulerService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafSchedulerService.class);
 
   private final ExecutorService _executorService;
   private final ConcurrentHashMap<OpChainId, Future<?>> _submittedOpChainMap;
 
-  public ThreadPoolSchedulerService(ExecutorService executorService) {
+  public LeafSchedulerService(ExecutorService executorService) {
     _executorService = executorService;
     _submittedOpChainMap = new ConcurrentHashMap<>();
   }
-  @Override
+
   public void register(OpChain operatorChain) {
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
@@ -79,7 +79,6 @@ public class ThreadPoolSchedulerService implements SchedulerService {
     _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
   }
 
-  @Override
   public void cancel(long requestId) {
     // simple cancellation. if there's dangling opChain we will use a cache to clean it up.
     // TODO: make sure this is thread-safe.
@@ -91,23 +90,6 @@ public class ThreadPoolSchedulerService implements SchedulerService {
         future.cancel(true);
       }
     }
-  }
-
-  @Override
-  public void onDataAvailable(OpChainId opChainId) {
-    // no-op
-  }
-
-  @Override
-  public void start()
-      throws Exception {
-    // no-op
-  }
-
-  @Override
-  public void stop()
-      throws Exception {
-    // no-op
   }
 
   private void closeOpChain(OpChain opChain) {

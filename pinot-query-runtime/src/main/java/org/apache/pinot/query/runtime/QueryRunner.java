@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -34,7 +36,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
@@ -45,9 +46,8 @@ import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
-import org.apache.pinot.query.runtime.executor.SchedulerService;
-import org.apache.pinot.query.runtime.executor.ThreadPoolSchedulerService;
-import org.apache.pinot.query.runtime.executor.YieldingSchedulerService;
+import org.apache.pinot.query.runtime.executor.LeafSchedulerService;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
@@ -85,35 +85,13 @@ public class QueryRunner {
   private String _hostname;
   private int _port;
   private VirtualServerAddress _rootServer;
-  // Query worker threads are used for (1) running intermediate stage operators (2) running segment level operators
-  /**
-   * Query worker threads are used for:
-   * <ol>
-   *   <li>
-   *     Running intermediate stage operators (v2 engine operators).
-   *   </li>
-   *   <li>
-   *     Running per-segment operators submitted in {@link BaseCombineOperator}.
-   *   </li>
-   * </ol>
-   */
+
   private ExecutorService _queryWorkerIntermExecutorService;
   private ExecutorService _queryWorkerLeafExecutorService;
-  /**
-   * Query runner threads are used for:
-   * <ol>
-   *   <li>
-   *     Merging results in BaseCombineOperator for leaf stages. Results are provided by per-segment operators run in
-   *     worker threads
-   *   </li>
-   *   <li>
-   *     Building the OperatorChain and submitting to the scheduler for non-leaf stages (intermediate stages).
-   *   </li>
-   * </ol>
-   */
   private ExecutorService _queryRunnerExecutorService;
-  private SchedulerService _yieldingScheduler;
-  private SchedulerService _threadPoolScheduler;
+
+  private OpChainSchedulerService _intermScheduler;
+  private LeafSchedulerService _leafScheduler;
 
   /**
    * Initializes the query executor.
@@ -137,10 +115,10 @@ public class QueryRunner {
           new NamedThreadFactory("query_leaf_worker_on_" + _port + "_port"));
       _queryRunnerExecutorService = Executors.newCachedThreadPool(
           new NamedThreadFactory("query_runner_on_" + _port + "_port"));
-      _yieldingScheduler = new YieldingSchedulerService(new RoundRobinScheduler(releaseMs),
+      _intermScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
           getQueryWorkerIntermExecutorService());
-      _threadPoolScheduler = new ThreadPoolSchedulerService(getQueryRunnerExecutorService());
-      _mailboxService = new MailboxService(_hostname, _port, config, _yieldingScheduler::onDataAvailable);
+      _leafScheduler = new LeafSchedulerService(getQueryRunnerExecutorService());
+      _mailboxService = new MailboxService(_hostname, _port, config, _intermScheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
@@ -149,18 +127,18 @@ public class QueryRunner {
   }
 
   public void start()
-      throws Exception {
+      throws TimeoutException {
     _helixPropertyStore = _helixManager.getHelixPropertyStore();
     _mailboxService.start();
     _serverExecutor.start();
-    _yieldingScheduler.start();
+    _intermScheduler.startAsync().awaitRunning(30, TimeUnit.SECONDS);
   }
 
   public void shutDown()
-      throws Exception {
+      throws TimeoutException {
     _serverExecutor.shutDown();
     _mailboxService.shutdown();
-    _yieldingScheduler.stop();
+    _intermScheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
@@ -172,18 +150,18 @@ public class QueryRunner {
     if (isLeafStage(distributedStagePlan)) {
       OpChain rootOperator = compileLeafStage(distributedStagePlan, requestMetadataMap, timeoutMs, deadlineMs,
           requestId);
-      _threadPoolScheduler.register(rootOperator);
+      _leafScheduler.register(rootOperator);
     } else {
       PlanNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
           new PlanRequestContext(_mailboxService, requestId, stageRoot.getPlanFragmentId(), timeoutMs, deadlineMs,
               distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), isTraceEnabled));
-      _yieldingScheduler.register(rootOperator);
+      _intermScheduler.register(rootOperator);
     }
   }
 
   public void cancel(long requestId) {
-    _yieldingScheduler.cancel(requestId);
+    _intermScheduler.cancel(requestId);
   }
 
   @VisibleForTesting
