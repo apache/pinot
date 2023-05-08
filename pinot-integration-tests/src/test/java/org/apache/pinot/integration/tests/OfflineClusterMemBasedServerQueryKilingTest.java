@@ -68,9 +68,15 @@ public class OfflineClusterMemBasedServerQueryKilingTest extends BaseClusterInte
   public static final String BOOLEAN_DIM_SV1 = "booleanDimSV1";
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
+private static final int NUM_DOCS = 3_000_000;
+
   private static final String OOM_QUERY =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest, intDimSV1 FROM mytable GROUP BY intDimSV1"
           + " ORDER BY digest LIMIT 30000";
+
+  private static final String OOM_QUERY_2 =
+      "SELECT stringDimSV2 FROM mytable GROUP BY stringDimSV2"
+          + " ORDER BY stringDimSV2 LIMIT 1000000";
 
   private static final String DIGEST_QUERY_1 =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest FROM mytable";
@@ -151,7 +157,7 @@ public class OfflineClusterMemBasedServerQueryKilingTest extends BaseClusterInte
     serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
     serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.60f);
+        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.40f);
     serverConf.setProperty(
         CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
@@ -188,7 +194,7 @@ public class OfflineClusterMemBasedServerQueryKilingTest extends BaseClusterInte
 
 
   protected long getCountStarResult() {
-    return 3_000_000;
+    return NUM_DOCS * 3;
   }
 
   protected String getTimeColumnName() {
@@ -210,6 +216,16 @@ public class OfflineClusterMemBasedServerQueryKilingTest extends BaseClusterInte
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY);
     LOGGER.info("testDigestOOM: {}", queryResponse);
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
+  }
+
+  @Test
+  public void testDigestOOM2()
+      throws Exception {
+    JsonNode queryResponse = postQuery(OOM_QUERY_2);
+    LOGGER.info("testDigestOOM: {}", queryResponse);
+//    System.out.println(queryResponse.get("exceptions").toString());
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
@@ -284,14 +300,14 @@ public class OfflineClusterMemBasedServerQueryKilingTest extends BaseClusterInte
       try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
         fileWriter.create(avroSchema, avroFile);
 
-        int numDocs = 1_000_000;
+        int numDocs = NUM_DOCS;
         int randBound = numDocs / 2;
         Random random = new Random(0);
         IntStream randomInt = random.ints(0, 100_000);
         for (int docId = 0; docId < numDocs; docId++) {
           GenericData.Record record = new GenericData.Record(avroSchema);
           record.put(STRING_DIM_SV1, "test query killing");
-          record.put(STRING_DIM_SV2, "test query killing");
+          record.put(STRING_DIM_SV2, "test query killing" + docId);
           record.put(INT_DIM_SV1, random.nextInt(randBound));
           record.put(LONG_DIM_SV1, random.nextLong());
           record.put(DOUBLE_DIM_SV1, random.nextDouble());
