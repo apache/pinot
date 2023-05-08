@@ -3232,6 +3232,7 @@ public class CalciteSqlCompilerTest {
         CalciteSqlParser.compileToPinotQuery("SELECT key, COUNT(*) AS b FROM T3 JOIN T4 GROUP BY key"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = T2.key"));
 
+    // test for self join queries
     query = "SELECT T1.a FROM T1 JOIN(SELECT key FROM T1) as self ON T1.key=self.key";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     dataSource = pinotQuery.getDataSource();
