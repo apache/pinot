@@ -30,21 +30,21 @@ public class ArgMinMaxRewriterTest {
   @Test
   public void testQueryRewrite() {
     testQueryRewrite("SELECT ARG_MIN(col1,col2), ARG_MIN(col1,col3) FROM myTable",
-        "SELECT PINOT_CHILD_AGGREGATION_ARG_MIN(0,col2,col1,col2), "
-            + "PINOT_CHILD_AGGREGATION_ARG_MIN(0,col3,col1,col3),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MIN(0,1,col1,col2,col3) FROM myTable");
+        "SELECT CHILD_AGGREGATION_ARG_MIN(0,col2,col1,col2), "
+            + "CHILD_AGGREGATION_ARG_MIN(0,col3,col1,col3),"
+            + "PARENT_AGGREGATION_ARG_MIN(0,1,col1,col2,col3) FROM myTable");
 
     testQueryRewrite("SELECT ARG_MIN(col1,col2), ARG_MIN(col1,col2) FROM myTable",
-        "SELECT PINOT_CHILD_AGGREGATION_ARG_MIN(0,col2,col1,col2),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MIN(0,1,col1,col2) FROM myTable");
+        "SELECT CHILD_AGGREGATION_ARG_MIN(0,col2,col1,col2),"
+            + "PARENT_AGGREGATION_ARG_MIN(0,1,col1,col2) FROM myTable");
 
     testQueryRewrite("SELECT ARG_MIN(col1,col2,col5), ARG_MIN(col1,col2,col6), ARG_MAX(col1,col2,col6) "
             + "FROM myTable",
-        "SELECT PINOT_CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5), "
-            + "PINOT_CHILD_AGGREGATION_ARG_MIN(0,col6,col1,col2,col6), "
-            + "PINOT_CHILD_AGGREGATION_ARG_MAX(0,col6,col1,col2,col6),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col6,col5),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MAX(0,2,col1,col2,col6) FROM myTable");
+        "SELECT CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5), "
+            + "CHILD_AGGREGATION_ARG_MIN(0,col6,col1,col2,col6), "
+            + "CHILD_AGGREGATION_ARG_MAX(0,col6,col1,col2,col6),"
+            + "PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col6,col5),"
+            + "PARENT_AGGREGATION_ARG_MAX(0,2,col1,col2,col6) FROM myTable");
   }
 
   @Test
@@ -52,20 +52,20 @@ public class ArgMinMaxRewriterTest {
     testQueryRewrite("SELECT ARG_MIN(col1,col2,col5), ARG_MIN(col1,col3,col6),"
             + "ARG_MIN(col3,col1,col6) FROM myTable GROUP BY col3 "
             + "ORDER BY col3 DESC",
-        "SELECT PINOT_CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5), "
-            + "PINOT_CHILD_AGGREGATION_ARG_MIN(1,col6,col1,col3,col6),"
-            + "PINOT_CHILD_AGGREGATION_ARG_MIN(2,col6,col3,col1,col6),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MIN(1,2,col1,col3,col6),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col5),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MIN(2,2,col3,col1,col6)"
+        "SELECT CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5), "
+            + "CHILD_AGGREGATION_ARG_MIN(1,col6,col1,col3,col6),"
+            + "CHILD_AGGREGATION_ARG_MIN(2,col6,col3,col1,col6),"
+            + "PARENT_AGGREGATION_ARG_MIN(1,2,col1,col3,col6),"
+            + "PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col5),"
+            + "PARENT_AGGREGATION_ARG_MIN(2,2,col3,col1,col6)"
             + "FROM myTable GROUP BY col3 ORDER BY col3 DESC");
 
     testQueryRewrite("SELECT ARG_MIN(col1,col2,col5), ARG_MAX(col1,col2,col5) FROM myTable GROUP BY col3 "
             + "ORDER BY ADD(co1, co3) DESC",
-        "SELECT PINOT_CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5),"
-            + "PINOT_CHILD_AGGREGATION_ARG_MAX(0,col5,col1,col2,col5),"
-            + "PINOT_PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col5), "
-            + "PINOT_PARENT_AGGREGATION_ARG_MAX(0,2,col1,col2,col5) "
+        "SELECT CHILD_AGGREGATION_ARG_MIN(0,col5,col1,col2,col5),"
+            + "CHILD_AGGREGATION_ARG_MAX(0,col5,col1,col2,col5),"
+            + "PARENT_AGGREGATION_ARG_MIN(0,2,col1,col2,col5), "
+            + "PARENT_AGGREGATION_ARG_MAX(0,2,col1,col2,col5) "
             + "FROM myTable GROUP BY col3 ORDER BY ADD(co1, co3) DESC");
   }
 

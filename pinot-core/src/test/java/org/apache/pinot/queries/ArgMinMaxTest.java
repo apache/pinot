@@ -527,14 +527,14 @@ public class ArgMinMaxTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("pinotchildaggregation_argMin('0', mvIntColumn, intColumn, mvIntColumn)"));
+        .toString().contains("childaggregation_argMin('0', mvIntColumn, intColumn, mvIntColumn)"));
     Assert.assertTrue(groupByExplainPlan
         .toString()
-        .contains("pinotchildaggregation_argMin('1', mvStringColumn, intColumn, doubleColumn, mvStringColumn)"));
+        .contains("childaggregation_argMin('1', mvStringColumn, intColumn, doubleColumn, mvStringColumn)"));
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("pinotparentaggregation_argMin('0', '1', intColumn, mvIntColumn)"));
+        .toString().contains("parentaggregation_argMin('0', '1', intColumn, mvIntColumn)"));
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("pinotparentaggregation_argMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
+        .toString().contains("parentaggregation_argMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test

@@ -325,13 +325,13 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
-          case PINOTPARENTAGGREGATIONARGMAX:
+          case PARENTAGGREGATIONARGMAX:
             return new ParentArgMinMaxAggregationFunction(arguments, true);
-          case PINOTPARENTAGGREGATIONARGMIN:
+          case PARENTAGGREGATIONARGMIN:
             return new ParentArgMinMaxAggregationFunction(arguments, false);
-          case PINOTCHILDAGGREGATIONARGMAX:
+          case CHILDAGGREGATIONARGMAX:
             return new ChildArgMinMaxAggregationFunction(arguments, true);
-          case PINOTCHILDAGGREGATIONARGMIN:
+          case CHILDAGGREGATIONARGMIN:
             return new ChildArgMinMaxAggregationFunction(arguments, false);
           case ARGMAX:
           case ARGMIN:
