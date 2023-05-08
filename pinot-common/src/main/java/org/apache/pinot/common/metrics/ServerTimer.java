@@ -85,7 +85,7 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   public static void main(String[] args) {
     // Demo
     Arrays.stream(ServerTimer.values()).forEach(m -> {
-      System.out.println(m.getTimerName() + "\t" +  m.getDescription() + "\t" + "Timer");
+      System.out.println(m.getTimerName() + "\t" + m.getDescription() + "\t" + "Timer");
     });
   }
 }
