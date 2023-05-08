@@ -85,9 +85,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
   // Netty connection metrics
-  NETTY_CONNECTION_BYTES_RECEIVED("bytes", true),
+  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
-  NETTY_CONNECTION_BYTES_SENT("bytes", true),
+  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
 
   // GRPC related metrics
   GRPC_QUERIES("grpcQueries", true),

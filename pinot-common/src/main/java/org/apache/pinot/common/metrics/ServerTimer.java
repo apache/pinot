@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import java.util.Arrays;
 import org.apache.pinot.common.Utils;
 
 
@@ -26,24 +27,26 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum ServerTimer implements AbstractMetrics.Timer {
-  // metric tracking the freshness lag for consuming segments
-  FRESHNESS_LAG_MS("freshnessLagMs", false),
+  FRESHNESS_LAG_MS("freshnessLagMs", false, "Tracks the freshness lag for consuming segments. "
+      + "Computed as the time-period between when the data was last updated in the table and the current time."),
 
-  // The latency of sending the response from server to broker
-  NETTY_CONNECTION_SEND_RESPONSE_LATENCY("nettyConnection", false),
+  NETTY_CONNECTION_SEND_RESPONSE_LATENCY("nettyConnection", false,
+      "Latency of sending the response from server to broker. Computed as the time spent in sending "
+          + "response to brokers after the results are available."),
 
-  // Query cost (execution thread cpu time) for query processing on server
-  EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false),
+  EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false, "Query cost (execution thread cpu time) "
+      + "for query processing on server. Computed as time spent by all threads processing query and results "
+      + "(doesn't includes time spent in system activities)"),
 
-  // Query cost (system activities cpu time) for query processing on server
-  SYSTEM_ACTIVITIES_CPU_TIME_NS("nanoseconds", false),
+  SYSTEM_ACTIVITIES_CPU_TIME_NS("nanoseconds", false, "Query cost (system activities cpu time) "
+      + "for query processing on server. Computed as the time spent in processing query on the servers "
+      + "(only counts system acitivities such as GC, OS paging etc.)"),
 
-  // Query cost (response serialization cpu time) for query processing on server
-  RESPONSE_SER_CPU_TIME_NS("nanoseconds", false),
+  RESPONSE_SER_CPU_TIME_NS("nanoseconds", false, "Query cost (response serialization cpu time) "
+      + "for query processing on server. Computed as the time spent in serializing query response on servers"),
 
-  // Total query cost (thread cpu time + system activities cpu time + response serialization cpu time) for query
-  // processing on server
-  TOTAL_CPU_TIME_NS("nanoseconds", false);
+  TOTAL_CPU_TIME_NS("nanoseconds", false, "Total query cost (thread cpu time + system "
+      + "activities cpu time + response serialization cpu time) for query processing on server.");
 
   private final String _timerName;
   private final boolean _global;
@@ -77,5 +80,12 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   @Override
   public String getDescription() {
     return _description;
+  }
+
+  public static void main(String[] args) {
+    // Demo
+    Arrays.stream(ServerTimer.values()).forEach(m -> {
+      System.out.println(m.getTimerName() + "\t" +  m.getDescription() + "\t" + "Timer");
+    });
   }
 }
