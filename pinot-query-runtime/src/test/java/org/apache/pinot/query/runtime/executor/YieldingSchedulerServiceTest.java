@@ -41,7 +41,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.clearInvocations;
 
 
-public class OpChainSchedulerServiceTest {
+public class YieldingSchedulerServiceTest {
 
   private ExecutorService _executor;
   private AutoCloseable _mocks;
