@@ -18,24 +18,10 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
+class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManager {
 
-
-public interface PartitionDedupMetadataManager {
-  /**
-   * Initializes the dedup metadata for the given immutable segment.
-   */
-  public void addSegment(IndexSegment segment);
-
-  /**
-   * Removes the dedup metadata for the given segment.
-   */
-  public void removeSegment(IndexSegment segment);
-
-  /**
-   * Add the primary key to the given segment to the dedup matadata if it was absent.
-   * Returns true if the key was already present.
-   */
-  boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment);
+  protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
+    return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, partitionId,
+        _serverMetrics, _hashFunction);
+  }
 }
