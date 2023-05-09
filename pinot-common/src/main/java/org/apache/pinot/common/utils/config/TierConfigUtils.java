@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -69,30 +68,29 @@ public final class TierConfigUtils {
   }
 
   /**
-   * Compute default instance partitions for every configured tier
+   * Consider configured tiers and compute default instance partitions for the segment
    *
-   * @return a map with tier names as keys, and default instance partitions as values
+   * @return InstancePartitions if the one can be derived from the given sorted tiers, null otherwise
    */
-  public static Map<String, InstancePartitions> getTierToInstancePartitionsMap(String tableNameWithType,
-      @Nullable List<Tier> sortedTiers, HelixManager helixManager) {
-    if (sortedTiers == null) {
+  @Nullable
+  public static InstancePartitions getTieredInstancePartitionsForSegment(String tableNameWithType,
+      @Nullable List<Tier> sortedTiers, String segmentName, HelixManager helixManager) {
+    if (CollectionUtils.isEmpty(sortedTiers)) {
       return null;
     }
 
-    Map<String, InstancePartitions> tierToInstancePartitionsMap = new HashMap<>();
+    // Find first applicable tier
     for (Tier tier : sortedTiers) {
-      LOGGER.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
-          tableNameWithType);
-
-      final PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-      final InstancePartitions tierInstancePartitions =
-          InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableNameWithType,
-              tier.getName(), storage.getServerTag());
-
-      tierToInstancePartitionsMap.put(tier.getName(), tierInstancePartitions);
+      if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentName)) {
+        // Compute default instance partitions
+        PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
+        return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableNameWithType,
+            tier.getName(), storage.getServerTag());
+      }
     }
 
-    return tierToInstancePartitionsMap;
+    // Tier not found
+    return null;
   }
 
   public static String getDataDirForTier(TableConfig tableConfig, String tierName,

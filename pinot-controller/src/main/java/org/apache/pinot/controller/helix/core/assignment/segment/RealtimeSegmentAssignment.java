@@ -105,14 +105,6 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     return instancesAssigned;
   }
 
-  @Override
-  public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> unusedSortedTiers,
-      @Nullable Map<String, InstancePartitions> unusedTierInstancePartitionsMap) {
-    _logger.warn("Tiered assignment of CONSUMING segments is not supported, switching to default assignment");
-    return assignSegment(segmentName, currentAssignment, instancePartitionsMap);
-  }
-
   /**
    * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
    */

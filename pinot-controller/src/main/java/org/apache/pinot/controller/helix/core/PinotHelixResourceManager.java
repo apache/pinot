@@ -2272,27 +2272,29 @@ public class PinotHelixResourceManager {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
 
-      List<Tier> sortedTiers = null;
-      Map<String, InstancePartitions> tierToInstancePartitionsMap = null;
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+          fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
 
       // Initialize tier information only in case direct tier assignment is configured
       if (_enableTieredSegmentAssignment && CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
-        sortedTiers = TierConfigUtils.getSortedTiersForStorageType(tableConfig.getTierConfigsList(),
+        List<Tier> sortedTiers = TierConfigUtils.getSortedTiersForStorageType(tableConfig.getTierConfigsList(),
             TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
-        tierToInstancePartitionsMap =
-            TierConfigUtils.getTierToInstancePartitionsMap(tableNameWithType, sortedTiers, _helixZkManager);
 
         // Update segment tier to support direct assignment for multiple data directories
         updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+
+        InstancePartitions tierInstancePartitions =
+            TierConfigUtils.getTieredInstancePartitionsForSegment(tableNameWithType, sortedTiers, segmentName,
+                _helixZkManager);
+        if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+          // Override instance partitions for offline table
+          instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, tierInstancePartitions);
+        }
       }
 
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-          fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       synchronized (getTableUpdaterLock(tableNameWithType)) {
-        final List<Tier> finalSortedTiers = sortedTiers;
-        final Map<String, InstancePartitions> finalTierToInstancePartitionsMap = tierToInstancePartitionsMap;
-
+        Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
           assert idealState != null;
           Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -2301,8 +2303,8 @@ public class PinotHelixResourceManager {
                 tableNameWithType);
           } else {
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap,
-                    finalSortedTiers, finalTierToInstancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, currentAssignment,
+                    finalInstancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
