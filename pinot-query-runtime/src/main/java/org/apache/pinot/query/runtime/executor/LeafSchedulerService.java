@@ -80,8 +80,8 @@ public class LeafSchedulerService {
   }
 
   public void cancel(long requestId) {
-    // simple cancellation. if there's dangling opChain we will use a cache to clean it up.
-    // TODO: make sure this is thread-safe.
+    // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
+    // via query timeout.
     List<OpChainId> opChainIdsToCancel = _submittedOpChainMap.keySet()
         .stream().filter(opChainId -> opChainId.getRequestId() == requestId).collect(Collectors.toList());
     for (OpChainId opChainId : opChainIdsToCancel) {
