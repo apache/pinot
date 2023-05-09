@@ -481,12 +481,10 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.info("No moving needed for segment on peer servers: {}", segmentLocation);
       return;
     }
-    URI segmentFileURI = URIUtils.getUri(segmentLocation);
-    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
-    URI uriToMoveTo = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
-    PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
-    Preconditions.checkState(pinotFS.move(segmentFileURI, uriToMoveTo, true),
-        "Failed to move segment file for segment: %s from: %s to: %s", segmentName, segmentLocation, uriToMoveTo);
+
+    URI tableDirURI = getTableDirURI(rawTableName);
+    PinotFS pinotFS = createPinotFS(rawTableName);
+    URI uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
     // Cleans up tmp segment files under table dir.
     // We only clean up tmp segment files in table level dir, so there's no need to list recursively.
@@ -1392,6 +1390,7 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
 
     // Use this retention value to avoid the data racing between segment upload and retention management.
     RetentionStrategy retentionStrategy = null;
@@ -1403,6 +1402,8 @@ public class PinotLLCRealtimeSegmentManager {
       retentionStrategy = new TimeRetentionStrategy(TimeUnit.MILLISECONDS,
           retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
     }
+
+    PinotFS pinotFS = createPinotFS(rawTableName);
 
     // Iterate through LLC segments and upload missing deep store copy by following steps:
     //  1. Ask servers which have online segment replica to upload to deep store.
@@ -1440,7 +1441,9 @@ public class PinotLLCRealtimeSegmentManager {
         String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
         LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
             serverUploadRequestUrl);
-        String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
+        String tempSegmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
+        String segmentDownloadUrl =
+            moveSegmentFile(rawTableName, segmentName, tempSegmentDownloadUrl, pinotFS).toString();
         LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
         // Update segment ZK metadata by adding the download URL
         segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
@@ -1554,5 +1557,24 @@ public class PinotLLCRealtimeSegmentManager {
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     Set<String> consumingSegments = findConsumingSegments(idealState);
     return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null);
+  }
+
+  private URI moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
+      throws IOException {
+    URI segmentFileURI = URIUtils.getUri(segmentLocation);
+    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
+    URI uriToMoveTo = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+    Preconditions.checkState(pinotFS.move(segmentFileURI, uriToMoveTo, true),
+        "Failed to move segment file for segment: %s from: %s to: %s", segmentName, segmentLocation, uriToMoveTo);
+    return uriToMoveTo;
+  }
+
+  private PinotFS createPinotFS(String rawTableName) {
+    URI tableDirURI = getTableDirURI(rawTableName);
+    return PinotFSFactory.create(tableDirURI.getScheme());
+  }
+
+  private URI getTableDirURI(String rawTableName) {
+    return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
   }
 }
