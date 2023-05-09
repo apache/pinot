@@ -19,18 +19,23 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.ingestion.dedup.LocalKeyValueStore;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -39,46 +44,73 @@ public class PartitionDedupMetadataManager {
   private final List<String> _primaryKeyColumns;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
-
-  @VisibleForTesting
-  final ConcurrentHashMap<Object, IndexSegment> _primaryKeyToSegmentMap = new ConcurrentHashMap<>();
+  private final DedupConfig _dedupConfig;
+  @VisibleForTesting final LocalKeyValueStore _keyValueStore;
 
   public PartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,
-      ServerMetrics serverMetrics, HashFunction hashFunction) {
+      ServerMetrics serverMetrics, DedupConfig dedupConfig) {
     _tableNameWithType = tableNameWithType;
     _primaryKeyColumns = primaryKeyColumns;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
+    _dedupConfig = dedupConfig;
+    try {
+      byte[] id = (tableNameWithType + "@" + partitionId).getBytes();
+      _keyValueStore = StringUtils.isEmpty(dedupConfig.getKeyStore())
+              ? new ConcurrentHashMapKeyValueStore(id)
+              : PluginManager.get().createInstance(
+                      dedupConfig.getKeyStore(),
+                      new Class[]{byte[].class},
+                      new Object[]{id}
+              );
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void addSegment(IndexSegment segment) {
-    // Add all PKs to _primaryKeyToSegmentMap
     Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
+    byte[] serializedSegment = serializeSegment(segment);
+    List<Pair<byte[], byte[]>> keyValues = new ArrayList<>();
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.put(HashUtils.hashPrimaryKey(pk, _hashFunction), segment);
+      byte[] serializedPrimaryKey = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _dedupConfig.getHashFunction()));
+      keyValues.add(Pair.of(serializedPrimaryKey, serializedSegment));
     }
+    _keyValueStore.putBatch(keyValues);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentMap.size());
+        _keyValueStore.getKeyCount());
+  }
+
+  @VisibleForTesting
+  static byte[] serializeSegment(IndexSegment segment) {
+    return segment.getSegmentName().getBytes();
+  }
+
+  @VisibleForTesting
+  static byte[] serializePrimaryKey(Object pk) {
+    if (pk instanceof PrimaryKey) {
+      return ((PrimaryKey) pk).asBytes();
+    }
+    if (pk instanceof ByteArray) {
+      return ((ByteArray) pk).getBytes();
+    }
+    throw new RuntimeException("Invalid primary key: " + pk);
   }
 
   public void removeSegment(IndexSegment segment) {
     // TODO(saurabh): Explain reload scenario here
     Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
+    byte[] segmentBytes = serializeSegment(segment);
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.compute(HashUtils.hashPrimaryKey(pk, _hashFunction), (primaryKey, currentSegment) -> {
-        if (currentSegment == segment) {
-          return null;
-        } else {
-          return currentSegment;
-        }
-      });
+      byte[] pkBytes = serializePrimaryKey(pk);
+      if (Objects.deepEquals(_keyValueStore.get(pkBytes), segmentBytes)) {
+        _keyValueStore.delete(pkBytes);
+      }
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentMap.size());
+        _keyValueStore.getKeyCount());
   }
 
   @VisibleForTesting
@@ -114,12 +146,13 @@ public class PartitionDedupMetadataManager {
   }
 
   public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    boolean present =
-        _primaryKeyToSegmentMap.putIfAbsent(HashUtils.hashPrimaryKey(pk, _hashFunction), indexSegment) != null;
-    if (!present) {
+    byte[] keyBytes = serializePrimaryKey(HashUtils.hashPrimaryKey(pk, _dedupConfig.getHashFunction()));
+    if (Objects.isNull(_keyValueStore.get(keyBytes))) {
+        _keyValueStore.put(keyBytes, serializeSegment(indexSegment));
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-          _primaryKeyToSegmentMap.size());
+          _keyValueStore.getKeyCount());
+      return false;
     }
-    return present;
+    return true;
   }
 }

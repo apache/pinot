@@ -229,6 +229,16 @@
       </destName>
     </file>
     <!-- End Include Pinot Segment Uploader Plugins-->
+    <!-- Start Include Pinot Dedup Plugins-->
+    <file>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-dedup-rocksdb/target/pinot-dedup-rocksdb-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins/pinot-stream-ingestion/pinot-dedup-rocksdb/pinot-dedup-rocksdb-${project.version}.jar
+      </destName>
+    </file>
+    <!-- End Include Pinot Segment Uploader Plugins-->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
