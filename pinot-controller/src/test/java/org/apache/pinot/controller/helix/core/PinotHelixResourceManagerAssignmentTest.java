@@ -47,7 +47,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-@Test(groups = "assignment")
+@Test(groups = "stateless")
 public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
   private static final int NUM_BROKER_INSTANCES = 3;
   private static final int NUM_OFFLINE_SERVER_INSTANCES = 2;
