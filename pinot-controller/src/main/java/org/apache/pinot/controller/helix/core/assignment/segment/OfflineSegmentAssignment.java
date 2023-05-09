@@ -32,20 +32,16 @@ import org.apache.pinot.controller.helix.core.assignment.segment.strategy.Segmen
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Segment assignment for offline table.
  */
 public class OfflineSegmentAssignment extends BaseSegmentAssignment {
-  private final Logger _logger = LoggerFactory.getLogger(getClass());
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    // Fallback to default assignment
     InstancePartitions instancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
     Preconditions.checkState(instancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
         _tableNameWithType);
