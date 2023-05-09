@@ -600,6 +600,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
         DataType dataType = fieldSpec.getDataType();
         value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
+        // aggregator value has to be numeric, but can be a different type of Number from the one expected on the column
+        // therefore we need to do some value changes here.
+        // TODO: Precision may change from one value to other, so we may need to study if this is actually what we want
+        //  to do
         switch (dataType.getStoredType()) {
           case INT:
             forwardIndex.add(((Number) value).intValue(), -1, docId);
