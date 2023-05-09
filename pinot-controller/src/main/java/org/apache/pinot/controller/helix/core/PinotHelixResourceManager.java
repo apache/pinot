@@ -2284,10 +2284,12 @@ public class PinotHelixResourceManager {
         updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
 
         InstancePartitions tierInstancePartitions =
-            TierConfigUtils.getTieredInstancePartitionsForSegment(tableNameWithType, sortedTiers, segmentName,
+            TierConfigUtils.getTieredInstancePartitionsForSegment(tableNameWithType, segmentName, sortedTiers,
                 _helixZkManager);
         if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
           // Override instance partitions for offline table
+          LOGGER.info("Overriding with tiered instance partitions: {} for segment: {} of table: {}",
+              tierInstancePartitions, segmentName, tableNameWithType);
           instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, tierInstancePartitions);
         }
       }

@@ -74,7 +74,7 @@ public final class TierConfigUtils {
    */
   @Nullable
   public static InstancePartitions getTieredInstancePartitionsForSegment(String tableNameWithType,
-      @Nullable List<Tier> sortedTiers, String segmentName, HelixManager helixManager) {
+      String segmentName, @Nullable List<Tier> sortedTiers, HelixManager helixManager) {
     if (CollectionUtils.isEmpty(sortedTiers)) {
       return null;
     }
