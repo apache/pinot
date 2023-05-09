@@ -3248,5 +3248,21 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(rightSubquery,
         CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
+
+    query = "SELECT T1.a FROM T1 JOIN(SELECT key FROM T2) as self ON T1.key=self.key";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    dataSource = pinotQuery.getDataSource();
+    Assert.assertNull(dataSource.getTableName());
+    Assert.assertNull(dataSource.getSubquery());
+    Assert.assertNotNull(dataSource.getJoin());
+    join = dataSource.getJoin();
+    Assert.assertEquals(join.getType(), JoinType.INNER);
+    Assert.assertEquals(join.getLeft().getTableName(), "T1");
+    right = join.getRight();
+    Assert.assertEquals(right.getTableName(), "self");
+    rightSubquery = right.getSubquery();
+    Assert.assertEquals(rightSubquery,
+        CalciteSqlParser.compileToPinotQuery("SELECT key FROM T2"));
+    Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
   }
 }
