@@ -33,7 +33,7 @@ public class QueryRewriterFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRewriterFactory.class);
 
-  static final List<String> DEFAULT_QUERY_REWRITERS_CLASS_NAMES =
+  public static final List<String> DEFAULT_QUERY_REWRITERS_CLASS_NAMES =
       ImmutableList.of(CompileTimeFunctionsInvoker.class.getName(), SelectionsRewriter.class.getName(),
           PredicateComparisonRewriter.class.getName(), OrdinalsUpdater.class.getName(),
           AliasApplier.class.getName(), NonAggregationGroupByToDistinctQueryRewriter.class.getName());
