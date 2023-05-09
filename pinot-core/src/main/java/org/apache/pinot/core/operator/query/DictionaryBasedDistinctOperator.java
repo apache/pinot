@@ -99,16 +99,16 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       records = new ArrayList<>(actualLimit);
 
       _numDocsScanned = actualLimit;
-      iterateOnDictionary(dictLength, actualLimit, records, true);
+      iterateOnDictionary(dictLength, actualLimit, records);
     } else {
       if (_dictionary.isSorted()) {
         records = new ArrayList<>(actualLimit);
         if (_isAscending) {
           _numDocsScanned = actualLimit;
-          iterateOnDictionary(dictLength, actualLimit, records, true);
+          iterateOnDictionary(dictLength, actualLimit, records);
         } else {
           _numDocsScanned = actualLimit;
-          iterateOnDictionary(dictLength, actualLimit, records, false);
+          iterateOnDictionaryDesc(dictLength, actualLimit, records);
         }
       } else {
         // DictionaryBasedDistinctOperator cannot handle nulls.
@@ -128,17 +128,17 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 
-  private void iterateOnDictionary(int dictLength, int actualLimit, List<Record> records, boolean isAscending) {
-    if (isAscending) {
-      for (int i = 0; i < actualLimit; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
-        records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
-      }
-    } else {
-      for (int i = dictLength - 1, j = 0; i >= (dictLength - actualLimit); i--, j++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(j);
-        records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
-      }
+  private void iterateOnDictionary(int dictLength, int actualLimit, List<Record> records) {
+    for (int i = 0; i < actualLimit; i++) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+      records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+    }
+  }
+
+  private void iterateOnDictionaryDesc(int dictLength, int actualLimit, List<Record> records) {
+    for (int i = dictLength - 1, j = 0; i >= (dictLength - actualLimit); i--, j++) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(j);
+      records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
     }
   }
 
