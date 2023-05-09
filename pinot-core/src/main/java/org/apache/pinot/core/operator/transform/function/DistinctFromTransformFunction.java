@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -43,16 +40,6 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   // Result value to save when two values are not distinct.
   // 0 for isDistinct, 1 for isNotDistinct
   private final int _notDistinctResult;
-
-  /**
-   * Returns a bit map of corresponding column.
-   * Returns null by default if null option is disabled.
-   */
-  @Nullable
-  private static RoaringBitmap getNullBitMap(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
-    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    return projectionBlock.getBlockValueSet(columnName).getNullBitmap();
-  }
 
   /**
    * Returns true when bitmap is null (null option is disabled) or bitmap is empty.
@@ -79,24 +66,15 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    super.init(arguments, dataSourceMap);
-    if (!(_leftTransformFunction instanceof IdentifierTransformFunction)
-        || !(_rightTransformFunction instanceof IdentifierTransformFunction)) {
-      throw new IllegalArgumentException("Only column names are supported in DistinctFrom transformation.");
-    }
-  }
-
-  @Override
   public TransformResultMetadata getResultMetadata() {
     return BOOLEAN_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    _intValuesSV = super.transformToIntValuesSV(projectionBlock);
-    RoaringBitmap leftNull = getNullBitMap(projectionBlock, _leftTransformFunction);
-    RoaringBitmap rightNull = getNullBitMap(projectionBlock, _rightTransformFunction);
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    _intValuesSV = super.transformToIntValuesSV(valueBlock);
+    RoaringBitmap leftNull = _leftTransformFunction.getNullBitmap(valueBlock);
+    RoaringBitmap rightNull = _rightTransformFunction.getNullBitmap(valueBlock);
     // Both sides are not null.
     if (isEmpty(leftNull) && isEmpty(rightNull)) {
       return _intValuesSV;
@@ -120,5 +98,11 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
     // For rows that are both null, mark them as not distinct.
     andNull.forEach((IntConsumer) i -> _intValuesSV[i] = _notDistinctResult);
     return _intValuesSV;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return null;
   }
 }

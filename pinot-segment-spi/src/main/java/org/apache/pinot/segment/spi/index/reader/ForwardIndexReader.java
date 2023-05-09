@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
@@ -31,7 +31,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
  *
  * @param <T> Type of the ReaderContext
  */
-public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends Closeable {
+public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends IndexReader {
 
   /**
    * Returns {@code true} if the forward index is dictionary-encoded, {@code false} if it is raw.

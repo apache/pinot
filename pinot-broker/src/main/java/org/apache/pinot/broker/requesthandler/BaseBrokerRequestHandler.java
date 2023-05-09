@@ -57,6 +57,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -250,7 +251,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     String query = sql.asText();
     requestContext.setQuery(query);
-    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
+    BrokerResponse brokerResponse = handleRequest(requestId, query, sqlNodeAndOptions, request,
+            requesterIdentity, requestContext);
+
+    if (request.has(Broker.Request.QUERY_OPTIONS)) {
+      String queryOptions = request.get(Broker.Request.QUERY_OPTIONS).asText();
+      Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
+      if (QueryOptionsUtils.shouldDropResults(optionsFromString)) {
+        brokerResponse.setResultTable(null);
+      }
+    }
+
+    return brokerResponse;
   }
 
   private BrokerResponseNative handleRequest(long requestId, String query,
@@ -294,11 +306,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
-      if (serverPinotQuery.getDataSource() == null) {
+      DataSource dataSource = serverPinotQuery.getDataSource();
+      if (dataSource == null) {
         LOGGER.info("Data source (FROM clause) not found in request {}: {}", request, query);
         requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
         return new BrokerResponseNative(
             QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Data source (FROM clause) not found"));
+      }
+      if (dataSource.getJoin() != null) {
+        LOGGER.info("JOIN is not supported in request {}: {}", request, query);
+        requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+        return new BrokerResponseNative(
+            QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "JOIN is not supported"));
+      }
+      if (dataSource.getTableName() == null) {
+        LOGGER.info("Table name not found in request {}: {}", request, query);
+        requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+        return new BrokerResponseNative(
+            QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Table name not found"));
       }
 
       try {
@@ -310,8 +335,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
 
-      String tableName = getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache);
-      serverPinotQuery.getDataSource().setTableName(tableName);
+      String tableName = getActualTableName(dataSource.getTableName(), _tableCache);
+      dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
 
@@ -514,18 +539,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-        if (pinotQuery.isExplain()) {
-          // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
-          return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
-        }
-
-        // Send empty response since we don't need to evaluate either offline or realtime request.
-        BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-        // Extract source info from incoming request
-        _queryLogger.log(
-            new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, 0, new ServerStats(),
-                brokerResponse, System.nanoTime(), requesterIdentity));
-        return brokerResponse;
+        return getEmptyBrokerOnlyResponse(requestId, query, requesterIdentity, requestContext, pinotQuery, tableName);
       }
 
       if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -593,9 +607,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-        LOGGER.info("No server found for request {}: {}", requestId, query);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
-        return new BrokerResponseNative(exceptions);
+        if (!exceptions.isEmpty()) {
+          LOGGER.info("No server found for request {}: {}", requestId, query);
+          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
+          return new BrokerResponseNative(exceptions);
+        } else {
+          // When all segments have been pruned, we can just return an empty response.
+          return getEmptyBrokerOnlyResponse(requestId, query, requesterIdentity, requestContext, pinotQuery,
+              tableName);
+        }
       }
       long routingEndTimeNs = System.nanoTime();
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING,
@@ -701,6 +721,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  private BrokerResponseNative getEmptyBrokerOnlyResponse(long requestId, String query,
+      RequesterIdentity requesterIdentity, RequestContext requestContext, PinotQuery pinotQuery, String tableName) {
+    if (pinotQuery.isExplain()) {
+      // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+      return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+    }
+
+    // Send empty response since we don't need to evaluate either offline or realtime request.
+    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    // Extract source info from incoming request
+    _queryLogger.log(new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, 0, new ServerStats(),
+        brokerResponse, System.nanoTime(), requesterIdentity));
+    return brokerResponse;
   }
 
   private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
@@ -1335,6 +1370,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       case BINARY_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
+        break;
+      case NULL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
+        row.add(null);
         break;
       default:
         break;

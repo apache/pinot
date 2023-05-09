@@ -74,7 +74,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
@@ -158,6 +157,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/tasktypes")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all task types")
   public Set<String> listTaskTypes() {
     return _pinotHelixTaskResourceManager.getTaskTypes();
@@ -166,6 +166,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/taskqueues")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all task queues (deprecated)")
   public Set<String> getTaskQueues() {
     return _pinotHelixTaskResourceManager.getTaskQueues();
@@ -173,6 +174,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/state")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the state (task queue state) for the given task type")
   public TaskState getTaskQueueState(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -182,6 +184,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/taskqueuestate/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the state (task queue state) for the given task type (deprecated)")
   public StringResultResponse getTaskQueueStateDeprecated(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -190,6 +193,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/tasks")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type")
   public Set<String> getTasks(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
     return _pinotHelixTaskResourceManager.getTasks(taskType);
@@ -197,6 +201,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/{tableNameWithType}/state")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type")
   public Map<String, TaskState> getTaskStatesByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
@@ -207,6 +212,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/{tableNameWithType}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get task metadata for the given task type and table")
   public String getTaskMetadataByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
@@ -214,8 +220,6 @@ public class PinotTaskRestletResource {
           String tableNameWithType) {
     try {
       return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
-    } catch (NoTaskMetadataException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     } catch (JsonProcessingException e) {
       throw new ControllerApplicationException(LOGGER, String
           .format("Failed to format task metadata into Json for task type: %s from table: %s", taskType,
@@ -225,6 +229,7 @@ public class PinotTaskRestletResource {
 
   @DELETE
   @Path("/tasks/{taskType}/{tableNameWithType}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Delete task metadata for the given task type and table")
   public SuccessResponse deleteTaskMetadataByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
@@ -237,6 +242,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/taskcounts")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch count of sub-tasks for each of the tasks for the given task type")
   public Map<String, PinotHelixTaskResourceManager.TaskCount> getTaskCounts(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -245,6 +251,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/debug")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch information for all the tasks for the given task type")
   public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
@@ -257,6 +264,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/{tableNameWithType}/debug")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch information for all the tasks for the given task type and table")
   public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
@@ -325,6 +333,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/task/{taskName}/debug")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch information for the given task name")
   public PinotHelixTaskResourceManager.TaskDebugInfo getTaskDebugInfo(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
@@ -338,6 +347,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/tasks/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type (deprecated)")
   public Set<String> getTasksDeprecated(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -346,6 +356,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/{taskType}/taskstates")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get a map from task to task state for the given task type")
   public Map<String, TaskState> getTaskStates(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -355,6 +366,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/taskstates/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get a map from task to task state for the given task type (deprecated)")
   public Map<String, TaskState> getTaskStatesDeprecated(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
@@ -363,6 +375,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/task/{taskName}/state")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task state for the given task")
   public TaskState getTaskState(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
@@ -372,6 +385,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/taskstate/{taskName}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task state for the given task (deprecated)")
   public StringResultResponse getTaskStateDeprecated(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
@@ -380,6 +394,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/subtask/{taskName}/state")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the states of all the sub tasks for the given task")
   public Map<String, TaskPartitionState> getSubtaskStates(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
@@ -388,6 +403,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/task/{taskName}/config")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task config (a list of child task configs) for the given task")
   public List<PinotTaskConfig> getTaskConfigs(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
@@ -396,6 +412,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/task/{taskName}/runtime/config")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task runtime config for the given task")
   public Map<String, String> getTaskConfig(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
@@ -405,6 +422,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @GET
   @Path("/tasks/taskconfig/{taskName}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task config (a list of child task configs) for the given task (deprecated)")
   public List<PinotTaskConfig> getTaskConfigsDeprecated(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
@@ -413,6 +431,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/subtask/{taskName}/config")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the configs of specified sub tasks for the given task")
   public Map<String, PinotTaskConfig> getSubtaskConfigs(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
@@ -501,6 +520,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/scheduler/information")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch cron scheduler information")
   public Map<String, Object> getCronSchedulerInformation()
       throws SchedulerException {
@@ -538,6 +558,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/scheduler/jobKeys")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch cron scheduler job keys")
   public List<JobKey> getCronSchedulerJobKeys()
       throws SchedulerException {
@@ -554,6 +575,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/scheduler/jobDetails")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch cron scheduler job keys")
   public Map<String, Object> getCronSchedulerJobDetails(
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
@@ -610,6 +632,7 @@ public class PinotTaskRestletResource {
 
   @POST
   @Path("/tasks/schedule")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
@@ -658,6 +681,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @PUT
   @Path("/tasks/scheduletasks")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks (deprecated)")
   public Map<String, String> scheduleTasksDeprecated() {
@@ -666,6 +690,7 @@ public class PinotTaskRestletResource {
 
   @PUT
   @Path("/tasks/{taskType}/cleanup")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type")
   public SuccessResponse cleanUpTasks(
@@ -677,6 +702,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @PUT
   @Path("/tasks/cleanuptasks/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type (deprecated)")
   public SuccessResponse cleanUpTasksDeprecated(
@@ -687,6 +713,7 @@ public class PinotTaskRestletResource {
 
   @PUT
   @Path("/tasks/{taskType}/stop")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Stop all running/pending tasks (as well as the task queue) for the given task type")
   public SuccessResponse stopTasks(
@@ -697,6 +724,7 @@ public class PinotTaskRestletResource {
 
   @PUT
   @Path("/tasks/{taskType}/resume")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Resume all stopped tasks (as well as the task queue) for the given task type")
   public SuccessResponse resumeTasks(
@@ -708,6 +736,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @PUT
   @Path("/tasks/taskqueue/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Stop/resume a task queue (deprecated)")
   public SuccessResponse toggleTaskQueueState(
@@ -727,6 +756,7 @@ public class PinotTaskRestletResource {
 
   @DELETE
   @Path("/tasks/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.DELETE)
   @ApiOperation("Delete all tasks (as well as the task queue) for the given task type")
   public SuccessResponse deleteTasks(
@@ -739,6 +769,7 @@ public class PinotTaskRestletResource {
 
   @DELETE
   @Path("/tasks/task/{taskName}")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.DELETE)
   @ApiOperation("Delete a single task given its task name")
   public SuccessResponse deleteTask(
@@ -752,6 +783,7 @@ public class PinotTaskRestletResource {
   @Deprecated
   @DELETE
   @Path("/tasks/taskqueue/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.DELETE)
   @ApiOperation("Delete a task queue (deprecated)")
   public SuccessResponse deleteTaskQueue(

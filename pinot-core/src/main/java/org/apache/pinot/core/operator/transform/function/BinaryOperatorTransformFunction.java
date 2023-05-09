@@ -23,9 +23,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -82,7 +82,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are exact 2 arguments
     Preconditions.checkArgument(arguments.size() == 2,
         "Exact 2 arguments are required for binary operator transform function");
@@ -105,37 +106,38 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    fillResultArray(projectionBlock);
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    fillResultArray(valueBlock);
     return _intValuesSV;
   }
 
-  private void fillResultArray(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+  private void fillResultArray(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initIntValuesSV(length);
     switch (_leftStoredType) {
       case INT:
-        fillResultInt(projectionBlock, length);
+        fillResultInt(valueBlock, length);
         break;
       case LONG:
-        fillResultLong(projectionBlock, length);
+        fillResultLong(valueBlock, length);
         break;
       case FLOAT:
-        fillResultFloat(projectionBlock, length);
+        fillResultFloat(valueBlock, length);
         break;
       case DOUBLE:
-        fillResultDouble(projectionBlock, length);
+        fillResultDouble(valueBlock, length);
         break;
       case BIG_DECIMAL:
-        fillResultBigDecimal(projectionBlock, length);
+        fillResultBigDecimal(valueBlock, length);
         break;
       case STRING:
-        fillResultString(projectionBlock, length);
+        fillResultString(valueBlock, length);
         break;
       case BYTES:
-        fillResultBytes(projectionBlock, length);
+        fillResultBytes(valueBlock, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       // NOTE: Multi-value columns are not comparable, so we should not reach here
       default:
@@ -143,130 +145,145 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  private void fillResultInt(ProjectionBlock projectionBlock, int length) {
-    int[] leftIntValues = _leftTransformFunction.transformToIntValuesSV(projectionBlock);
+  private void fillResultInt(ValueBlock valueBlock, int length) {
+    int[] leftIntValues = _leftTransformFunction.transformToIntValuesSV(valueBlock);
     switch (_rightStoredType) {
       case INT:
-        fillIntResultArray(projectionBlock, leftIntValues, length);
+        fillIntResultArray(valueBlock, leftIntValues, length);
         break;
       case LONG:
-        fillLongResultArray(projectionBlock, leftIntValues, length);
+        fillLongResultArray(valueBlock, leftIntValues, length);
         break;
       case FLOAT:
-        fillFloatResultArray(projectionBlock, leftIntValues, length);
+        fillFloatResultArray(valueBlock, leftIntValues, length);
         break;
       case DOUBLE:
-        fillDoubleResultArray(projectionBlock, leftIntValues, length);
+        fillDoubleResultArray(valueBlock, leftIntValues, length);
         break;
       case BIG_DECIMAL:
-        fillBigDecimalResultArray(projectionBlock, leftIntValues, length);
+        fillBigDecimalResultArray(valueBlock, leftIntValues, length);
         break;
       case STRING:
-        fillStringResultArray(projectionBlock, leftIntValues, length);
+        fillStringResultArray(valueBlock, leftIntValues, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       default:
         throw illegalState();
     }
   }
 
-  private void fillResultLong(ProjectionBlock projectionBlock, int length) {
-    long[] leftLongValues = _leftTransformFunction.transformToLongValuesSV(projectionBlock);
+  private void fillResultLong(ValueBlock valueBlock, int length) {
+    long[] leftLongValues = _leftTransformFunction.transformToLongValuesSV(valueBlock);
     switch (_rightStoredType) {
       case INT:
-        fillIntResultArray(projectionBlock, leftLongValues, length);
+        fillIntResultArray(valueBlock, leftLongValues, length);
         break;
       case LONG:
-        fillLongResultArray(projectionBlock, leftLongValues, length);
+        fillLongResultArray(valueBlock, leftLongValues, length);
         break;
       case FLOAT:
-        fillFloatResultArray(projectionBlock, leftLongValues, length);
+        fillFloatResultArray(valueBlock, leftLongValues, length);
         break;
       case DOUBLE:
-        fillDoubleResultArray(projectionBlock, leftLongValues, length);
+        fillDoubleResultArray(valueBlock, leftLongValues, length);
         break;
       case BIG_DECIMAL:
-        fillBigDecimalResultArray(projectionBlock, leftLongValues, length);
+        fillBigDecimalResultArray(valueBlock, leftLongValues, length);
         break;
       case STRING:
-        fillStringResultArray(projectionBlock, leftLongValues, length);
+        fillStringResultArray(valueBlock, leftLongValues, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       default:
         throw illegalState();
     }
   }
 
-  private void fillResultFloat(ProjectionBlock projectionBlock, int length) {
-    float[] leftFloatValues = _leftTransformFunction.transformToFloatValuesSV(projectionBlock);
+  private void fillResultFloat(ValueBlock valueBlock, int length) {
+    float[] leftFloatValues = _leftTransformFunction.transformToFloatValuesSV(valueBlock);
     switch (_rightStoredType) {
       case INT:
-        fillIntResultArray(projectionBlock, leftFloatValues, length);
+        fillIntResultArray(valueBlock, leftFloatValues, length);
         break;
       case LONG:
-        fillLongResultArray(projectionBlock, leftFloatValues, length);
+        fillLongResultArray(valueBlock, leftFloatValues, length);
         break;
       case FLOAT:
-        fillFloatResultArray(projectionBlock, leftFloatValues, length);
+        fillFloatResultArray(valueBlock, leftFloatValues, length);
         break;
       case DOUBLE:
-        fillDoubleResultArray(projectionBlock, leftFloatValues, length);
+        fillDoubleResultArray(valueBlock, leftFloatValues, length);
         break;
       case BIG_DECIMAL:
-        fillBigDecimalResultArray(projectionBlock, leftFloatValues, length);
+        fillBigDecimalResultArray(valueBlock, leftFloatValues, length);
         break;
       case STRING:
-        fillStringResultArray(projectionBlock, leftFloatValues, length);
+        fillStringResultArray(valueBlock, leftFloatValues, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       default:
         throw illegalState();
     }
   }
 
-  private void fillResultDouble(ProjectionBlock projectionBlock, int length) {
-    double[] leftDoubleValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
+  private void fillResultDouble(ValueBlock valueBlock, int length) {
+    double[] leftDoubleValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     switch (_rightStoredType) {
       case INT:
-        fillIntResultArray(projectionBlock, leftDoubleValues, length);
+        fillIntResultArray(valueBlock, leftDoubleValues, length);
         break;
       case LONG:
-        fillLongResultArray(projectionBlock, leftDoubleValues, length);
+        fillLongResultArray(valueBlock, leftDoubleValues, length);
         break;
       case FLOAT:
-        fillFloatResultArray(projectionBlock, leftDoubleValues, length);
+        fillFloatResultArray(valueBlock, leftDoubleValues, length);
         break;
       case DOUBLE:
-        fillDoubleResultArray(projectionBlock, leftDoubleValues, length);
+        fillDoubleResultArray(valueBlock, leftDoubleValues, length);
         break;
       case BIG_DECIMAL:
-        fillBigDecimalResultArray(projectionBlock, leftDoubleValues, length);
+        fillBigDecimalResultArray(valueBlock, leftDoubleValues, length);
         break;
       case STRING:
-        fillStringResultArray(projectionBlock, leftDoubleValues, length);
+        fillStringResultArray(valueBlock, leftDoubleValues, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       default:
         throw illegalState();
     }
   }
 
-  private void fillResultBigDecimal(ProjectionBlock projectionBlock, int length) {
-    BigDecimal[] leftBigDecimalValues = _leftTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+  private void fillResultBigDecimal(ValueBlock valueBlock, int length) {
+    BigDecimal[] leftBigDecimalValues = _leftTransformFunction.transformToBigDecimalValuesSV(valueBlock);
     switch (_rightStoredType) {
       case INT:
-        fillIntResultArray(projectionBlock, leftBigDecimalValues, length);
+        fillIntResultArray(valueBlock, leftBigDecimalValues, length);
         break;
       case LONG:
-        fillLongResultArray(projectionBlock, leftBigDecimalValues, length);
+        fillLongResultArray(valueBlock, leftBigDecimalValues, length);
         break;
       case FLOAT:
-        fillFloatResultArray(projectionBlock, leftBigDecimalValues, length);
+        fillFloatResultArray(valueBlock, leftBigDecimalValues, length);
         break;
       case DOUBLE:
-        fillDoubleResultArray(projectionBlock, leftBigDecimalValues, length);
+        fillDoubleResultArray(valueBlock, leftBigDecimalValues, length);
         break;
       case STRING:
-        fillStringResultArray(projectionBlock, leftBigDecimalValues, length);
+        fillStringResultArray(valueBlock, leftBigDecimalValues, length);
         break;
       case BIG_DECIMAL:
-        fillBigDecimalResultArray(projectionBlock, leftBigDecimalValues, length);
+        fillBigDecimalResultArray(valueBlock, leftBigDecimalValues, length);
+        break;
+      case UNKNOWN:
+        fillResultUnknown(length);
         break;
       default:
         throw illegalState();
@@ -280,59 +297,59 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         _rightTransformFunction.getName(), _rightStoredType));
   }
 
-  private void fillResultString(ProjectionBlock projectionBlock, int length) {
-    String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(projectionBlock);
-    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+  private void fillResultString(ValueBlock valueBlock, int length) {
+    String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(valueBlock);
+    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
     }
   }
 
-  private void fillResultBytes(ProjectionBlock projectionBlock, int length) {
-    byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(projectionBlock);
-    byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(projectionBlock);
+  private void fillResultBytes(ValueBlock valueBlock, int length) {
+    byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(valueBlock);
+    byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult((ByteArray.compare(leftBytesValues[i], rightBytesValues[i])));
     }
   }
 
-  private void fillIntResultArray(ProjectionBlock projectionBlock, int[] leftIntValues, int length) {
-    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+  private void fillIntResultArray(ValueBlock valueBlock, int[] leftIntValues, int length) {
+    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Integer.compare(leftIntValues[i], rightIntValues[i]));
     }
   }
 
-  private void fillLongResultArray(ProjectionBlock projectionBlock, int[] leftValues, int length) {
-    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
+  private void fillLongResultArray(ValueBlock valueBlock, int[] leftValues, int length) {
+    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Long.compare(leftValues[i], rightValues[i]));
     }
   }
 
-  private void fillFloatResultArray(ProjectionBlock projectionBlock, int[] leftValues, int length) {
-    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
+  private void fillFloatResultArray(ValueBlock valueBlock, int[] leftValues, int length) {
+    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightFloatValues[i]));
     }
   }
 
-  private void fillDoubleResultArray(ProjectionBlock projectionBlock, int[] leftValues, int length) {
-    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
+  private void fillDoubleResultArray(ValueBlock valueBlock, int[] leftValues, int length) {
+    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
     }
   }
 
-  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, int[] leftValues, int length) {
-    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+  private void fillBigDecimalResultArray(ValueBlock valueBlock, int[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
     }
   }
 
-  private void fillStringResultArray(ProjectionBlock projectionBlock, int[] leftValues, int length) {
-    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+  private void fillStringResultArray(ValueBlock valueBlock, int[] leftValues, int length) {
+    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       try {
         _intValuesSV[i] =
@@ -343,43 +360,43 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  private void fillIntResultArray(ProjectionBlock projectionBlock, long[] leftIntValues, int length) {
-    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+  private void fillIntResultArray(ValueBlock valueBlock, long[] leftIntValues, int length) {
+    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Long.compare(leftIntValues[i], rightIntValues[i]));
     }
   }
 
-  private void fillLongResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
-    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
+  private void fillLongResultArray(ValueBlock valueBlock, long[] leftValues, int length) {
+    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Long.compare(leftValues[i], rightValues[i]));
     }
   }
 
-  private void fillFloatResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
-    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
+  private void fillFloatResultArray(ValueBlock valueBlock, long[] leftValues, int length) {
+    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(compare(leftValues[i], rightFloatValues[i]));
     }
   }
 
-  private void fillDoubleResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
-    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
+  private void fillDoubleResultArray(ValueBlock valueBlock, long[] leftValues, int length) {
+    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(compare(leftValues[i], rightDoubleValues[i]));
     }
   }
 
-  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
-    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+  private void fillBigDecimalResultArray(ValueBlock valueBlock, long[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
     }
   }
 
-  private void fillStringResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
-    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+  private void fillStringResultArray(ValueBlock valueBlock, long[] leftValues, int length) {
+    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       try {
         _intValuesSV[i] =
@@ -390,43 +407,43 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  private void fillIntResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
-    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+  private void fillIntResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightIntValues[i]));
     }
   }
 
-  private void fillLongResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
-    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
+  private void fillLongResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(compare(leftValues[i], rightValues[i]));
     }
   }
 
-  private void fillFloatResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
-    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
+  private void fillFloatResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Float.compare(leftValues[i], rightFloatValues[i]));
     }
   }
 
-  private void fillDoubleResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
-    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
+  private void fillDoubleResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
     }
   }
 
-  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
-    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+  private void fillBigDecimalResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
     }
   }
 
-  private void fillStringResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
-    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+  private void fillStringResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       try {
         _intValuesSV[i] =
@@ -437,43 +454,43 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  private void fillIntResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
-    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+  private void fillIntResultArray(ValueBlock valueBlock, double[] leftValues, int length) {
+    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightIntValues[i]));
     }
   }
 
-  private void fillLongResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
-    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
+  private void fillLongResultArray(ValueBlock valueBlock, double[] leftValues, int length) {
+    long[] rightValues = _rightTransformFunction.transformToLongValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(compare(leftValues[i], rightValues[i]));
     }
   }
 
-  private void fillFloatResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
-    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
+  private void fillFloatResultArray(ValueBlock valueBlock, double[] leftValues, int length) {
+    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightFloatValues[i]));
     }
   }
 
-  private void fillDoubleResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
-    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
+  private void fillDoubleResultArray(ValueBlock valueBlock, double[] leftValues, int length) {
+    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
     }
   }
 
-  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
-    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+  private void fillBigDecimalResultArray(ValueBlock valueBlock, double[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
     }
   }
 
-  private void fillStringResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
-    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+  private void fillStringResultArray(ValueBlock valueBlock, double[] leftValues, int length) {
+    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       try {
         _intValuesSV[i] =
@@ -484,43 +501,43 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  private void fillIntResultArray(ProjectionBlock projectionBlock, BigDecimal[] leftValues, int length) {
-    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+  private void fillIntResultArray(ValueBlock valueBlock, BigDecimal[] leftValues, int length) {
+    int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftValues[i].compareTo(BigDecimal.valueOf(rightIntValues[i])));
     }
   }
 
-  private void fillLongResultArray(ProjectionBlock projectionBlock, BigDecimal[] leftValues, int length) {
-    long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
+  private void fillLongResultArray(ValueBlock valueBlock, BigDecimal[] leftValues, int length) {
+    long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftValues[i].compareTo(BigDecimal.valueOf(rightLongValues[i])));
     }
   }
 
-  private void fillFloatResultArray(ProjectionBlock projectionBlock, BigDecimal[] leftValues, int length) {
-    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
+  private void fillFloatResultArray(ValueBlock valueBlock, BigDecimal[] leftValues, int length) {
+    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftValues[i].compareTo(BigDecimal.valueOf(rightFloatValues[i])));
     }
   }
 
-  private void fillDoubleResultArray(ProjectionBlock projectionBlock, BigDecimal[] leftValues, int length) {
-    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
+  private void fillDoubleResultArray(ValueBlock valueBlock, BigDecimal[] leftValues, int length) {
+    double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftValues[i].compareTo(BigDecimal.valueOf(rightDoubleValues[i])));
     }
   }
 
-  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, BigDecimal[] leftValues, int length) {
-    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+  private void fillBigDecimalResultArray(ValueBlock valueBlock, BigDecimal[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftValues[i].compareTo(rightBigDecimalValues[i]));
     }
   }
 
-  private void fillStringResultArray(ProjectionBlock projectionBlock, BigDecimal[] leftValues, int length) {
-    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+  private void fillStringResultArray(ValueBlock valueBlock, BigDecimal[] leftValues, int length) {
+    String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftValues[i].compareTo(new BigDecimal(rightStringValues[i])));
     }

@@ -18,24 +18,10 @@
  */
 package org.apache.pinot.segment.spi.index;
 
-import java.io.File;
-import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
-import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
@@ -43,29 +29,17 @@ import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexProvider;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
-import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
-import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
-import org.apache.pinot.segment.spi.index.reader.provider.IndexReaderProvider;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class IndexingOverrides {
 
-  public interface IndexingOverride extends IndexCreatorProvider, IndexReaderProvider, MutableIndexProvider {
+  public interface IndexingOverride extends MutableIndexProvider {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexingOverrides.class);
 
-  private static final IndexCreatorProvider CREATOR_DEFAULTS = createDefaultCreatorProvider();
-  private static final IndexReaderProvider READER_DEFAULTS = createDefaultReaderProvider();
   private static final MutableIndexProvider MUTABLE_INDEX_DEFAULTS = createDefaultMutableIndexProvider();
 
   private static final AtomicReference<IndexingOverride> REGISTRATION = new AtomicReference<>();
@@ -84,14 +58,6 @@ public class IndexingOverrides {
   }
 
   /**
-   * Gets the registered {@see IndexReaderProvider} or the default if none was registered yet.
-   * @return an index reader provider.
-   */
-  public static IndexReaderProvider getIndexReaderProvider() {
-    return Holder.PROVIDER;
-  }
-
-  /**
    * Gets the registered {@see MutableIndexProvider} or the default if none was registered yet.
    * @return a mutable index reader provider.
    */
@@ -99,25 +65,8 @@ public class IndexingOverrides {
     return Holder.PROVIDER;
   }
 
-  /**
-   * Obtain the registered index creator provider. If the user has provided an override, then it will be used instead.
-   * If the user has not provided an override yet, then this action will prevent them from doing so.
-   * @return the global index provision logic.
-   */
-  public static IndexCreatorProvider getIndexCreatorProvider() {
-    return Holder.PROVIDER;
-  }
-
   private static final class Holder {
     public static final IndexingOverride PROVIDER = Optional.ofNullable(REGISTRATION.get()).orElseGet(Default::new);
-  }
-
-  private static IndexCreatorProvider createDefaultCreatorProvider() {
-    return invokeDefaultConstructor("org.apache.pinot.segment.local.segment.creator.impl.DefaultIndexCreatorProvider");
-  }
-
-  private static IndexReaderProvider createDefaultReaderProvider() {
-    return invokeDefaultConstructor("org.apache.pinot.segment.local.segment.index.readers.DefaultIndexReaderProvider");
   }
 
   private static MutableIndexProvider createDefaultMutableIndexProvider() {
@@ -141,118 +90,6 @@ public class IndexingOverrides {
    * Extend this class to override index creation
    */
   public static class Default implements IndexingOverride {
-
-    @Override
-    public BloomFilterCreator newBloomFilterCreator(IndexCreationContext.BloomFilter context)
-        throws IOException {
-      ensureCreatorPresent();
-      return CREATOR_DEFAULTS.newBloomFilterCreator(context);
-    }
-
-    @Override
-    public ForwardIndexCreator newForwardIndexCreator(IndexCreationContext.Forward context)
-        throws Exception {
-      ensureCreatorPresent();
-      return CREATOR_DEFAULTS.newForwardIndexCreator(context);
-    }
-
-    @Override
-    public GeoSpatialIndexCreator newGeoSpatialIndexCreator(IndexCreationContext.Geospatial context)
-        throws IOException {
-      ensureCreatorPresent();
-      return CREATOR_DEFAULTS.newGeoSpatialIndexCreator(context);
-    }
-
-    @Override
-    public DictionaryBasedInvertedIndexCreator newInvertedIndexCreator(IndexCreationContext.Inverted context)
-        throws IOException {
-      ensureCreatorPresent();
-      return CREATOR_DEFAULTS.newInvertedIndexCreator(context);
-    }
-
-    @Override
-    public JsonIndexCreator newJsonIndexCreator(IndexCreationContext.Json context)
-        throws IOException {
-      ensureCreatorPresent();
-      return CREATOR_DEFAULTS.newJsonIndexCreator(context);
-    }
-
-    @Override
-    public CombinedInvertedIndexCreator newRangeIndexCreator(IndexCreationContext.Range context)
-        throws IOException {
-      ensureCreatorPresent();
-      return CREATOR_DEFAULTS.newRangeIndexCreator(context);
-    }
-
-    @Override
-    public TextIndexCreator newTextIndexCreator(IndexCreationContext.Text context)
-        throws IOException {
-      ensureCreatorPresent();
-      return CREATOR_DEFAULTS.newTextIndexCreator(context);
-    }
-
-    @Override
-    public BloomFilterReader newBloomFilterReader(PinotDataBuffer dataBuffer, boolean onHeap)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newBloomFilterReader(dataBuffer, onHeap);
-    }
-
-    @Override
-    public ForwardIndexReader<?> newForwardIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newForwardIndexReader(dataBuffer, metadata);
-    }
-
-    @Override
-    public H3IndexReader newGeospatialIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newGeospatialIndexReader(dataBuffer, metadata);
-    }
-
-    @Override
-    public InvertedIndexReader<?> newInvertedIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newInvertedIndexReader(dataBuffer, metadata);
-    }
-
-    @Override
-    public JsonIndexReader newJsonIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newJsonIndexReader(dataBuffer, metadata);
-    }
-
-    @Override
-    public RangeIndexReader<?> newRangeIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newRangeIndexReader(dataBuffer, metadata);
-    }
-
-    @Override
-    public SortedIndexReader<?> newSortedIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newSortedIndexReader(dataBuffer, metadata);
-    }
-
-    @Override
-    public TextIndexReader newFSTIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
-        throws IOException {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newFSTIndexReader(dataBuffer, metadata);
-    }
-
-    @Override
-    public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
-        @Nullable Map<String, String> textIndexProperties) {
-      ensureReaderPresent();
-      return READER_DEFAULTS.newTextIndexReader(file, columnMetadata, textIndexProperties);
-    }
 
     @Override
     public MutableForwardIndex newForwardIndex(MutableIndexContext.Forward context) {
@@ -284,20 +121,8 @@ public class IndexingOverrides {
       return MUTABLE_INDEX_DEFAULTS.newDictionary(context);
     }
 
-    private void ensureReaderPresent() {
-      if (READER_DEFAULTS == null) {
-        throw new UnsupportedOperationException("default implementation not present on classpath");
-      }
-    }
-
     private void ensureMutableReaderPresent() {
       if (MUTABLE_INDEX_DEFAULTS == null) {
-        throw new UnsupportedOperationException("default implementation not present on classpath");
-      }
-    }
-
-    private void ensureCreatorPresent() {
-      if (CREATOR_DEFAULTS == null) {
         throw new UnsupportedOperationException("default implementation not present on classpath");
       }
     }

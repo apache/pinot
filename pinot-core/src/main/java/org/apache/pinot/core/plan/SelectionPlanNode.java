@@ -25,13 +25,13 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByAscOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -58,8 +58,8 @@ public class SelectionPlanNode implements PlanNode {
 
     if (limit == 0) {
       // Empty selection (LIMIT 0)
-      TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions, 0).run();
-      return new EmptySelectionOperator(_indexSegment, expressions, transformOperator);
+      BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressions, 0).run();
+      return new EmptySelectionOperator(_indexSegment, expressions, projectOperator);
     }
 
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
@@ -67,10 +67,9 @@ public class SelectionPlanNode implements PlanNode {
       // Selection only
       // ie: SELECT ... FROM Table WHERE ... LIMIT 10
       int maxDocsPerCall = Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-      TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
-      TransformOperator transformOperator = planNode.run();
-
-      return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
+      BaseProjectOperator<?> projectOperator =
+          new ProjectPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall).run();
+      return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
     int numOrderByExpressions = orderByExpressions.size();
     // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
@@ -87,23 +86,23 @@ public class SelectionPlanNode implements PlanNode {
         if (sortedColumnsPrefixSize == orderByExpressions.size()) {
           maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
         }
-        TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
-        TransformOperator transformOperator = planNode.run();
-        return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions, transformOperator,
+        BaseProjectOperator<?> projectOperator =
+            new ProjectPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall).run();
+        return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
       } else {
-        TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
-        TransformOperator transformOperator = planNode.run();
-        return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions,
-            transformOperator, sortedColumnsPrefixSize);
+        BaseProjectOperator<?> projectOperator =
+            new ProjectPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall).run();
+        return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions, projectOperator,
+            sortedColumnsPrefixSize);
       }
     }
     if (numOrderByExpressions == expressions.size()) {
       // All output expressions are ordered
       // ie: SELECT not_sorted1, not_sorted2 FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10 OFFSET 5
-      TransformOperator transformOperator =
-          new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-      return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
+      BaseProjectOperator<?> projectOperator =
+          new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+      return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
     // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
     // unnecessary data fetch
@@ -112,9 +111,9 @@ public class SelectionPlanNode implements PlanNode {
     for (OrderByExpressionContext orderByExpression : orderByExpressions) {
       expressionsToTransform.add(orderByExpression.getExpression());
     }
-    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
+    BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform,
         DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
+    return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
   }
 
   /**

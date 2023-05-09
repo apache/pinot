@@ -20,9 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
@@ -44,7 +44,8 @@ public class ArrayLengthTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 argument is required for ARRAYLENGTH transform function");
@@ -65,38 +66,36 @@ public class ArrayLengthTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    }
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initIntValuesSV(length);
     switch (_argument.getResultMetadata().getDataType().getStoredType()) {
       case INT:
-        int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
+        int[][] intValuesMV = _argument.transformToIntValuesMV(valueBlock);
         for (int i = 0; i < length; i++) {
           _intValuesSV[i] = intValuesMV[i].length;
         }
         break;
       case LONG:
-        long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
+        long[][] longValuesMV = _argument.transformToLongValuesMV(valueBlock);
         for (int i = 0; i < length; i++) {
           _intValuesSV[i] = longValuesMV[i].length;
         }
         break;
       case FLOAT:
-        float[][] floatValuesMV = _argument.transformToFloatValuesMV(projectionBlock);
+        float[][] floatValuesMV = _argument.transformToFloatValuesMV(valueBlock);
         for (int i = 0; i < length; i++) {
           _intValuesSV[i] = floatValuesMV[i].length;
         }
         break;
       case DOUBLE:
-        double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
+        double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(valueBlock);
         for (int i = 0; i < length; i++) {
           _intValuesSV[i] = doubleValuesMV[i].length;
         }
         break;
       case STRING:
-        String[][] stringValuesMV = _argument.transformToStringValuesMV(projectionBlock);
+        String[][] stringValuesMV = _argument.transformToStringValuesMV(valueBlock);
         for (int i = 0; i < length; i++) {
           _intValuesSV[i] = stringValuesMV[i].length;
         }

@@ -24,8 +24,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -38,8 +40,10 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,18 +65,19 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
 
-  private final InstanceResponseBlock _errorBlock;
-  private final List<InstanceResponseBlock> _baseResultBlock;
+  private final LinkedList<ServerQueryRequest> _serverQueryRequestQueue;
   private final DataSchema _desiredDataSchema;
-  private int _currentIndex;
+  private final Function<ServerQueryRequest, InstanceResponseBlock> _processCall;
 
-  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
-      long requestId, int stageId) {
-    super(requestId, stageId);
-    _baseResultBlock = baseResultBlock;
+  private InstanceResponseBlock _errorBlock;
+
+  public LeafStageTransferableBlockOperator(OpChainExecutionContext context,
+      Function<ServerQueryRequest, InstanceResponseBlock> processCall,
+      List<ServerQueryRequest> serverQueryRequestList, DataSchema dataSchema) {
+    super(context);
+    _processCall = processCall;
+    _serverQueryRequestQueue = new LinkedList<>(serverQueryRequestList);
     _desiredDataSchema = dataSchema;
-    _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
-    _currentIndex = 0;
   }
 
   @Override
@@ -83,30 +88,51 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME;
+      return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_currentIndex < 0) {
+    if (_errorBlock != null) {
       throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
     }
-    if (_errorBlock != null) {
-      _currentIndex = -1;
+    // runLeafStage
+    InstanceResponseBlock responseBlock = getNextBlockFromLeafStage();
+    if (responseBlock == null) {
+      // finished getting next block from leaf stage. returning EOS
+      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+    } else if (!responseBlock.getExceptions().isEmpty()) {
+      // get error from leaf stage, return ERROR
+      _errorBlock = responseBlock;
       return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
     } else {
-      if (_currentIndex < _baseResultBlock.size()) {
-        InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
-        if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
-          return composeTransferableBlock(responseBlock, _desiredDataSchema);
-        } else {
-          return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
-        }
+      // return normal block.
+      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
+      operatorStats.recordExecutionStats(responseBlock.getResponseMetadata());
+      if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
+        return composeTransferableBlock(responseBlock, _desiredDataSchema);
       } else {
-        _currentIndex = -1;
-        return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+        return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
       }
     }
+  }
+
+  private @Nullable InstanceResponseBlock getNextBlockFromLeafStage() {
+    if (!_serverQueryRequestQueue.isEmpty()) {
+      ServerQueryRequest request = _serverQueryRequestQueue.pop();
+      return _processCall.apply(request);
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Leaf stage operators should always collect stats for the tables used in queries
+   * Otherwise the Broker response will just contain zeros for every stat value
+   */
+  @Override
+  protected boolean shouldCollectStats() {
+    return true;
   }
 
   /**

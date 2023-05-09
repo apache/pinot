@@ -20,10 +20,7 @@ package org.apache.pinot.core.operator.blocks;
 
 import java.math.BigDecimal;
 import java.util.Map;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
@@ -35,7 +32,7 @@ import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
  * ProjectionBlock holds a column name to Block Map.
  * It provides DocIdSetBlock for a given column.
  */
-public class ProjectionBlock implements Block {
+public class ProjectionBlock implements ValueBlock {
   private final Map<String, DataSource> _dataSourceMap;
   private final DataBlockCache _dataBlockCache;
 
@@ -44,36 +41,25 @@ public class ProjectionBlock implements Block {
     _dataBlockCache = dataBlockCache;
   }
 
+  @Override
   public int getNumDocs() {
     return _dataBlockCache.getNumDocs();
   }
 
+  @Override
   public int[] getDocIds() {
     return _dataBlockCache.getDocIds();
   }
 
+  @Override
+  public BlockValSet getBlockValueSet(ExpressionContext expression) {
+    assert expression.getType() == ExpressionContext.Type.IDENTIFIER;
+    return getBlockValueSet(expression.getIdentifier());
+  }
+
+  @Override
   public BlockValSet getBlockValueSet(String column) {
     return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
-  }
-
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
   }
 
   /**

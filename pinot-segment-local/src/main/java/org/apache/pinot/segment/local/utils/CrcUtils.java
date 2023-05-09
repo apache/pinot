@@ -23,8 +23,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -91,34 +89,5 @@ public class CrcUtils {
     long crc = checksum.getValue();
     LOGGER.info("Computed crc = {}, based on files {}", crc, _files);
     return crc;
-  }
-
-  public String computeMD5()
-      throws NoSuchAlgorithmException, IOException {
-    byte[] buffer = new byte[BUFFER_SIZE];
-    MessageDigest digest = MessageDigest.getInstance("md5");
-
-    for (File file : _files) {
-      try (InputStream input = new FileInputStream(file)) {
-        int len;
-        while ((len = input.read(buffer)) > 0) {
-          digest.update(buffer, 0, len);
-        }
-      }
-    }
-    String md5Value = toHexaDecimal(digest.digest());
-    LOGGER.info("Computed MD5 = {}, based on files {}", md5Value, _files);
-    return md5Value;
-  }
-
-  public static String toHexaDecimal(byte[] bytesToConvert) {
-    final char[] hexCharactersAsArray = "0123456789ABCDEF".toCharArray();
-    final char[] convertedHexCharsArray = new char[bytesToConvert.length * 2];
-    for (int j = 0; j < bytesToConvert.length; j++) {
-      final int v = bytesToConvert[j] & 0xFF;
-      convertedHexCharsArray[j * 2] = hexCharactersAsArray[v >>> 4];
-      convertedHexCharsArray[j * 2 + 1] = hexCharactersAsArray[v & 0x0F];
-    }
-    return new String(convertedHexCharsArray);
   }
 }

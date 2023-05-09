@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -44,6 +46,8 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -100,6 +104,9 @@ public final class TableConfigUtils {
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
       EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.COUNT);
+  private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
+      ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+          RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -390,13 +397,6 @@ public final class TableConfigUtils {
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
-          if (schema != null) {
-            Preconditions.checkState(
-                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
-                "The destination column '" + columnName
-                    + "' of the transform function must be present in the schema or as a source column for "
-                    + "aggregations");
-          }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
             throw new IllegalStateException(
@@ -404,6 +404,13 @@ public final class TableConfigUtils {
           }
           if (!transformColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
+          }
+          if (schema != null) {
+            Preconditions.checkState(
+                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
+                "The destination column '" + columnName
+                    + "' of the transform function must be present in the schema or as a source column for "
+                    + "aggregations");
           }
           FunctionEvaluator expressionEvaluator;
           if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
@@ -430,8 +437,8 @@ public final class TableConfigUtils {
       ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
       if (complexTypeConfig != null && schema != null) {
         Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
-        Set<String> fieldNames = schema.getFieldSpecMap().keySet();
         if (MapUtils.isNotEmpty(prefixesToRename)) {
+          Set<String> fieldNames = schema.getColumnNames();
           for (String prefix : prefixesToRename.keySet()) {
             for (String field : fieldNames) {
               Preconditions.checkState(!field.startsWith(prefix),
@@ -557,8 +564,7 @@ public final class TableConfigUtils {
         "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
     Preconditions.checkState(tableConfig.getRoutingConfig() != null
-            && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
-            tableConfig.getRoutingConfig().getInstanceSelectorType()),
+            && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
@@ -570,9 +576,11 @@ public final class TableConfigUtils {
           "The upsert table cannot have star-tree index.");
 
       // comparison column exists
-      if (tableConfig.getUpsertConfig().getComparisonColumn() != null) {
-        String comparisonCol = tableConfig.getUpsertConfig().getComparisonColumn();
-        Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+      if (tableConfig.getUpsertConfig().getComparisonColumns() != null) {
+        List<String> comparisonCols = tableConfig.getUpsertConfig().getComparisonColumns();
+        for (String comparisonCol : comparisonCols) {
+          Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+        }
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);
@@ -590,7 +598,8 @@ public final class TableConfigUtils {
       return;
     }
     for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
-      Preconditions.checkState(!tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType),
+      Preconditions.checkState(
+          !tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString()),
           String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
               instancePartitionsType));
     }
@@ -641,8 +650,8 @@ public final class TableConfigUtils {
       UpsertConfig.Strategy columnStrategy = entry.getValue();
       Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
 
-      if (upsertConfig.getComparisonColumn() != null) {
-        Preconditions.checkState(!upsertConfig.getComparisonColumn().equals(column),
+      if (upsertConfig.getComparisonColumns() != null) {
+        Preconditions.checkState(!upsertConfig.getComparisonColumns().contains(column),
             "Merger cannot be applied to comparison column");
       } else {
         Preconditions.checkState(!tableConfig.getValidationConfig().getTimeColumnName().equals(column),
@@ -927,10 +936,13 @@ public final class TableConfigUtils {
   /**
    * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
    * compatibility mismatch. The checks performed are:
-   *     - Validate dictionary is enabled.
-   *     - Validate inverted index is enabled.
+   *
    *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
-   *       multi-value column (since mulit-value defaults to index v1).
+   *       multi-value column (since multi-value defaults to index v1).
+   *
+   * To rebuild the forward index when it has been disabled the dictionary and inverted index must be enabled for the
+   * given column. If either the inverted index or dictionary are disabled then the only way to get the forward index
+   * back or generate a new index for existing segments is to either refresh or back-fill the segments.
    */
   private static void validateForwardIndexDisabledIndexCompatibility(String columnName, FieldConfig fieldConfig,
       IndexingConfig indexingConfigs, List<String> noDictionaryColumns, Schema schema) {
@@ -939,18 +951,15 @@ public final class TableConfigUtils {
       return;
     }
 
-    boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties.get(FieldConfig.FORWARD_INDEX_DISABLED));
+    boolean forwardIndexDisabled =
+        Boolean.parseBoolean(fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
+            FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
     if (!forwardIndexDisabled) {
       return;
     }
 
     FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-    Preconditions.checkState(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
-            || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
-        String.format("Forward index disabled column %s must have dictionary enabled", columnName));
-    Preconditions.checkState(indexingConfigs.getInvertedIndexColumns() != null
-            && indexingConfigs.getInvertedIndexColumns().contains(columnName),
-        String.format("Forward index disabled column %s must have inverted index enabled", columnName));
+    // Check for the range index since the index itself relies on the existence of the forward index to work.
     if (indexingConfigs.getRangeIndexColumns() != null && indexingConfigs.getRangeIndexColumns().contains(columnName)) {
       Preconditions.checkState(fieldSpec.isSingleValueField(), String.format("Feature not supported for multi-value "
           + "columns with range index. Cannot disable forward index for column %s. Disable range index on this "
@@ -959,6 +968,23 @@ public final class TableConfigUtils {
           String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
               + "forward index for column %s. Either disable range index or create range index with"
               + " version >= 2 to use this feature", columnName));
+    }
+
+    Preconditions.checkState(
+        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(),
+        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+            + " not supported with forward index for column: %s, disabled", columnName));
+
+    boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
+        || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);
+    boolean hasInvertedIndex = indexingConfigs.getInvertedIndexColumns() != null
+        && indexingConfigs.getInvertedIndexColumns().contains(columnName);
+
+    if (!hasDictionary || !hasInvertedIndex) {
+      LOGGER.warn("Forward index has been disabled for column {}. Either dictionary ({}) and / or inverted index ({}) "
+              + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
+              + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.",
+          columnName, hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
     }
   }
 
@@ -1147,5 +1173,36 @@ public final class TableConfigUtils {
       }
     }
     return false;
+  }
+
+  private static boolean isRoutingStrategyAllowedForUpsert(@Nonnull RoutingConfig routingConfig) {
+    String instanceSelectorType = routingConfig.getInstanceSelectorType();
+    return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
+  }
+
+  /**
+   * Helper method to extract TableConfig in updated syntax from current TableConfig.
+   * <ul>
+   *   <li>Moves all index configs to FieldConfig.indexes</li>
+   *   <li>Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes</li>
+   * </ul>
+   */
+  public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
+    TableConfig clone = new TableConfig(tableConfig);
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      // get all the index data in new format
+      indexType.convertToNewFormat(clone, schema);
+    }
+    // cleanup the indexTypes field from all FieldConfig items
+    if (clone.getFieldConfigList() != null) {
+      List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
+      for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
+            .withIndexTypes(null)
+            .build());
+      }
+      clone.setFieldConfigList(cleanFieldConfigList);
+    }
+    return clone;
   }
 }

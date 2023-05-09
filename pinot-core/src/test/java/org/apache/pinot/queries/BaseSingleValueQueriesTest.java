@@ -32,6 +32,8 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -119,7 +121,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED,
         Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
     // Build the index segment.

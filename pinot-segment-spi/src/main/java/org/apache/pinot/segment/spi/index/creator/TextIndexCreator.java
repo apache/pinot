@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import java.io.Closeable;
 import java.io.IOException;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
 /**
- * Index creator for text index.
+ * Index creator for text indexes.
+ *
+ * In order to create FST indexes, {@link FSTIndexCreator} must be used.
  */
-public interface TextIndexCreator extends Closeable {
+public interface TextIndexCreator extends IndexCreator {
 
   /**
    * Adds the next document.

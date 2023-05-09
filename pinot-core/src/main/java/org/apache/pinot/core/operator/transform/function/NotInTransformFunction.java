@@ -21,8 +21,8 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
-import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 /**
@@ -36,16 +36,21 @@ public class NotInTransformFunction extends InTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    super.init(arguments, dataSourceMap);
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int[] intValuesSV = super.transformToIntValuesSV(projectionBlock);
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int[] intValuesSV = super.transformToIntValuesSV(valueBlock);
     for (int i = 0; i < intValuesSV.length; i++) {
       intValuesSV[i] = 1 - intValuesSV[i];
     }
     return intValuesSV;
+  }
+
+  @Override
+  protected boolean mainFunctionNotContainedInValues(int value) {
+    return value == 1;
   }
 }

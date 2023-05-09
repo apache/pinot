@@ -35,9 +35,9 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -133,9 +133,9 @@ public class TablesResourceTest extends BaseResourceTest {
       Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 2);
       Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 2);
       Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column1")
-          .containsKey(ColumnIndexType.DICTIONARY.getIndexName()));
+          .containsKey(StandardIndexes.dictionary().getId()));
       Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column2")
-          .containsKey(ColumnIndexType.FORWARD_INDEX.getIndexName()));
+          .containsKey(StandardIndexes.forward().getId()));
     }
 
     // No such table

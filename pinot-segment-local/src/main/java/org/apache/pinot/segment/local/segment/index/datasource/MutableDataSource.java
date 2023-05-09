@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.segment.index.datasource;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -48,8 +50,20 @@ public class MutableDataSource extends BaseDataSource {
       @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector, int maxRowLengthInBytes) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, cardinality,
-            partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes), forwardIndex, dictionary,
-        invertedIndex, rangeIndex, textIndex, fstIndex, jsonIndex, h3Index, bloomFilter, nullValueVector);
+            partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes),
+        new ColumnIndexContainer.FromMap.Builder()
+            .with(StandardIndexes.forward(), forwardIndex)
+            .with(StandardIndexes.dictionary(), dictionary)
+            .with(StandardIndexes.inverted(),
+        invertedIndex)
+            .with(StandardIndexes.range(), rangeIndex)
+            .with(StandardIndexes.text(), textIndex)
+            .with(StandardIndexes.fst(), fstIndex)
+            .with(StandardIndexes.json(), jsonIndex)
+            .with(StandardIndexes.h3(), h3Index)
+            .with(StandardIndexes.bloomFilter(), bloomFilter)
+            .with(StandardIndexes.nullValueVector(), nullValueVector)
+            .build());
   }
 
   private static class MutableDataSourceMetadata implements DataSourceMetadata {

@@ -211,6 +211,40 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
+  public void testQueryTracingWithLiteral()
+      throws Exception {
+    JsonNode jsonNode =
+        postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
+    long countStarResult = 10;
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    for (int rowId = 0; rowId < 10; rowId++) {
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(rowId).get(0).asLong(), 1);
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(rowId).get(1).asText(), "test");
+    }
+    Assert.assertTrue(jsonNode.get("exceptions").isEmpty());
+    JsonNode traceInfo = jsonNode.get("traceInfo");
+    Assert.assertEquals(traceInfo.size(), 2);
+    Assert.assertTrue(traceInfo.has("localhost_O"));
+    Assert.assertTrue(traceInfo.has("localhost_R"));
+  }
+
+  @Test
+  public void testDropResults()
+      throws Exception {
+    final String query = String.format("SELECT * FROM %s limit 10", getTableName());
+    final String resultTag = "resultTable";
+
+    // dropResults=true - resultTable must not be in the response
+    Assert.assertFalse(postQueryWithOptions(query, "dropResults=true").has(resultTag));
+
+    // dropResults=TrUE (case insensitive match) - resultTable must not be in the response
+    Assert.assertFalse(postQueryWithOptions(query, "dropResults=TrUE").has(resultTag));
+
+    // dropResults=truee - (anything other than true, is taken as false) - resultTable must be in the response
+    Assert.assertTrue(postQueryWithOptions(query, "dropResults=truee").has(resultTag));
+  }
+
+  @Test
   @Override
   public void testHardcodedQueries()
       throws Exception {

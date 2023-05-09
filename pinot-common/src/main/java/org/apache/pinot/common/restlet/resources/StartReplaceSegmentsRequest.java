@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 
@@ -31,17 +33,27 @@ import javax.annotation.Nullable;
  * 1. segmentsFrom : original segments. This field can be empty in case the user tries to upload the original segments
  *    and wants to achieve the atomic update of multiple segments.
  * 2. segmentsTo : merged segments.
+ * 3. customMap : custom map.
  */
 public class StartReplaceSegmentsRequest {
   private final List<String> _segmentsFrom;
   private final List<String> _segmentsTo;
+  private final Map<String, String> _customMap;
 
   public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
-      @JsonProperty("segmentsTo") List<String> segmentsTo) {
+      @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo) {
+    this(segmentsFrom, segmentsTo, null);
+  }
+
+  @JsonCreator
+  public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
+      @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo,
+      @JsonProperty("customMap") @Nullable Map<String, String> customMap) {
     _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
-    _segmentsTo = segmentsTo;
-    Preconditions
-        .checkArgument(segmentsTo != null && !segmentsTo.isEmpty(), "'segmentsTo' should not be null or empty");
+    _segmentsTo = (segmentsTo == null) ? Collections.emptyList() : segmentsTo;
+    Preconditions.checkArgument(!_segmentsFrom.isEmpty() || !_segmentsTo.isEmpty(),
+        "'segmentsFrom' and 'segmentsTo' cannot both be empty");
+    _customMap = customMap;
   }
 
   public List<String> getSegmentsFrom() {
@@ -50,5 +62,9 @@ public class StartReplaceSegmentsRequest {
 
   public List<String> getSegmentsTo() {
     return _segmentsTo;
+  }
+
+  public Map<String, String> getCustomMap() {
+    return _customMap;
   }
 }

@@ -37,9 +37,9 @@ public class SingletonExchangeTest {
   private AutoCloseable _mocks;
 
   @Mock
-  TransferableBlock _block;
+  private SendingMailbox _mailbox1;
   @Mock
-  private SendingMailbox<TransferableBlock> _mailbox1;
+  TransferableBlock _block;
 
   @BeforeMethod
   public void setUp() {
@@ -54,9 +54,10 @@ public class SingletonExchangeTest {
   }
 
   @Test
-  public void shouldRouteSingleton() {
+  public void shouldRouteSingleton()
+      throws Exception {
     // Given:
-    ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
+    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
 
     // When:
     new SingletonExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);

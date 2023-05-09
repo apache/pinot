@@ -102,7 +102,7 @@ public interface DataTable {
    */
   enum MetadataKey {
     UNKNOWN(0, "unknown", MetadataValueType.STRING),
-    TABLE(1, "table", MetadataValueType.STRING), // NOTE: this key is only used in PrioritySchedulerTest
+    TABLE(1, "table", MetadataValueType.STRING),
     NUM_DOCS_SCANNED(2, "numDocsScanned", MetadataValueType.LONG),
     NUM_ENTRIES_SCANNED_IN_FILTER(3, "numEntriesScannedInFilter", MetadataValueType.LONG),
     NUM_ENTRIES_SCANNED_POST_FILTER(4, "numEntriesScannedPostFilter", MetadataValueType.LONG),
@@ -110,8 +110,6 @@ public interface DataTable {
     NUM_SEGMENTS_PROCESSED(6, "numSegmentsProcessed", MetadataValueType.INT),
     NUM_SEGMENTS_MATCHED(7, "numSegmentsMatched", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_QUERIED(8, "numConsumingSegmentsQueried", MetadataValueType.INT),
-    NUM_CONSUMING_SEGMENTS_PROCESSED(26, "numConsumingSegmentsProcessed", MetadataValueType.INT),
-    NUM_CONSUMING_SEGMENTS_MATCHED(27, "numConsumingSegmentsMatched", MetadataValueType.INT),
     MIN_CONSUMING_FRESHNESS_TIME_MS(9, "minConsumingFreshnessTimeMs", MetadataValueType.LONG),
     TOTAL_DOCS(10, "totalDocs", MetadataValueType.LONG),
     NUM_GROUPS_LIMIT_REACHED(11, "numGroupsLimitReached", MetadataValueType.STRING),
@@ -128,11 +126,19 @@ public interface DataTable {
     NUM_SEGMENTS_PRUNED_BY_LIMIT(22, "numSegmentsPrunedByLimit", MetadataValueType.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(23, "numSegmentsPrunedByValue", MetadataValueType.INT),
     EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS(24, "explainPlanNumEmptyFilterSegments", MetadataValueType.INT),
-    EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(25, "explainPlanNumMatchAllFilterSegments", MetadataValueType.INT);
+    EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(25, "explainPlanNumMatchAllFilterSegments", MetadataValueType.INT),
+    NUM_CONSUMING_SEGMENTS_PROCESSED(26, "numConsumingSegmentsProcessed", MetadataValueType.INT),
+    NUM_CONSUMING_SEGMENTS_MATCHED(27, "numConsumingSegmentsMatched", MetadataValueType.INT),
+    NUM_BLOCKS(28, "numBlocks", MetadataValueType.INT),
+    NUM_ROWS(29, "numRows", MetadataValueType.INT),
+    OPERATOR_EXECUTION_TIME_MS(30, "operatorExecutionTimeMs", MetadataValueType.LONG),
+    OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
+    OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
+    OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = 27;
+    private static final int MAX_ID = 33;
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
@@ -186,6 +192,7 @@ public interface DataTable {
         int id = key.getId();
         Preconditions.checkArgument(id >= 0 && id <= MAX_ID,
             "Invalid id: %s for MetadataKey: %s, must be in the range of [0, MAX_ID(%s)]", id, key, MAX_ID);
+
         Preconditions.checkArgument(ID_TO_ENUM_KEY_MAP[id] == null,
             "Duplicate id: %s defined for MetadataKey: %s and %s", id, ID_TO_ENUM_KEY_MAP[id], key);
         ID_TO_ENUM_KEY_MAP[id] = key;

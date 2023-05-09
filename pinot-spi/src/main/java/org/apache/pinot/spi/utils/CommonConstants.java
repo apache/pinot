@@ -46,6 +46,7 @@ public class CommonConstants {
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
+
   /**
    * The state of the consumer for a given segment
    */
@@ -90,6 +91,10 @@ public class CommonConstants {
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
+
+    // 2 to the power of 16, for tradeoffs see datasketches library documentation:
+    // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
+    public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 65536;
 
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
@@ -189,7 +194,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
-    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = false;
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = true;
   }
 
   public static class Broker {
@@ -220,8 +225,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
+    // Comma separated list of packages that contains javax service resources.
+    public static final String BROKER_RESOURCE_PACKAGES = "broker.restlet.api.resource.packages";
+    public static final String DEFAULT_BROKER_RESOURCE_PACKAGES = "org.apache.pinot.broker.api.resources";
+
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
-    // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
+    // are ONLINE for this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
@@ -233,6 +242,25 @@ public class CommonConstants {
     public static final int DEFAULT_MAX_REDUCE_THREADS_PER_QUERY =
         Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
     // Same logic as CombineOperatorUtils
+
+    // Config for Jersey ThreadPoolExecutorProvider.
+    // By default, Jersey uses the default unbounded thread pool to process queries.
+    // By enabling it, BrokerManagedAsyncExecutorProvider will be used to create a bounded thread pool.
+    public static final String CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR =
+            "pinot.broker.enable.bounded.jersey.threadpool.executor";
+    public static final boolean DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR = false;
+    // Default capacities for the bounded thread pool
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
+            "pinot.broker.jersey.threadpool.executor.max.pool.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
+            Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
+            "pinot.broker.jersey.threadpool.executor.core.pool.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
+            Runtime.getRuntime().availableProcessors() * 2;
+    public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE =
+            "pinot.broker.jersey.threadpool.executor.queue.size";
+    public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE = Integer.MAX_VALUE;
 
     // used for SQL GROUP BY during broker reduce
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
@@ -254,7 +282,6 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
-
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
     // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
@@ -262,8 +289,7 @@ public class CommonConstants {
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
-    public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING =
-        "pinot.broker.request.client.ip.logging";
+    public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING = "pinot.broker.request.client.ip.logging";
 
     // TODO: Support populating clientIp for GrpcRequestIdentity.
     public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = false;
@@ -271,12 +297,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.broker.logger.root.dir";
     public static final String CONFIG_OF_SWAGGER_BROKER_ENABLED = "pinot.broker.swagger.enabled";
     public static final boolean DEFAULT_SWAGGER_BROKER_ENABLED = true;
-    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT
-        = "pinot.broker.instance.enableThreadCpuTimeMeasurement";
-    public static final String CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT
-        = "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
+        "pinot.broker.instance.enableThreadCpuTimeMeasurement";
+    public static final String CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT =
+        "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
+    public static final String CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES
+        = "pinot.broker.result.rewriter.class.names";
 
     public static class Request {
       public static final String SQL = "sql";
@@ -312,6 +340,8 @@ public class CommonConstants {
 
         // Handle IN predicate evaluation for big IN lists
         public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
+
+        public static final String DROP_RESULTS = "dropResults";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
@@ -531,8 +561,10 @@ public class CommonConstants {
         "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
         "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
+    // The order of the pruners matters. Pruning with segment metadata ahead of those using segment data like bloom
+    // filters to reduce the required data access.
     public static final List<String> DEFAULT_QUERY_EXECUTOR_PRUNER_CLASS =
-        ImmutableList.of("ColumnValueSegmentPruner", "SelectionQuerySegmentPruner");
+        ImmutableList.of("ColumnValueSegmentPruner", "BloomFilterSegmentPruner", "SelectionQuerySegmentPruner");
     public static final String DEFAULT_QUERY_EXECUTOR_PLAN_MAKER_CLASS =
         "org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2";
     public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000L;
@@ -760,20 +792,24 @@ public class CommonConstants {
     public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.critical.heap.usage.ratio";
     public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
 
+    public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC =
+        "accounting.oom.critical.heap.usage.ratio.delta.after.gc";
+    public static final float DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC = 0.15f;
+
     public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
     public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
 
     public static final String CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS = "accounting.heap.usage.publishing.period.ms";
     public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
 
-    public static final String CONFIG_OF_SLEEP_TIME = "accounting.sleep.ms";
-    public static final int DEFAULT_SLEEP_TIME = 30;
+    public static final String CONFIG_OF_SLEEP_TIME_MS = "accounting.sleep.ms";
+    public static final int DEFAULT_SLEEP_TIME_MS = 30;
 
     public static final String CONFIG_OF_SLEEP_TIME_DENOMINATOR = "accounting.sleep.time.denominator";
     public static final int DEFAULT_SLEEP_TIME_DENOMINATOR = 3;
 
-    public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO
-        = "accounting.min.memory.footprint.to.kill.ratio";
+    public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO =
+        "accounting.min.memory.footprint.to.kill.ratio";
     public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
 
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
@@ -781,6 +817,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_INSTANCE_TYPE = "accounting.instance.type";
     public static final InstanceType DEFAULT_CONFIG_OF_INSTANCE_TYPE = InstanceType.SERVER;
+
+    public static final String CONFIG_OF_GC_WAIT_TIME_MS = "accounting.gc.wait.time.ms";
+    public static final int DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS = 0;
   }
 
   public static class ExecutorService {
@@ -934,5 +973,12 @@ public class CommonConstants {
 
   public static class IdealState {
     public static final String HYBRID_TABLE_TIME_BOUNDARY = "HYBRID_TABLE_TIME_BOUNDARY";
+  }
+
+  public static class RewriterConstants {
+    public static final String PARENT_AGGREGATION_NAME_PREFIX = "parent";
+    public static final String CHILD_AGGREGATION_NAME_PREFIX = "child";
+    public static final String CHILD_AGGREGATION_SEPERATOR = "@";
+    public static final String CHILD_KEY_SEPERATOR = "_";
   }
 }

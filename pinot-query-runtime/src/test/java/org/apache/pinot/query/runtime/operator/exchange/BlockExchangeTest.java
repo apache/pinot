@@ -42,9 +42,9 @@ public class BlockExchangeTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private SendingMailbox<TransferableBlock> _mailbox1;
+  private SendingMailbox _mailbox1;
   @Mock
-  private SendingMailbox<TransferableBlock> _mailbox2;
+  private SendingMailbox _mailbox2;
 
   @BeforeMethod
   public void setUp() {
@@ -58,9 +58,10 @@ public class BlockExchangeTest {
   }
 
   @Test
-  public void shouldSendEosBlockToAllDestinations() {
+  public void shouldSendEosBlockToAllDestinations()
+      throws Exception {
     // Given:
-    List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
     // When:
     exchange.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -78,9 +79,10 @@ public class BlockExchangeTest {
   }
 
   @Test
-  public void shouldSendDataBlocksOnlyToTargetDestination() {
+  public void shouldSendDataBlocksOnlyToTargetDestination()
+      throws Exception {
     // Given:
-    List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
     BlockExchange exchange = new TestBlockExchange(destinations);
     TransferableBlock block = new TransferableBlock(ImmutableList.of(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
@@ -97,9 +99,10 @@ public class BlockExchangeTest {
   }
 
   @Test
-  public void shouldSplitBlocks() {
+  public void shouldSplitBlocks()
+      throws Exception {
     // Given:
-    List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
 
     DataSchema schema = new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING});
 
@@ -129,16 +132,17 @@ public class BlockExchangeTest {
   }
 
   private static class TestBlockExchange extends BlockExchange {
-    protected TestBlockExchange(List<SendingMailbox<TransferableBlock>> destinations) {
+    protected TestBlockExchange(List<SendingMailbox> destinations) {
       this(destinations, (block, type, size) -> Iterators.singletonIterator(block));
     }
 
-    protected TestBlockExchange(List<SendingMailbox<TransferableBlock>> destinations, BlockSplitter splitter) {
+    protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
       super(destinations, splitter);
     }
 
     @Override
-    protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
+    protected void route(List<SendingMailbox> destinations, TransferableBlock block)
+        throws Exception {
       for (SendingMailbox mailbox : destinations) {
         sendBlock(mailbox, block);
       }

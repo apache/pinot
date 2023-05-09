@@ -23,9 +23,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
@@ -46,7 +46,8 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   private DataType _resultDataType;
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
         getName());
     TransformFunction transformFunction = arguments.get(0);
@@ -70,33 +71,29 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initDoubleValuesSV(length);
     if (_resultDataType == DataType.BIG_DECIMAL) {
-      BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
+      BigDecimal[] values = transformToBigDecimalValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _doubleValuesSV, length);
     } else {
-      double[] values = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-      applyMathOperator(values, projectionBlock.getNumDocs());
+      double[] values = _transformFunction.transformToDoubleValuesSV(valueBlock);
+      applyMathOperator(values, valueBlock.getNumDocs());
     }
     return _doubleValuesSV;
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(length);
     if (_resultDataType == DataType.DOUBLE) {
-      double[] values = transformToDoubleValuesSV(projectionBlock);
+      double[] values = transformToDoubleValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _bigDecimalValuesSV, length);
     } else {
-      BigDecimal[] values = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
-      applyMathOperator(values, projectionBlock.getNumDocs());
+      BigDecimal[] values = _transformFunction.transformToBigDecimalValuesSV(valueBlock);
+      applyMathOperator(values, valueBlock.getNumDocs());
     }
     return _bigDecimalValuesSV;
   }

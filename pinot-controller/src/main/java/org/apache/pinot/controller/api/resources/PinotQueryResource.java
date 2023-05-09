@@ -30,9 +30,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,7 +52,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -59,6 +60,7 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -66,6 +68,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,7 +130,13 @@ public class PinotQueryResource {
   private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
       @Nullable String queryOptions, String endpointUrl)
       throws Exception {
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    SqlNodeAndOptions sqlNodeAndOptions;
+    try {
+      sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    } catch (SqlCompilationException ex) {
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR,
+          new Exception("Unable to parse the SQL")).toString();
+    }
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
       Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
@@ -138,7 +147,7 @@ public class PinotQueryResource {
     if (Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
       if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl);
+        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl, traceEnabled);
       } else {
         throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
             + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
@@ -161,7 +170,7 @@ public class PinotQueryResource {
   }
 
   private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String endpointUrl) {
+      String endpointUrl, String traceEnabled) {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
@@ -170,10 +179,31 @@ public class PinotQueryResource {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
-    // Get brokers, only DEFAULT tenant is supported for now.
-    // TODO: implement logic that only allows executing query where all accessed tables are within the same tenant.
-    List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
-        TagNameUtils.DEFAULT_TENANT_NAME));
+    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    if (tableNames.size() == 0) {
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR,
+          new Exception("Unable to find table name from SQL thus cannot dispatch to broker.")).toString();
+    }
+
+    List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
+    if (tableConfigList == null || tableConfigList.size() == 0) {
+      return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR, new Exception(
+          "Unable to find table in cluster, table does not exist")).toString();
+    }
+
+    // When routing a query, there should be at least one common broker tenant for the table. However, the server
+    // tenants can be completely disjoint. The leaf stages which access segments will be processed on the respective
+    // server tenants for each table. The intermediate stages can be processed in either or all of the server tenants
+    // belonging to the tables.
+    String brokerTenant = getCommonBrokerTenant(tableConfigList);
+    if (brokerTenant == null) {
+      return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
+          new Exception(String.format("Unable to dispatch multistage query with multiple tables : %s "
+              + "on different tenant", tableNames))).toString();
+    }
+    List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenant));
+
     if (instanceIds.isEmpty()) {
       return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
     }
@@ -185,7 +215,7 @@ public class PinotQueryResource {
 
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
-    return sendRequestToBroker(query, instanceId, "false", queryOptions, httpHeaders);
+    return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
@@ -224,6 +254,37 @@ public class PinotQueryResource {
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+  }
+
+  // given a list of tables, returns the list of tableConfigs
+  private List<TableConfig> getListTableConfigs(List<String> tableNames) {
+    List<TableConfig> allTableConfigList = new ArrayList<>();
+    for (String tableName: tableNames) {
+      List<TableConfig> tableConfigList = new ArrayList<>();
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(tableName)));
+      }
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(tableName)));
+      }
+      if (tableConfigList.size() == 0) {
+        return null;
+      }
+      allTableConfigList.addAll(tableConfigList);
+    }
+    return allTableConfigList;
+  }
+
+  // return the brokerTenant if all table configs point to the same broker, else returns null
+  private String getCommonBrokerTenant(List<TableConfig> tableConfigList) {
+    Set<String> tableBrokers = new HashSet<>();
+    for (TableConfig tableConfig : tableConfigList) {
+      tableBrokers.add(tableConfig.getTenantConfig().getBroker());
+    }
+    if (tableBrokers.size() != 1) {
+      return null;
+    }
+    return (String) (tableBrokers.toArray()[0]);
   }
 
   private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,

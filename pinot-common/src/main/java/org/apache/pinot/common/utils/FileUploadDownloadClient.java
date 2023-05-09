@@ -55,8 +55,10 @@ import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -129,8 +131,16 @@ public class FileUploadDownloadClient implements AutoCloseable {
     _httpClient = new HttpClient();
   }
 
+  public FileUploadDownloadClient(HttpClientConfig httpClientConfig) {
+    _httpClient = new HttpClient(httpClientConfig, null);
+  }
+
   public FileUploadDownloadClient(SSLContext sslContext) {
-    _httpClient = new HttpClient(sslContext);
+    _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, sslContext);
+  }
+
+  public FileUploadDownloadClient(HttpClientConfig httpClientConfig, SSLContext sslContext) {
+    _httpClient = new HttpClient(httpClientConfig, sslContext);
   }
 
   public HttpClient getHttpClient() {
@@ -479,10 +489,13 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getEndReplaceSegmentsRequest(URI uri, int socketTimeoutMs,
+  private static HttpUriRequest getEndReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs,
       @Nullable AuthProvider authProvider) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
+    if (jsonRequestBody != null) {
+      requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    }
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
@@ -837,6 +850,28 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
       @Nullable TableType tableType, boolean excludeReplacedSegments, @Nullable AuthProvider authProvider)
       throws Exception {
+    return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, Long.MIN_VALUE,
+        Long.MAX_VALUE, false, authProvider);
+  }
+
+  /**
+   * Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
+   * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
+   * @param controllerBaseUri the base controller URI, e.g., https://example.com:8000
+   * @param rawTableName the raw table name without table type
+   * @param tableType the table type (OFFLINE or REALTIME)
+   * @param excludeReplacedSegments whether to exclude replaced segments (determined by segment lineage)
+   * @param startTimestamp start timestamp in ms (inclusive)
+   * @param endTimestamp end timestamp in ms (exclusive)
+   * @param excludeOverlapping whether to exclude the segments overlapping with the timestamps, false by default
+   * @param authProvider the {@link AuthProvider}
+   * @return a map from a given tableType to a list of segment names
+   * @throws Exception when failed to get segments from the controller
+   */
+  public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
+      @Nullable TableType tableType, boolean excludeReplacedSegments, long startTimestamp, long endTimestamp,
+      boolean excludeOverlapping, @Nullable AuthProvider authProvider)
+      throws Exception {
     List<String> tableTypes;
     if (tableType == null) {
       tableTypes = Arrays.asList(TableType.OFFLINE.toString(), TableType.REALTIME.toString());
@@ -849,7 +884,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
     for (String tableTypeToFilter : tableTypes) {
       tableTypeToSegments.put(tableTypeToFilter, new ArrayList<>());
       String uri =
-          controllerRequestURLBuilder.forSegmentListAPI(rawTableName, tableTypeToFilter, excludeReplacedSegments);
+          controllerRequestURLBuilder.forSegmentListAPI(rawTableName, tableTypeToFilter, excludeReplacedSegments,
+              startTimestamp, endTimestamp, excludeOverlapping);
       RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
       AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
       HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
@@ -1035,10 +1071,13 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs, @Nullable AuthProvider authProvider)
+  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs, @Nullable
+  EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
+    String jsonBody = (endReplaceSegmentsRequest == null) ? null
+        : JsonUtils.objectToString(endReplaceSegmentsRequest);
     return HttpClient.wrapAndThrowHttpException(
-        _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs, authProvider)));
+        _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, jsonBody, socketTimeoutMs, authProvider)));
   }
 
   /**

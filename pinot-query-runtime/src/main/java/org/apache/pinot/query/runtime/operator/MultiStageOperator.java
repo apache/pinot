@@ -18,23 +18,30 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Joiner;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public abstract class MultiStageOperator implements Operator<TransferableBlock>, AutoCloseable {
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
-  // TODO: Move to OperatorContext class.
-  private final OperatorStats _operatorStats;
+  protected final OpChainExecutionContext _context;
+  protected final String _operatorId;
+  protected final OpChainStats _opChainStats;
 
-  public MultiStageOperator(long requestId, int stageId) {
-    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+  public MultiStageOperator(OpChainExecutionContext context) {
+    _context = context;
+    _operatorId =
+        Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
+    _opChainStats = _context.getStats();
   }
 
   @Override
@@ -43,20 +50,30 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
-      _operatorStats.startTimer();
-      TransferableBlock nextBlock = getNextBlock();
-      _operatorStats.recordRow(1, nextBlock.getNumRows());
-      _operatorStats.endTimer();
-      // TODO: move this to centralized reporting in broker
-      if (nextBlock.isEndOfStreamBlock()) {
-        LOGGER.info("Recorded operator stats: " + _operatorStats);
+      TransferableBlock nextBlock;
+      if (shouldCollectStats()) {
+        OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+        operatorStats.startTimer();
+        nextBlock = getNextBlock();
+        operatorStats.recordRow(1, nextBlock.getNumRows());
+        operatorStats.endTimer(nextBlock);
+      } else {
+        nextBlock = getNextBlock();
       }
       return nextBlock;
     }
   }
 
+  public String getOperatorId() {
+    return _operatorId;
+  }
+
   // Make it protected because we should always call nextBlock()
   protected abstract TransferableBlock getNextBlock();
+
+  protected boolean shouldCollectStats() {
+    return _context.isTraceEnabled();
+  }
 
   @Override
   public List<MultiStageOperator> getChildOperators() {

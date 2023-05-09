@@ -89,6 +89,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
 
+  // GRPC related metrics
+  GRPC_QUERIES("grpcQueries", true),
+  GRPC_BYTES_RECEIVED("grpcBytesReceived", true),
+  GRPC_BYTES_SENT("grpcBytesSent", true),
+
   NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
   NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),;

@@ -63,7 +63,7 @@ public class PinotStatement extends AbstractBaseStatement {
       if (!DriverUtils.queryContainsLimitStatement(sql)) {
         sql += " " + LIMIT_STATEMENT + " " + _maxRows;
       }
-      String enabledSql = DriverUtils.enableNullHandling(_connection, sql);
+      String enabledSql = DriverUtils.enableQueryOptions(sql, _connection.getQueryOptions());
       ResultSetGroup resultSetGroup = _session.execute(enabledSql);
       if (resultSetGroup.getResultSetCount() == 0) {
         _resultSet = PinotResultSet.empty();

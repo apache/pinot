@@ -288,12 +288,14 @@ public class RangePredicateEvaluatorFactory {
             return _rawValueBasedEvaluator.applySV(_dictionary.getFloatValue(dictId));
           case DOUBLE:
             return _rawValueBasedEvaluator.applySV(_dictionary.getDoubleValue(dictId));
+          case BIG_DECIMAL:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getBigDecimalValue(dictId));
           case STRING:
             return _rawValueBasedEvaluator.applySV(_dictionary.getStringValue(dictId));
           case BYTES:
             return _rawValueBasedEvaluator.applySV(_dictionary.getBytesValue(dictId));
           default:
-            throw new IllegalStateException();
+            throw new IllegalStateException("Unsupported value type: " + _dictionary.getValueType());
         }
       }
     }

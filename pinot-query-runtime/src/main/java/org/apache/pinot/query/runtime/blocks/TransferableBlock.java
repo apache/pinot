@@ -19,7 +19,9 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -27,20 +29,16 @@ import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-
+import org.apache.pinot.query.runtime.operator.OperatorStats;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 /**
  * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
  * {@link org.apache.pinot.common.proto.Mailbox}.
  */
 public class TransferableBlock implements Block {
-
   private final DataBlock.Type _type;
   private final DataSchema _dataSchema;
   private final int _numRows;
@@ -67,6 +65,13 @@ public class TransferableBlock implements Block {
     _type = dataBlock instanceof ColumnarDataBlock ? DataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? DataBlock.Type.ROW : DataBlock.Type.METADATA;
     _numRows = _dataBlock.getNumberOfRows();
+  }
+
+  public Map<String, OperatorStats> getResultMetadata() {
+    if (isSuccessfulEndOfStreamBlock()) {
+      return OperatorUtils.getOperatorStatsFromMetadata((MetadataBlock) _dataBlock);
+    }
+    return new HashMap<>();
   }
 
   public int getNumRows() {
@@ -182,25 +187,5 @@ public class TransferableBlock implements Block {
 
     MetadataBlock metadata = (MetadataBlock) _dataBlock;
     return metadata.getType() == type;
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
   }
 }

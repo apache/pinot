@@ -28,11 +28,12 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
 /**
  * Annotation {@code ProtoProperties} indicates whether a field defined in a
- * {@link org.apache.pinot.query.planner.stage.StageNode} should be serialized.
+ * {@link PlanNode} should be serialized.
  */
 @Target({ElementType.ANNOTATION_TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)

@@ -38,14 +38,10 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
  *   Numeric column</li>
  * </ul>
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Float> {
-
   private final static ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MIN_VALUE);
 
-  public LastFloatValueWithTimeAggregationFunction(
-      ExpressionContext dataCol,
-      ExpressionContext timeCol) {
+  public LastFloatValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol) {
     super(dataCol, timeCol, ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE);
   }
 
@@ -79,11 +75,8 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
   }
 
   @Override
-  public void aggregateGroupResultWithRawDataSv(int length,
-      int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet,
-      BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataSv(int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -94,11 +87,8 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
   }
 
   @Override
-  public void aggregateGroupResultWithRawDataMv(int length,
-      int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet,
-      BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataMv(int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -113,11 +103,6 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'FLOAT')";
-  }
-
-  @Override
-  public String getColumnName() {
-    return getType().getName() + "_" + _expression + "_" + _timeCol + "_FLOAT";
   }
 
   @Override

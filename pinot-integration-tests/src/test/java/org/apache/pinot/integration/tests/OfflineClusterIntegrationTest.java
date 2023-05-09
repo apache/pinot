@@ -49,6 +49,7 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -138,9 +140,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
   private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
-  // TODO: This might lead to flaky test, as this disk size is not deterministic
-  //       as it depends on the iteration order of a HashSet.
-  private static final int DISK_SIZE_IN_BYTES = 20797128;
+  private static final int DISK_SIZE_IN_BYTES = 20797324;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -167,6 +167,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @BeforeClass
   public void setUp()
       throws Exception {
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -518,12 +519,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // download, the original segment dir is deleted and then replaced with the newly downloaded segment, leaving a
     // small chance of race condition between getting table size check and replacing the segment dir, i.e. flaky test.
     addInvertedIndex();
-    // The table size gets larger for sure, but it does not necessarily equal to tableSizeWithNewIndex, because the
-    // order of entries in the index_map file can change when the raw segment adds/deletes indices back and forth.
-    long tableSizeAfterAddIndex = getTableSize(getTableName());
-    assertTrue(tableSizeAfterAddIndex > tableSizeAfterReloadSegment,
-        String.format("Table size: %d should increase after adding inverted index on segment: %s, as compared with %d",
-            tableSizeAfterAddIndex, segmentName, tableSizeAfterReloadSegment));
+    assertEquals(getTableSize(getTableName()), tableSizeWithNewIndex);
 
     // Force to download the whole table and use the original table config, so the disk usage should get back to
     // initial value.
@@ -2265,11 +2261,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime LIMIT 1000000";
-    h2Query = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime";
+    h2Query = "SELECT CAST(ArrTime-DepTime AS FLOAT) FROM mytable GROUP BY CAST(ArrTime-DepTime AS FLOAT)";
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A LIMIT 1000000";
-    h2Query = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A";
+    h2Query = "SELECT CAST(ArrTime+DepTime AS FLOAT) AS A FROM mytable GROUP BY A";
     testQuery(pinotQuery, h2Query);
   }
 
@@ -2430,9 +2426,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},"
         + "\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)\",1,0],[\"COMBINE_GROUP_BY\",2,1],"
         + "[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],"
-        + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],"
-        + "[\"TRANSFORM_PASSTHROUGH(Carrier)\",4,3],[\"PROJECT(Carrier)\",5,4],[\"DOC_ID_SET\",6,5],"
-        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",7,6]]}");
+        + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],[\"PROJECT(Carrier)\",4,3],"
+        + "[\"DOC_ID_SET\",5,4],[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",6,5]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.

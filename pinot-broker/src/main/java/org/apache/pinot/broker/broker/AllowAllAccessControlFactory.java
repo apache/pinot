@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker;
 
+import java.util.Set;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -41,6 +42,11 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
   private static class AllowAllAccessControl implements AccessControl {
     @Override
     public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+      return true;
+    }
+
+    @Override
+    public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       return true;
     }
   }

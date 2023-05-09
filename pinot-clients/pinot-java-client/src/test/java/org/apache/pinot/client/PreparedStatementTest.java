@@ -36,7 +36,8 @@ public class PreparedStatementTest {
   public void testPreparedStatementWithDynamicBroker() {
     // Create a connection with dynamic broker selector.
     BrokerSelector mockBrokerSelector = Mockito.mock(BrokerSelector.class);
-    Mockito.when(mockBrokerSelector.selectBroker(Mockito.anyString())).thenAnswer(i -> i.getArgument(0));
+    Mockito.when(mockBrokerSelector.selectBroker(Mockito.anyString()))
+        .thenAnswer(i -> i.getArgument(0));
     Connection connection = new Connection(mockBrokerSelector, _dummyPinotClientTransport);
 
     PreparedStatement preparedStatement = connection.prepareStatement("SELECT foo FROM bar WHERE baz = ?");

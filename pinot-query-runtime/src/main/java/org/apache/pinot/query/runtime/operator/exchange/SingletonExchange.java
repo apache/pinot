@@ -30,12 +30,13 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 class SingletonExchange extends BlockExchange {
 
-  SingletonExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
+  SingletonExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
     super(sendingMailboxes, splitter);
   }
 
   @Override
-  protected void route(List<SendingMailbox<TransferableBlock>> mailbox, TransferableBlock block) {
+  protected void route(List<SendingMailbox> mailbox, TransferableBlock block)
+      throws Exception {
     for (SendingMailbox sendingMailbox : mailbox) {
       sendBlock(sendingMailbox, block);
     }

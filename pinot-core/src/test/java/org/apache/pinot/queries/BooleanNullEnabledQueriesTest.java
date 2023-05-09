@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -181,7 +180,6 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
   }
 
   public void testQueries() {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     HashSet<Integer> trueIndices = new HashSet<Integer>(Arrays.asList(1, 3, 5));

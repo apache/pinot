@@ -23,29 +23,23 @@ import java.util.Objects;
 
 
 /**
- * Represents the address of a {@link VirtualServer} containing
- * both the ID of the specific virtualized server and the physical
- * internet address in id@hostname:port format.
- *
- * <p>This is needed in addition to {@code VirtualServer} because there
- * are some parts of the code that don't have enough information to
- * construct the full {@code VirtualServer} and only require the
- * hostname, port and virtualId.</p>
+ * Represents the address of a {@link QueryServerInstance} containing both the ID of the specific worker and the
+ * physical host/port info from {@link QueryServerInstance}.
  */
 public class VirtualServerAddress {
 
   private final String _hostname;
   private final int _port;
-  private final int _virtualId;
+  private final int _workerId;
 
-  public VirtualServerAddress(String hostname, int port, int virtualId) {
+  public VirtualServerAddress(String hostname, int port, int workerId) {
     _hostname = hostname;
     _port = port;
-    _virtualId = virtualId;
+    _workerId = workerId;
   }
 
-  public VirtualServerAddress(VirtualServer server) {
-    this(server.getHostname(), server.getQueryMailboxPort(), server.getVirtualId());
+  public VirtualServerAddress(QueryServerInstance server, int workerId) {
+    this(server.getHostname(), server.getQueryMailboxPort(), workerId);
   }
 
   /**
@@ -75,8 +69,8 @@ public class VirtualServerAddress {
     return _port;
   }
 
-  public int virtualId() {
-    return _virtualId;
+  public int workerId() {
+    return _workerId;
   }
 
   @Override
@@ -89,17 +83,17 @@ public class VirtualServerAddress {
     }
     VirtualServerAddress that = (VirtualServerAddress) o;
     return _port == that._port
-        && _virtualId == that._virtualId
+        && _workerId == that._workerId
         && Objects.equals(_hostname, that._hostname);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_hostname, _port, _virtualId);
+    return Objects.hash(_hostname, _port, _workerId);
   }
 
   @Override
   public String toString() {
-    return _virtualId + "@" + _hostname + ":" + _port;
+    return _workerId + "@" + _hostname + ":" + _port;
   }
 }

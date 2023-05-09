@@ -22,6 +22,7 @@ import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -44,5 +45,13 @@ public class PinotRuleUtils {
       reference = ((HepRelVertex) reference).getCurrentRel();
     }
     return reference instanceof Exchange;
+  }
+
+  public static boolean isProject(RelNode rel) {
+    RelNode reference = rel;
+    if (reference instanceof HepRelVertex) {
+      reference = ((HepRelVertex) reference).getCurrentRel();
+    }
+    return reference instanceof Project;
   }
 }

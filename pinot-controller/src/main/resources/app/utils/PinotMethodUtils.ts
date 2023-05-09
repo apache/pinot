@@ -577,6 +577,7 @@ const getSegmentDetails = (tableName, segmentName) => {
     const segmentMetaDataJson = { ...segmentMetaData }
     delete segmentMetaDataJson.indexes
     delete segmentMetaDataJson.columns
+    const indexes = get(segmentMetaData, 'indexes', {})
 
     return {
       replicaSet: {
@@ -585,7 +586,7 @@ const getSegmentDetails = (tableName, segmentName) => {
       },
       indexes: {
         columns: ['Field Name', 'Bloom Filter', 'Dictionary', 'Forward Index', 'Sorted', 'Inverted Index', 'JSON Index', 'Null Value Vector Reader', 'Range Index'],
-        records: Object.keys(segmentMetaData.indexes).map(fieldName => [
+        records: Object.keys(indexes).map(fieldName => [
           fieldName,
           segmentMetaData.indexes[fieldName]["bloom-filter"] === "YES",
           segmentMetaData.indexes[fieldName]["dictionary"] === "YES",
@@ -1002,7 +1003,9 @@ const verifyAuth = (authToken) => {
 
 const getAccessTokenFromHashParams = () => {
   let accessToken = '';
-  const urlSearchParams = new URLSearchParams(location.hash.substr(1));
+  const hashParam = removeAllLeadingForwardSlash(location.hash.substring(1));
+  
+  const urlSearchParams = new URLSearchParams(hashParam);
   if (urlSearchParams.has('access_token')) {
     accessToken = urlSearchParams.get('access_token') as string;
   }
@@ -1010,6 +1013,13 @@ const getAccessTokenFromHashParams = () => {
   return accessToken;
 };
 
+const removeAllLeadingForwardSlash = (string: string) => {
+  if(!string) {
+    return "";
+  }
+
+  return string.replace(new RegExp("^/+", "g"), "");
+}
 
 // validates app redirect path with known routes
 const validateRedirectPath = (path: string): boolean => {

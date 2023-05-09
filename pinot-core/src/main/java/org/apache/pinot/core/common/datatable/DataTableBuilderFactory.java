@@ -34,7 +34,7 @@ public class DataTableBuilderFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableBuilderFactory.class);
 
-  public static final int DEFAULT_VERSION = DataTableFactory.VERSION_3;
+  public static final int DEFAULT_VERSION = DataTableFactory.VERSION_4;
 
   private static int _version = DEFAULT_VERSION;
 

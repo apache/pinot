@@ -5,14 +5,29 @@
     "secondsSinceEpoch": 1567205394
   },
   {
+    "event_id": "aa",
+    "description" : "update",
+    "secondsSinceEpoch": 1567205397
+  },
+  {
+    "event_id": "aa",
+    "description" : "first arrival, other column",
+    "otherComparisonColumn": 1567205395
+  },
+  {
+    "event_id": "aa",
+    "description" : "late arrival, other column",
+    "otherComparisonColumn": 1567205393
+  },
+  {
     "event_id": "bb",
     "description" : "first",
     "secondsSinceEpoch": 1567205396
   },
   {
-    "event_id": "aa",
-    "description" : "update",
-    "secondsSinceEpoch": 1567205397
+    "event_id": "bb",
+    "description" : "duplicate arrival",
+    "secondsSinceEpoch": 1567205396
   },
   {
     "event_id": "bb",

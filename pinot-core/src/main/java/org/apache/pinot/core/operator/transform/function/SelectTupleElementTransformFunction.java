@@ -22,16 +22,18 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class SelectTupleElementTransformFunction extends BaseTransformFunction {
 
   private static final EnumSet<FieldSpec.DataType> SUPPORTED_DATATYPES = EnumSet.of(FieldSpec.DataType.INT,
       FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.BIG_DECIMAL,
-      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING);
+      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING, FieldSpec.DataType.UNKNOWN);
 
   private static final EnumMap<FieldSpec.DataType, EnumSet<FieldSpec.DataType>> ACCEPTABLE_COMBINATIONS =
       createAcceptableCombinations();
@@ -46,7 +48,7 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     if (arguments.isEmpty()) {
       throw new IllegalArgumentException(_name + " takes at least one argument");
     }
@@ -63,7 +65,8 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
       }
       if (dataType == null) {
         dataType = argumentType;
-      } else if (ACCEPTABLE_COMBINATIONS.get(dataType).contains(argumentType)) {
+      } else if (dataType.isUnknown() || argumentType.isUnknown() || ACCEPTABLE_COMBINATIONS.get(dataType)
+          .contains(argumentType)) {
         dataType = getLowestCommonDenominatorType(dataType, argumentType);
       } else {
         throw new IllegalArgumentException(
@@ -82,6 +85,25 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
   @Override
   public String getName() {
     return _name;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    RoaringBitmap bitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    if (bitmap == null || bitmap.isEmpty()) {
+      return bitmap;
+    }
+    for (int i = 1; i < _arguments.size(); i++) {
+      RoaringBitmap curBitmap = _arguments.get(i).getNullBitmap(valueBlock);
+      if (curBitmap == null || curBitmap.isEmpty()) {
+        return curBitmap;
+      }
+      bitmap.and(curBitmap);
+      if (bitmap.isEmpty()) {
+        return null;
+      }
+    }
+    return bitmap;
   }
 
   private static FieldSpec.DataType getLowestCommonDenominatorType(FieldSpec.DataType left, FieldSpec.DataType right) {

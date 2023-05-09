@@ -160,8 +160,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         "Finishing uploading segments: " + context.getSegmentConversionResults().size());
     if (context.isReplaceSegmentsEnabled()) {
       String lineageEntryId = (String) context.getCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID);
-      SegmentConversionUtils.endSegmentReplace(context.getTableNameWithType(), context.getUploadURL(), lineageEntryId,
-          _minionConf.getEndReplaceSegmentsTimeoutMs(), context.getAuthProvider());
+      SegmentConversionUtils.endSegmentReplace(context.getTableNameWithType(), context.getUploadURL(),
+          lineageEntryId, _minionConf.getEndReplaceSegmentsTimeoutMs(), context.getAuthProvider());
     }
   }
 

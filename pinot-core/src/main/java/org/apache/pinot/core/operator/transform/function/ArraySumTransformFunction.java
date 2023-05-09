@@ -20,9 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
@@ -44,7 +44,8 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 argument is required for ArraySum transform function");
@@ -68,12 +69,10 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
-    double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initDoubleValuesSV(length);
+    double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
       double sumRes = 0;
       for (double value : doubleValuesMV[i]) {

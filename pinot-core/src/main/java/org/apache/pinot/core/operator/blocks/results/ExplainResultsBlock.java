@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.blocks.results;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,7 @@ public class ExplainResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public Collection<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows(QueryContext queryContext) {
     List<Object[]> rows = new ArrayList<>(_entries.size());
     for (ExplainEntry entry : _entries) {
       rows.add(entry.toRow());

@@ -126,13 +126,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
-  protected void prefetchAll() {
+  public void prefetchAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).prefetch(_fetchContexts.get(i));
     }
   }
 
-  protected void releaseAll() {
+  public void releaseAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).release(_fetchContexts.get(i));
     }

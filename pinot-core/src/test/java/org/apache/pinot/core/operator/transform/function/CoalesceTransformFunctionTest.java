@@ -453,17 +453,21 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     testIntTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
   }
 
-  // Test that all arguments have to be same type.
+  // Test that string literal works for coalesce
   @Test
-  public void testDifferentArgumentType()
+  public void testDifferentLiteralArgs()
       throws Exception {
     ExpressionContext coalesceExpr =
-        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", INT_SV_COLUMN1, STRING_SV_COLUMN1));
-    Assert.assertThrows(RuntimeException.class, () -> {
-      TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
-    });
-    Assert.assertThrows(RuntimeException.class, () -> {
-      TransformFunctionFactory.get(coalesceExpr, _disableNullDataSourceMap);
-    });
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,'%s')", STRING_SV_COLUMN1, 234));
+    String[] expectedResults = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isColumn1Null(i)) {
+        expectedResults[i] = "234";
+      } else {
+        expectedResults[i] = _stringSVValues[i];
+      }
+    }
+    testStringTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
+    testStringTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
   }
 }

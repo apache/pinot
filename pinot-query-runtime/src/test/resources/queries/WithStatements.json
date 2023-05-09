@@ -43,23 +43,23 @@
         "description": "multi 'with' table",
         "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, avg(intCol) AS avgVal FROM {tbl2} GROUP BY strCol1) SELECT strCol, sumVal - avgVal FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
         "outputs": [
-          ["a", 3],
-          ["b", -98460]
+          ["a", 2.5],
+          ["b", -98460.5]
         ]
       },
       {
         "description": "nested 'with' on agg table: (with a as ( ... ), select ... ",
         "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2) SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1",
         "outputs": [
-          ["a", 1],
-          ["b", 98462]
+          ["a", 1.5],
+          ["b", 98462.5]
         ]
       },
       {
         "description": "nested multi 'with' table: (with a as ( ... ), with b as ( ... from a ... ) select ... ",
         "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2), agg2 AS ( SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1) SELECT strCol1, avgVal FROM agg2 WHERE avgVal < 100",
         "outputs": [
-          ["a", 1]
+          ["a", 1.5]
         ]
       },
       {
@@ -95,6 +95,61 @@
           ["a", 2, 3],
           ["b", 196883, 2]
         ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER()",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 11],
+          ["a", 1, 11],
+          ["b", 2, 11]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() and empty filter on outer SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol > 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() with filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} WHERE intCol < 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 6],
+          ["a", 1, 6],
+          ["b", 2, 6]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() with empty filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} WHERE intCol > 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 4],
+          ["a", 1, 4],
+          ["b", 2, 2]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY and empty filter on outer SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol > 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY with filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} WHERE intCol > 1) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 3],
+          ["b", 2, 2]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY with empty filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} WHERE intCol > 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": []
       },
       {
         "ignored": true,

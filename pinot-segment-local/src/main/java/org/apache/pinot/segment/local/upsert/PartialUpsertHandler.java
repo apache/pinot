@@ -35,13 +35,13 @@ public class PartialUpsertHandler {
   // _column2Mergers maintains the mapping of merge strategies per columns.
   private final Map<String, PartialUpsertMerger> _column2Mergers = new HashMap<>();
   private final PartialUpsertMerger _defaultPartialUpsertMerger;
-  private final String _comparisonColumn;
+  private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
 
   public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
-      UpsertConfig.Strategy defaultPartialUpsertStrategy, String comparisonColumn) {
+      UpsertConfig.Strategy defaultPartialUpsertStrategy, List<String> comparisonColumns) {
     _defaultPartialUpsertMerger = PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy);
-    _comparisonColumn = comparisonColumn;
+    _comparisonColumns = comparisonColumns;
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
 
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
@@ -66,12 +66,16 @@ public class PartialUpsertHandler {
    */
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
     for (String column : previousRecord.getFieldToValueMap().keySet()) {
-      if (!_primaryKeyColumns.contains(column) && !_comparisonColumn.equals(column)) {
+      if (!_primaryKeyColumns.contains(column)) {
         if (!previousRecord.isNullValue(column)) {
           if (newRecord.isNullValue(column)) {
+            // Note that we intentionally want to overwrite any previous _comparisonColumn value in the case of using
+            // multiple comparison columns. We never apply a merge function to it, rather we just take any/all non-null
+            // comparison column values from the previous record, and the sole non-null comparison column value from
+            // the new record.
             newRecord.putValue(column, previousRecord.getValue(column));
             newRecord.removeNullValueField(column);
-          } else {
+          } else if (!_comparisonColumns.contains(column)) {
             PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
             newRecord.putValue(column,
                 merger.merge(previousRecord.getValue(column), newRecord.getValue(column)));

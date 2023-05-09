@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -34,13 +35,14 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
@@ -68,44 +70,45 @@ import org.roaringbitmap.RoaringBitmap;
  * </ul>
  */
 public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
-
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
   private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final boolean _nullHandlingEnabled;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   private final List<ExpressionContext> _expressions;
-  private final TransformOperator _transformOperator;
+  private final BaseProjectOperator<?> _projectOperator;
   private final List<OrderByExpressionContext> _orderByExpressions;
-  private final TransformResultMetadata[] _orderByExpressionMetadata;
+  private final ColumnContext[] _orderByColumnContexts;
   private final int _numRowsToKeep;
+  private final Comparator<Object[]> _comparator;
   private final PriorityQueue<Object[]> _rows;
 
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator) {
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
     _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
-    _transformOperator = transformOperator;
+    _projectOperator = projectOperator;
 
     _orderByExpressions = queryContext.getOrderByExpressions();
     assert _orderByExpressions != null;
     int numOrderByExpressions = _orderByExpressions.size();
-    _orderByExpressionMetadata = new TransformResultMetadata[numOrderByExpressions];
+    _orderByColumnContexts = new ColumnContext[numOrderByExpressions];
     for (int i = 0; i < numOrderByExpressions; i++) {
       ExpressionContext expression = _orderByExpressions.get(i).getExpression();
-      _orderByExpressionMetadata[i] = _transformOperator.getResultMetadata(expression);
+      _orderByColumnContexts[i] = _projectOperator.getResultColumnContext(expression);
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
-    Comparator<Object[]> comparator =
-        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByExpressionMetadata, true,
-            _nullHandlingEnabled);
+    _comparator =
+        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByColumnContexts, _nullHandlingEnabled);
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        comparator);
+        _comparator.reversed());
   }
 
   @Override
@@ -137,15 +140,15 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
     // Fetch all the expressions and insert them into the priority queue
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
-    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
-    TransformBlock transformBlock;
-    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+    int numColumnsProjected = _projectOperator.getNumColumnsProjected();
+    ValueBlock valueBlock;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
-        blockValSets[i] = transformBlock.getBlockValueSet(expression);
+        blockValSets[i] = valueBlock.getBlockValueSet(expression);
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      int numDocsFetched = transformBlock.getNumDocs();
+      int numDocsFetched = valueBlock.getNumDocs();
       if (_nullHandlingEnabled) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
         for (int i = 0; i < numExpressions; i++) {
@@ -175,13 +178,12 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       columnNames[i] = _expressions.get(i).toString();
-      TransformResultMetadata expressionMetadata = _orderByExpressionMetadata[i];
-      columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
+          _orderByColumnContexts[i].isSingleValue());
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, _rows);
+    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator);
   }
 
   /**
@@ -193,16 +195,16 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
     // Fetch the order-by expressions and docIds and insert them into the priority queue
     BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions];
-    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
-    TransformBlock transformBlock;
-    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+    int numColumnsProjected = _projectOperator.getNumColumnsProjected();
+    ValueBlock valueBlock;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
       for (int i = 0; i < numOrderByExpressions; i++) {
         ExpressionContext expression = _orderByExpressions.get(i).getExpression();
-        blockValSets[i] = transformBlock.getBlockValueSet(expression);
+        blockValSets[i] = valueBlock.getBlockValueSet(expression);
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      int numDocsFetched = transformBlock.getNumDocs();
-      int[] docIds = transformBlock.getDocIds();
+      int numDocsFetched = valueBlock.getNumDocs();
+      int[] docIds = valueBlock.getDocIds();
       if (_nullHandlingEnabled) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numOrderByExpressions];
         for (int i = 0; i < numOrderByExpressions; i++) {
@@ -262,19 +264,20 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
-    TransformOperator transformOperator = new TransformOperator(projectionOperator, nonOrderByExpressions);
+    TransformOperator transformOperator =
+        new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 
     // Fill the non-order-by expression values
     int numNonOrderByExpressions = nonOrderByExpressions.size();
     blockValSets = new BlockValSet[numNonOrderByExpressions];
     int rowBaseId = 0;
-    while ((transformBlock = transformOperator.nextBlock()) != null) {
+    while ((valueBlock = transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numNonOrderByExpressions; i++) {
         ExpressionContext expression = nonOrderByExpressions.get(i);
-        blockValSets[i] = transformBlock.getBlockValueSet(expression);
+        blockValSets[i] = valueBlock.getBlockValueSet(expression);
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      int numDocsFetched = transformBlock.getNumDocs();
+      int numDocsFetched = valueBlock.getNumDocs();
       for (int i = 0; i < numDocsFetched; i++) {
         blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
       }
@@ -289,23 +292,31 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       columnNames[i] = _expressions.get(i).toString();
     }
     for (int i = 0; i < numOrderByExpressions; i++) {
-      TransformResultMetadata expressionMetadata = _orderByExpressionMetadata[i];
-      columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
+          _orderByColumnContexts[i].isSingleValue());
     }
     for (int i = 0; i < numNonOrderByExpressions; i++) {
-      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(nonOrderByExpressions.get(i));
+      ColumnContext columnContext = transformOperator.getResultColumnContext(nonOrderByExpressions.get(i));
       columnDataTypes[numOrderByExpressions + i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, _rows);
+    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator);
+  }
+
+  private List<Object[]> getSortedRows() {
+    int numRows = _rows.size();
+    Object[][] sortedRows = new Object[numRows][];
+    for (int i = numRows - 1; i >= 0; i--) {
+      sortedRows[i] = _rows.poll();
+    }
+    return Arrays.asList(sortedRows);
   }
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+    return Collections.singletonList(_projectOperator);
   }
 
   @Override
@@ -315,7 +326,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, _numEntriesScannedPostFilter,
         numTotalDocs);

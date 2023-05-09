@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.MVScanDocIdSet;
@@ -37,9 +38,15 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   private final DataSource _dataSource;
   private final int _numDocs;
   private final boolean _nullHandlingEnabled;
+  private final int _batchSize;
 
-  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+  public ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
       boolean nullHandlingEnabled) {
+    this(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled, BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE);
+  }
+
+  public ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      boolean nullHandlingEnabled, int batchSize) {
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;
     _numDocs = numDocs;
@@ -47,13 +54,15 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     Preconditions.checkState(_dataSource.getForwardIndex() != null,
         "Forward index disabled for column: %s, scan based filtering not supported!",
         _dataSource.getDataSourceMetadata().getFieldSpec().getName());
+    _batchSize = batchSize;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.isSingleValue()) {
-      return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled));
+      return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled,
+          _batchSize));
     } else {
       return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs));
     }

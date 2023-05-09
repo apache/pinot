@@ -20,7 +20,6 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -65,7 +64,7 @@ public class QueryServerEnclosure {
   private final InstanceDataManager _instanceDataManager;
   private final HelixManager _helixManager;
 
-  private QueryRunner _queryRunner;
+  private final QueryRunner _queryRunner;
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
     try {
@@ -112,7 +111,6 @@ public class QueryServerEnclosure {
   public void start()
       throws Exception {
     PinotConfiguration configuration = new PinotConfiguration(_runnerConfig);
-    _queryRunner = new QueryRunner();
     _queryRunner.init(configuration, _instanceDataManager, _helixManager, mockServiceMetrics());
     _queryRunner.start();
   }
@@ -120,7 +118,7 @@ public class QueryServerEnclosure {
   public void shutDown() {
     try {
       _queryRunner.shutDown();
-    } catch (TimeoutException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }

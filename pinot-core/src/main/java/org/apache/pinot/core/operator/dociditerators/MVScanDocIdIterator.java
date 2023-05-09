@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.util.OptionalInt;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -26,7 +27,6 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.utils.CommonConstants.Query.OptimizationConstants;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.RoaringBitmapWriter;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -79,13 +79,21 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
-    if (docIds.isEmpty()) {
+  public MutableRoaringBitmap applyAnd(BatchIterator docIdIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
+    if (!docIdIterator.hasNext()) {
       return new MutableRoaringBitmap();
     }
-    RoaringBitmapWriter<MutableRoaringBitmap> result = RoaringBitmapWriter.bufferWriter()
-        .expectedRange(docIds.first(), docIds.last()).runCompress(false).get();
-    BatchIterator docIdIterator = docIds.getBatchIterator();
+    RoaringBitmapWriter<MutableRoaringBitmap> result;
+    if (firstDoc.isPresent() && lastDoc.isPresent()) {
+      result = RoaringBitmapWriter.bufferWriter()
+          .expectedRange(firstDoc.getAsInt(), lastDoc.getAsInt())
+          .runCompress(false)
+          .get();
+    } else {
+      result = RoaringBitmapWriter.bufferWriter()
+          .runCompress(false)
+          .get();
+    }
     int[] buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
     while (docIdIterator.hasNext()) {
       int limit = docIdIterator.nextBatch(buffer);
