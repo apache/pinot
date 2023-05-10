@@ -26,7 +26,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -66,13 +65,6 @@ public class OperatorUtils {
     functionName = StringUtils.remove(functionName, " ");
     functionName = OPERATOR_TOKEN_MAPPING.getOrDefault(functionName, functionName);
     return functionName;
-  }
-
-  public static void recordTableName(OperatorStats operatorStats, PlanFragmentMetadata planFragmentMetadata) {
-    if (PlanFragmentMetadata.getTableName(planFragmentMetadata) != null) {
-      operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(),
-          PlanFragmentMetadata.getTableName(planFragmentMetadata));
-    }
   }
 
   public static void recordTableName(OperatorStats operatorStats, DispatchablePlanFragment dispatchablePlanFragment) {

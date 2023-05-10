@@ -19,44 +19,44 @@
 package org.apache.pinot.query.planner;
 
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 
 
+/**
+ * QueryPlanMetadata contains the metadata of the {@code QueryPlan}.
+ * It contains the table names and the fields of the query result.
+ */
 public class QueryPlanMetadata {
   private final Set<String> _tableNames;
   private final List<Pair<Integer, String>> _fields;
   private final Map<String, String> _customProperties;
 
-  public QueryPlanMetadata() {
-    _tableNames = new HashSet<>();
+  public QueryPlanMetadata(Set<String> tableNames, ImmutableList<Pair<Integer, String>> fields) {
+    _tableNames = tableNames;
+    _fields = fields;
     _customProperties = new HashMap<>();
-    _fields = new ArrayList<>();
   }
 
   public Map<String, String> getCustomProperties() {
     return _customProperties;
   }
 
-  public void setTableNames(Set<String> tableNamesFromRelRoot) {
-    _tableNames.clear();
-    _tableNames.addAll(tableNamesFromRelRoot);
-  }
-
+  /**
+   * Get the table names.
+   * @return table names.
+   */
   public Set<String> getTableNames() {
     return _tableNames;
   }
 
-  public void setFields(ImmutableList<Pair<Integer, String>> fields) {
-    _fields.clear();
-    _fields.addAll(fields);
-  }
-
+  /**
+   * Get the query result field.
+   * @return query result field.
+   */
   public List<Pair<Integer, String>> getFields() {
     return _fields;
   }

@@ -36,7 +36,7 @@ public class DispatchablePlanFragment {
   private final PlanFragment _planFragment;
   private final List<WorkerMetadata> _workerMetadataList;
 
-  // This i
+  // This is used at broker stage - we don't need to ship it to the server.
   private Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
 
   // used for table scan stage - we use ServerInstance instead of VirtualServer
@@ -44,10 +44,6 @@ public class DispatchablePlanFragment {
   // same segments on them
   private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
   private Map<String, String> _customProperties;
-
-  public DispatchablePlanFragment() {
-    this(null, new ArrayList<>(), new HashMap<>(), new HashMap<>());
-  }
 
   public DispatchablePlanFragment(PlanFragment planFragment) {
     this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>());

@@ -272,7 +272,7 @@ public final class RelToStageConverter {
     }
   }
 
-  private static Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
+  public static Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
     Set<String> tableNames = new HashSet<>();
     List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
     for (String qualifiedTableName : qualifiedTableNames) {

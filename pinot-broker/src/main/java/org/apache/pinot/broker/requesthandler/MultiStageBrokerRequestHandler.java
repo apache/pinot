@@ -175,7 +175,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
 
-    //DispatchableSubPlan dispatchableQueryPlan = queryPlanResult.getQueryPlan();
     DispatchableSubPlan dispatchableQueryPlan = queryPlanResult.getQueryPlan();
     Set<String> tableNames = queryPlanResult.getTableNames();
 

@@ -25,7 +25,6 @@ import java.util.Map;
 
 
 public class PlanFragmentMetadata {
-  public static final String PLAN_FRAGMENT_ID_KEY = "planFragmentId";
   private final Map<String, String> _customProperties = new HashMap<>();
 
   private List<String> _scannedTables = new ArrayList<>();

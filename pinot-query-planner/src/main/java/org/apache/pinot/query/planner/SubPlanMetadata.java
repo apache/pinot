@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,40 +26,34 @@ import org.apache.calcite.util.Pair;
 
 
 public class SubPlanMetadata {
-  public static final String SUBPLAN_ID_KEY = "subplanId";
-  private final Map<String, String> _metadata;
 
-  private final Set<String> _tableNames = new HashSet<>();
+  /**
+   * The set of tables that are scanned in this subplan.
+   */
+  private final Set<String> _tableNames;
 
-  // Only valid for SubPlan 0, which surfaces the fields from the original query
+  /**
+   * The list of fields that are surfaced by this subplan. Only valid for SubPlan Id 0.
+   */
   private List<Pair<Integer, String>> _fields;
 
-  public SubPlanMetadata() {
-    this(new HashMap<>());
-  }
+  private final Map<String, String> _customProperties;
 
-  public SubPlanMetadata(Map<String, String> metadata) {
-    _metadata = metadata;
-  }
-
-  public Map<String, String> getMetadata() {
-    return _metadata;
+  public SubPlanMetadata(Set<String> tableNames, List<Pair<Integer, String>> fields) {
+    _tableNames = tableNames;
+    _fields = fields;
+    _customProperties = new HashMap<>();
   }
 
   public List<Pair<Integer, String>> getFields() {
     return _fields;
   }
 
-  public void setFields(List<Pair<Integer, String>> fields) {
-    _fields = fields;
-  }
-
   public Set<String> getTableNames() {
     return _tableNames;
   }
 
-  public void setTableNames(Set<String> tableNames) {
-    _tableNames.clear();
-    _tableNames.addAll(tableNames);
+  public Map<String, String> getCustomProperties() {
+    return _customProperties;
   }
 }

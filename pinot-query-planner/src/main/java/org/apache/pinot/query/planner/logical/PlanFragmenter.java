@@ -44,10 +44,18 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
- * Fragment a subPlan into multiple plan fragments.
+ * PlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a
+ * {@link org.apache.pinot.query.planner.SubPlan} into multiple {@link PlanFragment}.
+ *
+ * The fragmenting process is as follows:
+ * 1. Traverse the plan tree in a depth-first manner;
+ * 2. For each node, if it is a PlanFragment splittable ExchangeNode, split it into {@link MailboxReceiveNode} and
+ * {@link MailboxSendNode} pair;
+ * 3. Assign current PlanFragment Id to {@link MailboxReceiveNode};
+ * 4. Increment current PlanFragment Id by one and assign it to the {@link MailboxSendNode}.
  */
-public class PlanFragmentFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmentFragmenter.Context> {
-  public static final PlanFragmentFragmenter INSTANCE = new PlanFragmentFragmenter();
+public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context> {
+  public static final PlanFragmenter INSTANCE = new PlanFragmenter();
 
   private PlanNode process(PlanNode node, Context context) {
     node.setPlanFragmentId(context._currentPlanFragmentId);

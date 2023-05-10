@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -58,9 +57,8 @@ public class PinotLogicalQueryPlanner {
     RelNode relRootNode = relRoot.rel;
     // Walk through RelNode tree and construct a StageNode tree.
     PlanNode globalRoot = relNodeToStageNode(relRootNode);
-    QueryPlanMetadata queryPlanMetadata = new QueryPlanMetadata();
-    queryPlanMetadata.setTableNames(getTableNamesFromRelRoot(relRootNode));
-    queryPlanMetadata.setFields(relRoot.fields);
+    QueryPlanMetadata queryPlanMetadata =
+        new QueryPlanMetadata(RelToStageConverter.getTableNamesFromRelRoot(relRootNode), relRoot.fields);
     return new QueryPlan(globalRoot, queryPlanMetadata);
   }
 
@@ -76,19 +74,18 @@ public class PinotLogicalQueryPlanner {
     // Fragment the stage tree into multiple SubPlans.
     SubPlanFragmenter.Context subPlanContext = new SubPlanFragmenter.Context();
     subPlanContext._subPlanIdToRootNodeMap.put(0, globalRoot);
-    subPlanContext._subPlanIdToMetadataMap.put(0, new SubPlanMetadata());
-    subPlanContext._subPlanIdToMetadataMap.get(0).setFields(queryPlan.getPlanMetadata().getFields());
-    subPlanContext._subPlanIdToMetadataMap.get(0).setTableNames(queryPlan.getPlanMetadata().getTableNames());
+    subPlanContext._subPlanIdToMetadataMap.put(0,
+        new SubPlanMetadata(queryPlan.getPlanMetadata().getTableNames(), queryPlan.getPlanMetadata().getFields()));
     globalRoot.visit(SubPlanFragmenter.INSTANCE, subPlanContext);
 
     Map<Integer, SubPlan> subPlanMap = new HashMap<>();
     for (Map.Entry<Integer, PlanNode> subPlanEntry : subPlanContext._subPlanIdToRootNodeMap.entrySet()) {
       int subPlanId = subPlanEntry.getKey();
       PlanNode subPlanRoot = subPlanEntry.getValue();
-      PlanFragmentFragmenter.Context planFragmentContext = new PlanFragmentFragmenter.Context();
+      PlanFragmenter.Context planFragmentContext = new PlanFragmenter.Context();
       planFragmentContext._planFragmentIdToRootNodeMap.put(1,
           new PlanFragment(1, subPlanRoot, new PlanFragmentMetadata(), new ArrayList<>()));
-      subPlanRoot = subPlanRoot.visit(PlanFragmentFragmenter.INSTANCE, planFragmentContext);
+      subPlanRoot = subPlanRoot.visit(PlanFragmenter.INSTANCE, planFragmentContext);
 
       // Sub plan root needs to send results back to the Broker ROOT, a.k.a. the client response node. the last stage
       // only has one
@@ -122,8 +119,6 @@ public class PinotLogicalQueryPlanner {
       }
       SubPlan subPlan = new SubPlan(planFragmentContext._planFragmentIdToRootNodeMap.get(0),
           subPlanContext._subPlanIdToMetadataMap.get(0), new ArrayList<>());
-      subPlan.getSubPlanMetadata().setTableNames(queryPlan.getPlanMetadata().getTableNames());
-      // subPlan.getSubPlanMetadata().setFields(queryPlan.getPlanMetadata().getFields());
       subPlanMap.put(subPlanId, subPlan);
     }
     for (Map.Entry<Integer, List<Integer>> subPlanToChildrenEntry : subPlanContext._subPlanIdToChildrenMap.entrySet()) {
@@ -162,17 +157,5 @@ public class PinotLogicalQueryPlanner {
       planNode.addInput(relNodeToStageNode(input));
     }
     return planNode;
-  }
-
-  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    Set<String> tableNames = new HashSet<>();
-    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
-    for (String qualifiedTableName : qualifiedTableNames) {
-      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
-      // statements, particularly to handle cases when they contain special characters or reserved keywords.
-      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
-      tableNames.add(tableName);
-    }
-    return tableNames;
   }
 }

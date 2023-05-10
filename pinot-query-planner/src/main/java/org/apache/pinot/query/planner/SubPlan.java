@@ -23,12 +23,21 @@ import java.util.List;
 
 /**
  * The {@code SubPlan} is the logical sub query plan that should be scheduled together from the result of
- * {@link org.apache.pinot.query.planner.logical.PinotQueryFragmenter}.
+ * {@link org.apache.pinot.query.planner.logical.SubPlanFragmenter}.
  *
  */
 public class SubPlan {
+  /**
+   * The root node of the sub query plan.
+   */
   private final PlanFragment _subPlanRoot;
+  /**
+   * The metadata of the sub query plan.
+   */
   private final SubPlanMetadata _subPlanMetadata;
+  /**
+   * The list of children sub query plans.
+   */
   private final List<SubPlan> _children;
 
   public SubPlan(PlanFragment subPlanRoot, SubPlanMetadata subPlanMetadata, List<SubPlan> children) {

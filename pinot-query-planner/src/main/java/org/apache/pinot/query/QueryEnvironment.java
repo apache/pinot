@@ -20,8 +20,6 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -65,6 +63,7 @@ import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
+import org.apache.pinot.query.planner.logical.RelToStageConverter;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
@@ -159,8 +158,11 @@ public class QueryEnvironment {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       SubPlan subPlan = toSubPlan(relRoot);
+      // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
+      // Each SubPlan should be able to run independently from Broker then set the results into the dependent
+      // SubPlan for further processing.
       DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(subPlan, plannerContext, requestId);
-      return new QueryPlannerResult(dispatchableSubPlan, null);
+      return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -189,7 +191,7 @@ public class QueryEnvironment {
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
+      Set<String> tableNames = RelToStageConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
@@ -213,10 +215,6 @@ public class QueryEnvironment {
     private DispatchableSubPlan _dispatchableSubPlan;
     private String _explainPlan;
     Set<String> _tableNames;
-
-    QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan) {
-      this(dispatchableSubPlan, explainPlan, dispatchableSubPlan.getTableNames());
-    }
 
     QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan,
         Set<String> tableNames) {
@@ -318,7 +316,7 @@ public class QueryEnvironment {
     // 6. construct a dispatchable query plan.
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
-    DispatchableSubPlan dispatchableSubPlan = pinotDispatchPlanner.createDispatchTasks(subPlan);
+    DispatchableSubPlan dispatchableSubPlan = pinotDispatchPlanner.createDispatchableSubPlan(subPlan);
     return dispatchableSubPlan;
   }
 
@@ -328,17 +326,5 @@ public class QueryEnvironment {
 
   private HintStrategyTable getHintStrategyTable() {
     return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
-  }
-
-  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    Set<String> tableNames = new HashSet<>();
-    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
-    for (String qualifiedTableName : qualifiedTableNames) {
-      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
-      // statements, particularly to handle cases when they contain special characters or reserved keywords.
-      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
-      tableNames.add(tableName);
-    }
-    return tableNames;
   }
 }

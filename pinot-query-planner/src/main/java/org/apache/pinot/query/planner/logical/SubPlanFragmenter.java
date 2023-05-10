@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +41,13 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
- * Fragment the logical plan into multiple sub-plans.
+ * SubPlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a
+ * {@link org.apache.pinot.query.planner.QueryPlan} into multiple {@link org.apache.pinot.query.planner.SubPlan}.
+ *
+ * The fragmenting process is as follows:
+ * 1. Traverse the plan tree in a depth-first manner;
+ * 2. For each node, if it is a SubPlan splittable ExchangeNode, switch it to a {@link LiteralValueNode};
+ * 3. Increment current SubPlan Id by one and keep traverse the tree.
  */
 public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragmenter.Context> {
   public static final SubPlanFragmenter INSTANCE = new SubPlanFragmenter();
@@ -125,9 +132,7 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
       context._subPlanIdToChildrenMap.put(currentStageId, new ArrayList<>());
     }
     context._subPlanIdToChildrenMap.get(currentStageId).add(nextSubPlanId);
-    context._subPlanIdToMetadataMap.put(nextSubPlanId, new SubPlanMetadata());
-    context._subPlanIdToMetadataMap.get(nextSubPlanId).setTableNames(node.getTableNames());
-
+    context._subPlanIdToMetadataMap.put(nextSubPlanId, new SubPlanMetadata(node.getTableNames(), ImmutableList.of()));
     PlanNode literalValueNode = new LiteralValueNode(nextStageRoot.getDataSchema());
     return literalValueNode;
   }
