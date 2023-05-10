@@ -92,8 +92,6 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
     URL resourcesLoc = SegmentGenerationAndPushTaskGeneratorTest.class.getClassLoader().getResource(".");
     SegmentGenerationAndPushTaskExecutor executor = new SegmentGenerationAndPushTaskExecutor();
     Schema schema = new Schema.SchemaBuilder().build();
-    // FieldUtils.writeField(executor, "_pinotTaskConfig", new PinotTaskConfig("",
-    // Map.of()), true);
     FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
     Map<String, String> configMap = Map.ofEntries(
         Pair.of(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc.toString() + "dummyTable.json"),
