@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
@@ -44,5 +45,25 @@ public class RangeIndexConfig extends IndexConfig {
 
   public int getVersion() {
     return _version;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    RangeIndexConfig that = (RangeIndexConfig) o;
+    return _version == that._version;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _version);
   }
 }

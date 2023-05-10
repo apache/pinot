@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 
@@ -127,5 +128,29 @@ public class JsonIndexConfig extends IndexConfig {
 
   public void setExcludeFields(@Nullable Set<String> excludeFields) {
     _excludeFields = excludeFields;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    JsonIndexConfig config = (JsonIndexConfig) o;
+    return _maxLevels == config._maxLevels && _excludeArray == config._excludeArray
+        && _disableCrossArrayUnnest == config._disableCrossArrayUnnest && Objects.equals(_includePaths,
+        config._includePaths) && Objects.equals(_excludePaths, config._excludePaths) && Objects.equals(_excludeFields,
+        config._excludeFields);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _maxLevels, _excludeArray, _disableCrossArrayUnnest, _includePaths,
+        _excludePaths, _excludeFields);
   }
 }
