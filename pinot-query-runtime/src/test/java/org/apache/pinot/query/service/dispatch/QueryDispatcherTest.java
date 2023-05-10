@@ -99,10 +99,10 @@ public class QueryDispatcherTest extends QueryTestSet {
   @Test(dataProvider = "testSql")
   public void testQueryDispatcherCanSendCorrectPayload(String sql)
       throws Exception {
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     int reducerStageId =
-        dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 10_000L, new HashMap<>());
+        dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, 10_000L, new HashMap<>());
     Assert.assertTrue(PlannerUtils.isRootPlanFragment(reducerStageId));
     dispatcher.shutdown();
   }
@@ -113,10 +113,10 @@ public class QueryDispatcherTest extends QueryTestSet {
     String sql = "SELECT * FROM a WHERE col1 = 'foo'";
     QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
     Mockito.doThrow(new RuntimeException("foo")).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 10_000L, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, 10_000L, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -138,11 +138,11 @@ public class QueryDispatcherTest extends QueryTestSet {
         return null;
       }
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     try {
-      dispatcher.submitAndReduce(requestId, dispatchableQueryPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
@@ -160,12 +160,12 @@ public class QueryDispatcherTest extends QueryTestSet {
   public void testQueryDispatcherCancelWhenQueryReducerThrowsError()
       throws Exception {
     String sql = "SELECT * FROM a";
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     try {
       // will throw b/c mailboxService is null
-      dispatcher.submitAndReduce(requestId, dispatchableQueryPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       System.out.println("e = " + e);
@@ -194,10 +194,10 @@ public class QueryDispatcherTest extends QueryTestSet {
         return null;
       }
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 10_000L, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, 10_000L, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -220,10 +220,10 @@ public class QueryDispatcherTest extends QueryTestSet {
         return null;
       }
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 1_000, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, 1_000, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Timed out waiting for response")
@@ -236,10 +236,10 @@ public class QueryDispatcherTest extends QueryTestSet {
   @Test
   public void testQueryDispatcherThrowsWhenDeadlinePreExpiredAndAsyncResponseNotPolled() {
     String sql = "SELECT * FROM a WHERE col1 = 'foo'";
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, -10_000, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, -10_000, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Timed out waiting"));

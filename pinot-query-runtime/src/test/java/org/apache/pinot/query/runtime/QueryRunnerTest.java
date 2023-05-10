@@ -185,24 +185,24 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId),
             QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
             String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
     int reducerStageId = -1;
-    for (int stageId : dispatchableQueryPlan.getQueryStageMap().keySet()) {
-      if (dispatchableQueryPlan.getQueryStageMap().get(stageId).getPlanFragment()
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
+      if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
           .getFragmentRoot() instanceof MailboxReceiveNode) {
         reducerStageId = stageId;
       } else {
-        processDistributedStagePlans(dispatchableQueryPlan, stageId, requestMetadataMap);
+        processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
       }
     }
     Preconditions.checkState(reducerStageId != -1);
 
     try {
-      QueryDispatcher.runReducer(requestId, dispatchableQueryPlan, reducerStageId,
+      QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
           Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService, null,
           false);
     } catch (RuntimeException rte) {

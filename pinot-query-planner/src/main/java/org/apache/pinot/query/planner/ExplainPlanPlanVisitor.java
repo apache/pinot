@@ -47,30 +47,30 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  */
 public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, ExplainPlanPlanVisitor.Context> {
 
-  private final DispatchableSubPlan _dispatchableQueryPlan;
+  private final DispatchableSubPlan _dispatchableSubPlan;
 
-  public ExplainPlanPlanVisitor(DispatchableSubPlan dispatchableQueryPlan) {
-    _dispatchableQueryPlan = dispatchableQueryPlan;
+  public ExplainPlanPlanVisitor(DispatchableSubPlan dispatchableSubPlan) {
+    _dispatchableSubPlan = dispatchableSubPlan;
   }
 
   /**
    * Explains the query plan.
    *
    * @see DispatchableSubPlan#explain()
-   * @param dispatchableQueryPlan the queryPlan to explain
+   * @param dispatchableSubPlan the queryPlan to explain
    * @return a String representation of the query plan tree
    */
-  public static String explain(DispatchableSubPlan dispatchableQueryPlan) {
-    if (dispatchableQueryPlan.getQueryStageMap().isEmpty()) {
+  public static String explain(DispatchableSubPlan dispatchableSubPlan) {
+    if (dispatchableSubPlan.getQueryStageList().isEmpty()) {
       return "EMPTY";
     }
 
     // the root of a query plan always only has a single node
     QueryServerInstance rootServer =
-        dispatchableQueryPlan.getQueryStageMap().get(0).getServerInstanceToWorkerIdMap()
+        dispatchableSubPlan.getQueryStageList().get(0).getServerInstanceToWorkerIdMap()
             .keySet().iterator().next();
-    return explainFrom(dispatchableQueryPlan,
-        dispatchableQueryPlan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot(), rootServer);
+    return explainFrom(dispatchableSubPlan,
+        dispatchableSubPlan.getQueryStageList().get(0).getPlanFragment().getFragmentRoot(), rootServer);
   }
 
   /**
@@ -79,15 +79,15 @@ public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, Ex
    * at a given point in time (for example, printing the tree that will be executed on a
    * local node right before it is executed).
    *
-   * @param dispatchableQueryPlan the entire query plan, including non-executed portions
+   * @param dispatchableSubPlan the entire query plan, including non-executed portions
    * @param node the node to begin traversal
    * @param rootServer the server instance that is executing this plan (should execute {@code node})
    *
    * @return a query plan associated with
    */
-  public static String explainFrom(DispatchableSubPlan dispatchableQueryPlan, PlanNode node,
+  public static String explainFrom(DispatchableSubPlan dispatchableSubPlan, PlanNode node,
       QueryServerInstance rootServer) {
-    final ExplainPlanPlanVisitor visitor = new ExplainPlanPlanVisitor(dispatchableQueryPlan);
+    final ExplainPlanPlanVisitor visitor = new ExplainPlanPlanVisitor(dispatchableSubPlan);
     return node
         .visit(visitor, new Context(rootServer, 0, "", "", new StringBuilder()))
         .toString();
@@ -156,7 +156,7 @@ public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, Ex
 
     MailboxSendNode sender = (MailboxSendNode) node.getSender();
     int senderStageId = node.getSenderStageId();
-    DispatchablePlanFragment dispatchablePlanFragment = _dispatchableQueryPlan.getQueryStageMap().get(senderStageId);
+    DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageList().get(senderStageId);
     Map<Integer, Map<String, List<String>>> segments = dispatchablePlanFragment.getWorkerIdToSegmentsMap();
 
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
@@ -195,7 +195,7 @@ public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, Ex
 
     int receiverStageId = node.getReceiverStageId();
     Map<QueryServerInstance, List<Integer>> servers =
-        _dispatchableQueryPlan.getQueryStageMap().get(receiverStageId)
+        _dispatchableSubPlan.getQueryStageList().get(receiverStageId)
             .getServerInstanceToWorkerIdMap();
     context._builder.append("->");
     String receivers = servers.entrySet().stream()
@@ -219,7 +219,7 @@ public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, Ex
   public StringBuilder visitTableScan(TableScanNode node, Context context) {
     return appendInfo(node, context)
         .append(' ')
-        .append(_dispatchableQueryPlan.getQueryStageMap()
+        .append(_dispatchableSubPlan.getQueryStageList()
             .get(node.getPlanFragmentId())
             .getWorkerIdToSegmentsMap()
             .get(context._host))

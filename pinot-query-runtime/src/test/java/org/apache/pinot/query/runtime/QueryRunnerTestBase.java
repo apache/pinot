@@ -96,7 +96,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult =
         _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
-    DispatchableSubPlan dispatchableQueryPlan = queryPlannerResult.getQueryPlan();
+    DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
@@ -109,33 +109,33 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
 
     int reducerStageId = -1;
-    for (int stageId : dispatchableQueryPlan.getQueryStageMap().keySet()) {
-      if (dispatchableQueryPlan.getQueryStageMap().get(stageId).getPlanFragment()
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
+      if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
           .getFragmentRoot() instanceof MailboxReceiveNode) {
         reducerStageId = stageId;
       } else {
-        processDistributedStagePlans(dispatchableQueryPlan, stageId, requestMetadataMap);
+        processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
       }
       if (executionStatsAggregatorMap != null) {
         executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
     Preconditions.checkState(reducerStageId != -1);
-    ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableQueryPlan, reducerStageId,
+    ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
         executionStatsAggregatorMap, true);
     return resultTable.getRows();
   }
 
-  protected void processDistributedStagePlans(DispatchableSubPlan dispatchableQueryPlan, int stageId,
+  protected void processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan, int stageId,
       Map<String, String> requestMetadataMap) {
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
-        dispatchableQueryPlan.getQueryStageMap().get(stageId).getServerInstanceToWorkerIdMap();
+        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
       QueryServerInstance server = entry.getKey();
       for (int workerId : entry.getValue()) {
         DistributedStagePlan distributedStagePlan = QueryDispatcher.constructDistributedStagePlan(
-            dispatchableQueryPlan, stageId, new VirtualServerAddress(server, workerId));
+            dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
         _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
       }
     }

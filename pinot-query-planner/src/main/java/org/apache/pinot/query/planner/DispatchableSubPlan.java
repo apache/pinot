@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 
@@ -39,22 +38,22 @@ import org.apache.calcite.util.Pair;
  */
 public class DispatchableSubPlan {
   private final List<Pair<Integer, String>> _queryResultFields;
-  private final Map<Integer, DispatchablePlanFragment> _queryStageMap;
+  private final List<DispatchablePlanFragment> _queryStageList;
   private final Set<String> _tableNames;
 
-  public DispatchableSubPlan(List<Pair<Integer, String>> fields, Map<Integer, DispatchablePlanFragment> queryStageMap,
+  public DispatchableSubPlan(List<Pair<Integer, String>> fields, List<DispatchablePlanFragment> queryStageList,
       Set<String> tableNames) {
     _queryResultFields = fields;
-    _queryStageMap = queryStageMap;
+    _queryStageList = queryStageList;
     _tableNames = tableNames;
   }
 
   /**
-   * Get the map between stageID and the stage plan root node.
+   * Get the list of stage plan root node.
    * @return stage plan map.
    */
-  public Map<Integer, DispatchablePlanFragment> getQueryStageMap() {
-    return _queryStageMap;
+  public List<DispatchablePlanFragment> getQueryStageList() {
+    return _queryStageList;
   }
 
   /**

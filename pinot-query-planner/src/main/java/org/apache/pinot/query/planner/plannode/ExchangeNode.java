@@ -47,6 +47,9 @@ public class ExchangeNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RelFieldCollation> _collations;
 
+  /**
+   * The set of tables that are scanned in this planFragment.
+   */
   @ProtoProperties
   private Set<String> _tableNames;
 

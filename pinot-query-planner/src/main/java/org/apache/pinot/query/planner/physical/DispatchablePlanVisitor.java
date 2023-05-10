@@ -46,13 +46,6 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
         (id) -> new DispatchablePlanMetadata());
   }
 
-  public static void computeWorkerAssignment(PlanNode node, DispatchablePlanContext context) {
-    int planFragmentId = node.getPlanFragmentId();
-    context.getWorkerManager()
-        .assignWorkerToStage(planFragmentId, context.getDispatchablePlanMetadataMap().get(planFragmentId),
-            context.getRequestId(), context.getPlannerContext().getOptions(), context.getTableNames());
-  }
-
   @Override
   public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
@@ -110,9 +103,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getOrCreateDispatchablePlanMetadata(node, context);
-
     context.getDispatchablePlanStageRootMap().put(node.getPlanFragmentId(), node);
-    computeWorkerAssignment(node, context);
     return null;
   }
 

@@ -58,7 +58,7 @@ public class PinotDispatchPlanner {
     // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
     dispatchablePlanContext.getDispatchablePlanStageRootMap().put(0, subPlanRoot);
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
-    DispatchablePlanVisitor.computeWorkerAssignment(subPlanRoot, dispatchablePlanContext);
+    computeWorkerAssignment(subPlan.getSubPlanRoot(), dispatchablePlanContext);
     // 4. compute the mailbox assignment for each stage.
     // TODO: refactor this to be a pluggable interface.
     computeMailboxAssignment(dispatchablePlanContext);
@@ -87,7 +87,19 @@ public class PinotDispatchPlanner {
   private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
       DispatchablePlanContext dispatchablePlanContext) {
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
-        dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot),
+        dispatchablePlanContext.constructDispatchablePlanFragmentList(subPlanRoot),
         dispatchablePlanContext.getTableNames());
+  }
+
+  private static void computeWorkerAssignment(PlanFragment planFragment, DispatchablePlanContext context) {
+    computeWorkerAssignment(planFragment.getFragmentRoot(), context);
+    planFragment.getChildren().forEach(child -> computeWorkerAssignment(child, context));
+  }
+
+  private static void computeWorkerAssignment(PlanNode node, DispatchablePlanContext context) {
+    int planFragmentId = node.getPlanFragmentId();
+    context.getWorkerManager()
+        .assignWorkerToStage(planFragmentId, context.getDispatchablePlanMetadataMap().get(planFragmentId),
+            context.getRequestId(), context.getPlannerContext().getOptions(), context.getTableNames());
   }
 }

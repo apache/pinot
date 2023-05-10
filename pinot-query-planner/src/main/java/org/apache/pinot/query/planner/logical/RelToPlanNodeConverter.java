@@ -62,11 +62,11 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The {@code StageNodeConverter} converts a logical {@link RelNode} to a {@link PlanNode}.
+ * The {@link RelToPlanNodeConverter} converts a logical {@link RelNode} to a {@link PlanNode}.
  */
-public final class RelToStageConverter {
+public final class RelToPlanNodeConverter {
 
-  private RelToStageConverter() {
+  private RelToPlanNodeConverter() {
     // do not instantiate.
   }
 
@@ -118,10 +118,10 @@ public final class RelToStageConverter {
     }
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
 
+    // Compute all the tables involved under this exchange node
     Set<String> tableNames = getTableNamesFromRelRoot(node);
     return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), tableNames, node.getDistribution(),
-        fieldCollations,
-        isSortOnSender, isSortOnReceiver);
+        fieldCollations, isSortOnSender, isSortOnReceiver);
   }
 
   private static PlanNode convertLogicalSetOp(SetOp node, int currentStageId) {

@@ -112,17 +112,17 @@ public class QueryServerTest extends QueryTestSet {
   @Test(dataProvider = "testSql")
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
 
-    for (int stageId : dispatchableQueryPlan.getQueryStageMap().keySet()) {
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       if (stageId > 0) { // we do not test reduce stage.
         // only get one worker request out.
-        Worker.QueryRequest queryRequest = getQueryRequest(dispatchableQueryPlan, stageId);
+        Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, stageId);
 
         // submit the request for testing.
         submitRequest(queryRequest);
 
-        DispatchablePlanFragment dispatchablePlanFragment = dispatchableQueryPlan.getQueryStageMap().get(stageId);
+        DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
 
         PlanFragmentMetadata planFragmentMetadata = dispatchablePlanFragment.toPlanFragmentMetadata();
 
@@ -132,11 +132,12 @@ public class QueryServerTest extends QueryTestSet {
         String requestIdStr = queryRequest.getMetadataOrThrow(QueryConfig.KEY_OF_BROKER_REQUEST_ID);
 
         // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
+        int finalStageId = stageId;
         TestUtils.waitForCondition(aVoid -> {
           try {
             Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
               PlanNode planNode =
-                  dispatchableQueryPlan.getQueryStageMap().get(stageId).getPlanFragment().getFragmentRoot();
+                  dispatchableSubPlan.getQueryStageList().get(finalStageId).getPlanFragment().getFragmentRoot();
               return isStageNodesEqual(planNode, distributedStagePlan.getStageRoot()) && isStageMetadataEqual(
                   planFragmentMetadata, distributedStagePlan.getStageMetadata());
             }), Mockito.argThat(requestMetadataMap -> requestIdStr.equals(
@@ -221,16 +222,16 @@ public class QueryServerTest extends QueryTestSet {
     channel.shutdown();
   }
 
-  private Worker.QueryRequest getQueryRequest(DispatchableSubPlan dispatchableQueryPlan, int stageId) {
+  private Worker.QueryRequest getQueryRequest(DispatchableSubPlan dispatchableSubPlan, int stageId) {
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
-        dispatchableQueryPlan.getQueryStageMap().get(stageId).getServerInstanceToWorkerIdMap();
+        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
     // this particular test set requires the request to have a single QueryServerInstance to dispatch to
     // as it is not testing the multi-tenancy dispatch (which is in the QueryDispatcherTest)
     QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
     int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
 
     return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(
-            QueryDispatcher.constructDistributedStagePlan(dispatchableQueryPlan, stageId,
+            QueryDispatcher.constructDistributedStagePlan(dispatchableSubPlan, stageId,
                 new VirtualServerAddress(serverInstance, workerId))))
         // the default configurations that must exist.
         .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))

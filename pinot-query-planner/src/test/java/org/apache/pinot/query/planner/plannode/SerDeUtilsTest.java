@@ -36,8 +36,8 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
   public void testQueryStagePlanSerDe(String query)
       throws Exception {
 
-    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
-    for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableQueryPlan.getQueryStageMap().values()) {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStageList()) {
       PlanNode stageNode = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
       Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stageNode);
       PlanNode deserializedStageNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);

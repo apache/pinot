@@ -48,7 +48,10 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 public class PinotLogicalQueryPlanner {
 
   /**
-   * Construct the dispatchable plan from relational logical plan.
+   * planQuery achieves 2 objective:
+   *   1. convert Calcite's {@link RelNode} to Pinot's {@link PlanNode} format from the {@link RelRoot} of Calcite's
+   *   LogicalPlanner result.
+   *   2. while walking Calcite's {@link RelNode} tree, populate {@link QueryPlanMetadata}.
    *
    * @param relRoot relational plan root.
    * @return dispatchable plan.
@@ -58,12 +61,12 @@ public class PinotLogicalQueryPlanner {
     // Walk through RelNode tree and construct a StageNode tree.
     PlanNode globalRoot = relNodeToStageNode(relRootNode);
     QueryPlanMetadata queryPlanMetadata =
-        new QueryPlanMetadata(RelToStageConverter.getTableNamesFromRelRoot(relRootNode), relRoot.fields);
+        new QueryPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRootNode), relRoot.fields);
     return new QueryPlan(globalRoot, queryPlanMetadata);
   }
 
   /**
-   * Construct the dispatchable plan from relational logical plan.
+   * Convert the Pinot plan from {@link PinotLogicalQueryPlanner#planQuery(RelRoot)} into a {@link SubPlan}.
    *
    * @param queryPlan relational plan root.
    * @return dispatchable plan.
@@ -151,7 +154,7 @@ public class PinotLogicalQueryPlanner {
   // non-threadsafe
   // TODO: add dataSchema (extracted from RelNode schema) to the StageNode.
   private PlanNode relNodeToStageNode(RelNode node) {
-    PlanNode planNode = RelToStageConverter.toStageNode(node, -1);
+    PlanNode planNode = RelToPlanNodeConverter.toStageNode(node, -1);
     List<RelNode> inputs = node.getInputs();
     for (RelNode input : inputs) {
       planNode.addInput(relNodeToStageNode(input));

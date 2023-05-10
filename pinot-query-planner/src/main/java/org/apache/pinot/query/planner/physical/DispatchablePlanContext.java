@@ -85,10 +85,11 @@ public class DispatchablePlanContext {
     return _dispatchablePlanStageRootMap;
   }
 
-  public Map<Integer, DispatchablePlanFragment> constructDispatchablePlanFragmentMap(PlanFragment subPlanRoot) {
-
-    Map<Integer, DispatchablePlanFragment> dispatchablePlanFragmentMap = new HashMap<>();
-    createDispatchablePlanFragmentMap(dispatchablePlanFragmentMap, subPlanRoot);
+  public List<DispatchablePlanFragment> constructDispatchablePlanFragmentList(PlanFragment subPlanRoot) {
+    DispatchablePlanFragment[] dispatchablePlanFragmentArray =
+        new DispatchablePlanFragment[_dispatchablePlanStageRootMap.size()];
+    createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, subPlanRoot);
+    List<DispatchablePlanFragment> dispatchablePlanFragmentList = Arrays.asList(dispatchablePlanFragmentArray);
     for (Map.Entry<Integer, DispatchablePlanMetadata> dispatchableEntry : _dispatchablePlanMetadataMap.entrySet()) {
       DispatchablePlanMetadata dispatchablePlanMetadata = dispatchableEntry.getValue();
 
@@ -110,33 +111,33 @@ public class DispatchablePlanContext {
 
       // set the stageMetadata
       int stageId = dispatchableEntry.getKey();
-      dispatchablePlanFragmentMap.get(stageId).setScannedTables(dispatchablePlanMetadata.getScannedTables());
+      dispatchablePlanFragmentList.get(stageId).setScannedTables(dispatchablePlanMetadata.getScannedTables());
 
-      dispatchablePlanFragmentMap.get(stageId).setWorkerMetadataList(Arrays.asList(workerMetadataList));
-      dispatchablePlanFragmentMap.get(stageId)
+      dispatchablePlanFragmentList.get(stageId).setWorkerMetadataList(Arrays.asList(workerMetadataList));
+      dispatchablePlanFragmentList.get(stageId)
           .setWorkerIdToSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap());
-      dispatchablePlanFragmentMap.get(stageId)
+      dispatchablePlanFragmentList.get(stageId)
           .setServerInstanceToWorkerIdMap(dispatchablePlanMetadata.getServerInstanceToWorkerIdMap());
       if (dispatchablePlanMetadata.getScannedTables().size() > 0) {
-        dispatchablePlanFragmentMap.get(stageId)
+        dispatchablePlanFragmentList.get(stageId)
             .setScannedTables(dispatchablePlanMetadata.getScannedTables());
       }
       if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
-        dispatchablePlanFragmentMap.get(stageId).setTableName(dispatchablePlanMetadata.getScannedTables().get(0));
+        dispatchablePlanFragmentList.get(stageId).setTableName(dispatchablePlanMetadata.getScannedTables().get(0));
       }
       if (dispatchablePlanMetadata.getTimeBoundaryInfo() != null) {
-        dispatchablePlanFragmentMap.get(stageId)
+        dispatchablePlanFragmentList.get(stageId)
             .setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
       }
     }
-    return dispatchablePlanFragmentMap;
+    return dispatchablePlanFragmentList;
   }
 
-  private void createDispatchablePlanFragmentMap(Map<Integer, DispatchablePlanFragment> dispatchablePlanFragmentMap,
+  private void createDispatchablePlanFragmentList(DispatchablePlanFragment[] dispatchablePlanFragmentArray,
       PlanFragment planFragmentRoot) {
-    dispatchablePlanFragmentMap.put(planFragmentRoot.getFragmentId(), new DispatchablePlanFragment(planFragmentRoot));
+    dispatchablePlanFragmentArray[planFragmentRoot.getFragmentId()] = new DispatchablePlanFragment(planFragmentRoot);
     for (PlanFragment childPlanFragment : planFragmentRoot.getChildren()) {
-      createDispatchablePlanFragmentMap(dispatchablePlanFragmentMap, childPlanFragment);
+      createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, childPlanFragment);
     }
   }
 }
