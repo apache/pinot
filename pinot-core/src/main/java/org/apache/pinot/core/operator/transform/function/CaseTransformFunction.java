@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -329,27 +328,30 @@ public class CaseTransformFunction extends BaseTransformFunction {
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, int[]> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToIntValuesSV(valueBlock));
-      }
-    }
-    for (int docId = 0; docId < numDocs; docId++) {
-      if (selected[docId] >= 0) {
-        _intValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
-        unselectedDocs.clear(docId);
-      }
-    }
-    if (!unselectedDocs.isEmpty()) {
-      if (_elseStatement == null) {
+        TransformFunction transformFunction = _thenStatements.get(i);
+        int[] intValues = transformFunction.transformToIntValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _intValuesSV[docId] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+          if (selected[docId] == i) {
+            _intValuesSV[docId] = intValues[docId];
+            unselectedDocs.clear(docId);
+          }
         }
-      } else {
-        int[] elseValues = _elseStatement.transformToIntValuesSV(valueBlock);
-        for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _intValuesSV[docId] = elseValues[docId];
+        if (unselectedDocs.isEmpty()) {
+          break;
+        }
+      }
+      if (!unselectedDocs.isEmpty()) {
+        if (_elseStatement == null) {
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _intValuesSV[docId] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+          }
+        } else {
+          int[] intValuesSV = _elseStatement.transformToIntValuesSV(valueBlock);
+          for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
+            _intValuesSV[docId] = intValuesSV[docId];
+          }
         }
       }
     }
