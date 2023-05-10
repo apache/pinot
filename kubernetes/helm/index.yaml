@@ -25,7 +25,7 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/pinot/tree/master/kubernetes/helmq
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.7.tgz
     version: 0.2.7
