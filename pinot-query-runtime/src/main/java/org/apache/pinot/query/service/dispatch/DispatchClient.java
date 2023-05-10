@@ -25,14 +25,14 @@ import io.grpc.stub.StreamObserver;
 import java.util.function.Consumer;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Dispatches a query plan to given a {@link VirtualServer}. Each {@link DispatchClient} has its own gRPC Channel and
- * Client Stub.
+ * Dispatches a query plan to given a {@link QueryServerInstance}. Each {@link DispatchClient} has its own gRPC Channel
+ * and Client Stub.
  * TODO: It might be neater to implement pooling at the client level. Two options: (1) Pass a channel provider and
  *       let that take care of pooling. (2) Create a DispatchClient interface and implement pooled/non-pooled versions.
  */
@@ -51,7 +51,7 @@ class DispatchClient {
     return _channel;
   }
 
-  public void submit(Worker.QueryRequest request, int stageId, VirtualServer virtualServer, Deadline deadline,
+  public void submit(Worker.QueryRequest request, int stageId, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncQueryDispatchResponse> callback) {
     try {
       _dispatchStub.withDeadline(deadline).submit(request, new DispatchObserver(stageId, virtualServer, callback));

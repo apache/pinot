@@ -335,6 +335,18 @@ public class AggregationFunctionFactory {
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case PARENTARGMAX:
+            return new ParentArgMinMaxAggregationFunction(arguments, true);
+          case PARENTARGMIN:
+            return new ParentArgMinMaxAggregationFunction(arguments, false);
+          case CHILDARGMAX:
+            return new ChildArgMinMaxAggregationFunction(arguments, true);
+          case CHILDARGMIN:
+            return new ChildArgMinMaxAggregationFunction(arguments, false);
+          case ARGMAX:
+          case ARGMIN:
+            throw new IllegalArgumentException("Aggregation function: " + function
+                + " is only supported in selection without alias.");
           default:
             throw new IllegalArgumentException();
         }

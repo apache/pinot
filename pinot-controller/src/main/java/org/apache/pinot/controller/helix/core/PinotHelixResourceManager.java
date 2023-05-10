@@ -112,12 +112,16 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
+import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import org.apache.pinot.controller.ControllerConf;
@@ -132,6 +136,8 @@ import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssign
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.helix.core.lineage.LineageManager;
+import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
@@ -185,6 +191,10 @@ public class PinotHelixResourceManager {
   private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
   private static final String API_REQUEST_ID_PREFIX = "api-";
 
+  private enum LineageUpdateType {
+    START, END, REVERT
+  }
+
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
   public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
@@ -216,10 +226,11 @@ public class PinotHelixResourceManager {
   private SegmentDeletionManager _segmentDeletionManager;
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
+  private final LineageManager _lineageManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables,
-      int deletedSegmentsRetentionInDays) {
+      int deletedSegmentsRetentionInDays, LineageManager lineageManager) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -241,12 +252,14 @@ public class PinotHelixResourceManager {
     for (int i = 0; i < _tableUpdaterLocks.length; i++) {
       _tableUpdaterLocks[i] = new Object();
     }
+    _lineageManager = lineageManager;
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
-        controllerConf.getHLCTablesAllowed(), controllerConf.getDeletedSegmentsRetentionInDays());
+        controllerConf.getHLCTablesAllowed(), controllerConf.getDeletedSegmentsRetentionInDays(),
+        LineageManagerFactory.create(controllerConf));
   }
 
   /**
@@ -362,6 +375,15 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
+  }
+
+  /**
+   * Get the linage manager.
+   *
+   * @return lineage manager
+   */
+  public LineageManager getLineageManager() {
+    return _lineageManager;
   }
 
   /**
@@ -1639,6 +1661,17 @@ public class PinotHelixResourceManager {
             "Failed to find instances with tag: " + tag + " for table: " + tableNameWithType);
       }
     }
+    // Check if serverTags as configured in tierConfigs are valid.
+    List<TierConfig> tierConfigList = tableConfig.getTierConfigsList();
+    if (CollectionUtils.isNotEmpty(tierConfigList)) {
+      for (TierConfig tierConfig : tierConfigList) {
+        if (getInstancesWithTag(tierConfig.getServerTag()).isEmpty()) {
+          throw new InvalidTableConfigException(
+              String.format("Failed to find instances with tag: %s as used by tier: %s for table: %s",
+                  tierConfig.getServerTag(), tierConfig.getName(), tableNameWithType));
+        }
+      }
+    }
   }
 
   public boolean setZKData(String path, ZNRecord record, int expectedVersion, int accessOption) {
@@ -2195,8 +2228,8 @@ public class PinotHelixResourceManager {
       tasks.put(jobId, jobMetadata);
       if (tasks.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
         tasks = tasks.entrySet().stream().sorted((v1, v2) -> Long.compare(
-                Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
-                Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
+            Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
+            Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
             .collect(Collectors.toList()).subList(0, CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK)
             .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       }
@@ -3170,13 +3203,68 @@ public class PinotHelixResourceManager {
     }
     String rebalanceJobId = rebalanceConfig.getString(RebalanceConfigConstants.JOB_ID);
     Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig ");
+    if (rebalanceConfig.getBoolean(RebalanceConfigConstants.UPDATE_TARGET_TIER,
+        RebalanceConfigConstants.DEFAULT_UPDATE_TARGET_TIER)) {
+      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
+    }
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId, this);
     }
     TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver);
-    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
-    return rebalanceResult;
+    return tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+  }
+
+  /**
+   * Calculate the target tier the segment belongs to and set it in segment ZK metadata as goal state, which can be
+   * checked by servers when loading the segment to put it onto the target storage tier.
+   */
+  @VisibleForTesting
+  void updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
+    List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
+    List<Tier> sortedTiers = tierCfgs == null ? Collections.emptyList()
+        : TierConfigUtils.getSortedTiers(tierCfgs, _helixZkManager);
+    LOGGER.info("For rebalanceId: {}, updating target tiers for segments of table: {} with tierConfigs: {}",
+        rebalanceJobId, tableNameWithType, sortedTiers);
+    for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
+      updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+    }
+  }
+
+  private void updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
+    ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (segmentMetadataZNRecord == null) {
+      LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+      return;
+    }
+    Tier targetTier = null;
+    for (Tier tier : sortedTiers) {
+      TierSegmentSelector tierSegmentSelector = tier.getSegmentSelector();
+      if (tierSegmentSelector.selectSegment(tableNameWithType, segmentName)) {
+        targetTier = tier;
+        break;
+      }
+    }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZNRecord);
+    String targetTierName = null;
+    if (targetTier == null) {
+      if (segmentZKMetadata.getTier() == null) {
+        LOGGER.debug("Segment: {} of table: {} is already set to go to default tier", segmentName, tableNameWithType);
+        return;
+      }
+      LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
+    } else {
+      targetTierName = targetTier.getName();
+      if (targetTierName.equals(segmentZKMetadata.getTier())) {
+        LOGGER.debug("Segment: {} of table: {} is already set to go to target tier: {}", segmentName, tableNameWithType,
+            targetTierName);
+        return;
+      }
+      LOGGER.info("Segment: {} of table: {} is put onto new tier: {}", segmentName, tableNameWithType, targetTierName);
+    }
+    // Update the tier in segment ZK metadata and write it back to ZK.
+    segmentZKMetadata.setTier(targetTierName);
+    updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
   }
 
   /**
@@ -3310,12 +3398,13 @@ public class PinotHelixResourceManager {
    * @param segmentsFrom a list of segments to be merged
    * @param segmentsTo a list of merged segments
    * @param forceCleanup True for enabling the force segment cleanup
+   * @param customMap
    * @return Segment lineage entry id
    *
    * @throws InvalidConfigException
    */
   public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo,
-      boolean forceCleanup) {
+      boolean forceCleanup, Map<String, String> customMap) {
     // Create a segment lineage entry id
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
@@ -3465,6 +3554,8 @@ public class PinotHelixResourceManager {
         segmentLineage.addLineageEntry(segmentLineageEntryId,
             new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
 
+        _lineageManager
+            .updateLineageForStartReplaceSegments(tableConfig, segmentLineageEntryId, customMap, segmentLineage);
         // Write back to the lineage entry to the property store
         if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
           // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
@@ -3501,9 +3592,9 @@ public class PinotHelixResourceManager {
    *
    * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
    * metadata.
-   *
    * @param tableNameWithType
    * @param segmentLineageEntryId
+   * @param endReplaceSegmentsRequest
    */
   public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId,
       @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
@@ -3561,8 +3652,11 @@ public class PinotHelixResourceManager {
             new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsTo, LineageEntryState.COMPLETED,
                 System.currentTimeMillis());
 
-        if (writeLineageEntryWithTightLoop(tableNameWithType, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
-            _propertyStore)) {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        Map<String, String> customMap =
+            endReplaceSegmentsRequest == null ? null : endReplaceSegmentsRequest.getCustomMap();
+        if (writeLineageEntryWithTightLoop(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
+            _propertyStore, LineageUpdateType.END, customMap)) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
@@ -3602,11 +3696,12 @@ public class PinotHelixResourceManager {
    *
    * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
    * metadata.
-   *
    * @param tableNameWithType
    * @param segmentLineageEntryId
+   * @param revertReplaceSegmentsRequest
    */
-  public void revertReplaceSegments(String tableNameWithType, String segmentLineageEntryId, boolean forceRevert) {
+  public void revertReplaceSegments(String tableNameWithType, String segmentLineageEntryId, boolean forceRevert,
+      @Nullable RevertReplaceSegmentsRequest revertReplaceSegmentsRequest) {
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         // Fetch the segment lineage metadata
@@ -3670,8 +3765,11 @@ public class PinotHelixResourceManager {
             new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
                 System.currentTimeMillis());
 
-        if (writeLineageEntryWithTightLoop(tableNameWithType, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
-            _propertyStore)) {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        Map<String, String> customMap =
+            revertReplaceSegmentsRequest == null ? null : revertReplaceSegmentsRequest.getCustomMap();
+        if (writeLineageEntryWithTightLoop(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
+            _propertyStore, LineageUpdateType.REVERT, customMap)) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
@@ -3701,20 +3799,22 @@ public class PinotHelixResourceManager {
 
   /**
    * Update the lineage entry with the tight loop to increase the chance for successful ZK write.
-   *
-   * @param tableNameWithType table name with type
+   * @param tableConfig table config
    * @param lineageEntryId lineage entry id
    * @param lineageEntryToUpdate lineage entry that needs to be updated
    * @param lineageEntryToMatch lineage entry that needs to match with the entry from the newly fetched segment lineage.
    * @param propertyStore property store
+   * @param lineageUpdateType
+   * @param customMap
    */
-  private boolean writeLineageEntryWithTightLoop(String tableNameWithType, String lineageEntryId,
+  private boolean writeLineageEntryWithTightLoop(TableConfig tableConfig, String lineageEntryId,
       LineageEntry lineageEntryToUpdate, LineageEntry lineageEntryToMatch,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore,
+      LineageUpdateType lineageUpdateType, Map<String, String> customMap) {
     for (int i = 0; i < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; i++) {
       // Fetch the segment lineage
       ZNRecord segmentLineageToUpdateZNRecord =
-          SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore, tableNameWithType);
+          SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore, tableConfig.getTableName());
       int expectedVersion = segmentLineageToUpdateZNRecord.getVersion();
       SegmentLineage segmentLineageToUpdate = SegmentLineage.fromZNRecord(segmentLineageToUpdateZNRecord);
       LineageEntry currentLineageEntry = segmentLineageToUpdate.getLineageEntry(lineageEntryId);
@@ -3723,13 +3823,28 @@ public class PinotHelixResourceManager {
       if (!currentLineageEntry.equals(lineageEntryToMatch)) {
         String errorMsg = String.format(
             "Aborting the to update lineage entry since we find that the entry has been modified for table %s, "
-                + "entry id: %s", tableNameWithType, lineageEntryId);
+                + "entry id: %s", tableConfig.getTableName(), lineageEntryId);
         LOGGER.error(errorMsg);
         throw new RuntimeException(errorMsg);
       }
 
       // Update lineage entry
       segmentLineageToUpdate.updateLineageEntry(lineageEntryId, lineageEntryToUpdate);
+      switch (lineageUpdateType) {
+        case START:
+          _lineageManager
+              .updateLineageForStartReplaceSegments(tableConfig, lineageEntryId, customMap, segmentLineageToUpdate);
+          break;
+        case END:
+          _lineageManager
+              .updateLineageForEndReplaceSegments(tableConfig, lineageEntryId, customMap, segmentLineageToUpdate);
+          break;
+        case REVERT:
+          _lineageManager
+              .updateLineageForRevertReplaceSegments(tableConfig, lineageEntryId, customMap, segmentLineageToUpdate);
+          break;
+        default:
+      }
 
       // Write back to the lineage entry
       if (SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineageToUpdate, expectedVersion)) {

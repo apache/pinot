@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -46,7 +47,7 @@ public class MailboxServiceTest {
   private static final DataSchema DATA_SCHEMA =
       new DataSchema(new String[]{"testColumn"}, new ColumnDataType[]{ColumnDataType.INT});
 
-  private final AtomicReference<Consumer<String>> _receiveMailCallback1 = new AtomicReference<>();
+  private final AtomicReference<Consumer<OpChainId>> _receiveMailCallback1 = new AtomicReference<>();
 
   private MailboxService _mailboxService1;
   private MailboxService _mailboxService2;
@@ -58,7 +59,7 @@ public class MailboxServiceTest {
     PinotConfiguration config = new PinotConfiguration(
         Collections.singletonMap(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
     _mailboxService1 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config,
-        mailboxId -> _receiveMailCallback1.get().accept(mailboxId));
+        opChainId -> _receiveMailCallback1.get().accept(opChainId));
     _mailboxService1.start();
     _mailboxService2 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config, mailboxId -> {
     });

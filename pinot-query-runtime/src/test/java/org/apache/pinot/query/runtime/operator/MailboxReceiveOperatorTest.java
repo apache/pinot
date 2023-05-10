@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.Arrays;
-import java.util.Collections;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
@@ -28,9 +30,10 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -58,25 +61,53 @@ public class MailboxReceiveOperatorTest {
   @Mock
   private MailboxService _mailboxService;
   @Mock
-  private VirtualServer _server1;
-  @Mock
-  private VirtualServer _server2;
-  @Mock
   private ReceivingMailbox _mailbox1;
   @Mock
   private ReceivingMailbox _mailbox2;
+  private PlanFragmentMetadata _planFragmentMetadataBoth;
+  private PlanFragmentMetadata _planFragmentMetadata1;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
     when(_mailboxService.getHostname()).thenReturn("localhost");
     when(_mailboxService.getPort()).thenReturn(123);
-    when(_server1.getHostname()).thenReturn("localhost");
-    when(_server1.getQueryMailboxPort()).thenReturn(123);
-    when(_server1.getVirtualId()).thenReturn(0);
-    when(_server2.getHostname()).thenReturn("localhost");
-    when(_server2.getQueryMailboxPort()).thenReturn(123);
-    when(_server2.getVirtualId()).thenReturn(1);
+    VirtualServerAddress server1 = new VirtualServerAddress("localhost", 123, 0);
+    VirtualServerAddress server2 = new VirtualServerAddress("localhost", 123, 1);
+    _planFragmentMetadataBoth = new PlanFragmentMetadata.Builder()
+        .setWorkerMetadataList(Stream.of(server1, server2).map(
+                s -> new WorkerMetadata.Builder()
+                    .setVirtualServerAddress(s)
+                    .addMailBoxInfoMap(0,
+                        new MailboxMetadata(
+                            ImmutableList.of(
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 1, 0, 0)),
+                            ImmutableList.of(server1, server2), ImmutableMap.of()))
+                    .addMailBoxInfoMap(1,
+                        new MailboxMetadata(
+                            ImmutableList.of(
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0),
+                                org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 1, 0, 0)),
+                            ImmutableList.of(server1, server2), ImmutableMap.of()))
+                    .build())
+            .collect(Collectors.toList()))
+        .build();
+    // sending stage is 0, receiving stage is 1
+    _planFragmentMetadata1 = new PlanFragmentMetadata.Builder()
+        .setWorkerMetadataList(Stream.of(server1).map(
+            s -> new WorkerMetadata.Builder()
+                .setVirtualServerAddress(s)
+                .addMailBoxInfoMap(0, new MailboxMetadata(
+                    ImmutableList.of(
+                        org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0)),
+                    ImmutableList.of(server1), ImmutableMap.of()))
+                .addMailBoxInfoMap(1, new MailboxMetadata(
+                    ImmutableList.of(
+                        org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(1, 0, 0, 0)),
+                    ImmutableList.of(server1), ImmutableMap.of()))
+                .build()).collect(Collectors.toList()))
+        .build();
   }
 
   @AfterMethod
@@ -85,26 +116,26 @@ public class MailboxReceiveOperatorTest {
     _mocks.close();
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Failed to find instance.*")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Failed to find mailbox.*")
   public void shouldThrowSingletonNoMatchMailboxServer() {
-    when(_server1.getQueryMailboxPort()).thenReturn(456);
-    when(_server2.getQueryMailboxPort()).thenReturn(789);
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
+    VirtualServerAddress server1 = new VirtualServerAddress("localhost", 456, 0);
+    VirtualServerAddress server2 = new VirtualServerAddress("localhost", 789, 1);
+    PlanFragmentMetadata planFragmentMetadata = new PlanFragmentMetadata.Builder()
+        .setWorkerMetadataList(Stream.of(server1, server2).map(
+            s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
+        .build();
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            planFragmentMetadata, false);
     //noinspection resource
     new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Multiple instances.*")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only one mailbox is.*")
   public void shouldThrowReceiveSingletonFromMultiMatchMailboxServer() {
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadataBoth, false);
     //noinspection resource
     new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1);
   }
@@ -113,7 +144,7 @@ public class MailboxReceiveOperatorTest {
   public void shouldThrowRangeDistributionNotSupported() {
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.emptyMap(), false);
+            null, false);
     //noinspection resource
     new MailboxReceiveOperator(context, RelDistribution.Type.RANGE_DISTRIBUTED, 1);
   }
@@ -124,11 +155,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
 
     // Short timeoutMs should result in timeout
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10L, System.currentTimeMillis() + 10L,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       Thread.sleep(100L);
       TransferableBlock mailbox = receiveOp.nextBlock();
@@ -139,7 +168,7 @@ public class MailboxReceiveOperatorTest {
 
     // Longer timeout or default timeout (10s) doesn't result in timeout
     context = new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10_000L,
-        System.currentTimeMillis() + 10_000L, Collections.singletonMap(1, stageMetadata), false);
+        System.currentTimeMillis() + 10_000L, _planFragmentMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       Thread.sleep(100L);
       TransferableBlock mailbox = receiveOp.nextBlock();
@@ -151,11 +180,9 @@ public class MailboxReceiveOperatorTest {
   public void shouldReceiveSingletonNullMailbox() {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
 
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       assertTrue(receiveOp.nextBlock().isNoOpBlock());
     }
@@ -166,11 +193,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
     }
@@ -183,11 +208,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
       assertEquals(actualRows.size(), 1);
@@ -203,11 +226,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox1.poll()).thenReturn(
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
 
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Collections.singletonList(_server1));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
@@ -224,11 +245,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadataBoth, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
         1)) {
       List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
@@ -250,11 +269,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadataBoth, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
         1)) {
       // Receive first block from server1
@@ -278,11 +295,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    StageMetadata stageMetadata = new StageMetadata();
-    stageMetadata.setServerInstances(Arrays.asList(_server1, _server2));
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonMap(1, stageMetadata), false);
+            _planFragmentMetadataBoth, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
         1)) {
       TransferableBlock block = receiveOp.nextBlock();

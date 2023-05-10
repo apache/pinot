@@ -110,6 +110,8 @@ public class PinotQueryRuleSets {
 
   // Pinot specific rules that should be run after all other rules
   public static final Collection<RelOptRule> PINOT_POST_RULES = ImmutableList.of(
+      // Evaluate the Literal filter nodes
+      CoreRules.FILTER_REDUCE_EXPRESSIONS,
       // Expand all SEARCH nodes to simplified filter nodes. SEARCH nodes get created for queries with range
       // predicates, in-clauses, etc.
       PinotFilterExpandSearchRule.INSTANCE,
@@ -120,6 +122,7 @@ public class PinotQueryRuleSets {
 
       PinotJoinExchangeNodeInsertRule.INSTANCE,
       PinotAggregateExchangeNodeInsertRule.INSTANCE,
-      PinotWindowExchangeNodeInsertRule.INSTANCE
+      PinotWindowExchangeNodeInsertRule.INSTANCE,
+      PinotSetOpExchangeNodeInsertRule.INSTANCE
   );
 }

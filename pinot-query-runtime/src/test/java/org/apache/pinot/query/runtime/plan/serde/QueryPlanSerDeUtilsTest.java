@@ -19,12 +19,10 @@
 
 package org.apache.pinot.query.runtime.plan.serde;
 
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
 
 
 public class QueryPlanSerDeUtilsTest {
@@ -32,35 +30,29 @@ public class QueryPlanSerDeUtilsTest {
   @Test
   public void shouldSerializeServer() {
     // Given:
-    VirtualServer server = Mockito.mock(VirtualServer.class);
-    Mockito.when(server.getVirtualId()).thenReturn(1);
-    Mockito.when(server.getHostname()).thenReturn("Server_192.987.1.123");
-    Mockito.when(server.getPort()).thenReturn(80);
-    Mockito.when(server.getGrpcPort()).thenReturn(10);
-    Mockito.when(server.getQueryServicePort()).thenReturn(20);
-    Mockito.when(server.getQueryMailboxPort()).thenReturn(30);
+    VirtualServerAddress server = Mockito.mock(VirtualServerAddress.class);
+    Mockito.when(server.workerId()).thenReturn(1);
+    Mockito.when(server.hostname()).thenReturn("Server_192.987.1.123");
+    Mockito.when(server.port()).thenReturn(80);
 
     // When:
-    String serialized = QueryPlanSerDeUtils.instanceToString(server);
+    String serialized = QueryPlanSerDeUtils.addressToProto(server);
 
     // Then:
-    Assert.assertEquals(serialized, "1@Server_192.987.1.123:80(10:20:30)");
+    Assert.assertEquals(serialized, "1@Server_192.987.1.123:80");
   }
 
   @Test
   public void shouldDeserializeServerString() {
     // Given:
-    String serverString = "1@Server_192.987.1.123:80(10:20:30)";
+    String serverString = "1@Server_192.987.1.123:80";
 
     // When:
-    VirtualServer server = QueryPlanSerDeUtils.stringToInstance(serverString);
+    VirtualServerAddress server = QueryPlanSerDeUtils.protoToAddress(serverString);
 
     // Then:
-    Assert.assertEquals(server.getVirtualId(), 1);
-    Assert.assertEquals(server.getHostname(), "Server_192.987.1.123");
-    Assert.assertEquals(server.getPort(), 80);
-    Assert.assertEquals(server.getGrpcPort(), 10);
-    Assert.assertEquals(server.getQueryServicePort(), 20);
-    Assert.assertEquals(server.getQueryMailboxPort(), 30);
+    Assert.assertEquals(server.workerId(), 1);
+    Assert.assertEquals(server.hostname(), "Server_192.987.1.123");
+    Assert.assertEquals(server.port(), 80);
   }
 }

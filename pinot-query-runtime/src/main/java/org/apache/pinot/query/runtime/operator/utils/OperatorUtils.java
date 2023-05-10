@@ -20,13 +20,12 @@ package org.apache.pinot.query.runtime.operator.utils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Joiner;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -68,10 +67,10 @@ public class OperatorUtils {
     return functionName;
   }
 
-  public static void recordTableName(OperatorStats operatorStats, StageMetadata operatorStageMetadata) {
-    if (!operatorStageMetadata.getScannedTables().isEmpty()) {
+  public static void recordTableName(OperatorStats operatorStats, PlanFragmentMetadata planFragmentMetadata) {
+    if (PlanFragmentMetadata.getTableName(planFragmentMetadata) != null) {
       operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(),
-          Joiner.on("::").join(operatorStageMetadata.getScannedTables()));
+          PlanFragmentMetadata.getTableName(planFragmentMetadata));
     }
   }
 

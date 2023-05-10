@@ -81,13 +81,14 @@ public class PinotSegmentRestletResourceTest {
     // Now starts to replace segments.
     List<String> segmentsFrom = Arrays.asList("s0", "s1");
     List<String> segmentsTo = Collections.singletonList("some_segment");
-    String segmentLineageId = resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false);
+    String segmentLineageId = resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false,
+        null);
 
     // Replace more segments to add another entry to segment lineage.
     segmentsFrom = Arrays.asList("s2", "s3");
     segmentsTo = Collections.singletonList("another_segment");
     String nextSegmentLineageId =
-        resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false);
+        resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false, null);
 
     // There should now be two segment lineage entries resulting from the operations above.
     segmentLineageResponse =

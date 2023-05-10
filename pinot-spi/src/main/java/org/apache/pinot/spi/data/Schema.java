@@ -104,6 +104,56 @@ public final class Schema implements Serializable {
     return JsonUtils.inputStreamToObject(schemaInputStream, Schema.class);
   }
 
+  public static void validate(FieldType fieldType, DataType dataType) {
+    switch (fieldType) {
+      case DIMENSION:
+      case TIME:
+      case DATE_TIME:
+        switch (dataType) {
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+          case BIG_DECIMAL:
+          case BOOLEAN:
+          case TIMESTAMP:
+          case STRING:
+          case JSON:
+          case BYTES:
+            break;
+          default:
+            throw new IllegalStateException(
+                "Unsupported data type: " + dataType + " in DIMENSION/TIME field");
+        }
+        break;
+      case METRIC:
+        switch (dataType) {
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+          case BIG_DECIMAL:
+          case BYTES:
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field");
+        }
+        break;
+      case COMPLEX:
+        switch (dataType) {
+          case STRUCT:
+          case MAP:
+          case LIST:
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field");
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unsupported data type: " + dataType + " for field");
+    }
+  }
+
   /**
    * NOTE: schema name could be null in tests
    */
@@ -450,52 +500,10 @@ public final class Schema implements Serializable {
       FieldType fieldType = fieldSpec.getFieldType();
       DataType dataType = fieldSpec.getDataType();
       String fieldName = fieldSpec.getName();
-      switch (fieldType) {
-        case DIMENSION:
-        case TIME:
-        case DATE_TIME:
-          switch (dataType) {
-            case INT:
-            case LONG:
-            case FLOAT:
-            case DOUBLE:
-            case BIG_DECIMAL:
-            case BOOLEAN:
-            case TIMESTAMP:
-            case STRING:
-            case JSON:
-            case BYTES:
-              break;
-            default:
-              throw new IllegalStateException(
-                  "Unsupported data type: " + dataType + " in DIMENSION/TIME field: " + fieldName);
-          }
-          break;
-        case METRIC:
-          switch (dataType) {
-            case INT:
-            case LONG:
-            case FLOAT:
-            case DOUBLE:
-            case BIG_DECIMAL:
-            case BYTES:
-              break;
-            default:
-              throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field: " + fieldName);
-          }
-          break;
-        case COMPLEX:
-          switch (dataType) {
-            case STRUCT:
-            case MAP:
-            case LIST:
-              break;
-            default:
-              throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field: " + fieldName);
-          }
-          break;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + dataType + " for field: " + fieldName);
+      try {
+        validate(fieldType, dataType);
+      } catch (IllegalStateException e) {
+        throw new IllegalStateException(e.getMessage() + ": " + fieldName);
       }
     }
   }

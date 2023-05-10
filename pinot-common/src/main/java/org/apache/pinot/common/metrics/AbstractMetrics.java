@@ -93,6 +93,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public interface QueryPhase {
     String getQueryPhaseName();
+
+    default String getDescription() {
+      return "";
+    }
   }
 
   public interface Meter {
@@ -101,6 +105,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String getUnit();
 
     boolean isGlobal();
+
+    default String getDescription() {
+      return "";
+    }
   }
 
   public interface Gauge {
@@ -109,12 +117,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String getUnit();
 
     boolean isGlobal();
+    default String getDescription() {
+      return "";
+    }
   }
 
   public interface Timer {
     String getTimerName();
 
     boolean isGlobal();
+    default String getDescription() {
+      return "";
+    }
   }
 
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {

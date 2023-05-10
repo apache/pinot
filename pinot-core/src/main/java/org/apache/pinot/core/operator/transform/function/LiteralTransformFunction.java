@@ -40,6 +40,8 @@ import org.roaringbitmap.RoaringBitmap;
  * LITERAL. The data type is inferred from the literal string.
  */
 public class LiteralTransformFunction implements TransformFunction {
+  public static final String FUNCTION_NAME = "literal";
+
   private final Object _literal;
   private final DataType _dataType;
   private final int _intLiteral;
@@ -94,7 +96,7 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public String getName() {
-    throw new UnsupportedOperationException();
+    return FUNCTION_NAME;
   }
 
   @Override

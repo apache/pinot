@@ -40,6 +40,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
@@ -51,10 +52,12 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
+import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
@@ -236,8 +239,28 @@ public class QueryEnvironment {
       throws Exception {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
-    RelNode optimized = optimize(relation, plannerContext);
+    RelRoot decorrelated = decorrelateIfNeeded(relation);
+    RelNode optimized = optimize(decorrelated, plannerContext);
     return relation.withRel(optimized);
+  }
+
+  private RelRoot decorrelateIfNeeded(RelRoot relRoot) {
+    if (hasCorrelateNode(relRoot.rel)) {
+      relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, RelBuilder.create(_config)));
+    }
+    return relRoot;
+  }
+
+  private static boolean hasCorrelateNode(RelNode relNode) {
+    if (relNode instanceof LogicalCorrelate) {
+      return true;
+    }
+    for (RelNode input : relNode.getInputs()) {
+      if (hasCorrelateNode(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private SqlNode validate(SqlNode parsed, PlannerContext plannerContext)
