@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -74,9 +73,8 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
   private boolean _canSkipShuffleForJoin;
 
-  public static void optimizeShuffles(QueryPlan queryPlan, TableCache tableCache) {
-    PlanNode rootPlanNode = queryPlan.getQueryStageMap().get(0);
-    Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap = queryPlan.getDispatchablePlanMetadataMap();
+  public static void optimizeShuffles(PlanNode rootPlanNode,
+      Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap, TableCache tableCache) {
     GreedyShuffleRewriteContext context = GreedyShuffleRewritePreComputeVisitor.preComputeContext(rootPlanNode);
     // This assumes that if planFragmentId(S1) > planFragmentId(S2), then S1 is not an ancestor of S2.
     // TODO: If this assumption is wrong, we can compute the reverse topological ordering explicitly.

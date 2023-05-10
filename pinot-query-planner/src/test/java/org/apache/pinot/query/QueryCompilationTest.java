@@ -28,10 +28,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
-import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -61,8 +61,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryPlanWithoutException(String query)
       throws Exception {
     try {
-      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-      Assert.assertNotNull(queryPlan);
+      DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
+      Assert.assertNotNull(dispatchableQueryPlan);
     } catch (RuntimeException e) {
       Assert.fail("failed to plan query: " + query, e);
     }
@@ -78,11 +78,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  private static void assertGroupBySingletonAfterJoin(QueryPlan queryPlan, boolean shouldRewrite)
+  private static void assertGroupBySingletonAfterJoin(DispatchableSubPlan dispatchableQueryPlan,
+      boolean shouldRewrite)
       throws Exception {
-    for (Map.Entry<Integer, DispatchablePlanMetadata> e : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
-      if (e.getValue().getScannedTables().size() == 0 && !PlannerUtils.isRootPlanFragment(e.getKey())) {
-        PlanNode node = queryPlan.getQueryStageMap().get(e.getKey());
+    for (Map.Entry<Integer, DispatchablePlanFragment> e : dispatchableQueryPlan.getQueryStageMap()
+        .entrySet()) {
+      if (dispatchableQueryPlan.getTableNames().size() == 0 && !PlannerUtils.isRootPlanFragment(e.getKey())) {
+        PlanNode node = dispatchableQueryPlan.getQueryStageMap().get(e.getKey()).getPlanFragment().getFragmentRoot();
         while (node != null) {
           if (node instanceof JoinNode) {
             // JOIN is exchanged with hash distribution (data shuffle)
@@ -112,10 +114,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryAndAssertStageContentForJoin()
       throws Exception {
     String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
-    Assert.assertEquals(queryPlan.getDispatchablePlanMetadataMap().size(), 4);
-    for (Map.Entry<Integer, DispatchablePlanMetadata> e : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(dispatchableQueryPlan.getQueryStageMap().size(), 4);
+    for (Map.Entry<Integer, DispatchablePlanFragment> e : dispatchableQueryPlan.getQueryStageMap()
+        .entrySet()) {
       List<String> tables = e.getValue().getScannedTables();
       if (tables.size() == 1) {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
@@ -147,13 +149,14 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryProjectFilterPushDownForJoin() {
     String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
         + "WHERE a.col3 >= 0 AND a.col2 IN ('b') AND b.col3 < 0";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    List<PlanNode> intermediateStageRoots =
-        queryPlan.getDispatchablePlanMetadataMap().entrySet().stream()
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
+    List<DispatchablePlanFragment> intermediateStages =
+        dispatchableQueryPlan.getQueryStageMap().entrySet().stream()
             .filter(e -> e.getValue().getScannedTables().size() == 0)
-            .map(e -> queryPlan.getQueryStageMap().get(e.getKey())).collect(Collectors.toList());
+            .map(e -> dispatchableQueryPlan.getQueryStageMap().get(e.getKey())).collect(Collectors.toList());
     // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
-    for (PlanNode roots : intermediateStageRoots) {
+    for (DispatchablePlanFragment dispatchablePlanFragment : intermediateStages) {
+      PlanNode roots = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
       assertNodeTypeNotIn(roots, ImmutableList.of(ProjectNode.class, FilterNode.class));
     }
   }
@@ -161,26 +164,24 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testQueryRoutingManagerCompilation() {
     String query = "SELECT * FROM d_OFFLINE";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    List<DispatchablePlanMetadata> tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
-        .filter(planFragmentMetadata -> planFragmentMetadata.getScannedTables().size() != 0)
-        .collect(Collectors.toList());
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
+    List<DispatchablePlanFragment> tableScanMetadataList =
+        dispatchableQueryPlan.getQueryStageMap().values().stream()
+            .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
 
     query = "SELECT * FROM d_REALTIME";
-    queryPlan = _queryEnvironment.planQuery(query);
-    tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
-        .filter(planFragmentMetadata -> planFragmentMetadata.getScannedTables().size() != 0)
-        .collect(Collectors.toList());
+    dispatchableQueryPlan = _queryEnvironment.planQuery(query);
+    tableScanMetadataList = dispatchableQueryPlan.getQueryStageMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 1);
 
     query = "SELECT * FROM d";
-    queryPlan = _queryEnvironment.planQuery(query);
-    tableScanMetadataList = queryPlan.getDispatchablePlanMetadataMap().values().stream()
-        .filter(planFragmentMetadata -> planFragmentMetadata.getScannedTables().size() != 0)
-        .collect(Collectors.toList());
+    dispatchableQueryPlan = _queryEnvironment.planQuery(query);
+    tableScanMetadataList = dispatchableQueryPlan.getQueryStageMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
   }
@@ -189,26 +190,26 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testPlanQueryMultiThread()
       throws Exception {
-    Map<String, ArrayList<QueryPlan>> queryPlans = new HashMap<>();
+    Map<String, ArrayList<DispatchableSubPlan>> queryPlans = new HashMap<>();
     Lock lock = new ReentrantLock();
     Runnable joinQuery = () -> {
       String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2";
-      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
       lock.lock();
-      if (!queryPlans.containsKey(queryPlan)) {
+      if (!queryPlans.containsKey(dispatchableQueryPlan)) {
         queryPlans.put(query, new ArrayList<>());
       }
-      queryPlans.get(query).add(queryPlan);
+      queryPlans.get(query).add(dispatchableQueryPlan);
       lock.unlock();
     };
     Runnable selectQuery = () -> {
       String query = "SELECT * FROM a";
-      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
       lock.lock();
-      if (!queryPlans.containsKey(queryPlan)) {
+      if (!queryPlans.containsKey(dispatchableQueryPlan)) {
         queryPlans.put(query, new ArrayList<>());
       }
-      queryPlans.get(query).add(queryPlan);
+      queryPlans.get(query).add(dispatchableQueryPlan);
       lock.unlock();
     };
     ArrayList<Thread> threads = new ArrayList<>();
@@ -228,8 +229,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     for (Thread t : threads) {
       t.join();
     }
-    for (ArrayList<QueryPlan> plans : queryPlans.values()) {
-      for (QueryPlan plan : plans) {
+    for (ArrayList<DispatchableSubPlan> plans : queryPlans.values()) {
+      for (DispatchableSubPlan plan : plans) {
         Assert.assertTrue(plan.equals(plans.get(0)));
       }
     }
@@ -241,10 +242,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     // Hinting the query to use final stage aggregation makes server directly return final result
     // This is useful when data is already partitioned by col1
     String query = "SELECT /*+ aggFinalStage */ col1, COUNT(*) FROM b GROUP BY col1";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 2);
-    Assert.assertEquals(queryPlan.getDispatchablePlanMetadataMap().size(), 2);
-    for (Map.Entry<Integer, DispatchablePlanMetadata> e : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(dispatchableQueryPlan.getQueryStageMap().size(), 2);
+    for (Map.Entry<Integer, DispatchablePlanFragment> e : dispatchableQueryPlan.getQueryStageMap()
+        .entrySet()) {
       List<String> tables = e.getValue().getScannedTables();
       if (tables.size() != 0) {
         // table scan stages; for tableB it should have only 1

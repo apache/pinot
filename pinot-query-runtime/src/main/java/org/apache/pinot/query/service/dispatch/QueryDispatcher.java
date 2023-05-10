@@ -45,11 +45,10 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
-import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -84,28 +83,32 @@ public class QueryDispatcher {
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
   }
 
-  public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan, MailboxService mailboxService, long timeoutMs,
+  public ResultTable submitAndReduce(long requestId, DispatchableSubPlan dispatchableQueryPlan,
+      MailboxService mailboxService, long timeoutMs,
       Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator,
       boolean traceEnabled)
       throws Exception {
     try {
       // submit all the distributed stages.
-      int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
+      int reduceStageId = submit(requestId, dispatchableQueryPlan, timeoutMs, queryOptions);
       // run reduce stage and return result.
-      return runReducer(requestId, queryPlan, reduceStageId, timeoutMs, mailboxService, executionStatsAggregator,
+      return runReducer(requestId, dispatchableQueryPlan, reduceStageId, timeoutMs, mailboxService,
+          executionStatsAggregator,
           traceEnabled);
     } catch (Exception e) {
-      cancel(requestId, queryPlan);
-      throw new RuntimeException("Error executing query: " + ExplainPlanPlanVisitor.explain(queryPlan), e);
+      cancel(requestId, dispatchableQueryPlan);
+      throw new RuntimeException("Error executing query: " + ExplainPlanPlanVisitor.explain(dispatchableQueryPlan), e);
     }
   }
 
-  private void cancel(long requestId, QueryPlan queryPlan) {
+  private void cancel(long requestId, DispatchableSubPlan dispatchableQueryPlan) {
     Set<DispatchClient> dispatchClientSet = new HashSet<>();
-    for (Map.Entry<Integer, DispatchablePlanMetadata> stage : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
+    for (Map.Entry<Integer, DispatchablePlanFragment> stage : dispatchableQueryPlan.getQueryStageMap()
+        .entrySet()) {
       int stageId = stage.getKey();
       // stage rooting at a mailbox receive node means reduce stage.
-      if (!(queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode)) {
+      if (!(dispatchableQueryPlan.getQueryStageMap().get(stageId).getPlanFragment()
+          .getFragmentRoot() instanceof MailboxReceiveNode)) {
         Set<QueryServerInstance> serverInstances = stage.getValue().getServerInstanceToWorkerIdMap().keySet();
         for (QueryServerInstance serverInstance : serverInstances) {
           String host = serverInstance.getHostname();
@@ -120,16 +123,19 @@ public class QueryDispatcher {
   }
 
   @VisibleForTesting
-  int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
+  int submit(long requestId, DispatchableSubPlan dispatchableQueryPlan, long timeoutMs,
+      Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
     BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks = new LinkedBlockingQueue<>();
     int dispatchCalls = 0;
-    for (Map.Entry<Integer, DispatchablePlanMetadata> stage : queryPlan.getDispatchablePlanMetadataMap().entrySet()) {
+    for (Map.Entry<Integer, DispatchablePlanFragment> stage : dispatchableQueryPlan.getQueryStageMap()
+        .entrySet()) {
       int stageId = stage.getKey();
       // stage rooting at a mailbox receive node means reduce stage.
-      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
+      if (dispatchableQueryPlan.getQueryStageMap().get(stageId).getPlanFragment()
+          .getFragmentRoot() instanceof MailboxReceiveNode) {
         reduceStageId = stageId;
       } else {
         for (Map.Entry<QueryServerInstance, List<Integer>> queryServerEntry
@@ -144,11 +150,11 @@ public class QueryDispatcher {
             dispatchCalls++;
             _executorService.submit(() -> {
               client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
-                      QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId,
-                          virtualServerAddress)))
-                  .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-                  .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
-                  .putAllMetadata(queryOptions).build(), stageId, queryServerInstance, deadline,
+                          QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(dispatchableQueryPlan, stageId,
+                              virtualServerAddress)))
+                      .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
+                      .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
+                      .putAllMetadata(queryOptions).build(), stageId, queryServerInstance, deadline,
                   dispatchCallbacks::offer);
             });
           }
@@ -183,29 +189,37 @@ public class QueryDispatcher {
   }
 
   @VisibleForTesting
-  public static ResultTable runReducer(long requestId, QueryPlan queryPlan, int reduceStageId, long timeoutMs,
+  public static ResultTable runReducer(long requestId, DispatchableSubPlan dispatchableQueryPlan, int reduceStageId,
+      long timeoutMs,
       MailboxService mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled) {
-    MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
+    MailboxReceiveNode reduceNode =
+        (MailboxReceiveNode) dispatchableQueryPlan.getQueryStageMap().get(reduceStageId).getPlanFragment()
+            .getFragmentRoot();
     VirtualServerAddress server = new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), 0);
     OpChainExecutionContext context =
         new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs,
-            System.currentTimeMillis() + timeoutMs, queryPlan.getStageMetadata(reduceStageId), traceEnabled);
+            System.currentTimeMillis() + timeoutMs,
+            dispatchableQueryPlan.getQueryStageMap().get(reduceStageId).toPlanFragmentMetadata(),
+            traceEnabled);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context, reduceNode.getSenderStageId());
     List<DataBlock> resultDataBlocks =
-        reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, queryPlan, context.getStats());
-    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
-        queryPlan.getQueryStageMap().get(0).getDataSchema());
+        reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, dispatchableQueryPlan,
+            context.getStats());
+    return toResultTable(resultDataBlocks, dispatchableQueryPlan.getQueryResultFields(),
+        dispatchableQueryPlan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema());
   }
 
   @VisibleForTesting
-  public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
-      VirtualServerAddress serverAddress) {
-    return new DistributedStagePlan(stageId, serverAddress, queryPlan.getQueryStageMap().get(stageId),
-        queryPlan.getStageMetadata(stageId));
+  public static DistributedStagePlan constructDistributedStagePlan(DispatchableSubPlan dispatchableQueryPlan,
+      int stageId, VirtualServerAddress serverAddress) {
+    return new DistributedStagePlan(stageId, serverAddress,
+        dispatchableQueryPlan.getQueryStageMap().get(stageId).getPlanFragment().getFragmentRoot(),
+        dispatchableQueryPlan.getQueryStageMap().get(stageId).toPlanFragmentMetadata());
   }
 
   private static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
-      @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap, QueryPlan queryPlan,
+      @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap,
+      DispatchableSubPlan dispatchableQueryPlan,
       OpChainStats stats) {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
@@ -230,9 +244,9 @@ public class QueryDispatcher {
             ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
             rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             if (stageStatsAggregator != null) {
-              if (queryPlan != null) {
-                PlanFragmentMetadata planFragmentMetadata = queryPlan.getStageMetadata(operatorStats.getStageId());
-                OperatorUtils.recordTableName(operatorStats, planFragmentMetadata);
+              if (dispatchableQueryPlan != null) {
+                OperatorUtils.recordTableName(operatorStats,
+                    dispatchableQueryPlan.getQueryStageMap().get(operatorStats.getStageId()));
               }
               stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             }

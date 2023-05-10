@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.SubPlan;
+import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -50,23 +54,26 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
    *   <li>attach worker execution information including physical server address, worker ID to each stage.</li>
    * </ul>
    *
-   * @param globalReceiverNode the entrypoint of the stage plan.
+   * @param subPlan the entrypoint of the sub plan.
    * @param dispatchablePlanContext dispatchable plan context used to record the walk of the stage node tree.
    */
-  public QueryPlan constructDispatchablePlan(PlanNode globalReceiverNode,
-      DispatchablePlanContext dispatchablePlanContext) {
-    // 1. start by visiting the stage root.
-    globalReceiverNode.visit(DispatchablePlanVisitor.INSTANCE, dispatchablePlanContext);
+  public DispatchableSubPlan constructDispatchableSubPlan(SubPlan subPlan,
+      DispatchablePlanContext dispatchablePlanContext, TableCache tableCache) {
+    PlanNode subPlanRoot = subPlan.getSubPlanRoot().getFragmentRoot();
+    // 1. start by visiting the sub plan fragment root.
+    subPlanRoot.visit(DispatchablePlanVisitor.INSTANCE, dispatchablePlanContext);
     // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
-    dispatchablePlanContext.getDispatchablePlanStageRootMap().put(0, globalReceiverNode);
+    dispatchablePlanContext.getDispatchablePlanStageRootMap().put(0, subPlanRoot);
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
-    computeWorkerAssignment(globalReceiverNode, dispatchablePlanContext);
+    computeWorkerAssignment(subPlanRoot, dispatchablePlanContext);
     // 4. compute the mailbox assignment for each stage.
     // TODO: refactor this to be a pluggable interface.
     computeMailboxAssignment(dispatchablePlanContext);
-    // 5. convert it into query plan.
+    // 5. Run physical optimizations
+    runPhysicalOptimizers(subPlanRoot, dispatchablePlanContext, tableCache);
+    // 6. convert it into query plan.
     // TODO: refactor this to be a pluggable interface.
-    return finalizeQueryPlan(dispatchablePlanContext);
+    return finalizeDispatchableSubPlan(subPlan.getSubPlanRoot(), dispatchablePlanContext);
   }
 
   private void computeMailboxAssignment(DispatchablePlanContext dispatchablePlanContext) {
@@ -74,12 +81,26 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
         dispatchablePlanContext);
   }
 
-  private static QueryPlan finalizeQueryPlan(DispatchablePlanContext dispatchablePlanContext) {
-    return new QueryPlan(dispatchablePlanContext.getResultFields(),
-        dispatchablePlanContext.getDispatchablePlanStageRootMap(),
-        dispatchablePlanContext.getDispatchablePlanMetadataMap());
+  // TODO: Switch to Worker SPI to avoid multiple-places where workers are assigned.
+  private void runPhysicalOptimizers(PlanNode subPlanRoot, DispatchablePlanContext dispatchablePlanContext,
+      TableCache tableCache) {
+    if (dispatchablePlanContext.getPlannerContext().getOptions().getOrDefault("useColocatedJoin", "false")
+        .equals("true")) {
+      GreedyShuffleRewriteVisitor.optimizeShuffles(subPlanRoot,
+          dispatchablePlanContext.getDispatchablePlanMetadataMap(), tableCache);
+    }
   }
 
+  private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
+      DispatchablePlanContext dispatchablePlanContext) {
+    return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
+        dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot),
+        dispatchablePlanContext.getTableNames());
+  }
+
+  /**
+   * Convert the {@link DispatchablePlanMetadata} into dispatchable info for each stage/worker.
+   */
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
       DispatchablePlanContext context) {
     return context.getDispatchablePlanMetadataMap().computeIfAbsent(node.getPlanFragmentId(),

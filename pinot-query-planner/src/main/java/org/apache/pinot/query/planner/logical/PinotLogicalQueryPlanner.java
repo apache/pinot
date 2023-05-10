@@ -1,0 +1,178 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.query.planner.logical;
+
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
+import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.PlanFragmentMetadata;
+import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.QueryPlanMetadata;
+import org.apache.pinot.query.planner.SubPlan;
+import org.apache.pinot.query.planner.SubPlanMetadata;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+
+
+/**
+ * PinotLogicalQueryPlanner walks top-down from {@link RelRoot} and construct a forest of trees with {@link PlanNode}.
+ *
+ * This class is non-threadsafe. Do not reuse the stage planner for multiple query plans.
+ */
+public class PinotLogicalQueryPlanner {
+
+  /**
+   * Construct the dispatchable plan from relational logical plan.
+   *
+   * @param relRoot relational plan root.
+   * @return dispatchable plan.
+   */
+  public QueryPlan planQuery(RelRoot relRoot) {
+    RelNode relRootNode = relRoot.rel;
+    // Walk through RelNode tree and construct a StageNode tree.
+    PlanNode globalRoot = relNodeToStageNode(relRootNode);
+    QueryPlanMetadata queryPlanMetadata = new QueryPlanMetadata();
+    queryPlanMetadata.setTableNames(getTableNamesFromRelRoot(relRootNode));
+    queryPlanMetadata.setFields(relRoot.fields);
+    return new QueryPlan(globalRoot, queryPlanMetadata);
+  }
+
+  /**
+   * Construct the dispatchable plan from relational logical plan.
+   *
+   * @param queryPlan relational plan root.
+   * @return dispatchable plan.
+   */
+  public SubPlan makePlan(QueryPlan queryPlan) {
+    PlanNode globalRoot = queryPlan.getPlanRoot();
+
+    // Fragment the stage tree into multiple SubPlans.
+    SubPlanFragmenter.Context subPlanContext = new SubPlanFragmenter.Context();
+    subPlanContext._subPlanIdToRootNodeMap.put(0, globalRoot);
+    subPlanContext._subPlanIdToMetadataMap.put(0, new SubPlanMetadata());
+    subPlanContext._subPlanIdToMetadataMap.get(0).setFields(queryPlan.getPlanMetadata().getFields());
+    subPlanContext._subPlanIdToMetadataMap.get(0).setTableNames(queryPlan.getPlanMetadata().getTableNames());
+    globalRoot.visit(SubPlanFragmenter.INSTANCE, subPlanContext);
+
+    Map<Integer, SubPlan> subPlanMap = new HashMap<>();
+    for (Map.Entry<Integer, PlanNode> subPlanEntry : subPlanContext._subPlanIdToRootNodeMap.entrySet()) {
+      int subPlanId = subPlanEntry.getKey();
+      PlanNode subPlanRoot = subPlanEntry.getValue();
+      PlanFragmentFragmenter.Context planFragmentContext = new PlanFragmentFragmenter.Context();
+      planFragmentContext._planFragmentIdToRootNodeMap.put(1,
+          new PlanFragment(1, subPlanRoot, new PlanFragmentMetadata(), new ArrayList<>()));
+      subPlanRoot = subPlanRoot.visit(PlanFragmentFragmenter.INSTANCE, planFragmentContext);
+
+      // Sub plan root needs to send results back to the Broker ROOT, a.k.a. the client response node. the last stage
+      // only has one
+      // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
+      PlanNode subPlanRootSenderNode =
+          new MailboxSendNode(subPlanRoot.getPlanFragmentId(), subPlanRoot.getDataSchema(),
+              0, RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false);
+      subPlanRootSenderNode.addInput(subPlanRoot);
+
+      PlanNode subPlanRootReceiverNode =
+          new MailboxReceiveNode(0, subPlanRoot.getDataSchema(), subPlanRoot.getPlanFragmentId(),
+              RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, subPlanRootSenderNode);
+      subPlanRoot = subPlanRootReceiverNode;
+      PlanFragment planFragment1 = planFragmentContext._planFragmentIdToRootNodeMap.get(1);
+      planFragmentContext._planFragmentIdToRootNodeMap.put(1,
+          new PlanFragment(1, subPlanRootSenderNode, planFragment1.getFragmentMetadata(), planFragment1.getChildren()));
+      PlanFragment rootPlanFragment
+          = new PlanFragment(subPlanRoot.getPlanFragmentId(), subPlanRoot, new PlanFragmentMetadata(),
+          ImmutableList.of(planFragmentContext._planFragmentIdToRootNodeMap.get(1)));
+      planFragmentContext._planFragmentIdToRootNodeMap.put(0, rootPlanFragment);
+      planFragmentContext._planFragmentIdToRootNodeMap.get(0).getFragmentMetadata()
+          .setScannedTables(new ArrayList<>(getTableNamesFromSubPlan(rootPlanFragment)));
+      for (Map.Entry<Integer, List<Integer>> planFragmentToChildrenEntry
+          : planFragmentContext._planFragmentIdToChildrenMap.entrySet()) {
+        int planFragmentId = planFragmentToChildrenEntry.getKey();
+        List<Integer> planFragmentChildren = planFragmentToChildrenEntry.getValue();
+        for (int planFragmentChild : planFragmentChildren) {
+          planFragmentContext._planFragmentIdToRootNodeMap.get(planFragmentId).getChildren()
+              .add(planFragmentContext._planFragmentIdToRootNodeMap.get(planFragmentChild));
+        }
+      }
+      SubPlan subPlan = new SubPlan(planFragmentContext._planFragmentIdToRootNodeMap.get(0),
+          subPlanContext._subPlanIdToMetadataMap.get(0), new ArrayList<>());
+      subPlan.getSubPlanMetadata().setTableNames(queryPlan.getPlanMetadata().getTableNames());
+      // subPlan.getSubPlanMetadata().setFields(queryPlan.getPlanMetadata().getFields());
+      subPlanMap.put(subPlanId, subPlan);
+    }
+    for (Map.Entry<Integer, List<Integer>> subPlanToChildrenEntry : subPlanContext._subPlanIdToChildrenMap.entrySet()) {
+      int subPlanId = subPlanToChildrenEntry.getKey();
+      List<Integer> subPlanChildren = subPlanToChildrenEntry.getValue();
+      for (int subPlanChild : subPlanChildren) {
+        subPlanMap.get(subPlanId).getChildren().add(subPlanMap.get(subPlanChild));
+      }
+    }
+    return subPlanMap.get(0);
+  }
+
+  private Set<String> getTableNamesFromSubPlan(PlanFragment subPlanRoot) {
+    Set<String> tableNames = new HashSet<>();
+    getTableNamesFromPlanNode(subPlanRoot.getFragmentRoot(), tableNames);
+    return tableNames;
+  }
+
+  private void getTableNamesFromPlanNode(PlanNode rootPlanNode, Set<String> tableNames) {
+    if (rootPlanNode instanceof TableScanNode) {
+      tableNames.add(((TableScanNode) rootPlanNode).getTableName());
+    } else {
+      List<PlanNode> children = rootPlanNode.getInputs();
+      for (PlanNode child : children) {
+        getTableNamesFromPlanNode(child, tableNames);
+      }
+    }
+  }
+
+  // non-threadsafe
+  // TODO: add dataSchema (extracted from RelNode schema) to the StageNode.
+  private PlanNode relNodeToStageNode(RelNode node) {
+    PlanNode planNode = RelToStageConverter.toStageNode(node, -1);
+    List<RelNode> inputs = node.getInputs();
+    for (RelNode input : inputs) {
+      planNode.addInput(relNodeToStageNode(input));
+    }
+    return planNode;
+  }
+
+  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
+    Set<String> tableNames = new HashSet<>();
+    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
+    for (String qualifiedTableName : qualifiedTableNames) {
+      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
+      // statements, particularly to handle cases when they contain special characters or reserved keywords.
+      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
+      tableNames.add(tableName);
+    }
+    return tableNames;
+  }
+}

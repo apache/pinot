@@ -18,34 +18,34 @@
  */
 package org.apache.pinot.query.planner;
 
-import org.apache.pinot.query.planner.plannode.PlanNode;
+import java.util.List;
 
 
 /**
- * The {@code QueryPlan} is the logical query plan from the result of
- * {@link org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner}.
+ * The {@code SubPlan} is the logical sub query plan that should be scheduled together from the result of
+ * {@link org.apache.pinot.query.planner.logical.PinotQueryFragmenter}.
  *
  */
-public class QueryPlan {
-  private final PlanNode _planRoot;
-  private final QueryPlanMetadata _queryPlanMetadata;
+public class SubPlan {
+  private final PlanFragment _subPlanRoot;
+  private final SubPlanMetadata _subPlanMetadata;
+  private final List<SubPlan> _children;
 
-  public QueryPlan(PlanNode queryPlanRoot, QueryPlanMetadata queryPlanMetadata) {
-    _planRoot = queryPlanRoot;
-    _queryPlanMetadata = queryPlanMetadata;
+  public SubPlan(PlanFragment subPlanRoot, SubPlanMetadata subPlanMetadata, List<SubPlan> children) {
+    _subPlanRoot = subPlanRoot;
+    _subPlanMetadata = subPlanMetadata;
+    _children = children;
   }
 
-  /**
-   * Get the root node of the query plan.
-   */
-  public PlanNode getPlanRoot() {
-    return _planRoot;
+  public PlanFragment getSubPlanRoot() {
+    return _subPlanRoot;
   }
 
-  /**
-   * Get the metadata of the query plan.
-   */
-  public QueryPlanMetadata getPlanMetadata() {
-    return _queryPlanMetadata;
+  public SubPlanMetadata getSubPlanMetadata() {
+    return _subPlanMetadata;
+  }
+
+  public List<SubPlan> getChildren() {
+    return _children;
   }
 }

@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
@@ -114,7 +117,10 @@ public final class RelToStageConverter {
       }
     }
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
-    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), node.getDistribution(), fieldCollations,
+
+    Set<String> tableNames = getTableNamesFromRelRoot(node);
+    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), tableNames, node.getDistribution(),
+        fieldCollations,
         isSortOnSender, isSortOnReceiver);
   }
 
@@ -264,5 +270,17 @@ public final class RelToStageConverter {
         return DataSchema.ColumnDataType.BIG_DECIMAL;
       }
     }
+  }
+
+  private static Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
+    Set<String> tableNames = new HashSet<>();
+    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
+    for (String qualifiedTableName : qualifiedTableNames) {
+      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
+      // statements, particularly to handle cases when they contain special characters or reserved keywords.
+      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
+      tableNames.add(tableName);
+    }
+    return tableNames;
   }
 }

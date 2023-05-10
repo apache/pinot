@@ -18,34 +18,30 @@
  */
 package org.apache.pinot.query.planner;
 
-import org.apache.pinot.query.planner.plannode.PlanNode;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 
-/**
- * The {@code QueryPlan} is the logical query plan from the result of
- * {@link org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner}.
- *
- */
-public class QueryPlan {
-  private final PlanNode _planRoot;
-  private final QueryPlanMetadata _queryPlanMetadata;
+public class PlanFragmentMetadata {
+  public static final String PLAN_FRAGMENT_ID_KEY = "planFragmentId";
+  private final Map<String, String> _customProperties = new HashMap<>();
 
-  public QueryPlan(PlanNode queryPlanRoot, QueryPlanMetadata queryPlanMetadata) {
-    _planRoot = queryPlanRoot;
-    _queryPlanMetadata = queryPlanMetadata;
+  private List<String> _scannedTables = new ArrayList<>();
+
+  public PlanFragmentMetadata() {
   }
 
-  /**
-   * Get the root node of the query plan.
-   */
-  public PlanNode getPlanRoot() {
-    return _planRoot;
+  public Map<String, String> getCustomProperties() {
+    return _customProperties;
   }
 
-  /**
-   * Get the metadata of the query plan.
-   */
-  public QueryPlanMetadata getPlanMetadata() {
-    return _queryPlanMetadata;
+  public List<String> getScannedTables() {
+    return _scannedTables;
+  }
+
+  public void setScannedTables(List<String> scannedTables) {
+    _scannedTables = scannedTables;
   }
 }

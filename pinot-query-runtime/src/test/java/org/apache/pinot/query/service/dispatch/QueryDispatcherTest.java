@@ -33,8 +33,8 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlannerUtils;
-import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -70,7 +70,7 @@ public class QueryDispatcherTest extends QueryTestSet {
 
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
-      QueryRunner queryRunner = Mockito.mock(QueryRunner.class);;
+      QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
       Mockito.when(queryRunner.getQueryWorkerLeafExecutorService()).thenReturn(LEAF_WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryWorkerIntermExecutorService()).thenReturn(INTERM_WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryRunnerExecutorService()).thenReturn(RUNNER_EXECUTOR_SERVICE);
@@ -99,9 +99,10 @@ public class QueryDispatcherTest extends QueryTestSet {
   @Test(dataProvider = "testSql")
   public void testQueryDispatcherCanSendCorrectPayload(String sql)
       throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
-    int reducerStageId = dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
+    int reducerStageId =
+        dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 10_000L, new HashMap<>());
     Assert.assertTrue(PlannerUtils.isRootPlanFragment(reducerStageId));
     dispatcher.shutdown();
   }
@@ -112,10 +113,10 @@ public class QueryDispatcherTest extends QueryTestSet {
     String sql = "SELECT * FROM a WHERE col1 = 'foo'";
     QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
     Mockito.doThrow(new RuntimeException("foo")).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 10_000L, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -137,11 +138,11 @@ public class QueryDispatcherTest extends QueryTestSet {
         return null;
       }
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     try {
-      dispatcher.submitAndReduce(requestId, queryPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(requestId, dispatchableQueryPlan, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
@@ -159,14 +160,15 @@ public class QueryDispatcherTest extends QueryTestSet {
   public void testQueryDispatcherCancelWhenQueryReducerThrowsError()
       throws Exception {
     String sql = "SELECT * FROM a";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     try {
       // will throw b/c mailboxService is null
-      dispatcher.submitAndReduce(requestId, queryPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(requestId, dispatchableQueryPlan, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
+      System.out.println("e = " + e);
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
     }
     // wait just a little, until the cancel is being called.
@@ -192,10 +194,10 @@ public class QueryDispatcherTest extends QueryTestSet {
         return null;
       }
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 10_000L, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -218,10 +220,10 @@ public class QueryDispatcherTest extends QueryTestSet {
         return null;
       }
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 1_000, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, 1_000, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Timed out waiting for response")
@@ -234,10 +236,10 @@ public class QueryDispatcherTest extends QueryTestSet {
   @Test
   public void testQueryDispatcherThrowsWhenDeadlinePreExpiredAndAsyncResponseNotPolled() {
     String sql = "SELECT * FROM a WHERE col1 = 'foo'";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableQueryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     try {
-      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, -10_000, new HashMap<>());
+      dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableQueryPlan, -10_000, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Timed out waiting"));

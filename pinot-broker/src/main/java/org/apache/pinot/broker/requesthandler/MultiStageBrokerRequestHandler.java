@@ -51,7 +51,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -175,7 +175,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
 
-    QueryPlan queryPlan = queryPlanResult.getQueryPlan();
+    //DispatchableSubPlan dispatchableQueryPlan = queryPlanResult.getQueryPlan();
+    DispatchableSubPlan dispatchableQueryPlan = queryPlanResult.getQueryPlan();
     Set<String> tableNames = queryPlanResult.getTableNames();
 
     // Compilation Time. This includes the time taken for parsing, compiling, create stage plans and assigning workers.
@@ -201,13 +202,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
-    for (Integer stageId : queryPlan.getDispatchablePlanMetadataMap().keySet()) {
+    for (Integer stageId : dispatchableQueryPlan.getQueryStageMap().keySet()) {
       stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
     }
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
+      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableQueryPlan, _mailboxService, queryTimeoutMs,
           sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);

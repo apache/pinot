@@ -60,9 +60,12 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.logical.StagePlanner;
+import org.apache.pinot.query.planner.SubPlan;
+import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
+import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -72,7 +75,7 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 /**
  * The {@code QueryEnvironment} contains the main entrypoint for query planning.
  *
- * <p>It provide the higher level entry interface to convert a SQL string into a {@link QueryPlan}.
+ * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
  */
 public class QueryEnvironment {
   // Calcite configurations
@@ -155,9 +158,9 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      Set<String> tableNames = getTableNamesFromRelRoot(relRoot.rel);
-      return new QueryPlannerResult(toDispatchablePlan(relRoot, plannerContext, requestId, tableNames), null,
-          tableNames);
+      SubPlan subPlan = toSubPlan(relRoot);
+      DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(subPlan, plannerContext, requestId);
+      return new QueryPlannerResult(dispatchableSubPlan, null);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -170,7 +173,8 @@ public class QueryEnvironment {
    * Explain a SQL query.
    *
    * Similar to {@link QueryEnvironment#planQuery(String, SqlNodeAndOptions, long)}, this API runs the query
-   * compilation. But it doesn't run the distributed {@link QueryPlan} generation, instead it only returns the
+   * compilation. But it doesn't run the distributed {@link DispatchableSubPlan} generation, instead it only
+   * returns the
    * explained logical plan.
    *
    * @param sqlQuery SQL query string.
@@ -193,7 +197,7 @@ public class QueryEnvironment {
   }
 
   @VisibleForTesting
-  public QueryPlan planQuery(String sqlQuery) {
+  public DispatchableSubPlan planQuery(String sqlQuery) {
     return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0).getQueryPlan();
   }
 
@@ -206,12 +210,17 @@ public class QueryEnvironment {
    * Results of planning a query
    */
   public static class QueryPlannerResult {
-    private QueryPlan _queryPlan;
+    private DispatchableSubPlan _dispatchableSubPlan;
     private String _explainPlan;
     Set<String> _tableNames;
 
-    QueryPlannerResult(@Nullable QueryPlan queryPlan, @Nullable String explainPlan, Set<String> tableNames) {
-      _queryPlan = queryPlan;
+    QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan) {
+      this(dispatchableSubPlan, explainPlan, dispatchableSubPlan.getTableNames());
+    }
+
+    QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan,
+        Set<String> tableNames) {
+      _dispatchableSubPlan = dispatchableSubPlan;
       _explainPlan = explainPlan;
       _tableNames = tableNames;
     }
@@ -220,8 +229,8 @@ public class QueryEnvironment {
       return _explainPlan;
     }
 
-    public QueryPlan getQueryPlan() {
-      return _queryPlan;
+    public DispatchableSubPlan getQueryPlan() {
+      return _dispatchableSubPlan;
     }
 
     // Returns all the table names in the query.
@@ -297,11 +306,20 @@ public class QueryEnvironment {
     }
   }
 
-  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
-      Set<String> tableNames) {
-    // 5. construct a dispatchable query plan.
-    StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager, requestId, _tableCache);
-    return queryStagePlanner.makePlan(relRoot, tableNames);
+  private SubPlan toSubPlan(RelRoot relRoot) {
+    // 5. construct a logical query plan.
+    PinotLogicalQueryPlanner pinotLogicalQueryPlanner = new PinotLogicalQueryPlanner();
+    QueryPlan queryPlan = pinotLogicalQueryPlanner.planQuery(relRoot);
+    SubPlan subPlan = pinotLogicalQueryPlanner.makePlan(queryPlan);
+    return subPlan;
+  }
+
+  private DispatchableSubPlan toDispatchableSubPlan(SubPlan subPlan, PlannerContext plannerContext, long requestId) {
+    // 6. construct a dispatchable query plan.
+    PinotDispatchPlanner pinotDispatchPlanner =
+        new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
+    DispatchableSubPlan dispatchableSubPlan = pinotDispatchPlanner.createDispatchTasks(subPlan);
+    return dispatchableSubPlan;
   }
 
   // --------------------------------------------------------------------------
@@ -311,7 +329,6 @@ public class QueryEnvironment {
   private HintStrategyTable getHintStrategyTable() {
     return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
   }
-
 
   private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
     Set<String> tableNames = new HashSet<>();

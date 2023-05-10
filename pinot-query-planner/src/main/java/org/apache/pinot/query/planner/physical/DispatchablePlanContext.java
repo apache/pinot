@@ -18,14 +18,20 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 public class DispatchablePlanContext {
@@ -77,5 +83,60 @@ public class DispatchablePlanContext {
 
   public Map<Integer, PlanNode> getDispatchablePlanStageRootMap() {
     return _dispatchablePlanStageRootMap;
+  }
+
+  public Map<Integer, DispatchablePlanFragment> constructDispatchablePlanFragmentMap(PlanFragment subPlanRoot) {
+
+    Map<Integer, DispatchablePlanFragment> dispatchablePlanFragmentMap = new HashMap<>();
+    createDispatchablePlanFragmentMap(dispatchablePlanFragmentMap, subPlanRoot);
+    for (Map.Entry<Integer, DispatchablePlanMetadata> dispatchableEntry : _dispatchablePlanMetadataMap.entrySet()) {
+      DispatchablePlanMetadata dispatchablePlanMetadata = dispatchableEntry.getValue();
+
+      // construct each worker metadata
+      WorkerMetadata[] workerMetadataList = new WorkerMetadata[dispatchablePlanMetadata.getTotalWorkerCount()];
+      for (Map.Entry<QueryServerInstance, List<Integer>> queryServerEntry
+          : dispatchablePlanMetadata.getServerInstanceToWorkerIdMap().entrySet()) {
+        for (int workerId : queryServerEntry.getValue()) {
+          VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerEntry.getKey(), workerId);
+          WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
+          builder.setVirtualServerAddress(virtualServerAddress);
+          if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
+            builder.addTableSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap().get(workerId));
+          }
+          builder.putAllMailBoxInfosMap(dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap().get(workerId));
+          workerMetadataList[workerId] = builder.build();
+        }
+      }
+
+      // set the stageMetadata
+      int stageId = dispatchableEntry.getKey();
+      dispatchablePlanFragmentMap.get(stageId).setScannedTables(dispatchablePlanMetadata.getScannedTables());
+
+      dispatchablePlanFragmentMap.get(stageId).setWorkerMetadataList(Arrays.asList(workerMetadataList));
+      dispatchablePlanFragmentMap.get(stageId)
+          .setWorkerIdToSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap());
+      dispatchablePlanFragmentMap.get(stageId)
+          .setServerInstanceToWorkerIdMap(dispatchablePlanMetadata.getServerInstanceToWorkerIdMap());
+      if (dispatchablePlanMetadata.getScannedTables().size() > 0) {
+        dispatchablePlanFragmentMap.get(stageId)
+            .setScannedTables(dispatchablePlanMetadata.getScannedTables());
+      }
+      if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
+        dispatchablePlanFragmentMap.get(stageId).setTableName(dispatchablePlanMetadata.getScannedTables().get(0));
+      }
+      if (dispatchablePlanMetadata.getTimeBoundaryInfo() != null) {
+        dispatchablePlanFragmentMap.get(stageId)
+            .setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
+      }
+    }
+    return dispatchablePlanFragmentMap;
+  }
+
+  private void createDispatchablePlanFragmentMap(Map<Integer, DispatchablePlanFragment> dispatchablePlanFragmentMap,
+      PlanFragment planFragmentRoot) {
+    dispatchablePlanFragmentMap.put(planFragmentRoot.getFragmentId(), new DispatchablePlanFragment(planFragmentRoot));
+    for (PlanFragment childPlanFragment : planFragmentRoot.getChildren()) {
+      createDispatchablePlanFragmentMap(dispatchablePlanFragmentMap, childPlanFragment);
+    }
   }
 }
