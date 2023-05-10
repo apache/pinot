@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.plan;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 
 
@@ -33,20 +33,20 @@ public class PlanRequestContext {
   private final long _timeoutMs;
   private final long _deadlineMs;
   protected final VirtualServerAddress _server;
-  protected final StageMetadata _stageMetadata;
+  protected final PlanFragmentMetadata _planFragmentMetadata;
   protected final List<String> _receivingMailboxIds = new ArrayList<>();
   private final OpChainExecutionContext _opChainExecutionContext;
   private final boolean _traceEnabled;
 
   public PlanRequestContext(MailboxService mailboxService, long requestId, int stageId, long timeoutMs, long deadlineMs,
-      VirtualServerAddress server, StageMetadata stageMetadata, boolean traceEnabled) {
+      VirtualServerAddress server, PlanFragmentMetadata planFragmentMetadata, boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
     _server = server;
-    _stageMetadata = stageMetadata;
+    _planFragmentMetadata = planFragmentMetadata;
     _traceEnabled = traceEnabled;
     _opChainExecutionContext = new OpChainExecutionContext(this);
   }
@@ -71,8 +71,8 @@ public class PlanRequestContext {
     return _server;
   }
 
-  public StageMetadata getStageMetadata() {
-    return _stageMetadata;
+  public PlanFragmentMetadata getStageMetadata() {
+    return _planFragmentMetadata;
   }
 
   public MailboxService getMailboxService() {

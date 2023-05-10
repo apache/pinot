@@ -37,19 +37,20 @@ import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SetOpNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.StageNodeVisitor;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
-import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -75,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
  * filtering and other auxiliary functionalities.
  */
-public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPlanRequestContext> {
+public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRequestPlanVisitor.class);
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
@@ -161,7 +162,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     pinotQuery.setQueryOptions(queryOptions);
   }
 
-  private static void walkStageNode(StageNode node, ServerPlanRequestContext context) {
+  private static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
   }
 
@@ -187,6 +188,11 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
   public Void visitSetOp(SetOpNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     return null;
+  }
+
+  @Override
+  public Void visitExchange(ExchangeNode exchangeNode, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Exchange not yet supported!");
   }
 
   @Override
@@ -258,8 +264,8 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     return null;
   }
 
-  private void visitChildren(StageNode node, ServerPlanRequestContext context) {
-    for (StageNode child : node.getInputs()) {
+  private void visitChildren(PlanNode node, ServerPlanRequestContext context) {
+    for (PlanNode child : node.getInputs()) {
       child.visit(this, context);
     }
   }

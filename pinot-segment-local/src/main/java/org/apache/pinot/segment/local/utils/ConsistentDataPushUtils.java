@@ -120,7 +120,7 @@ public class ConsistentDataPushUtils {
       List<String> segmentsFrom = uriToSegmentsFrom.get(controllerUri);
 
       StartReplaceSegmentsRequest startReplaceSegmentsRequest =
-          new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo, null);
+          new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo);
       DEFAULT_RETRY_POLICY.attempt(() -> {
         try {
           SimpleHttpResponse response =

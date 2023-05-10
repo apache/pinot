@@ -45,12 +45,12 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.ExplainPlanStageVisitor;
+import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -96,7 +96,7 @@ public class QueryDispatcher {
           traceEnabled);
     } catch (Exception e) {
       cancel(requestId, queryPlan);
-      throw new RuntimeException("Error executing query: " + ExplainPlanStageVisitor.explain(queryPlan), e);
+      throw new RuntimeException("Error executing query: " + ExplainPlanPlanVisitor.explain(queryPlan), e);
     }
   }
 
@@ -170,7 +170,8 @@ public class QueryDispatcher {
           if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
             throw new RuntimeException(
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", resp.getStageId(),
-                    resp.getVirtualServer(), response));
+                    resp.getVirtualServer(),
+                    response.getMetadataOrDefault(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, "null")));
           }
           successfulDispatchCalls++;
         }
@@ -231,8 +232,8 @@ public class QueryDispatcher {
             rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             if (stageStatsAggregator != null) {
               if (queryPlan != null) {
-                StageMetadata stageMetadata = queryPlan.getStageMetadata(operatorStats.getStageId());
-                OperatorUtils.recordTableName(operatorStats, stageMetadata);
+                PlanFragmentMetadata planFragmentMetadata = queryPlan.getStageMetadata(operatorStats.getStageId());
+                OperatorUtils.recordTableName(operatorStats, planFragmentMetadata);
               }
               stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
             }

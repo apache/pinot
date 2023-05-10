@@ -85,8 +85,8 @@ public class WorkerMetadata {
       return this;
     }
 
-    public Builder addMailBoxInfoMap(Integer stageId, MailboxMetadata mailBoxMetadata) {
-      _mailBoxInfosMap.put(stageId, mailBoxMetadata);
+    public Builder addMailBoxInfoMap(Integer planFragmentId, MailboxMetadata mailBoxMetadata) {
+      _mailBoxInfosMap.put(planFragmentId, mailBoxMetadata);
       return this;
     }
 

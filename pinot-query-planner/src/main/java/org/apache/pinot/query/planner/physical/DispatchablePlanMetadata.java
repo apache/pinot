@@ -29,7 +29,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 
 
 /**
- * The {@code StageMetadata} info contains the information for dispatching a particular stage.
+ * The {@code DispatchablePlanMetadata} info contains the information for dispatching a particular plan fragment.
  *
  * <p>It contains information aboute:
  * <ul>
@@ -50,7 +50,7 @@ public class DispatchablePlanMetadata implements Serializable {
   private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
 
   // used for build mailboxes between workers.
-  // workerId -> {stageId -> mailbox list}
+  // workerId -> {planFragmentId -> mailbox list}
   private Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
 
   // time boundary info
@@ -100,8 +100,9 @@ public class DispatchablePlanMetadata implements Serializable {
     _workerIdToMailboxesMap.putAll(workerIdToMailboxesMap);
   }
 
-  public void addWorkerIdToMailBoxIdsMap(int stageId, Map<Integer, MailboxMetadata> stageIdToMailboxesMap) {
-    _workerIdToMailboxesMap.put(stageId, stageIdToMailboxesMap);
+  public void addWorkerIdToMailBoxIdsMap(int planFragmentId,
+      Map<Integer, MailboxMetadata> planFragmentIdToMailboxesMap) {
+    _workerIdToMailboxesMap.put(planFragmentId, planFragmentIdToMailboxesMap);
   }
 
   public Map<QueryServerInstance, List<Integer>> getServerInstanceToWorkerIdMap() {

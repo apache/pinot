@@ -25,10 +25,10 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.query.planner.stage.AbstractStageNode;
-import org.apache.pinot.query.planner.stage.StageNodeSerDeUtils;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
+import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -55,7 +55,7 @@ public class QueryPlanSerDeUtils {
     return Worker.StagePlan.newBuilder()
         .setStageId(distributedStagePlan.getStageId())
         .setVirtualAddress(addressToProto(distributedStagePlan.getServer()))
-        .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) distributedStagePlan.getStageRoot()))
+        .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) distributedStagePlan.getStageRoot()))
         .setStageMetadata(toProtoStageMetadata(distributedStagePlan.getStageMetadata())).build();
   }
 
@@ -79,8 +79,8 @@ public class QueryPlanSerDeUtils {
     return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
   }
 
-  private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
-    StageMetadata.Builder builder = new StageMetadata.Builder();
+  private static PlanFragmentMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
+    PlanFragmentMetadata.Builder builder = new PlanFragmentMetadata.Builder();
     List<WorkerMetadata> workerMetadataList = new ArrayList<>();
     for (Worker.WorkerMetadata protoWorkerMetadata : protoStageMetadata.getWorkerMetadataList()) {
       workerMetadataList.add(fromProtoWorkerMetadata(protoWorkerMetadata));
@@ -119,12 +119,12 @@ public class QueryPlanSerDeUtils {
     return mailboxMetadata;
   }
 
-  private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {
+  private static Worker.StageMetadata toProtoStageMetadata(PlanFragmentMetadata planFragmentMetadata) {
     Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
-    for (WorkerMetadata workerMetadata : stageMetadata.getWorkerMetadataList()) {
+    for (WorkerMetadata workerMetadata : planFragmentMetadata.getWorkerMetadataList()) {
       builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
     }
-    builder.putAllCustomProperty(stageMetadata.getCustomProperties());
+    builder.putAllCustomProperty(planFragmentMetadata.getCustomProperties());
     return builder.build();
   }
 
