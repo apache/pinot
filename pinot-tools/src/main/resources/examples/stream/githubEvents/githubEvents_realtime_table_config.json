@@ -38,15 +38,6 @@
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
     }
   },
-  "task": {
-    "taskTypeConfigsMap": {
-      "RealtimeToOfflineSegmentsTask": {
-        "bucketTimePeriod": "1h",
-        "bufferTimePeriod": "1h",
-        "schedule": "0 * * * * ?"
-      }
-    }
-  },
   "metadata": {
     "customConfigs": {
     }
