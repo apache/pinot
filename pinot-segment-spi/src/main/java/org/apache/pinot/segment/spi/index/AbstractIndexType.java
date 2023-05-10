@@ -99,6 +99,7 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
         JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), configValue.toJsonNode());
         FieldConfig.Builder builder = new FieldConfig.Builder(entry.getKey());
         builder.withIndexes(indexes);
+        builder.withEncodingType(FieldConfig.EncodingType.DICTIONARY);
         fieldConfigList.add(builder.build());
       }
     }
