@@ -36,6 +36,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -58,8 +59,8 @@ import org.testng.annotations.Test;
 /**
  * Integration test for heap size based server query killing, this works only for xmx4G
  */
-public class OfflineClusterMemBasedServerQueryKilingTest extends BaseClusterIntegrationTestSet {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterMemBasedServerQueryKilingTest.class);
+public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterIntegrationTestSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterMemBasedServerQueryKillingTest.class);
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
   public static final String INT_DIM_SV1 = "intDimSV1";
@@ -101,7 +102,7 @@ private static final int NUM_DOCS = 3_000_000;
   public void setUp()
       throws Exception {
     // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterMemBasedServerQueryKilingTest.class).setLevel(Level.INFO);
+    LogManager.getLogger(OfflineClusterMemBasedServerQueryKillingTest.class).setLevel(Level.INFO);
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
         .setLevel(Level.INFO);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
@@ -216,6 +217,8 @@ private static final int NUM_DOCS = 3_000_000;
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY);
     LOGGER.info("testDigestOOM: {}", queryResponse);
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
+        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
@@ -267,6 +270,7 @@ private static final int NUM_DOCS = 3_000_000;
     );
     countDownLatch.await();
     LOGGER.info("testDigestOOMMultipleQueries: {}", queryResponse1);
+    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":503"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
