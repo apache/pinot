@@ -23,8 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
 
@@ -111,8 +111,8 @@ public class DispatchablePlanFragment {
     _planFragment.getFragmentMetadata().setScannedTables(scannedTables);
   }
 
-  public PlanFragmentMetadata toPlanFragmentMetadata() {
-    return new PlanFragmentMetadata(_workerMetadataList, _customProperties);
+  public StageMetadata toStageMetadata() {
+    return new StageMetadata(_workerMetadataList, _customProperties);
   }
 
   public void setServerInstanceToWorkerIdMap(Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap) {

@@ -196,7 +196,7 @@ public class QueryDispatcher {
     OpChainExecutionContext context =
         new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs,
             System.currentTimeMillis() + timeoutMs,
-            dispatchableSubPlan.getQueryStageList().get(reduceStageId).toPlanFragmentMetadata(),
+            dispatchableSubPlan.getQueryStageList().get(reduceStageId).toStageMetadata(),
             traceEnabled);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context, reduceNode.getSenderStageId());
     List<DataBlock> resultDataBlocks =
@@ -211,7 +211,7 @@ public class QueryDispatcher {
       int stageId, VirtualServerAddress serverAddress) {
     return new DistributedStagePlan(stageId, serverAddress,
         dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment().getFragmentRoot(),
-        dispatchableSubPlan.getQueryStageList().get(stageId).toPlanFragmentMetadata());
+        dispatchableSubPlan.getQueryStageList().get(stageId).toStageMetadata());
   }
 
   private static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,

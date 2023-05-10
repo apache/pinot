@@ -39,8 +39,8 @@ import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
@@ -124,7 +124,7 @@ public class QueryServerTest extends QueryTestSet {
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
 
-        PlanFragmentMetadata planFragmentMetadata = dispatchablePlanFragment.toPlanFragmentMetadata();
+        StageMetadata stageMetadata = dispatchablePlanFragment.toStageMetadata();
 
         // ensure mock query runner received correctly deserialized payload.
         QueryRunner mockRunner =
@@ -139,7 +139,7 @@ public class QueryServerTest extends QueryTestSet {
               PlanNode planNode =
                   dispatchableSubPlan.getQueryStageList().get(finalStageId).getPlanFragment().getFragmentRoot();
               return isStageNodesEqual(planNode, distributedStagePlan.getStageRoot()) && isStageMetadataEqual(
-                  planFragmentMetadata, distributedStagePlan.getStageMetadata());
+                  stageMetadata, distributedStagePlan.getStageMetadata());
             }), Mockito.argThat(requestMetadataMap -> requestIdStr.equals(
                 requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))));
             return true;
@@ -154,13 +154,13 @@ public class QueryServerTest extends QueryTestSet {
     }
   }
 
-  private boolean isStageMetadataEqual(PlanFragmentMetadata expected, PlanFragmentMetadata actual) {
-    if (!EqualityUtils.isEqual(PlanFragmentMetadata.getTableName(expected),
-        PlanFragmentMetadata.getTableName(actual))) {
+  private boolean isStageMetadataEqual(StageMetadata expected, StageMetadata actual) {
+    if (!EqualityUtils.isEqual(StageMetadata.getTableName(expected),
+        StageMetadata.getTableName(actual))) {
       return false;
     }
-    TimeBoundaryInfo expectedTimeBoundaryInfo = PlanFragmentMetadata.getTimeBoundary(expected);
-    TimeBoundaryInfo actualTimeBoundaryInfo = PlanFragmentMetadata.getTimeBoundary(actual);
+    TimeBoundaryInfo expectedTimeBoundaryInfo = StageMetadata.getTimeBoundary(expected);
+    TimeBoundaryInfo actualTimeBoundaryInfo = StageMetadata.getTimeBoundary(actual);
     if (expectedTimeBoundaryInfo == null && actualTimeBoundaryInfo != null
         || expectedTimeBoundaryInfo != null && actualTimeBoundaryInfo == null) {
       return false;

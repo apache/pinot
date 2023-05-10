@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -165,12 +165,12 @@ public class MailboxSendOperatorTest {
   }
 
   private MailboxSendOperator getMailboxSendOperator() {
-    PlanFragmentMetadata planFragmentMetadata = new PlanFragmentMetadata.Builder()
+    StageMetadata stageMetadata = new StageMetadata.Builder()
         .setWorkerMetadataList(Collections.singletonList(
             new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE, Long.MAX_VALUE,
-            planFragmentMetadata, false);
+            stageMetadata, false);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

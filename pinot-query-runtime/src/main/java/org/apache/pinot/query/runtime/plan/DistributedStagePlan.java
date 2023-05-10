@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.plan;
 
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -34,18 +34,18 @@ public class DistributedStagePlan {
   private int _stageId;
   private VirtualServerAddress _server;
   private PlanNode _stageRoot;
-  private PlanFragmentMetadata _planFragmentMetadata;
+  private StageMetadata _stageMetadata;
 
   public DistributedStagePlan(int stageId) {
     _stageId = stageId;
   }
 
   public DistributedStagePlan(int stageId, VirtualServerAddress server, PlanNode stageRoot,
-      PlanFragmentMetadata planFragmentMetadata) {
+      StageMetadata stageMetadata) {
     _stageId = stageId;
     _server = server;
     _stageRoot = stageRoot;
-    _planFragmentMetadata = planFragmentMetadata;
+    _stageMetadata = stageMetadata;
   }
 
   public int getStageId() {
@@ -60,8 +60,8 @@ public class DistributedStagePlan {
     return _stageRoot;
   }
 
-  public PlanFragmentMetadata getStageMetadata() {
-    return _planFragmentMetadata;
+  public StageMetadata getStageMetadata() {
+    return _stageMetadata;
   }
 
   public void setServer(VirtualServerAddress serverAddress) {
@@ -72,11 +72,11 @@ public class DistributedStagePlan {
     _stageRoot = stageRoot;
   }
 
-  public void setStageMetadata(PlanFragmentMetadata planFragmentMetadata) {
-    _planFragmentMetadata = planFragmentMetadata;
+  public void setStageMetadata(StageMetadata stageMetadata) {
+    _stageMetadata = stageMetadata;
   }
 
   public WorkerMetadata getCurrentWorkerMetadata() {
-    return _planFragmentMetadata.getWorkerMetadataList().get(_server.workerId());
+    return _stageMetadata.getWorkerMetadataList().get(_server.workerId());
   }
 }
