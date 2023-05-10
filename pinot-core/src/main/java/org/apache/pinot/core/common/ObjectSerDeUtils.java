@@ -218,13 +218,10 @@ public class ObjectSerDeUtils {
         return ObjectType.VarianceTuple;
       } else if (value instanceof PinotFourthMoment) {
         return ObjectType.PinotFourthMoment;
-<<<<<<< HEAD
       } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
         return ObjectType.IntegerTupleSketch;
-=======
       } else if (value instanceof ArgMinMaxObject) {
         return ObjectType.ArgMinMaxObject;
->>>>>>> master
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1302,11 +1299,8 @@ public class ObjectSerDeUtils {
       COVARIANCE_TUPLE_OBJECT_SER_DE,
       VARIANCE_TUPLE_OBJECT_SER_DE,
       PINOT_FOURTH_MOMENT_OBJECT_SER_DE,
-<<<<<<< HEAD
-      DATA_SKETCH_INT_TUPLE_SER_DE
-=======
-      ARG_MIN_MAX_OBJECT_SER_DE,
->>>>>>> master
+      DATA_SKETCH_INT_TUPLE_SER_DE,
+      ARG_MIN_MAX_OBJECT_SER_DE
   };
   //@formatter:on
 
