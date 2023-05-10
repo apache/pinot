@@ -19,12 +19,17 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -348,6 +353,50 @@ public class DictionaryIndexType
   @Override
   protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns() == null
+        ? Lists.newArrayList()
+        : indexingConfig.getNoDictionaryColumns();
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
+        ? Lists.newArrayList()
+        : tableConfig.getFieldConfigList();
+
+    List<FieldConfig> configsToUpdate = new ArrayList<>();
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      // skip further computation of field configs which already has RAW encodingType
+      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+        continue;
+      }
+      // ensure encodingType is RAW on noDictionaryColumns
+      if (noDictionaryColumns.remove(fieldConfig.getName())) {
+        configsToUpdate.add(fieldConfig);
+      }
+      try {
+        DictionaryIndexConfig indexConfig = new ObjectMapper()
+            .treeToValue(fieldConfig.getIndexes().get(getPrettyName()), DictionaryIndexConfig.class);
+        // ensure encodingType is RAW where dictionary index config has disabled = true
+        if (indexConfig.isDisabled()) {
+          configsToUpdate.add(fieldConfig);
+        }
+      } catch (JsonProcessingException | NullPointerException ignore) {
+      }
+    }
+
+    // update the encodingType to RAW on the selected field configs
+    for (FieldConfig fieldConfig : configsToUpdate) {
+      FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
+      builder.withEncodingType(FieldConfig.EncodingType.RAW);
+      fieldConfigList.remove(fieldConfig);
+      fieldConfigList.add(builder.build());
+    }
+
+    // create the missing field config for the remaining noDictionaryColumns
+    for (String column : noDictionaryColumns) {
+      FieldConfig.Builder builder = new FieldConfig.Builder(column);
+      builder.withEncodingType(FieldConfig.EncodingType.RAW);
+      fieldConfigList.add(builder.build());
+    }
+
+    // old configs cleanup
     indexingConfig.setNoDictionaryConfig(null);
     indexingConfig.setNoDictionaryColumns(null);
     indexingConfig.setOnHeapDictionaryColumns(null);
