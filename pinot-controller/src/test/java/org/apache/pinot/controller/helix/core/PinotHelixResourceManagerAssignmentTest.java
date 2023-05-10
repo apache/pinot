@@ -97,6 +97,10 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
     for (String serverInstance : _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME)) {
       _helixResourceManager.updateInstanceTags(serverInstance, Helix.UNTAGGED_SERVER_INSTANCE, false);
     }
+
+    for (String serverInstance : _helixResourceManager.getAllInstancesForServerTenant(SERVER_COLD_TENANT_NAME)) {
+      _helixResourceManager.updateInstanceTags(serverInstance, Helix.UNTAGGED_SERVER_INSTANCE, false);
+    }
   }
 
   private void resetServerTags() {
