@@ -3249,7 +3249,7 @@ public class CalciteSqlCompilerTest {
         CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
 
-    // test for join queries with 'as' alias
+    // test for join queries with 'as' alias.
     query = "SELECT T1.a FROM T1 JOIN(SELECT key FROM T2) as self ON T1.key=self.key";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     dataSource = pinotQuery.getDataSource();
