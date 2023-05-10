@@ -21,10 +21,8 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -37,7 +35,6 @@ import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.TableScanNode;
 
 
 /**
@@ -109,8 +106,6 @@ public class PinotLogicalQueryPlanner {
           = new PlanFragment(subPlanRoot.getPlanFragmentId(), subPlanRoot, new PlanFragmentMetadata(),
           ImmutableList.of(planFragmentContext._planFragmentIdToRootNodeMap.get(1)));
       planFragmentContext._planFragmentIdToRootNodeMap.put(0, rootPlanFragment);
-      planFragmentContext._planFragmentIdToRootNodeMap.get(0).getFragmentMetadata()
-          .setScannedTables(new ArrayList<>(getTableNamesFromSubPlan(rootPlanFragment)));
       for (Map.Entry<Integer, List<Integer>> planFragmentToChildrenEntry
           : planFragmentContext._planFragmentIdToChildrenMap.entrySet()) {
         int planFragmentId = planFragmentToChildrenEntry.getKey();
@@ -132,23 +127,6 @@ public class PinotLogicalQueryPlanner {
       }
     }
     return subPlanMap.get(0);
-  }
-
-  private Set<String> getTableNamesFromSubPlan(PlanFragment subPlanRoot) {
-    Set<String> tableNames = new HashSet<>();
-    getTableNamesFromPlanNode(subPlanRoot.getFragmentRoot(), tableNames);
-    return tableNames;
-  }
-
-  private void getTableNamesFromPlanNode(PlanNode rootPlanNode, Set<String> tableNames) {
-    if (rootPlanNode instanceof TableScanNode) {
-      tableNames.add(((TableScanNode) rootPlanNode).getTableName());
-    } else {
-      List<PlanNode> children = rootPlanNode.getInputs();
-      for (PlanNode child : children) {
-        getTableNamesFromPlanNode(child, tableNames);
-      }
-    }
   }
 
   // non-threadsafe

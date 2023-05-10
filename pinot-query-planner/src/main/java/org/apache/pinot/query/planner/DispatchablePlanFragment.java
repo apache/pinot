@@ -37,13 +37,15 @@ public class DispatchablePlanFragment {
   private final List<WorkerMetadata> _workerMetadataList;
 
   // This is used at broker stage - we don't need to ship it to the server.
-  private Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
+  private final Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
 
   // used for table scan stage - we use ServerInstance instead of VirtualServer
   // here because all virtual servers that share a server instance will have the
   // same segments on them
-  private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
-  private Map<String, String> _customProperties;
+  private final Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
+
+  // used for passing custom properties to build StageMetadata on the server.
+  private final Map<String, String> _customProperties;
 
   public DispatchablePlanFragment(PlanFragment planFragment) {
     this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>());
@@ -54,6 +56,7 @@ public class DispatchablePlanFragment {
     _planFragment = planFragment;
     _workerMetadataList = workerMetadataList;
     _serverInstanceToWorkerIdMap = serverInstanceToWorkerIdMap;
+    _workerIdToSegmentsMap = new HashMap<>();
     _customProperties = customPropertyMap;
   }
 
@@ -96,19 +99,13 @@ public class DispatchablePlanFragment {
   }
 
   public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
-    _workerIdToSegmentsMap = workerIdToSegmentsMap;
-  }
-
-  public List<String> getScannedTables() {
-    return _planFragment.getFragmentMetadata().getScannedTables();
+    _workerIdToSegmentsMap.clear();
+    _workerIdToSegmentsMap.putAll(workerIdToSegmentsMap);
   }
 
   public void setWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
+    _workerMetadataList.clear();
     _workerMetadataList.addAll(workerMetadataList);
-  }
-
-  public void setScannedTables(List<String> scannedTables) {
-    _planFragment.getFragmentMetadata().setScannedTables(scannedTables);
   }
 
   public StageMetadata toStageMetadata() {
@@ -116,6 +113,7 @@ public class DispatchablePlanFragment {
   }
 
   public void setServerInstanceToWorkerIdMap(Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap) {
-    _serverInstanceToWorkerIdMap = serverInstanceToWorkerIdMap;
+    _serverInstanceToWorkerIdMap.clear();
+    _serverInstanceToWorkerIdMap.putAll(serverInstanceToWorkerIdMap);
   }
 }

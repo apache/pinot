@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.query.planner;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 
 
+/**
+ * Metadata for a subplan. This class won't leave the query planner/broker side.
+ */
 public class SubPlanMetadata {
 
   /**
@@ -37,12 +38,9 @@ public class SubPlanMetadata {
    */
   private List<Pair<Integer, String>> _fields;
 
-  private final Map<String, String> _customProperties;
-
   public SubPlanMetadata(Set<String> tableNames, List<Pair<Integer, String>> fields) {
     _tableNames = tableNames;
     _fields = fields;
-    _customProperties = new HashMap<>();
   }
 
   public List<Pair<Integer, String>> getFields() {
@@ -51,9 +49,5 @@ public class SubPlanMetadata {
 
   public Set<String> getTableNames() {
     return _tableNames;
-  }
-
-  public Map<String, String> getCustomProperties() {
-    return _customProperties;
   }
 }

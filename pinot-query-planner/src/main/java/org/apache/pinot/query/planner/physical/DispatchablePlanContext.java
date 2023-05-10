@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -111,17 +112,13 @@ public class DispatchablePlanContext {
 
       // set the stageMetadata
       int stageId = dispatchableEntry.getKey();
-      dispatchablePlanFragmentList.get(stageId).setScannedTables(dispatchablePlanMetadata.getScannedTables());
-
       dispatchablePlanFragmentList.get(stageId).setWorkerMetadataList(Arrays.asList(workerMetadataList));
       dispatchablePlanFragmentList.get(stageId)
           .setWorkerIdToSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap());
       dispatchablePlanFragmentList.get(stageId)
           .setServerInstanceToWorkerIdMap(dispatchablePlanMetadata.getServerInstanceToWorkerIdMap());
-      if (dispatchablePlanMetadata.getScannedTables().size() > 0) {
-        dispatchablePlanFragmentList.get(stageId)
-            .setScannedTables(dispatchablePlanMetadata.getScannedTables());
-      }
+      Preconditions.checkState(dispatchablePlanMetadata.getScannedTables().size() <= 1,
+          "More than one table is not supported yet");
       if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
         dispatchablePlanFragmentList.get(stageId).setTableName(dispatchablePlanMetadata.getScannedTables().get(0));
       }

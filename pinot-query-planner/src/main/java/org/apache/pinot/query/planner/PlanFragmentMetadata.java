@@ -18,29 +18,11 @@
  */
 package org.apache.pinot.query.planner;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-
+/**
+ * Metadata for a plan fragment. This class won't leave the query planner/broker side.
+ */
 public class PlanFragmentMetadata {
-  private final Map<String, String> _customProperties = new HashMap<>();
-
-  private List<String> _scannedTables = new ArrayList<>();
 
   public PlanFragmentMetadata() {
-  }
-
-  public Map<String, String> getCustomProperties() {
-    return _customProperties;
-  }
-
-  public List<String> getScannedTables() {
-    return _scannedTables;
-  }
-
-  public void setScannedTables(List<String> scannedTables) {
-    _scannedTables = scannedTables;
   }
 }

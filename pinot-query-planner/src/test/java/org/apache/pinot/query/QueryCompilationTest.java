@@ -118,12 +118,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
-      List<String> tables = dispatchablePlanFragment.getScannedTables();
-      if (tables.size() == 1) {
+      String tableName = dispatchablePlanFragment.getTableName();
+      if (tableName != null) {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry).collect(Collectors.toSet()),
-            tables.get(0).equals("a") ? ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]")
+            tableName.equals("a") ? ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]")
                 : ImmutableList.of("localhost@{1,1}|[0]"));
       } else if (!PlannerUtils.isRootPlanFragment(stageId)) {
         // join stage should have both servers used.
@@ -145,7 +145,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "WHERE a.col3 >= 0 AND a.col2 IN ('b') AND b.col3 < 0";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     List<DispatchablePlanFragment> intermediateStages =
-        dispatchableSubPlan.getQueryStageList().stream().filter(q -> q.getScannedTables().size() == 0)
+        dispatchableSubPlan.getQueryStageList().stream().filter(q -> q.getTableName() == null)
             .collect(Collectors.toList());
     // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
     for (DispatchablePlanFragment dispatchablePlanFragment : intermediateStages) {
@@ -159,21 +159,21 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "SELECT * FROM d_OFFLINE";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     List<DispatchablePlanFragment> tableScanMetadataList = dispatchableSubPlan.getQueryStageList().stream()
-        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+        .filter(stageMetadata -> stageMetadata.getTableName() != null).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
 
     query = "SELECT * FROM d_REALTIME";
     dispatchableSubPlan = _queryEnvironment.planQuery(query);
     tableScanMetadataList = dispatchableSubPlan.getQueryStageList().stream()
-        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+        .filter(stageMetadata -> stageMetadata.getTableName() != null).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 1);
 
     query = "SELECT * FROM d";
     dispatchableSubPlan = _queryEnvironment.planQuery(query);
     tableScanMetadataList = dispatchableSubPlan.getQueryStageList().stream()
-        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+        .filter(stageMetadata -> stageMetadata.getTableName() != null).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
   }
@@ -238,8 +238,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(dispatchableSubPlan.getQueryStageList().size(), 2);
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
-      List<String> tables = dispatchablePlanFragment.getScannedTables();
-      if (tables.size() != 0) {
+      String tableName = dispatchablePlanFragment.getTableName();
+      if (tableName != null) {
         // table scan stages; for tableB it should have only 1
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry).collect(Collectors.toSet()),
