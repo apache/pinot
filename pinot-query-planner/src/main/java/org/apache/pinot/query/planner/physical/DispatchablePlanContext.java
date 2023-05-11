@@ -18,14 +18,21 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 public class DispatchablePlanContext {
@@ -77,5 +84,57 @@ public class DispatchablePlanContext {
 
   public Map<Integer, PlanNode> getDispatchablePlanStageRootMap() {
     return _dispatchablePlanStageRootMap;
+  }
+
+  public List<DispatchablePlanFragment> constructDispatchablePlanFragmentList(PlanFragment subPlanRoot) {
+    DispatchablePlanFragment[] dispatchablePlanFragmentArray =
+        new DispatchablePlanFragment[_dispatchablePlanStageRootMap.size()];
+    createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, subPlanRoot);
+    List<DispatchablePlanFragment> dispatchablePlanFragmentList = Arrays.asList(dispatchablePlanFragmentArray);
+    for (Map.Entry<Integer, DispatchablePlanMetadata> dispatchableEntry : _dispatchablePlanMetadataMap.entrySet()) {
+      DispatchablePlanMetadata dispatchablePlanMetadata = dispatchableEntry.getValue();
+
+      // construct each worker metadata
+      WorkerMetadata[] workerMetadataList = new WorkerMetadata[dispatchablePlanMetadata.getTotalWorkerCount()];
+      for (Map.Entry<QueryServerInstance, List<Integer>> queryServerEntry
+          : dispatchablePlanMetadata.getServerInstanceToWorkerIdMap().entrySet()) {
+        for (int workerId : queryServerEntry.getValue()) {
+          VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerEntry.getKey(), workerId);
+          WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
+          builder.setVirtualServerAddress(virtualServerAddress);
+          if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
+            builder.addTableSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap().get(workerId));
+          }
+          builder.putAllMailBoxInfosMap(dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap().get(workerId));
+          workerMetadataList[workerId] = builder.build();
+        }
+      }
+
+      // set the stageMetadata
+      int stageId = dispatchableEntry.getKey();
+      dispatchablePlanFragmentList.get(stageId).setWorkerMetadataList(Arrays.asList(workerMetadataList));
+      dispatchablePlanFragmentList.get(stageId)
+          .setWorkerIdToSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap());
+      dispatchablePlanFragmentList.get(stageId)
+          .setServerInstanceToWorkerIdMap(dispatchablePlanMetadata.getServerInstanceToWorkerIdMap());
+      Preconditions.checkState(dispatchablePlanMetadata.getScannedTables().size() <= 1,
+          "More than one table is not supported yet");
+      if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
+        dispatchablePlanFragmentList.get(stageId).setTableName(dispatchablePlanMetadata.getScannedTables().get(0));
+      }
+      if (dispatchablePlanMetadata.getTimeBoundaryInfo() != null) {
+        dispatchablePlanFragmentList.get(stageId)
+            .setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
+      }
+    }
+    return dispatchablePlanFragmentList;
+  }
+
+  private void createDispatchablePlanFragmentList(DispatchablePlanFragment[] dispatchablePlanFragmentArray,
+      PlanFragment planFragmentRoot) {
+    dispatchablePlanFragmentArray[planFragmentRoot.getFragmentId()] = new DispatchablePlanFragment(planFragmentRoot);
+    for (PlanFragment childPlanFragment : planFragmentRoot.getChildren()) {
+      createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, childPlanFragment);
+    }
   }
 }

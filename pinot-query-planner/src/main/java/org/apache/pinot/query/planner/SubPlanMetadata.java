@@ -18,34 +18,36 @@
  */
 package org.apache.pinot.query.planner;
 
-import org.apache.pinot.query.planner.plannode.PlanNode;
+import java.util.List;
+import java.util.Set;
+import org.apache.calcite.util.Pair;
 
 
 /**
- * The {@code QueryPlan} is the logical query plan from the result of
- * {@link org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner}.
- *
+ * Metadata for a subplan. This class won't leave the query planner/broker side.
  */
-public class QueryPlan {
-  private final PlanNode _planRoot;
-  private final QueryPlanMetadata _queryPlanMetadata;
-
-  public QueryPlan(PlanNode queryPlanRoot, QueryPlanMetadata queryPlanMetadata) {
-    _planRoot = queryPlanRoot;
-    _queryPlanMetadata = queryPlanMetadata;
-  }
+public class SubPlanMetadata {
 
   /**
-   * Get the root node of the query plan.
+   * The set of tables that are scanned in this subplan.
    */
-  public PlanNode getPlanRoot() {
-    return _planRoot;
-  }
+  private final Set<String> _tableNames;
 
   /**
-   * Get the metadata of the query plan.
+   * The list of fields that are surfaced by this subplan. Only valid for SubPlan Id 0.
    */
-  public QueryPlanMetadata getPlanMetadata() {
-    return _queryPlanMetadata;
+  private List<Pair<Integer, String>> _fields;
+
+  public SubPlanMetadata(Set<String> tableNames, List<Pair<Integer, String>> fields) {
+    _tableNames = tableNames;
+    _fields = fields;
+  }
+
+  public List<Pair<Integer, String>> getFields() {
+    return _fields;
+  }
+
+  public Set<String> getTableNames() {
+    return _tableNames;
   }
 }
