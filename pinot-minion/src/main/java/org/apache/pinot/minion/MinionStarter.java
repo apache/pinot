@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.minion;
 
+import java.io.File;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -49,5 +51,15 @@ public class MinionStarter extends BaseMinionStarter {
   public MinionStarter(PinotConfiguration config)
       throws Exception {
     init(config);
+  }
+
+  public static void main(String[] args)
+    throws Exception {
+    FileUtils.deleteQuietly(new File(CommonConstants.Minion.DEFAULT_INSTANCE_BASE_DIR));
+    PinotConfiguration minionConf = new PinotConfiguration();
+    minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, "quickstart");
+    minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, "localhost:2122");
+    MinionStarter starter = new MinionStarter(minionConf);
+    starter.start();
   }
 }
