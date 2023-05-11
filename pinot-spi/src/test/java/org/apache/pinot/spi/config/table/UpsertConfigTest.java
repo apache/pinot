@@ -41,8 +41,8 @@ public class UpsertConfigTest {
     assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3);
 
     upsertConfig1.setUpsertTTLConfig(new UpsertTTLConfig(TimeUnit.DAYS, 1));
-    assertEquals(upsertConfig1.getUpsertTTLConfig().getTtlTimeUnit(), "DAYS");
-    assertEquals(upsertConfig1.getUpsertTTLConfig().getTtlTimeValue(), "1");
+    assertEquals(upsertConfig1.getUpsertTTLConfig().getTtlTimeUnit(), TimeUnit.DAYS);
+    assertEquals(upsertConfig1.getUpsertTTLConfig().getTtlTimeValue(), 1);
 
     UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
