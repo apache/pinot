@@ -76,6 +76,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_RESOURCE_PACKAGES = "controller.restlet.api.resource.packages";
   public static final String DEFAULT_CONTROLLER_RESOURCE_PACKAGES = "org.apache.pinot.controller.api.resources";
 
+  // Consider tierConfigs when assigning new offline segment
+  public static final String CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT = "controller.segment.enableTieredAssignment";
+
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
   }
@@ -669,6 +672,14 @@ public class ControllerConf extends PinotConfiguration {
   public void setSegmentRelocatorFrequencyInSeconds(int segmentRelocatorFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS,
         Integer.toString(segmentRelocatorFrequencyInSeconds));
+  }
+
+  public boolean tieredSegmentAssignmentEnabled() {
+    return getProperty(CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, false);
+  }
+
+  public void setTieredSegmentAssignmentEnabled(boolean enabled) {
+    setProperty(CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, enabled);
   }
 
   public boolean tenantIsolationEnabled() {
