@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.plan;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
 
@@ -32,20 +31,18 @@ public class PlanRequestContext {
   // TODO: Timeout is not needed since deadline is already present.
   private final long _timeoutMs;
   private final long _deadlineMs;
-  protected final VirtualServerAddress _server;
   protected final WorkerMetadata _workerMetadata;
   protected final List<String> _receivingMailboxIds = new ArrayList<>();
   private final OpChainExecutionContext _opChainExecutionContext;
   private final boolean _traceEnabled;
 
   public PlanRequestContext(MailboxService mailboxService, long requestId, int stageId, long timeoutMs, long deadlineMs,
-      VirtualServerAddress server, WorkerMetadata workerMetadata, boolean traceEnabled) {
+      WorkerMetadata workerMetadata, boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
-    _server = server;
     _workerMetadata = workerMetadata;
     _traceEnabled = traceEnabled;
     _opChainExecutionContext = new OpChainExecutionContext(this);
@@ -65,10 +62,6 @@ public class PlanRequestContext {
 
   public long getDeadlineMs() {
     return _deadlineMs;
-  }
-
-  public VirtualServerAddress getServer() {
-    return _server;
   }
 
   public WorkerMetadata getWorkerMetadata() {

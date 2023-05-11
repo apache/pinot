@@ -19,32 +19,23 @@
 package org.apache.pinot.query.runtime.plan;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
-import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
  * {@code StageMetadata} is used to send plan fragment-level info about how to execute a stage physically.
  */
 public class StageMetadata {
-  private final List<WorkerMetadata> _workerMetadataList;
   private final Map<String, String> _customProperties;
 
-  public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
-    _workerMetadataList = workerMetadataList;
+  public StageMetadata(Map<String, String> customProperties) {
     _customProperties = customProperties;
   }
 
   public static StageMetadata from(DispatchablePlanFragment dispatchablePlanFragment) {
-    return new StageMetadata(dispatchablePlanFragment.getWorkerMetadataList(),
-        dispatchablePlanFragment.getCustomProperties());
-  }
-
-  public List<WorkerMetadata> getWorkerMetadataList() {
-    return _workerMetadataList;
+    return new StageMetadata(dispatchablePlanFragment.getCustomProperties());
   }
 
   public Map<String, String> getCustomProperties() {
@@ -55,16 +46,10 @@ public class StageMetadata {
     public static final String TABLE_NAME_KEY = "tableName";
     public static final String TIME_BOUNDARY_COLUMN_KEY = "timeBoundaryInfo.timeColumn";
     public static final String TIME_BOUNDARY_VALUE_KEY = "timeBoundaryInfo.timeValue";
-    private List<WorkerMetadata> _workerMetadataList;
     private Map<String, String> _customProperties;
 
     public Builder() {
       _customProperties = new HashMap<>();
-    }
-
-    public Builder setWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
-      _workerMetadataList = workerMetadataList;
-      return this;
     }
 
     public Builder addTableName(String tableName) {
@@ -79,7 +64,7 @@ public class StageMetadata {
     }
 
     public StageMetadata build() {
-      return new StageMetadata(_workerMetadataList, _customProperties);
+      return new StageMetadata(_customProperties);
     }
 
     public void putAllCustomProperties(Map<String, String> customPropertyMap) {

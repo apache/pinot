@@ -108,9 +108,7 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
-            stagePlan.getServer(),
-            stagePlan.getStageMetadata().getWorkerMetadataList().get(stagePlan.getServer().workerId()), pinotQuery,
-            tableType, timeBoundaryInfo, traceEnabled);
+            stagePlan.getWorkerMetadata(), pinotQuery, tableType, timeBoundaryInfo, traceEnabled);
 
     // visit the plan and create query physical plan.
     ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);

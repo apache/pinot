@@ -33,6 +33,8 @@ public class DistributedStagePlan {
   private int _stageId;
   private VirtualServerAddress _server;
   private PlanNode _stageRoot;
+  private WorkerMetadata _workerMetadata;
+
   private StageMetadata _stageMetadata;
 
   public DistributedStagePlan(int stageId) {
@@ -40,11 +42,12 @@ public class DistributedStagePlan {
   }
 
   public DistributedStagePlan(int stageId, VirtualServerAddress server, PlanNode stageRoot,
-      StageMetadata stageMetadata) {
+      StageMetadata stageMetadata, WorkerMetadata workerMetadata) {
     _stageId = stageId;
     _server = server;
     _stageRoot = stageRoot;
     _stageMetadata = stageMetadata;
+    _workerMetadata = workerMetadata;
   }
 
   public int getStageId() {
@@ -63,6 +66,10 @@ public class DistributedStagePlan {
     return _stageMetadata;
   }
 
+  public WorkerMetadata getWorkerMetadata() {
+    return _workerMetadata;
+  }
+
   public void setServer(VirtualServerAddress serverAddress) {
     _server = serverAddress;
   }
@@ -75,7 +82,7 @@ public class DistributedStagePlan {
     _stageMetadata = stageMetadata;
   }
 
-  public WorkerMetadata getCurrentWorkerMetadata() {
-    return _stageMetadata.getWorkerMetadataList().get(_server.workerId());
+  public void setWorkerMetadata(WorkerMetadata workerMetadata) {
+    _workerMetadata = workerMetadata;
   }
 }

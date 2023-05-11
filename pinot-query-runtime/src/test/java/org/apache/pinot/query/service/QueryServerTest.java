@@ -121,10 +121,9 @@ public class QueryServerTest extends QueryTestSet {
 
         // submit the request for testing.
         submitRequest(queryRequest);
-
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
-
         StageMetadata stageMetadata = StageMetadata.from(dispatchablePlanFragment);
+        WorkerMetadata workerMetadata = dispatchablePlanFragment.getWorkerMetadataList().get(0);
 
         // ensure mock query runner received correctly deserialized payload.
         QueryRunner mockRunner =
@@ -139,7 +138,8 @@ public class QueryServerTest extends QueryTestSet {
               PlanNode planNode =
                   dispatchableSubPlan.getQueryStageList().get(finalStageId).getPlanFragment().getFragmentRoot();
               return isStageNodesEqual(planNode, distributedStagePlan.getStageRoot()) && isStageMetadataEqual(
-                  stageMetadata, distributedStagePlan.getStageMetadata());
+                  stageMetadata, distributedStagePlan.getStageMetadata()) && isWorkerMetadataEqual(workerMetadata,
+                  distributedStagePlan.getWorkerMetadata());
             }), Mockito.argThat(requestMetadataMap -> requestIdStr.equals(
                 requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))));
             return true;
@@ -170,16 +170,6 @@ public class QueryServerTest extends QueryTestSet {
             || !EqualityUtils.isEqual(expectedTimeBoundaryInfo.getTimeValue(),
             actualTimeBoundaryInfo.getTimeValue()))) {
       return false;
-    }
-    List<WorkerMetadata> expectedWorkerMetadataList = expected.getWorkerMetadataList();
-    List<WorkerMetadata> actualWorkerMetadataList = actual.getWorkerMetadataList();
-    if (expectedWorkerMetadataList.size() != actualWorkerMetadataList.size()) {
-      return false;
-    }
-    for (int i = 0; i < expectedWorkerMetadataList.size(); i++) {
-      if (!isWorkerMetadataEqual(expectedWorkerMetadataList.get(i), actualWorkerMetadataList.get(i))) {
-        return false;
-      }
     }
     return true;
   }

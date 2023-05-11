@@ -73,10 +73,10 @@ message StagePlan {
   string virtualAddress = 2;
   StageNode stageRoot = 3;
   StageMetadata stageMetadata = 4;
+  WorkerMetadata workerMetadata = 5;
 }
 
 message StageMetadata {
-  repeated WorkerMetadata workerMetadata = 1;
   map<string, string> customProperty = 2;
 }
 

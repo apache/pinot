@@ -48,6 +48,7 @@ public class QueryPlanSerDeUtils {
     distributedStagePlan.setServer(protoToAddress(stagePlan.getVirtualAddress()));
     distributedStagePlan.setStageRoot(StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot()));
     distributedStagePlan.setStageMetadata(fromProtoStageMetadata(stagePlan.getStageMetadata()));
+    distributedStagePlan.setWorkerMetadata(fromProtoWorkerMetadata(stagePlan.getWorkerMetadata()));
     return distributedStagePlan;
   }
 
@@ -56,7 +57,9 @@ public class QueryPlanSerDeUtils {
         .setStageId(distributedStagePlan.getStageId())
         .setVirtualAddress(addressToProto(distributedStagePlan.getServer()))
         .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) distributedStagePlan.getStageRoot()))
-        .setStageMetadata(toProtoStageMetadata(distributedStagePlan.getStageMetadata())).build();
+        .setStageMetadata(toProtoStageMetadata(distributedStagePlan.getStageMetadata()))
+        .setWorkerMetadata(toProtoWorkerMetadata(distributedStagePlan.getWorkerMetadata()))
+        .build();
   }
 
   private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
@@ -81,11 +84,6 @@ public class QueryPlanSerDeUtils {
 
   private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
     StageMetadata.Builder builder = new StageMetadata.Builder();
-    List<WorkerMetadata> workerMetadataList = new ArrayList<>();
-    for (Worker.WorkerMetadata protoWorkerMetadata : protoStageMetadata.getWorkerMetadataList()) {
-      workerMetadataList.add(fromProtoWorkerMetadata(protoWorkerMetadata));
-    }
-    builder.setWorkerMetadataList(workerMetadataList);
     builder.putAllCustomProperties(protoStageMetadata.getCustomPropertyMap());
     return builder.build();
   }
@@ -121,9 +119,6 @@ public class QueryPlanSerDeUtils {
 
   private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {
     Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
-    for (WorkerMetadata workerMetadata : stageMetadata.getWorkerMetadataList()) {
-      builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
-    }
     builder.putAllCustomProperty(stageMetadata.getCustomProperties());
     return builder.build();
   }

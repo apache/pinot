@@ -26,8 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.DataTable;
@@ -85,25 +83,23 @@ public class OpChainTest {
 
   private VirtualServerAddress _serverAddress;
   private StageMetadata _receivingStageMetadata;
+  private WorkerMetadata _workerMetadata;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
     _serverAddress = new VirtualServerAddress("localhost", 123, 0);
-    _receivingStageMetadata = new StageMetadata.Builder()
-        .setWorkerMetadataList(Stream.of(_serverAddress).map(
-            s -> new WorkerMetadata.Builder()
-                .setVirtualServerAddress(s)
-                .addMailBoxInfoMap(0, new MailboxMetadata(
-                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-                    ImmutableList.of(s), ImmutableMap.of()))
-                .addMailBoxInfoMap(1, new MailboxMetadata(
-                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-                    ImmutableList.of(s), ImmutableMap.of()))
-                .addMailBoxInfoMap(2, new MailboxMetadata(
-                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-                    ImmutableList.of(s), ImmutableMap.of()))
-                .build()).collect(Collectors.toList()))
+    _workerMetadata = new WorkerMetadata.Builder()
+        .setVirtualServerAddress(_serverAddress)
+        .addMailBoxInfoMap(0, new MailboxMetadata(
+            ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
+            ImmutableList.of(_serverAddress), ImmutableMap.of()))
+        .addMailBoxInfoMap(1, new MailboxMetadata(
+            ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
+            ImmutableList.of(_serverAddress), ImmutableMap.of()))
+        .addMailBoxInfoMap(2, new MailboxMetadata(
+            ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
+            ImmutableList.of(_serverAddress), ImmutableMap.of()))
         .build();
 
     when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);
@@ -199,7 +195,7 @@ public class OpChainTest {
     int senderStageId = 1;
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService1, 1, senderStageId, 1000, System.currentTimeMillis() + 1000,
-            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), true);
+            _workerMetadata, true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -213,7 +209,7 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, 1000, System.currentTimeMillis() + 1000,
-            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), true);
+            _workerMetadata, true);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -239,7 +235,7 @@ public class OpChainTest {
     int senderStageId = 1;
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService1, 1, senderStageId, 1000, System.currentTimeMillis() + 1000,
-            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), false);
+            _workerMetadata, false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -251,7 +247,7 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, 1000, System.currentTimeMillis() + 1000,
-            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), false);
+            _workerMetadata, false);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 

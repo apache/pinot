@@ -156,8 +156,7 @@ public class QueryRunner {
       PlanNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
           new PlanRequestContext(_mailboxService, requestId, stageRoot.getPlanFragmentId(), timeoutMs, deadlineMs,
-              distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata().getWorkerMetadataList()
-              .get(distributedStagePlan.getServer().workerId()), isTraceEnabled));
+              distributedStagePlan.getWorkerMetadata(), isTraceEnabled));
       _intermScheduler.register(rootOperator);
     }
   }
@@ -193,11 +192,9 @@ public class QueryRunner {
           new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis()));
     }
     MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
-    VirtualServerAddress server = distributedStagePlan.getServer();
-    StageMetadata stageMetadata = distributedStagePlan.getStageMetadata();
     OpChainExecutionContext opChainExecutionContext =
         new OpChainExecutionContext(_mailboxService, requestId, sendNode.getPlanFragmentId(), timeoutMs,
-            deadlineMs, stageMetadata.getWorkerMetadataList().get(server.workerId()), isTraceEnabled);
+            deadlineMs, distributedStagePlan.getWorkerMetadata(), isTraceEnabled);
     MultiStageOperator leafStageOperator =
         new LeafStageTransferableBlockOperator(opChainExecutionContext, this::processServerQueryRequest,
             serverQueryRequests, sendNode.getDataSchema());
@@ -212,7 +209,7 @@ public class QueryRunner {
       Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore,
       MailboxService mailboxService, long deadlineMs) {
     StageMetadata stageMetadata = distributedStagePlan.getStageMetadata();
-    WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
+    WorkerMetadata workerMetadata = distributedStagePlan.getWorkerMetadata();
     String rawTableName = StageMetadata.getTableName(stageMetadata);
     Map<String, List<String>> tableToSegmentListMap = WorkerMetadata.getTableSegmentsMap(workerMetadata);
     List<ServerPlanRequestContext> requests = new ArrayList<>();
@@ -258,7 +255,7 @@ public class QueryRunner {
   }
 
   private boolean isLeafStage(DistributedStagePlan distributedStagePlan) {
-    WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
+    WorkerMetadata workerMetadata = distributedStagePlan.getWorkerMetadata();
     Map<String, List<String>> segments = WorkerMetadata.getTableSegmentsMap(workerMetadata);
     return segments != null && segments.size() > 0;
   }
