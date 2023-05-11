@@ -19,12 +19,11 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -75,6 +74,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -370,14 +370,19 @@ public class DictionaryIndexType
       if (noDictionaryColumns.remove(fieldConfig.getName())) {
         configsToUpdate.add(fieldConfig);
       }
+      if (fieldConfig.getIndexes() == null) {
+        continue;
+      }
       try {
-        DictionaryIndexConfig indexConfig = new ObjectMapper()
-            .treeToValue(fieldConfig.getIndexes().get(getPrettyName()), DictionaryIndexConfig.class);
+        DictionaryIndexConfig indexConfig = JsonUtils.jsonNodeToObject(
+            fieldConfig.getIndexes().get(getPrettyName()),
+            DictionaryIndexConfig.class);
         // ensure encodingType is RAW where dictionary index config has disabled = true
         if (indexConfig.isDisabled()) {
           configsToUpdate.add(fieldConfig);
         }
-      } catch (JsonProcessingException | NullPointerException ignore) {
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
       }
     }
 
