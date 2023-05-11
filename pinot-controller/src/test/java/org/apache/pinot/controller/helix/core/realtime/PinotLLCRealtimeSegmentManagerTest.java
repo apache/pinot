@@ -65,6 +65,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -990,7 +991,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
             "segments",
             REALTIME_TABLE_NAME,
             segmentsZKMetadata.get(0).getSegmentName(),
-            "upload");
+            "upload") + "?uploadTimeoutMs=-1";
     String segmentDownloadUrl0 = String.format("segmentDownloadUr_%s", segmentsZKMetadata.get(0)
         .getSegmentName());
     when(segmentManager._mockedFileUploadDownloadClient
@@ -1013,7 +1014,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
             "segments",
             REALTIME_TABLE_NAME,
             segmentsZKMetadata.get(1).getSegmentName(),
-            "upload");
+            "upload") + "?uploadTimeoutMs=-1";
     when(segmentManager._mockedFileUploadDownloadClient
         .uploadToSegmentStore(serverUploadRequestUrl1))
         .thenThrow(new HttpErrorStatusException(
@@ -1206,6 +1207,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     long getCurrentTimeMs() {
       return CURRENT_TIME_MS;
     }
+
+    @Override
+    String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
+        throws IOException {
+      return segmentLocation;
+    }
   }
 
   private static class FakePinotLLCRealtimeSegmentManagerII extends FakePinotLLCRealtimeSegmentManager {
@@ -1238,6 +1245,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
           break;
       }
       return segmentZKMetadata;
+    }
+
+    @Override
+    String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
+        throws IOException {
+      return segmentLocation;
     }
   }
 }

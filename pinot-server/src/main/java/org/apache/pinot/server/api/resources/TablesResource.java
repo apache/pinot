@@ -468,7 +468,8 @@ public class TablesResource {
    * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
    * when segment store copy is unavailable for committed low level consumer segments.
    * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
+   * to upload it. There's a query parameter to configure how long the segment-uploader should wait for the upload to
+   * deep-store to finish.
    * @see <a>href="https://tinyurl.com/f63ru4sb</a>
    */
   @POST
@@ -485,7 +486,8 @@ public class TablesResource {
   public String uploadLLCSegment(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
           String realtimeTableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs)
       throws Exception {
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableName);
@@ -527,7 +529,12 @@ public class TablesResource {
 
       // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
       SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
-      URI segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
+      URI segmentDownloadUrl;
+      if (timeoutMs <= 0) {
+        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
+      } else {
+        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
+      }
       if (segmentDownloadUrl == null) {
         throw new WebApplicationException(
             String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
