@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.routing;
+package org.apache.pinot.query.runtime.plan;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
@@ -34,6 +36,11 @@ public class StageMetadata {
   public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
     _workerMetadataList = workerMetadataList;
     _customProperties = customProperties;
+  }
+
+  public static StageMetadata from(DispatchablePlanFragment dispatchablePlanFragment) {
+    return new StageMetadata(dispatchablePlanFragment.getWorkerMetadataList(),
+        dispatchablePlanFragment.getCustomProperties());
   }
 
   public List<WorkerMetadata> getWorkerMetadataList() {

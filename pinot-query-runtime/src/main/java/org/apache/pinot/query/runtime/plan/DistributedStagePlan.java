@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 

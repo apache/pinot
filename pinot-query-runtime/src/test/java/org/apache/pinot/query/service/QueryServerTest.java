@@ -40,10 +40,10 @@ import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -124,7 +124,7 @@ public class QueryServerTest extends QueryTestSet {
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
 
-        StageMetadata stageMetadata = dispatchablePlanFragment.toStageMetadata();
+        StageMetadata stageMetadata = StageMetadata.from(dispatchablePlanFragment);
 
         // ensure mock query runner received correctly deserialized payload.
         QueryRunner mockRunner =

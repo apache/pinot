@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -74,7 +75,8 @@ public class OpChainSchedulerServiceTest {
 
   private OpChain getChain(MultiStageOperator operator) {
     VirtualServerAddress address = new VirtualServerAddress("localhost", 1234, 1);
-    OpChainExecutionContext context = new OpChainExecutionContext(null, 123L, 1, address, 0, 0, null, true);
+    OpChainExecutionContext context = new OpChainExecutionContext(null, 123L, 1, 0, 0,
+        new WorkerMetadata.Builder().setVirtualServerAddress(address).build(), true);
     return new OpChain(context, operator, ImmutableList.of());
   }
 

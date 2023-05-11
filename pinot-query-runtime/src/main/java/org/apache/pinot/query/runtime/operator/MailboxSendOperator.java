@@ -91,9 +91,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     long requestId = context.getRequestId();
     long deadlineMs = context.getDeadlineMs();
 
-    int workerId = context.getServer().workerId();
     MailboxMetadata receiverMailboxMetadatas =
-        context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(receiverStageId);
+        context.getWorkerMetadata().getMailBoxInfosMap().get(receiverStageId);
     if (exchangeType == RelDistribution.Type.SINGLETON) {
       Preconditions.checkState(receiverMailboxMetadatas.getMailBoxIdList().size() == 1,
           "Multiple instances found for SINGLETON exchange type");

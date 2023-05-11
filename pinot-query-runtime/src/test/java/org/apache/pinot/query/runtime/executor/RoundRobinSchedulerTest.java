@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -179,7 +180,8 @@ public class RoundRobinSchedulerTest {
   }
 
   private OpChainExecutionContext getOpChainExecutionContext(long requestId, int stageId, int virtualServerId) {
-    return new OpChainExecutionContext(null, requestId, stageId,
-        new VirtualServerAddress("localhost", 1234, virtualServerId), 0, 0, null, true);
+    return new OpChainExecutionContext(null, requestId, stageId, 0, 0,
+        new WorkerMetadata.Builder().setVirtualServerAddress(
+            new VirtualServerAddress("localhost", 1234, virtualServerId)).build(), true);
   }
 }

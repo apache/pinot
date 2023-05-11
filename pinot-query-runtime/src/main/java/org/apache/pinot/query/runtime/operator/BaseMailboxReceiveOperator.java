@@ -57,9 +57,8 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _exchangeType = exchangeType;
 
     long requestId = context.getRequestId();
-    int workerId = context.getServer().workerId();
     MailboxMetadata senderMailBoxMetadatas =
-        context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
+        context.getWorkerMetadata().getMailBoxInfosMap().get(senderStageId);
     Preconditions.checkState(senderMailBoxMetadatas != null && !senderMailBoxMetadatas.getMailBoxIdList().isEmpty(),
         "Failed to find mailbox for stage: %s",
         senderStageId);

@@ -58,6 +58,7 @@ import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -194,11 +195,10 @@ public class QueryDispatcher {
         (MailboxReceiveNode) dispatchableSubPlan.getQueryStageList().get(reduceStageId).getPlanFragment()
             .getFragmentRoot();
     VirtualServerAddress server = new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), 0);
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs,
-            System.currentTimeMillis() + timeoutMs,
-            dispatchableSubPlan.getQueryStageList().get(reduceStageId).toStageMetadata(),
-            traceEnabled);
+    StageMetadata stageMetadata = StageMetadata.from(dispatchableSubPlan.getQueryStageList().get(reduceStageId));
+    OpChainExecutionContext context = new OpChainExecutionContext(mailboxService, requestId, reduceStageId, timeoutMs,
+        System.currentTimeMillis() + timeoutMs, stageMetadata.getWorkerMetadataList().get(server.workerId()),
+        traceEnabled);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context, reduceNode.getSenderStageId());
     List<DataBlock> resultDataBlocks =
         reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, dispatchableSubPlan,
@@ -212,7 +212,7 @@ public class QueryDispatcher {
       int stageId, VirtualServerAddress serverAddress) {
     return new DistributedStagePlan(stageId, serverAddress,
         dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment().getFragmentRoot(),
-        dispatchableSubPlan.getQueryStageList().get(stageId).toStageMetadata());
+        StageMetadata.from(dispatchableSubPlan.getQueryStageList().get(stageId)));
   }
 
   private static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,

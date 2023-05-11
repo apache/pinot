@@ -42,13 +42,13 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -198,8 +198,8 @@ public class OpChainTest {
     int receivedStageId = 2;
     int senderStageId = 1;
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, 1000, System.currentTimeMillis() + 1000,
+            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -212,8 +212,8 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, 1000, System.currentTimeMillis() + 1000,
+            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), true);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -238,8 +238,8 @@ public class OpChainTest {
     int receivedStageId = 2;
     int senderStageId = 1;
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, 1000, System.currentTimeMillis() + 1000,
+            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -250,8 +250,8 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, 1000, System.currentTimeMillis() + 1000,
+            _receivingStageMetadata.getWorkerMetadataList().get(_serverAddress.workerId()), false);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 
@@ -289,8 +289,8 @@ public class OpChainTest {
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
         new SelectionResultsBlock(upStreamSchema, Arrays.asList(new Object[]{1}, new Object[]{2})), queryContext));
     LeafStageTransferableBlockOperator leafOp = new LeafStageTransferableBlockOperator(context,
-            LeafStageTransferableBlockOperatorTest.getStaticBlockProcessor(resultsBlockList),
-            Collections.singletonList(mock(ServerQueryRequest.class)), upStreamSchema);
+        LeafStageTransferableBlockOperatorTest.getStaticBlockProcessor(resultsBlockList),
+        Collections.singletonList(mock(ServerQueryRequest.class)), upStreamSchema);
 
     //Transform operator
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
