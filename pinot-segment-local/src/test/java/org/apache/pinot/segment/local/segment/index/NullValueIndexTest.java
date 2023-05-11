@@ -23,7 +23,6 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -34,8 +33,7 @@ public class NullValueIndexTest {
     public void oldToNewConfConversion() {
       _tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
       convertToUpdatedFormat();
-      assertNotNull(_tableConfig.getFieldConfigList());
-      assertTrue(_tableConfig.getFieldConfigList().isEmpty());
+      assertTrue(_tableConfig.getIndexingConfig().isNullHandlingEnabled());
     }
   }
 
