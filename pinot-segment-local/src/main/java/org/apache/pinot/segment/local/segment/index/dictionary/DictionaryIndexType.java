@@ -370,7 +370,7 @@ public class DictionaryIndexType
       if (noDictionaryColumns.remove(fieldConfig.getName())) {
         configsToUpdate.add(fieldConfig);
       }
-      if (fieldConfig.getIndexes() == null) {
+      if (fieldConfig.getIndexes() == null || fieldConfig.getIndexes().get(getPrettyName()) == null) {
         continue;
       }
       try {
