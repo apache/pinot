@@ -123,7 +123,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) segment;
     MutableRoaringBitmap validDocIds;
-    if (_enableSnapshot) {
+    // no need to enable snapshot if upsertTTLConfig is already presented.
+    assert !(_enableSnapshot && _upsertTTLConfig != null);
+    if (_enableSnapshot || _upsertTTLConfig != null) {
       validDocIds = immutableSegmentImpl.loadValidDocIdsFromSnapshot();
       if (validDocIds != null && validDocIds.isEmpty()) {
         _logger.info("Skip adding segment: {} without valid doc, current primary key count: {}",

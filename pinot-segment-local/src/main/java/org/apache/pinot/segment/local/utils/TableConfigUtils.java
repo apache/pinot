@@ -584,6 +584,34 @@ public final class TableConfigUtils {
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);
+    validateTTLConfigForUpsertConfig(tableConfig, schema);
+  }
+
+  /**
+   * Validates whether the comparison columns is compatible with Upsert TTL feature.
+   * Validation fails when one of the comparison columns is not a numeric value.
+   */
+  @VisibleForTesting
+  static void validateTTLConfigForUpsertConfig(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE
+        || tableConfig.getUpsertConfig().getUpsertTTLConfig() == null) {
+      return;
+    }
+
+    // comparison columns should hold timestamp values in millisecond
+    List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
+    if (comparisonColumns != null && !comparisonColumns.isEmpty()) {
+      for (String column : comparisonColumns) {
+        Preconditions.checkState(schema.getFieldSpecFor(column).getDataType().isNumeric(), String.format(
+            "Upsert TTL must have numeric value for the comparison columns. The column %s: %s is not a "
+                + "numeric values", column, schema.getFieldSpecFor(column).getDataType()));
+      }
+    }
+
+    // snapshotEnabled and upsertTTLConfig should not be enabled together to avoid accessing the same file.
+    Preconditions.checkState(!tableConfig.getUpsertConfig().isEnableSnapshot()
+            || tableConfig.getUpsertConfig().getUpsertTTLConfig() == null,
+        String.format("No need to enable snapshot if upsertTTLConfig is already presented."));
   }
 
   /**
