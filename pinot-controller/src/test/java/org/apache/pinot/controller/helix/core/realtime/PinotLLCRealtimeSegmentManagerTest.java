@@ -65,7 +65,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -82,6 +81,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -1042,6 +1042,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
         .thenReturn(segmentManager._tableConfig);
 
+
+    segmentManager = Mockito.spy(segmentManager);
+    Mockito.doAnswer(answer -> answer.getArgument(2))
+        .when(segmentManager).moveSegmentFile(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any());
     // Verify the result
     segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
     assertEquals(
@@ -1207,12 +1211,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     long getCurrentTimeMs() {
       return CURRENT_TIME_MS;
     }
-
-    @Override
-    String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
-        throws IOException {
-      return segmentLocation;
-    }
   }
 
   private static class FakePinotLLCRealtimeSegmentManagerII extends FakePinotLLCRealtimeSegmentManager {
@@ -1245,12 +1243,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
           break;
       }
       return segmentZKMetadata;
-    }
-
-    @Override
-    String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
-        throws IOException {
-      return segmentLocation;
     }
   }
 }
