@@ -230,7 +230,11 @@ public class DictionaryIndexTypeTest {
           .setOnHeapDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
       convertToUpdatedFormat();
       FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
-      assertNotNull(fieldConfig.getIndexes().get(new DictionaryIndexType().getPrettyName()));
+      DictionaryIndexConfig config = JsonUtils.jsonNodeToObject(
+          fieldConfig.getIndexes().get(StandardIndexes.dictionary().getPrettyName()),
+          DictionaryIndexConfig.class);
+      assertNotNull(config);
+      assertTrue(config.isOnHeap());
       postConversionAsserts();
     }
 
@@ -241,7 +245,11 @@ public class DictionaryIndexTypeTest {
           .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
       convertToUpdatedFormat();
       FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
-      assertNotNull(fieldConfig.getIndexes().get(new DictionaryIndexType().getPrettyName()));
+      DictionaryIndexConfig config = JsonUtils.jsonNodeToObject(
+          fieldConfig.getIndexes().get(StandardIndexes.dictionary().getPrettyName()),
+          DictionaryIndexConfig.class);
+      assertNotNull(config);
+      assertTrue(config.getUseVarLengthDictionary());
       postConversionAsserts();
     }
 
