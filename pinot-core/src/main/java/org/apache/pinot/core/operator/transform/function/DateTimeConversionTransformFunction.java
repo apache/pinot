@@ -96,7 +96,6 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     if (arguments.size() != 4) {
       throw new IllegalArgumentException("Exactly 4 arguments are required for DATE_TIME_CONVERT transform function");
     }
-
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
