@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -32,62 +35,77 @@ import org.slf4j.LoggerFactory;
 
 
 public class LeafSchedulerService {
+  private static final int DANGLING_LEAF_OP_CHAIN_EXPIRY_SECONDS = 300;
+  private static final long SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafSchedulerService.class);
 
   private final ExecutorService _executorService;
-  private final ConcurrentHashMap<OpChainId, Future<?>> _submittedOpChainMap;
+  private final Cache<OpChainId, Future<?>> _submittedOpChainCache =
+      CacheBuilder.newBuilder().expireAfterAccess(DANGLING_LEAF_OP_CHAIN_EXPIRY_SECONDS, TimeUnit.SECONDS)
+          .removalListener((RemovalListener<OpChainId, Future<?>>) notification -> {
+            if (notification.wasEvicted()) {
+              Future<?> future = notification.getValue();
+              if (!future.isDone()) {
+                LOGGER.warn("Evicting dangling leaf opChain: {}", notification.getKey());
+                future.cancel(true);
+              }
+            }
+          }).build();
+  private final Cache<Long, Long> _cancelledRequests = CacheBuilder.newBuilder()
+      .expireAfterWrite(SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS, TimeUnit.MILLISECONDS).build();
 
   public LeafSchedulerService(ExecutorService executorService) {
     _executorService = executorService;
-    _submittedOpChainMap = new ConcurrentHashMap<>();
   }
 
   public void register(OpChain operatorChain) {
-    Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
-      @Override
-      public void runJob() {
-        boolean isFinished = false;
-        boolean returnedErrorBlock = false;
-        Throwable thrown = null;
-        try {
-          LOGGER.trace("({}): Executing", operatorChain);
-          operatorChain.getStats().executing();
-          TransferableBlock result = operatorChain.getRoot().nextBlock();
-          while (!result.isEndOfStreamBlock()) {
-            result = operatorChain.getRoot().nextBlock();
-          }
-          isFinished = true;
-          if (result.isErrorBlock()) {
-            returnedErrorBlock = true;
-            LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
-                result.getDataBlock().getExceptions());
-          } else {
-            LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
-          }
-        } catch (Exception e) {
-          LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
-          thrown = e;
-        } finally {
-          if (returnedErrorBlock || thrown != null) {
-            cancelOpChain(operatorChain, thrown);
-          } else if (isFinished) {
-            closeOpChain(operatorChain);
+    if (!_cancelledRequests.asMap().containsKey(operatorChain.getId().getRequestId())) {
+      Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
+        @Override
+        public void runJob() {
+          boolean isFinished = false;
+          boolean returnedErrorBlock = false;
+          Throwable thrown = null;
+          try {
+            LOGGER.trace("({}): Executing", operatorChain);
+            operatorChain.getStats().executing();
+            TransferableBlock result = operatorChain.getRoot().nextBlock();
+            while (!result.isEndOfStreamBlock()) {
+              result = operatorChain.getRoot().nextBlock();
+            }
+            isFinished = true;
+            if (result.isErrorBlock()) {
+              returnedErrorBlock = true;
+              LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+                  result.getDataBlock().getExceptions());
+            } else {
+              LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+            }
+          } catch (Exception e) {
+            LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
+            thrown = e;
+          } finally {
+            if (returnedErrorBlock || thrown != null) {
+              cancelOpChain(operatorChain, thrown);
+            } else if (isFinished) {
+              closeOpChain(operatorChain);
+            }
           }
         }
-      }
-    });
-    _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
+      });
+      _submittedOpChainCache.put(operatorChain.getId(), scheduledFuture);
+    }
   }
 
   public void cancel(long requestId) {
-    // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
-    // via query timeout.
-    List<OpChainId> opChainIdsToCancel = _submittedOpChainMap.keySet()
+    _cancelledRequests.put(requestId, requestId);
+    List<OpChainId> opChainIdsToCancel = _submittedOpChainCache.asMap().keySet()
         .stream().filter(opChainId -> opChainId.getRequestId() == requestId).collect(Collectors.toList());
     for (OpChainId opChainId : opChainIdsToCancel) {
-      Future<?> future = _submittedOpChainMap.get(opChainId);
+      Future<?> future = _submittedOpChainCache.getIfPresent(opChainId);
       if (future != null) {
         future.cancel(true);
+        _submittedOpChainCache.invalidate(opChainId);
       }
     }
   }
