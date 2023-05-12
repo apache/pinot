@@ -1567,10 +1567,14 @@ public class PinotLLCRealtimeSegmentManager {
   String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
       throws IOException {
     URI segmentFileURI = URIUtils.getUri(segmentLocation);
-    URI uriToMoveTo = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+    URI uriToMoveTo = createSegmentPath(rawTableName, segmentName);
     Preconditions.checkState(pinotFS.move(segmentFileURI, uriToMoveTo, true),
         "Failed to move segment file for segment: %s from: %s to: %s", segmentName, segmentLocation, uriToMoveTo);
     return uriToMoveTo.toString();
+  }
+
+  URI createSegmentPath(String rawTableName, String segmentName) {
+    return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
 
   private PinotFS createPinotFS(String rawTableName) {
