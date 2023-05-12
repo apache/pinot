@@ -45,7 +45,6 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.executor.LeafSchedulerService;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
@@ -91,7 +90,7 @@ public class QueryRunner {
   private ExecutorService _queryRunnerExecutorService;
 
   private OpChainSchedulerService _intermScheduler;
-  private LeafSchedulerService _leafScheduler;
+  private OpChainSchedulerService _leafScheduler;
 
   /**
    * Initializes the query executor.
@@ -117,7 +116,7 @@ public class QueryRunner {
           new NamedThreadFactory("query_runner_on_" + _port + "_port"));
       _intermScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
           getQueryWorkerIntermExecutorService());
-      _leafScheduler = new LeafSchedulerService(getQueryRunnerExecutorService());
+      _leafScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), getQueryRunnerExecutorService());
       _mailboxService = new MailboxService(_hostname, _port, config, _intermScheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -131,6 +130,7 @@ public class QueryRunner {
     _helixPropertyStore = _helixManager.getHelixPropertyStore();
     _mailboxService.start();
     _serverExecutor.start();
+    _leafScheduler.startAsync().awaitRunning(30, TimeUnit.SECONDS);
     _intermScheduler.startAsync().awaitRunning(30, TimeUnit.SECONDS);
   }
 
@@ -138,6 +138,7 @@ public class QueryRunner {
       throws TimeoutException {
     _serverExecutor.shutDown();
     _mailboxService.shutdown();
+    _leafScheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
     _intermScheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
   }
 
