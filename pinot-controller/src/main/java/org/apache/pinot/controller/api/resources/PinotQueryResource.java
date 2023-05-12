@@ -52,6 +52,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -121,6 +122,9 @@ public class PinotQueryResource {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
+    } catch (ProcessingException pe) {
+      LOGGER.error("Caught exception while processing get request", pe);
+      return pe.toString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -134,8 +138,7 @@ public class PinotQueryResource {
     try {
       sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
     } catch (SqlCompilationException ex) {
-      return QueryException.getException(QueryException.SQL_PARSING_ERROR,
-          new Exception("Unable to parse the SQL")).toString();
+      throw QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception("Unable to parse the SQL"));
     }
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
