@@ -151,6 +151,12 @@ public class MailboxSendOperatorTest {
     TransferableBlock block = mailboxSendOperator.nextBlock();
 
     // Then:
+    assertSame(block, dataBlock, "expected EOS block to propagate");
+
+    // When:
+    block = mailboxSendOperator.nextBlock();
+
+    // Then:
     assertSame(block, eosBlock, "expected EOS block to propagate");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
     verify(_exchange, times(2)).send(captor.capture());

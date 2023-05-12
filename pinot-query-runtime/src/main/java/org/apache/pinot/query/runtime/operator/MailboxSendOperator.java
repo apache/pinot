@@ -109,7 +109,8 @@ public class MailboxSendOperator extends MultiStageOperator {
       sendingMailboxes.add(mailboxService.getSendingMailbox(receiverMailboxMetadatas.getVirtualAddress(i).hostname(),
           receiverMailboxMetadatas.getVirtualAddress(i).port(), sendingMailboxIds.get(i), deadlineMs));
     }
-    return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector, TransferableBlockUtils::splitBlock);
+    return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector,
+        TransferableBlockUtils::splitBlock);
   }
 
   @Override
@@ -125,24 +126,25 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    boolean canContinue = true;
     TransferableBlock transferableBlock;
     try {
       transferableBlock = _sourceOperator.nextBlock();
-      while (!transferableBlock.isNoOpBlock()) {
-        if (transferableBlock.isEndOfStreamBlock()) {
-          if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
-            //Stats need to be populated here because the block is being sent to the mailbox
-            // and the receiving opChain will not be able to access the stats from the previous opChain
-            TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
-                OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-            _exchange.send(eosBlockWithStats);
-          } else {
-            _exchange.send(transferableBlock);
-          }
-          return transferableBlock;
+      if (transferableBlock.isNoOpBlock()) {
+        return transferableBlock;
+      } else if (transferableBlock.isEndOfStreamBlock()) {
+        if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
+          // Stats need to be populated here because the block is being sent to the mailbox
+          // and the receiving opChain will not be able to access the stats from the previous opChain
+          TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
+              OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+          _exchange.send(eosBlockWithStats);
+        } else {
+          _exchange.send(transferableBlock);
         }
+      } else { // normal blocks
+        // check whether we should continue depending on exchange queue condition.
         _exchange.send(transferableBlock);
-        transferableBlock = _sourceOperator.nextBlock();
       }
     } catch (Exception e) {
       transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
