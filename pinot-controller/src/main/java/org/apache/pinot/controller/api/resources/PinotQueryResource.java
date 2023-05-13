@@ -109,7 +109,7 @@ public class PinotQueryResource {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
-      LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
+      LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
       return pe.getMessage();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);

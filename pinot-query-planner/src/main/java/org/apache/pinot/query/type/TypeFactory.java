@@ -81,7 +81,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
             : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
       case JSON:
-        return createSqlType(SqlTypeName.VARCHAR);
+        // TODO: support JSON, JSON should be supported using a special RelDataType as it is not a simple String,
+        // nor can it be easily parsed as a STRUCT.
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:
