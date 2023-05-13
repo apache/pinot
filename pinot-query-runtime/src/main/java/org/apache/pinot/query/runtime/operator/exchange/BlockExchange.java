@@ -20,12 +20,19 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
@@ -33,23 +40,32 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * exchanging data across different servers.
  */
 public abstract class BlockExchange {
+  public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
+
+  private final OpChainId _opChainId;
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
+  private final Consumer<OpChainId> _callback;
+  private final long _deadlineMs;
 
-  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
+  private final BlockingQueue<TransferableBlock> _queue = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
+
+
+  public static BlockExchange getExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
     switch (exchangeType) {
       case SINGLETON:
-        return new SingletonExchange(sendingMailboxes, splitter);
+        return new SingletonExchange(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
       case HASH_DISTRIBUTED:
-        return new HashExchange(sendingMailboxes, selector, splitter);
+        return new HashExchange(opChainId, sendingMailboxes, selector, splitter, callback, deadlineMs);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(sendingMailboxes, splitter);
+        return new RandomExchange(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(sendingMailboxes, splitter);
+        return new BroadcastExchange(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -58,20 +74,48 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
+  protected BlockExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
+    _opChainId = opChainId;
     _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
+    _callback = callback;
+    _deadlineMs = deadlineMs;
   }
 
-  public void send(TransferableBlock block)
+  public boolean offerBlock(TransferableBlock block, long timeoutMs)
       throws Exception {
-    if (block.isEndOfStreamBlock()) {
-      for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-        sendBlock(sendingMailbox, block);
+    return _queue.offer(block, timeoutMs, TimeUnit.MILLISECONDS);
+  }
+
+  public int getRemainingCapacity() {
+    return _queue.remainingCapacity();
+  }
+
+  public TransferableBlock send() {
+    try {
+      TransferableBlock block;
+      long timeoutMs = _deadlineMs - System.currentTimeMillis();
+      block = _queue.poll(timeoutMs, TimeUnit.MILLISECONDS);
+      if (block == null) {
+        block = TransferableBlockUtils.getErrorTransferableBlock(
+            new TimeoutException("Timed out on exchange for opChain: " + _opChainId));
+      } else {
+        // Notify that the block exchange can now accept more blocks.
+        _callback.accept(_opChainId);
+        if (block.isEndOfStreamBlock()) {
+          for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+            sendBlock(sendingMailbox, block);
+          }
+        } else {
+          route(_sendingMailboxes, block);
+        }
       }
-      return;
+      return block;
+    } catch (Exception e) {
+      return TransferableBlockUtils.getErrorTransferableBlock(
+          new RuntimeException("Exception while sending data via exchange for opChain: " + _opChainId));
     }
-    route(_sendingMailboxes, block);
   }
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)

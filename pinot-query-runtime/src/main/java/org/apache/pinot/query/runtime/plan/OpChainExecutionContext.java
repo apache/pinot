@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
+import org.apache.pinot.query.runtime.operator.exchange.ExchangeService;
 
 
 /**
@@ -32,6 +34,8 @@ import org.apache.pinot.query.runtime.operator.OpChainStats;
  */
 public class OpChainExecutionContext {
   private final MailboxService _mailboxService;
+  private final ExchangeService _exchangeService;
+  private final Consumer<OpChainId> _callback;
   private final long _requestId;
   private final int _stageId;
   private final VirtualServerAddress _server;
@@ -42,10 +46,12 @@ public class OpChainExecutionContext {
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
-  public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long timeoutMs, long deadlineMs, StageMetadata stageMetadata,
-      boolean traceEnabled) {
+  public OpChainExecutionContext(MailboxService mailboxService, ExchangeService exchangeService,
+      Consumer<OpChainId> callback, long requestId, int stageId, VirtualServerAddress server, long timeoutMs,
+      long deadlineMs, StageMetadata stageMetadata, boolean traceEnabled) {
     _mailboxService = mailboxService;
+    _exchangeService = exchangeService;
+    _callback = callback;
     _requestId = requestId;
     _stageId = stageId;
     _server = server;
@@ -58,13 +64,22 @@ public class OpChainExecutionContext {
   }
 
   public OpChainExecutionContext(PlanRequestContext planRequestContext) {
-    this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
+    this(planRequestContext.getMailboxService(), planRequestContext.getExchangeService(),
+        planRequestContext.getCallback(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
         planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
         planRequestContext.getStageMetadata(), planRequestContext.isTraceEnabled());
   }
 
   public MailboxService getMailboxService() {
     return _mailboxService;
+  }
+
+  public ExchangeService getExchangeService() {
+    return _exchangeService;
+  }
+
+  public Consumer<OpChainId> getCallback() {
+    return _callback;
   }
 
   public long getRequestId() {

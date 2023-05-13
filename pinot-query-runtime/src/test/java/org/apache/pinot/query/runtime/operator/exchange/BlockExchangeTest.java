@@ -28,6 +28,7 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -64,7 +65,8 @@ public class BlockExchangeTest {
     List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
     // When:
-    exchange.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    exchange.offerBlock(TransferableBlockUtils.getEndOfStreamTransferableBlock(), Long.MAX_VALUE);
+    exchange.send();
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -88,7 +90,8 @@ public class BlockExchangeTest {
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
 
     // When:
-    exchange.send(block);
+    exchange.offerBlock(block, Long.MAX_VALUE);
+    exchange.send();
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -119,7 +122,8 @@ public class BlockExchangeTest {
         (block, type, maxSize) -> ImmutableList.of(outBlockOne, outBlockTwo).iterator());
 
     // When:
-    exchange.send(inBlock);
+    exchange.offerBlock(inBlock, Long.MAX_VALUE);
+    exchange.send();
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -137,7 +141,7 @@ public class BlockExchangeTest {
     }
 
     protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
-      super(destinations, splitter);
+      super(new OpChainId(1, 2, 3), destinations, splitter, (opChainId) -> { }, Long.MAX_VALUE);
     }
 
     @Override
