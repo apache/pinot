@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.connector.spark.common
 
+import java.util
+
 import org.apache.pinot.spi.config.table.TableType
 
-import java.util
 import scala.util.Random
 
 /**

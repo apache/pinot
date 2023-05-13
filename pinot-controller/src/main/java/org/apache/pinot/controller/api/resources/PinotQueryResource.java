@@ -69,7 +69,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
-import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,8 +109,8 @@ public class PinotQueryResource {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
-      LOGGER.error("Caught exception while processing post request", pe);
-      return pe.toString();
+      LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
+      return pe.getMessage();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -126,8 +125,8 @@ public class PinotQueryResource {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
-      LOGGER.error("Caught exception while processing get request", pe);
-      return pe.toString();
+      LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
+      return pe.getMessage();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -141,7 +140,8 @@ public class PinotQueryResource {
     try {
       sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
     } catch (Exception ex) {
-      throw QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception("Unable to parse the SQL"));
+      String errorMessage = String.format("Unable to parse the SQL: '%s'", sqlQuery);
+      throw QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(errorMessage));
     }
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
