@@ -81,13 +81,14 @@ public class TypeFactory extends JavaTypeFactoryImpl {
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
             : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
       case JSON:
-        return createSqlType(SqlTypeName.VARBINARY);
+        return createSqlType(SqlTypeName.VARCHAR);
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:
       case MAP:
       default:
-        throw new UnsupportedOperationException("unsupported!");
+        String message = String.format("Unsupported type: %s ", fieldSpec.getDataType().toString());
+        throw new UnsupportedOperationException(message);
     }
   }
 }

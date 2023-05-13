@@ -109,6 +109,9 @@ public class PinotQueryResource {
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
+    } catch (ProcessingException pe) {
+      LOGGER.error("Caught exception while processing post request", pe);
+      return pe.toString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -137,7 +140,7 @@ public class PinotQueryResource {
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    } catch (SqlCompilationException ex) {
+    } catch (Exception ex) {
       throw QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception("Unable to parse the SQL"));
     }
     Map<String, String> options = sqlNodeAndOptions.getOptions();
