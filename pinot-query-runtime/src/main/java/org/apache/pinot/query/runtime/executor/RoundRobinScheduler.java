@@ -94,7 +94,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
   private final Supplier<Long> _ticker;
 
   private final Map<OpChainId, OpChain> _aliveChains = new ConcurrentHashMap<>();
-  final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
+  private final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
   private final Map<OpChainId, Long> _available = new ConcurrentHashMap<>();
 
   private final BlockingQueue<OpChain> _ready = new LinkedBlockingQueue<>();
