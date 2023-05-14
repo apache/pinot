@@ -1,0 +1,22 @@
+{
+  "json_data": {
+    "tables": {
+      "jsonTbl": {
+        "schema": [
+          {"name": "jsonCol", "type": "JSON"},
+          {"name": "stringCol", "type": "STRING"}
+        ],
+        "inputs": [
+          ["{\"key1\":\"val1\",\"key2\":\"val2\"}", "str1"],
+          ["{\"key11\":\"val11\",\"key22\":\"val22\"}", "str22"],
+          ["{\"key111\":\"val111\",\"key222\":{\"key222_a\":\"val222_a\"}}", "str33"]
+        ]
+      }
+    },
+    "queries": [
+      {"sql": "SELECT jsonCol FROM {jsonTbl}"},
+      {"sql": "SELECT jsonCol, stringCol FROM {jsonTbl}"},
+      {"sql": "SELECT jsonCol, stringCol FROM {jsonTbl} where stringCol='str33'"}
+    ]
+  }
+}

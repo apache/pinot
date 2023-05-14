@@ -30,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -156,7 +157,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     while (h2ResultSet.next()) {
       Object[] row = new Object[columnCount];
       for (int i = 0; i < columnCount; i++) {
-        row[i] = h2ResultSet.getObject(i + 1);
+        if (h2ResultSet.getMetaData().getColumnType(i + 1) == Types.OTHER) {
+          row[i] = h2ResultSet.getString(i + 1);
+        } else {
+          row[i] = h2ResultSet.getObject(i + 1);
+        }
       }
       result.add(row);
     }
@@ -386,14 +391,22 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         h2FieldNamesAndTypes.toArray(new String[h2FieldNamesAndTypes.size()])) + ")").execute();
   }
 
+  private String getH2InsertQueryParam(String h2FieldNameAndType) {
+    String type = h2FieldNameAndType.split(" ")[1];
+    if ("json".equalsIgnoreCase(type)) {
+      return "? FORMAT JSON";
+    }
+    return "?";
+  }
+
   protected void addDataToH2(String tableName, Schema schema, List<GenericRow> rows)
       throws SQLException, DecoderException {
     if (rows != null && rows.size() > 0) {
       // prepare the statement for ingestion
       List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
-      StringBuilder params = new StringBuilder("?");
-      for (int i = 0; i < h2FieldNamesAndTypes.size() - 1; i++) {
-        params.append(",?");
+      StringBuilder params = new StringBuilder(getH2InsertQueryParam(h2FieldNamesAndTypes.get(0)));
+      for (int i = 1; i <= h2FieldNamesAndTypes.size() - 1; i++) {
+        params.append(",").append(getH2InsertQueryParam(h2FieldNamesAndTypes.get(i)));
       }
       PreparedStatement h2Statement =
           _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
@@ -455,6 +468,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return "BYTEA";
       case TIMESTAMP:
         return "TIMESTAMP";
+      case JSON:
+        return "json";
       default:
         throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
     }
