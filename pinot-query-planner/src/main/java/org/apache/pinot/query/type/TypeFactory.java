@@ -88,7 +88,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       case STRUCT:
       case MAP:
       default:
-        throw new UnsupportedOperationException("unsupported!");
+        String message = String.format("Unsupported type: %s ", fieldSpec.getDataType().toString());
+        throw new UnsupportedOperationException(message);
     }
   }
 }
