@@ -278,7 +278,8 @@ public class ForwardIndexTypeTest {
         throws JsonProcessingException {
       addFieldIndexConfig(""
           + " {\n"
-          + "    \"name\": \"dimInt\","
+          + "    \"name\": \"dimInt\",\n"
+          + "    \"compressionCodec\": \"PASS_THROUGH\",\n"
           + "    \"encodingType\": \"RAW\"\n"
           + " }"
       );

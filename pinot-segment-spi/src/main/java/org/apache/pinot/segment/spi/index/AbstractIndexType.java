@@ -81,20 +81,25 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
     Map<String, FieldConfig> fieldConfigMap = fieldConfigList.stream()
         .collect(Collectors.toMap(FieldConfig::getName, Function.identity()));
     for (Map.Entry<String, C> entry : deserialize.entrySet()) {
+      C configValue = entry.getValue();
+      if (configValue.equals(getDefaultConfig())) {
+        continue;
+      }
       FieldConfig fieldConfig = fieldConfigMap.get(entry.getKey());
       if (fieldConfig != null) {
         ObjectNode currentIndexes = fieldConfig.getIndexes().isNull()
             ? new ObjectMapper().createObjectNode()
             : new ObjectMapper().valueToTree(fieldConfig.getIndexes());
-        JsonNode indexes = currentIndexes.set(getPrettyName(), entry.getValue().toJsonNode());
+        JsonNode indexes = currentIndexes.set(getPrettyName(), configValue.toJsonNode());
         FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
         builder.withIndexes(indexes);
         fieldConfigList.remove(fieldConfig);
         fieldConfigList.add(builder.build());
       } else {
-        JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), entry.getValue().toJsonNode());
+        JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), configValue.toJsonNode());
         FieldConfig.Builder builder = new FieldConfig.Builder(entry.getKey());
         builder.withIndexes(indexes);
+        builder.withEncodingType(FieldConfig.EncodingType.DICTIONARY);
         fieldConfigList.add(builder.build());
       }
     }

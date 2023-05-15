@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
@@ -65,5 +66,25 @@ public class H3IndexConfig extends IndexConfig {
 
   public H3IndexResolution getResolution() {
     return _resolution;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    H3IndexConfig that = (H3IndexConfig) o;
+    return Objects.equals(_resolution, that._resolution);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _resolution);
   }
 }

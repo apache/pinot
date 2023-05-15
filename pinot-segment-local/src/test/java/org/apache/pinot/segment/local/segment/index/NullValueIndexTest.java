@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.segment.local.segment.index;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.pinot.segment.local.segment.index.nullvalue.NullValueIndexPlugin;
-import org.apache.pinot.segment.local.segment.index.nullvalue.NullValueIndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class NullValueIndexTest {
@@ -36,14 +33,7 @@ public class NullValueIndexTest {
     public void oldToNewConfConversion() {
       _tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
       convertToUpdatedFormat();
-      assertNotNull(_tableConfig.getFieldConfigList());
-      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
-      _tableConfig.getFieldConfigList()
-          .forEach(fieldConfig -> {
-            JsonNode indexConfig = fieldConfig.getIndexes().get(NullValueIndexType.INDEX_DISPLAY_NAME);
-            assertNotNull(indexConfig);
-            assertFalse(indexConfig.get("disabled").asBoolean());
-          });
+      assertTrue(_tableConfig.getIndexingConfig().isNullHandlingEnabled());
     }
   }
 
