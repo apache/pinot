@@ -120,8 +120,6 @@ public abstract class SetOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isNoOpBlock() || leftBlock.isSuccessfulEndOfStreamBlock()) {
-      if (!leftBlock.getResultMetadata().isEmpty()) {
-      }
       if (leftBlock.isSuccessfulEndOfStreamBlock()) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
