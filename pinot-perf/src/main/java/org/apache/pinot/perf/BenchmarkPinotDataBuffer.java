@@ -19,6 +19,7 @@
 package org.apache.pinot.perf;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +43,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
+import org.openjdk.jmh.profile.LinuxPerfAsmProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -60,7 +62,8 @@ public class BenchmarkPinotDataBuffer {
   private static final Random RANDOM = new Random();
   private static final int BUFFER_SIZE = 1_000_000;
 
-  @Param({"1", "32", "1024"})
+  //@Param({"1", "32", "1024"})
+  @Param({"1024"})
   private int _valueLength;
   @Param({"bytebuffer", "larray", "unsafe"})
   private String _bufferLibrary;
@@ -128,20 +131,18 @@ public class BenchmarkPinotDataBuffer {
   @Benchmark
   public void batchRead(Blackhole bh) {
     long index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
-    byte[] buffer = new byte[_valueLength];
-    _buffer.copyTo(index, buffer);
+    _buffer.copyTo(index, _bytes);
 
-    bh.consume(buffer);
+    bh.consume(_bytes);
   }
 
   @Benchmark
   public void nonBatchRead(Blackhole bh) {
     int index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
-    byte[] buffer = new byte[_valueLength];
     for (int j = 0; j < _valueLength; j++) {
-      buffer[j] = _buffer.getByte(j + index);
+      _bytes[j] = _buffer.getByte(j + index);
     }
-    bh.consume(buffer);
+    bh.consume(_bytes);
   }
 
   @Benchmark
@@ -167,10 +168,9 @@ public class BenchmarkPinotDataBuffer {
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkPinotDataBuffer.class.getSimpleName());
-    if (args.length > 0 && args[0].equals("jfr")) {
-      opt = opt.addProfiler(JavaFlightRecorderProfiler.class)
-          .jvmArgsAppend("-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints");
-    }
+    //opt = opt.addProfiler(JavaFlightRecorderProfiler.class)
+    //        .jvmArgsAppend("-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints");
+    //opt.addProfiler(LinuxPerfAsmProfiler.class);
     new Runner(opt.build()).run();
   }
 }
