@@ -28,6 +28,22 @@ public class ByteBufferUtil {
 
   private static final ByteBufferCreator CREATOR;
   private static final List<CreatorSupplier> _SUPPLIERS = Lists.newArrayList(
+      // From Java 21
+      () -> {
+        Class<?> memorySegmentProxyClass = Class.forName("java.lang.foreign.MemorySegment");
+        Constructor<? extends ByteBuffer> dbbCC =
+            (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
+                .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class, memorySegmentProxyClass);
+        return (addr, size, att) -> {
+          dbbCC.setAccessible(true);
+          try {
+            return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size), att, null);
+          } catch (Exception e) {
+            throw new IllegalStateException("Failed to create DirectByteBuffer", e);
+          }
+        };
+      },
+      // From Java 17 to 20
       () -> {
         Constructor<? extends ByteBuffer> dbbCC =
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
@@ -41,6 +57,7 @@ public class ByteBufferUtil {
           }
         };
       },
+      // Java < 17
       () -> {
         Constructor<? extends ByteBuffer> dbbCC =
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
