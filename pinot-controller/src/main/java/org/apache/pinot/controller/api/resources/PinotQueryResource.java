@@ -265,7 +265,8 @@ public class PinotQueryResource {
   // given a list of tables, returns the list of tableConfigs
   private List<TableConfig> getListTableConfigs(List<String> tableNames) {
     List<TableConfig> allTableConfigList = new ArrayList<>();
-    for (String tableName: tableNames) {
+    for (String inputTableName: tableNames) {
+      String tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
       List<TableConfig> tableConfigList = new ArrayList<>();
       if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(tableName)));
