@@ -281,6 +281,12 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
     assertEquals(aggregationFunction.getResultColumnName(), "percentilerawtdigest(column, 99.9999)");
 
+    function = getFunction("PeRcEntiLEkll", "(column, 99.9999)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileKLLAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEKLL);
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilekll(column, 99.9999)");
+
     function = getFunction("PeRcEnTiLeRaWtDiGeSt", "(column, 99.9999, 500)");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
