@@ -61,6 +61,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ZK_STR = "controller.zk.str";
   // boolean: Update the statemodel on boot?
   public static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model";
+  public static final String MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = "controller.min_is_size_for_compression";
   public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   public static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   public static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
@@ -292,6 +293,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_LINEAGE_MANAGER =
       "org.apache.pinot.controller.helix.core.lineage.DefaultLineageManager";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
+  private static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
@@ -390,6 +392,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setUpdateSegmentStateModel(String updateStateModel) {
     setProperty(UPDATE_SEGMENT_STATE_MODEL, updateStateModel);
+  }
+
+  public void setMinISSizeForCompression(int minSize) {
+    setProperty(MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION, minSize);
   }
 
   public void setZkStr(String zkStr) {
@@ -857,6 +863,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getSegmentUploadTimeoutInMillis() {
     return getProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS);
+  }
+
+  public int getMinNumCharsInISToTurnOnCompression() {
+    return getProperty(MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION, DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION);
   }
 
   public void setSegmentUploadTimeoutInMillis(long segmentUploadTimeoutInMillis) {
