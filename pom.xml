@@ -160,7 +160,14 @@
     <audienceannotations.version>0.13.0</audienceannotations.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g</argLine>
+    <argLine>
+      -Xms4g -Xmx4g
+      --add-opens=java.base/java.nio=ALL-UNNAMED
+      --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+      --add-opens=java.base/java.lang=ALL-UNNAMED
+      --add-opens=java.base/java.util=ALL-UNNAMED
+      --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
+    </argLine>
 
     <!-- handle kafka imports
     kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
@@ -1355,13 +1362,6 @@
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
-            <argLine>
-              --add-opens=java.base/java.nio=ALL-UNNAMED
-              --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
-              --add-opens=java.base/java.lang=ALL-UNNAMED
-              --add-opens=java.base/java.util=ALL-UNNAMED
-              --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
-            </argLine>
           </configuration>
         </plugin>
         <plugin>
