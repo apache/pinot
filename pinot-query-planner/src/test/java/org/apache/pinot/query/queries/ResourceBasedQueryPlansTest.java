@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -51,9 +51,10 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
       Assert.assertEquals(explainedPlan, output,
           String.format("Test case %s for query %s doesn't match expected output: %s", testCaseName, query, output));
       String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR ", "");
-      QueryPlan queryPlan = _queryEnvironment.planQuery(queryWithoutExplainPlan);
-      Assert.assertNotNull(queryPlan, String.format("Test case %s for query %s should not have a null QueryPlan",
-          testCaseName, queryWithoutExplainPlan));
+      DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(queryWithoutExplainPlan);
+      Assert.assertNotNull(dispatchableSubPlan,
+          String.format("Test case %s for query %s should not have a null QueryPlan",
+              testCaseName, queryWithoutExplainPlan));
     } catch (Exception e) {
       Assert.fail("Test case: " + testCaseName + " failed to explain query: " + query, e);
     }
@@ -109,27 +110,27 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
   private static Object[][] testResourceQueryPlannerTestCaseProviderExceptions()
       throws Exception {
     Map<String, QueryPlanTestCase> testCaseMap = getTestCases();
-      List<Object[]> providerContent = new ArrayList<>();
-        for (Map.Entry<String, QueryPlanTestCase> testCaseEntry : testCaseMap.entrySet()) {
-        String testCaseName = testCaseEntry.getKey();
-        if (testCaseEntry.getValue()._ignored) {
+    List<Object[]> providerContent = new ArrayList<>();
+    for (Map.Entry<String, QueryPlanTestCase> testCaseEntry : testCaseMap.entrySet()) {
+      String testCaseName = testCaseEntry.getKey();
+      if (testCaseEntry.getValue()._ignored) {
+        continue;
+      }
+
+      List<QueryPlanTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryPlanTestCase.Query queryCase : queryCases) {
+        if (queryCase._ignored) {
           continue;
         }
 
-        List<QueryPlanTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
-        for (QueryPlanTestCase.Query queryCase : queryCases) {
-          if (queryCase._ignored) {
-            continue;
-          }
-
-          if (queryCase._expectedException != null) {
-            String sql = queryCase._sql;
-            String exceptionString = queryCase._expectedException;
-            Object[] testEntry = new Object[]{testCaseName, sql, exceptionString};
-            providerContent.add(testEntry);
-          }
+        if (queryCase._expectedException != null) {
+          String sql = queryCase._sql;
+          String exceptionString = queryCase._expectedException;
+          Object[] testEntry = new Object[]{testCaseName, sql, exceptionString};
+          providerContent.add(testEntry);
         }
       }
+    }
     return providerContent.toArray(new Object[][]{});
   }
 
@@ -161,7 +162,8 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
       // This test only supports local resource loading (e.g. must be a file), not support JAR test loading.
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
         Map<String, QueryPlanTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
-            new TypeReference<Map<String, QueryPlanTestCase>>() { });
+            new TypeReference<Map<String, QueryPlanTestCase>>() {
+            });
         {
           HashSet<String> hashSet = new HashSet<>(testCaseMap.keySet());
           hashSet.retainAll(testCases.keySet());

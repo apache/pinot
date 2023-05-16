@@ -36,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
@@ -606,6 +607,10 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Trigger the metadata event notifier
     _metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
+
+    if (StringUtils.isBlank(committingSegmentDescriptor.getSegmentLocation())) {
+      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.SEGMENT_MISSING_DEEP_STORE_LINK, 1);
+    }
   }
 
   /**

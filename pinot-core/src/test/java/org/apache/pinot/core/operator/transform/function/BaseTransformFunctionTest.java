@@ -80,6 +80,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
   protected static final String BIG_DECIMAL_SV_COLUMN = "bigDecimalSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String STRING_SV_NULL_COLUMN = "stringSVNull";
+
   protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
 
@@ -173,6 +175,11 @@ public abstract class BaseTransformFunctionTest {
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
       map.put(BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
+      if (i % 2 == 0) {
+        map.put(STRING_SV_NULL_COLUMN, _stringSVValues[i]);
+      } else {
+        map.put(STRING_SV_NULL_COLUMN, null);
+      }
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       if (i % 2 == 0) {
         map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
@@ -208,6 +215,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addMetric(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_SV_NULL_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_NULL_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
@@ -318,6 +326,36 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValues[i], Long.toString(expectedValues[i]));
     }
     testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, long[] expectedValues,
+      RoaringBitmap expectedNull) {
+    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
+    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
+    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues =
+        transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
+    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
+    assertEquals(intValues.getRight(), expectedNull);
+    assertEquals(longValues.getRight(), expectedNull);
+    assertEquals(floatValues.getRight(), expectedNull);
+    assertEquals(doubleValues.getRight(), expectedNull);
+    assertEquals(bigDecimalValues.getRight(), expectedNull);
+    assertEquals(stringValues.getRight(), expectedNull);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (expectedNull.contains(i)) {
+        continue;
+      }
+      // only compare the rows that are not null.
+      assertEquals(intValues.getLeft()[i], (int) expectedValues[i]);
+      assertEquals(longValues.getLeft()[i], expectedValues[i]);
+      assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
+      assertEquals(doubleValues.getLeft()[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues.getLeft()[i].longValue(), expectedValues[i]);
+      assertEquals(stringValues.getLeft()[i], Long.toString(expectedValues[i]));
+    }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, float[] expectedValues) {

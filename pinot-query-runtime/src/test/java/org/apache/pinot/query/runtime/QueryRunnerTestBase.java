@@ -47,8 +47,8 @@ import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -94,7 +94,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId).getQueryPlan();
+    QueryEnvironment.QueryPlannerResult queryPlannerResult =
+        _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+    DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
@@ -107,32 +109,33 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
 
     int reducerStageId = -1;
-    for (int stageId : queryPlan.getDispatchablePlanMetadataMap().keySet()) {
-      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
+      if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
+          .getFragmentRoot() instanceof MailboxReceiveNode) {
         reducerStageId = stageId;
       } else {
-        processDistributedStagePlans(queryPlan, stageId, requestMetadataMap);
+        processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
       }
       if (executionStatsAggregatorMap != null) {
         executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
     Preconditions.checkState(reducerStageId != -1);
-    ResultTable resultTable = QueryDispatcher.runReducer(requestId, queryPlan, reducerStageId,
+    ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
         executionStatsAggregatorMap, true);
     return resultTable.getRows();
   }
 
-  protected void processDistributedStagePlans(QueryPlan queryPlan, int stageId,
+  protected void processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan, int stageId,
       Map<String, String> requestMetadataMap) {
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
-        queryPlan.getDispatchablePlanMetadataMap().get(stageId).getServerInstanceToWorkerIdMap();
+        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
       QueryServerInstance server = entry.getKey();
       for (int workerId : entry.getValue()) {
         DistributedStagePlan distributedStagePlan = QueryDispatcher.constructDistributedStagePlan(
-            queryPlan, stageId, new VirtualServerAddress(server, workerId));
+            dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
         _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
       }
     }
@@ -234,31 +237,60 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return ((Timestamp) l).compareTo((Timestamp) r);
       } else if (l instanceof int[]) {
         int[] larray = (int[]) l;
-        Object[] rarray;
         try {
-          rarray = (Object[]) ((JdbcArray) r).getArray();
+          if (r instanceof JdbcArray) {
+            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+            for (int idx = 0; idx < larray.length; idx++) {
+              Number relement = (Number) rarray[idx];
+              if (larray[idx] != relement.intValue()) {
+                return -1;
+              }
+            }
+          } else {
+            int[] rarray = (int[]) r;
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (larray[idx] != rarray[idx]) {
+                return -1;
+              }
+            }
+          }
         } catch (SQLException e) {
           throw new RuntimeException(e);
-        }
-        for (int idx = 0; idx < larray.length; idx++) {
-          Number relement = (Number) rarray[idx];
-          if (larray[idx] != relement.intValue()) {
-            return -1;
-          }
         }
         return 0;
       } else if (l instanceof String[]) {
         String[] larray = (String[]) l;
-        Object[] rarray;
         try {
-          rarray = (Object[]) ((JdbcArray) r).getArray();
+          if (r instanceof JdbcArray) {
+            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (!larray[idx].equals(rarray[idx])) {
+                return -1;
+              }
+            }
+          } else {
+            String[] rarray = (String[]) r;
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (!larray[idx].equals(rarray[idx])) {
+                return -1;
+              }
+            }
+          }
         } catch (SQLException e) {
           throw new RuntimeException(e);
         }
-        for (int idx = 0; idx < larray.length; idx++) {
-          if (!larray[idx].equals(rarray[idx])) {
-            return -1;
+        return 0;
+      } else if (l instanceof JdbcArray) {
+        try {
+          Object[] larray = (Object[]) ((JdbcArray) l).getArray();
+          Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+          for (int idx = 0; idx < larray.length; idx++) {
+            if (!larray[idx].equals(rarray[idx])) {
+              return -1;
+            }
           }
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
         }
         return 0;
       } else {

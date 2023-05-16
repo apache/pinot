@@ -27,6 +27,7 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,13 +46,13 @@ public class ReceivingMailbox {
       TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by receiver"));
 
   private final String _id;
-  private final Consumer<String> _receiveMailCallback;
+  private final Consumer<OpChainId> _receiveMailCallback;
   // TODO: Make the queue size configurable
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
   private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
 
-  public ReceivingMailbox(String id, Consumer<String> receiveMailCallback) {
+  public ReceivingMailbox(String id, Consumer<OpChainId> receiveMailCallback) {
     _id = id;
     _receiveMailCallback = receiveMailCallback;
   }
@@ -78,7 +79,7 @@ public class ReceivingMailbox {
     try {
       if (_blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS)) {
         if (_errorBlock.get() == null) {
-          _receiveMailCallback.accept(_id);
+          _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
           return true;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
@@ -104,7 +105,7 @@ public class ReceivingMailbox {
   public void setErrorBlock(TransferableBlock errorBlock) {
     if (_errorBlock.compareAndSet(null, errorBlock)) {
       _blocks.clear();
-      _receiveMailCallback.accept(_id);
+      _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
     }
   }
 

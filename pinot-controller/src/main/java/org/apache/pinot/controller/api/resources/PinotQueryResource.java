@@ -52,6 +52,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -107,6 +108,9 @@ public class PinotQueryResource {
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
+    } catch (ProcessingException pe) {
+      LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
+      return pe.getMessage();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -120,6 +124,9 @@ public class PinotQueryResource {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
+    } catch (ProcessingException pe) {
+      LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
+      return pe.getMessage();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -129,7 +136,13 @@ public class PinotQueryResource {
   private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
       @Nullable String queryOptions, String endpointUrl)
       throws Exception {
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    SqlNodeAndOptions sqlNodeAndOptions;
+    try {
+      sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    } catch (Exception ex) {
+      String errorMessage = String.format("Unable to parse the SQL: '%s'", sqlQuery);
+      throw QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(errorMessage));
+    }
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
       Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
@@ -181,8 +194,8 @@ public class PinotQueryResource {
 
     List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
     if (tableConfigList == null || tableConfigList.size() == 0) {
-      return QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, new Exception(
-          "Unable to find table in cluster")).toString();
+      return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR, new Exception(
+          "Unable to find table in cluster, table does not exist")).toString();
     }
 
     // When routing a query, there should be at least one common broker tenant for the table. However, the server

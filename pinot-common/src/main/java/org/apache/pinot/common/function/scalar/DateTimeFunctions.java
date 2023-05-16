@@ -557,7 +557,8 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static long dateTrunc(String unit, long timeValue) {
-    return dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS, ISOChronology.getInstanceUTC(), TimeUnit.MILLISECONDS);
+    return dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS.name(), ISOChronology.getInstanceUTC(),
+        TimeUnit.MILLISECONDS.name());
   }
 
   /**
@@ -565,12 +566,11 @@ public class DateTimeFunctions {
    *
    * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
    * @param timeValue value to truncate
-   * @param inputTimeUnitStr TimeUnit of value, expressed in Java's joda TimeUnit
+   * @param inputTimeUnit TimeUnit of value, expressed in Java's joda TimeUnit
    * @return truncated timeValue in same TimeUnit as the input
    */
   @ScalarFunction
-  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr) {
-    TimeUnit inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
+  public static long dateTrunc(String unit, long timeValue, String inputTimeUnit) {
     return dateTrunc(unit, timeValue, inputTimeUnit, ISOChronology.getInstanceUTC(), inputTimeUnit);
   }
 
@@ -579,13 +579,12 @@ public class DateTimeFunctions {
    *
    * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
    * @param timeValue value to truncate
-   * @param inputTimeUnitStr TimeUnit of value, expressed in Java's joda TimeUnit
+   * @param inputTimeUnit TimeUnit of value, expressed in Java's joda TimeUnit
    * @param timeZone timezone of the input
    * @return truncated timeValue in same TimeUnit as the input
    */
   @ScalarFunction
-  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr, String timeZone) {
-    TimeUnit inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
+  public static long dateTrunc(String unit, long timeValue, String inputTimeUnit, String timeZone) {
     return dateTrunc(unit, timeValue, inputTimeUnit, DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(timeZone)),
         inputTimeUnit);
   }
@@ -595,23 +594,24 @@ public class DateTimeFunctions {
    *
    * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
    * @param timeValue value to truncate
-   * @param inputTimeUnitStr TimeUnit of value, expressed in Java's joda TimeUnit
+   * @param inputTimeUnit TimeUnit of value, expressed in Java's joda TimeUnit
    * @param timeZone timezone of the input
-   * @param outputTimeUnitStr TimeUnit to convert the output to
+   * @param outputTimeUnit TimeUnit to convert the output to
    * @return truncated timeValue
    *
    */
   @ScalarFunction
-  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr, String timeZone,
-      String outputTimeUnitStr) {
-    return dateTrunc(unit, timeValue, TimeUnit.valueOf(inputTimeUnitStr),
-        DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(timeZone)), TimeUnit.valueOf(outputTimeUnitStr));
+  public static long dateTrunc(String unit, long timeValue, String inputTimeUnit, String timeZone,
+      String outputTimeUnit) {
+    return dateTrunc(unit, timeValue, inputTimeUnit,
+        DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(timeZone)), outputTimeUnit);
   }
 
-  private static long dateTrunc(String unit, long timeValue, TimeUnit inputTimeUnit, ISOChronology chronology,
-      TimeUnit outputTimeUnit) {
-    return outputTimeUnit.convert(DateTimeUtils.getTimestampField(chronology, unit)
-        .roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, inputTimeUnit)), TimeUnit.MILLISECONDS);
+  private static long dateTrunc(String unit, long timeValue, String inputTimeUnit, ISOChronology chronology,
+      String outputTimeUnit) {
+    return TimeUnit.valueOf(outputTimeUnit.toUpperCase()).convert(DateTimeUtils.getTimestampField(chronology, unit)
+            .roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(inputTimeUnit.toUpperCase()))),
+        TimeUnit.MILLISECONDS);
   }
 
   /**

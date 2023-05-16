@@ -30,8 +30,8 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -64,6 +64,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       new Object[]{"charlie", "bar", 1},
   };
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
+
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -153,11 +154,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-
   /**
    * Test compares with expected row count only.
    */
-   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
+  @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
       throws Exception {
     List<Object[]> resultRows = queryRunner(sql, null);
@@ -185,23 +185,24 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId),
             QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
             String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
     int reducerStageId = -1;
-    for (int stageId : queryPlan.getDispatchablePlanMetadataMap().keySet()) {
-      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
+      if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
+          .getFragmentRoot() instanceof MailboxReceiveNode) {
         reducerStageId = stageId;
       } else {
-        processDistributedStagePlans(queryPlan, stageId, requestMetadataMap);
+        processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
       }
     }
     Preconditions.checkState(reducerStageId != -1);
 
     try {
-      QueryDispatcher.runReducer(requestId, queryPlan, reducerStageId,
+      QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
           Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService, null,
           false);
     } catch (RuntimeException rte) {
@@ -213,7 +214,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
-    return new Object[][] {
+    return new Object[][]{
         // using join clause
         new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},
 
@@ -225,8 +226,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10},
         new Object[]{"SELECT dateTrunc('DAY', CAST(col3 AS BIGINT)) FROM a LIMIT 10", 10},
         //   - on intermediate stage
-        new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
-            + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+        new Object[]{
+            "SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
+                + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15
+        },
         new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
 
         // ScalarFunction
@@ -250,14 +253,18 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
-    return new Object[][] {
+    return new Object[][]{
         // Timeout exception should occur with this option:
-        new Object[]{"SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-            "timeout"},
+        new Object[]{
+            "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
+            "timeout"
+        },
 
         // Function with incorrect argument signature should throw runtime exception when casting string to numeric
-        new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
-            "For input string:"},
+        new Object[]{
+            "SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
+            "For input string:"
+        },
 
         // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
         //   - predicate only functions:

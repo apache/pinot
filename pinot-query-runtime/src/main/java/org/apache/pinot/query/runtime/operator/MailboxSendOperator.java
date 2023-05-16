@@ -33,8 +33,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -89,40 +89,28 @@ public class MailboxSendOperator extends MultiStageOperator {
         exchangeType);
     MailboxService mailboxService = context.getMailboxService();
     long requestId = context.getRequestId();
-    int senderStageId = context.getStageId();
-    int senderWorkerId = context.getServer().workerId();
     long deadlineMs = context.getDeadlineMs();
-    List<WorkerMetadata> receivingMetadataList = context.getStageMetadataList().get(receiverStageId)
-        .getWorkerMetadataList();
-    List<SendingMailbox> sendingMailboxes;
+
+    int workerId = context.getServer().workerId();
+    MailboxMetadata receiverMailboxMetadatas =
+        context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(receiverStageId);
     if (exchangeType == RelDistribution.Type.SINGLETON) {
-      // TODO: this logic should be moved into SingletonExchange
-      VirtualServerAddress singletonReceiver = null;
-      for (WorkerMetadata receivingMetadata : receivingMetadataList) {
-        VirtualServerAddress receiver = receivingMetadata.getVirtualServerAddress();
-        if (receiver.hostname().equals(mailboxService.getHostname())
-            && receiver.port() == mailboxService.getPort()) {
-          Preconditions.checkState(singletonReceiver == null, "Multiple instances found for SINGLETON exchange type");
-          singletonReceiver = receiver;
-        }
-      }
-      Preconditions.checkState(singletonReceiver != null, "Failed to find instance for SINGLETON exchange type");
-      String mailboxId = MailboxIdUtils.toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId,
-          singletonReceiver.workerId());
-      sendingMailboxes = Collections.singletonList(
-          mailboxService.getSendingMailbox(singletonReceiver.hostname(), singletonReceiver.port(), mailboxId,
-              deadlineMs));
-    } else {
-      sendingMailboxes = new ArrayList<>(receivingMetadataList.size());
-      for (WorkerMetadata receivingMetadata : receivingMetadataList) {
-        VirtualServerAddress receiver = receivingMetadata.getVirtualServerAddress();
-        String mailboxId =
-            MailboxIdUtils.toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiver.workerId());
-        sendingMailboxes.add(
-            mailboxService.getSendingMailbox(receiver.hostname(), receiver.port(), mailboxId, deadlineMs));
-      }
+      Preconditions.checkState(receiverMailboxMetadatas.getMailBoxIdList().size() == 1,
+          "Multiple instances found for SINGLETON exchange type");
+      VirtualServerAddress virtualServerAddress = receiverMailboxMetadatas.getVirtualAddress(0);
+      Preconditions.checkState(virtualServerAddress.hostname().equals(mailboxService.getHostname()),
+          "SINGLETON exchange hostname should be the same as mailbox service hostname");
+      Preconditions.checkState(virtualServerAddress.port() == mailboxService.getPort(),
+          "SINGLETON exchange port should be the same as mailbox service port");
     }
-    return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector, TransferableBlockUtils::splitBlock);
+    List<String> sendingMailboxIds = MailboxIdUtils.toMailboxIds(requestId, receiverMailboxMetadatas);
+    List<SendingMailbox> sendingMailboxes = new ArrayList<>(sendingMailboxIds.size());
+    for (int i = 0; i < receiverMailboxMetadatas.getMailBoxIdList().size(); i++) {
+      sendingMailboxes.add(mailboxService.getSendingMailbox(receiverMailboxMetadatas.getVirtualAddress(i).hostname(),
+          receiverMailboxMetadatas.getVirtualAddress(i).port(), sendingMailboxIds.get(i), deadlineMs));
+    }
+    return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector,
+        TransferableBlockUtils::splitBlock);
   }
 
   @Override
@@ -141,21 +129,21 @@ public class MailboxSendOperator extends MultiStageOperator {
     TransferableBlock transferableBlock;
     try {
       transferableBlock = _sourceOperator.nextBlock();
-      while (!transferableBlock.isNoOpBlock()) {
-        if (transferableBlock.isEndOfStreamBlock()) {
-          if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
-            //Stats need to be populated here because the block is being sent to the mailbox
-            // and the receiving opChain will not be able to access the stats from the previous opChain
-            TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
-                OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-            _exchange.send(eosBlockWithStats);
-          } else {
-            _exchange.send(transferableBlock);
-          }
-          return transferableBlock;
+      if (transferableBlock.isNoOpBlock()) {
+        return transferableBlock;
+      } else if (transferableBlock.isEndOfStreamBlock()) {
+        if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
+          // Stats need to be populated here because the block is being sent to the mailbox
+          // and the receiving opChain will not be able to access the stats from the previous opChain
+          TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
+              OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+          _exchange.send(eosBlockWithStats);
+        } else {
+          _exchange.send(transferableBlock);
         }
+      } else { // normal blocks
+        // check whether we should continue depending on exchange queue condition.
         _exchange.send(transferableBlock);
-        transferableBlock = _sourceOperator.nextBlock();
       }
     } catch (Exception e) {
       transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);

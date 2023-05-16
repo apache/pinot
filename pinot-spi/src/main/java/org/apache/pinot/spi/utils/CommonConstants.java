@@ -303,6 +303,8 @@ public class CommonConstants {
         "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
+    public static final String CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES
+        = "pinot.broker.result.rewriter.class.names";
 
     public static class Request {
       public static final String SQL = "sql";
@@ -818,6 +820,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_GC_WAIT_TIME_MS = "accounting.gc.wait.time.ms";
     public static final int DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS = 0;
+
+    public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
+    public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
   }
 
   public static class ExecutorService {
@@ -971,5 +976,12 @@ public class CommonConstants {
 
   public static class IdealState {
     public static final String HYBRID_TABLE_TIME_BOUNDARY = "HYBRID_TABLE_TIME_BOUNDARY";
+  }
+
+  public static class RewriterConstants {
+    public static final String PARENT_AGGREGATION_NAME_PREFIX = "parent";
+    public static final String CHILD_AGGREGATION_NAME_PREFIX = "child";
+    public static final String CHILD_AGGREGATION_SEPERATOR = "@";
+    public static final String CHILD_KEY_SEPERATOR = "_";
   }
 }

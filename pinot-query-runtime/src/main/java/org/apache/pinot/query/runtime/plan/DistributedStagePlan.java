@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.ArrayList;
-import java.util.List;
-import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -35,20 +33,19 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 public class DistributedStagePlan {
   private int _stageId;
   private VirtualServerAddress _server;
-  private StageNode _stageRoot;
-  private List<StageMetadata> _stageMetadataList;
+  private PlanNode _stageRoot;
+  private StageMetadata _stageMetadata;
 
   public DistributedStagePlan(int stageId) {
     _stageId = stageId;
-    _stageMetadataList = new ArrayList<>();
   }
 
-  public DistributedStagePlan(int stageId, VirtualServerAddress server, StageNode stageRoot,
-      List<StageMetadata> stageMetadataList) {
+  public DistributedStagePlan(int stageId, VirtualServerAddress server, PlanNode stageRoot,
+      StageMetadata stageMetadata) {
     _stageId = stageId;
     _server = server;
     _stageRoot = stageRoot;
-    _stageMetadataList = stageMetadataList;
+    _stageMetadata = stageMetadata;
   }
 
   public int getStageId() {
@@ -59,27 +56,27 @@ public class DistributedStagePlan {
     return _server;
   }
 
-  public StageNode getStageRoot() {
+  public PlanNode getStageRoot() {
     return _stageRoot;
   }
 
-  public List<StageMetadata> getStageMetadataList() {
-    return _stageMetadataList;
+  public StageMetadata getStageMetadata() {
+    return _stageMetadata;
   }
 
   public void setServer(VirtualServerAddress serverAddress) {
     _server = serverAddress;
   }
 
-  public void setStageRoot(StageNode stageRoot) {
+  public void setStageRoot(PlanNode stageRoot) {
     _stageRoot = stageRoot;
   }
 
-  public StageMetadata getCurrentStageMetadata() {
-    return _stageMetadataList.get(_stageId);
+  public void setStageMetadata(StageMetadata stageMetadata) {
+    _stageMetadata = stageMetadata;
   }
 
   public WorkerMetadata getCurrentWorkerMetadata() {
-    return getCurrentStageMetadata().getWorkerMetadataList().get(_server.workerId());
+    return _stageMetadata.getWorkerMetadataList().get(_server.workerId());
   }
 }

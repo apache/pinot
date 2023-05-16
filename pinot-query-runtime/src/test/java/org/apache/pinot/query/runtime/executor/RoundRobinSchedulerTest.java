@@ -88,7 +88,7 @@ public class RoundRobinSchedulerTest {
     // When Op-Chain is done executing, yield is called
     _scheduler.yield(chain);
     // When data is received, callback is called
-    _scheduler.onDataAvailable(MAILBOX_1);
+    _scheduler.onDataAvailable(MailboxIdUtils.toOpChainId(MAILBOX_1));
     // next should return the OpChain immediately after the callback
     Assert.assertEquals(_scheduler.next(DEFAULT_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS), chain);
     // Say the OpChain is done, then a de-register will be called
@@ -160,9 +160,9 @@ public class RoundRobinSchedulerTest {
     _scheduler.yield(chain3);
     _scheduler.yield(chain2);
     // Data may be received in arbitrary order
-    _scheduler.onDataAvailable(MAILBOX_2);
-    _scheduler.onDataAvailable(MAILBOX_3);
-    _scheduler.onDataAvailable(MAILBOX_1);
+    _scheduler.onDataAvailable(MailboxIdUtils.toOpChainId(MAILBOX_2));
+    _scheduler.onDataAvailable(MailboxIdUtils.toOpChainId(MAILBOX_3));
+    _scheduler.onDataAvailable(MailboxIdUtils.toOpChainId(MAILBOX_1));
     // Subsequent polls would be in the order the callback was processed. A callback here is said to be "processed"
     // if it has successfully returned.
     Assert.assertEquals(_scheduler.next(DEFAULT_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS), chain2);

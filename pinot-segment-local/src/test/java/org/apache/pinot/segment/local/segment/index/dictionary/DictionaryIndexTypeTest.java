@@ -224,27 +224,56 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void oldToNewConfConversion()
+    public void oldToNewConfConversionWithOnHeap()
+        throws IOException {
+      _tableConfig.getIndexingConfig()
+          .setOnHeapDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      convertToUpdatedFormat();
+      FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      DictionaryIndexConfig config = JsonUtils.jsonNodeToObject(
+          fieldConfig.getIndexes().get(StandardIndexes.dictionary().getPrettyName()),
+          DictionaryIndexConfig.class);
+      assertNotNull(config);
+      assertTrue(config.isOnHeap());
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithVarLength()
+        throws IOException {
+      _tableConfig.getIndexingConfig()
+          .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      convertToUpdatedFormat();
+      FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      DictionaryIndexConfig config = JsonUtils.jsonNodeToObject(
+          fieldConfig.getIndexes().get(StandardIndexes.dictionary().getPrettyName()),
+          DictionaryIndexConfig.class);
+      assertNotNull(config);
+      assertTrue(config.getUseVarLengthDictionary());
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithNoDictionaryColumns()
         throws IOException {
       _tableConfig.getIndexingConfig().setNoDictionaryColumns(
           JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
       );
-      _tableConfig.getIndexingConfig()
-          .setOnHeapDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      _tableConfig.getIndexingConfig()
-          .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      _tableConfig.getIndexingConfig().setNoDictionaryConfig(
-          JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
-              new TypeReference<Map<String, String>>() {
-              })
-      );
       convertToUpdatedFormat();
+      FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      postConversionAsserts();
+    }
+
+    private FieldConfig getFieldConfigByColumn(String column) {
       assertNotNull(_tableConfig.getFieldConfigList());
       assertFalse(_tableConfig.getFieldConfigList().isEmpty());
-      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
-          .filter(fc -> fc.getName().equals("dimInt"))
+      return _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals(column))
           .collect(Collectors.toList()).get(0);
-      assertNotNull(fieldConfig.getIndexes().get(new DictionaryIndexType().getPrettyName()));
+    }
+
+    private void postConversionAsserts() {
       assertNull(_tableConfig.getIndexingConfig().getNoDictionaryColumns());
       assertNull(_tableConfig.getIndexingConfig().getOnHeapDictionaryColumns());
       assertNull(_tableConfig.getIndexingConfig().getVarLengthDictionaryColumns());

@@ -151,7 +151,13 @@ public class MailboxSendOperatorTest {
     TransferableBlock block = mailboxSendOperator.nextBlock();
 
     // Then:
-    assertSame(block, eosBlock, "expected EOS block to propagate");
+    assertSame(block, dataBlock, "expected data block to propagate first");
+
+    // When:
+    block = mailboxSendOperator.nextBlock();
+
+    // Then:
+    assertSame(block, eosBlock, "expected EOS block to propagate next");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
     verify(_exchange, times(2)).send(captor.capture());
     List<TransferableBlock> blocks = captor.getAllValues();
@@ -170,7 +176,7 @@ public class MailboxSendOperatorTest {
             new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE, Long.MAX_VALUE,
-            Collections.singletonList(stageMetadata), false);
+            stageMetadata, false);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

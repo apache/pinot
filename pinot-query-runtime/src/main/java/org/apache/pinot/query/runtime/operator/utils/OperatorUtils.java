@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -67,10 +67,10 @@ public class OperatorUtils {
     return functionName;
   }
 
-  public static void recordTableName(OperatorStats operatorStats, StageMetadata stageMetadata) {
-    if (StageMetadata.getTableName(stageMetadata) != null) {
-      operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(),
-          StageMetadata.getTableName(stageMetadata));
+  public static void recordTableName(OperatorStats operatorStats, DispatchablePlanFragment dispatchablePlanFragment) {
+    String tableName = dispatchablePlanFragment.getTableName();
+    if (tableName != null) {
+      operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(), tableName);
     }
   }
 

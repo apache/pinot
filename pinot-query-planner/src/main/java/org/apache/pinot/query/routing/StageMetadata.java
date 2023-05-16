@@ -25,7 +25,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 
 
 /**
- * {@code StageMetadata} is used to send stage-level info about how to execute a stage physically.
+ * {@code StageMetadata} is used to send plan fragment-level info about how to execute a stage physically.
  */
 public class StageMetadata {
   private final List<WorkerMetadata> _workerMetadataList;

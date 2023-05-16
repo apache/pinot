@@ -125,4 +125,8 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
       return new NullValueVectorReaderImpl(buffer);
     }
   }
+
+  @Override
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+  }
 }

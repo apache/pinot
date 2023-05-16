@@ -35,7 +35,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
@@ -95,7 +94,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
   private final Supplier<Long> _ticker;
 
   private final Map<OpChainId, OpChain> _aliveChains = new ConcurrentHashMap<>();
-  final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
+  private final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
   private final Map<OpChainId, Long> _available = new ConcurrentHashMap<>();
 
   private final BlockingQueue<OpChain> _ready = new LinkedBlockingQueue<>();
@@ -191,12 +190,11 @@ public class RoundRobinScheduler implements OpChainScheduler {
   }
 
   @Override
-  public void onDataAvailable(String mailboxId) {
-    OpChainId opChainId = MailboxIdUtils.toOpChainId(mailboxId);
+  public void onDataAvailable(OpChainId opChainId) {
     // If this chain isn't alive as per the scheduler, don't do anything. If the OpChain is registered after this, it
     // will anyways be scheduled to run since new OpChains are run immediately.
     if (!_aliveChains.containsKey(opChainId)) {
-      trace("got mail, but the OpChain is not registered so ignoring the event " + mailboxId);
+      trace("woken up but the OpChain is not registered so ignoring the event: " + opChainId);
       return;
     }
     _lock.lock();
@@ -217,7 +215,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
     } finally {
       _lock.unlock();
     }
-    trace("got mail for " + mailboxId);
+    trace("got data for " + opChainId);
   }
 
   @Override

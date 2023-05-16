@@ -38,7 +38,7 @@ public interface UpdatableBrokerCache {
    * @param tableName
    * @return Broker address corresponding to the table
    */
-  String getBroker(String tableName);
+  String getBroker(String... tableName);
 
   /**
    * Returns all the brokers currently in the cache

@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
@@ -29,6 +33,7 @@ public class MailboxIdUtils {
 
   private static final char SEPARATOR = '|';
 
+  @VisibleForTesting
   public static String toMailboxId(long requestId, int senderStageId, int senderWorkerId, int receiverStageId,
       int receiverWorkerId) {
     return Long.toString(requestId) + SEPARATOR + senderStageId + SEPARATOR + senderWorkerId + SEPARATOR
@@ -38,5 +43,11 @@ public class MailboxIdUtils {
   public static OpChainId toOpChainId(String mailboxId) {
     String[] parts = StringUtils.split(mailboxId, SEPARATOR);
     return new OpChainId(Long.parseLong(parts[0]), Integer.parseInt(parts[4]), Integer.parseInt(parts[3]));
+  }
+
+  public static List<String> toMailboxIds(long requestId, MailboxMetadata senderMailBoxMetadatas) {
+    return senderMailBoxMetadatas.getMailBoxIdList().stream()
+        .map(mailboxIdFromBroker -> Long.toString(requestId) + SEPARATOR + mailboxIdFromBroker)
+        .collect(Collectors.toList());
   }
 }

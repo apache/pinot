@@ -26,6 +26,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 
 
 public class ExceptionResultsBlock extends BaseResultsBlock {
@@ -36,6 +37,10 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
 
   public ExceptionResultsBlock(Throwable t) {
     this(QueryException.QUERY_EXECUTION_ERROR, t);
+  }
+
+  public ExceptionResultsBlock(QueryCancelledException t) {
+    this(QueryException.QUERY_CANCELLATION_ERROR, t);
   }
 
   @Override

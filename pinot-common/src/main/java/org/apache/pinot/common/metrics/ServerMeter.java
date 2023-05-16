@@ -74,6 +74,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_UPLOAD_FAILURE("segments", false),
+  SEGMENT_UPLOAD_SUCCESS("segments", false),
+  // Emitted only by Server to Deep-store segment uploader.
+  SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
@@ -101,11 +105,17 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   private final String _meterName;
   private final String _unit;
   private final boolean _global;
+  private final String _description;
 
   ServerMeter(String unit, boolean global) {
+    this(unit, global, "");
+  }
+
+  ServerMeter(String unit, boolean global, String description) {
     _unit = unit;
     _global = global;
     _meterName = Utils.toCamelCase(name().toLowerCase());
+    _description = description;
   }
 
   @Override
@@ -126,5 +136,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  @Override
+  public String getDescription() {
+    return _description;
   }
 }

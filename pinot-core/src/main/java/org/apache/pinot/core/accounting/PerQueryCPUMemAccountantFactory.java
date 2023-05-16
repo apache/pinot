@@ -59,8 +59,8 @@ import org.slf4j.LoggerFactory;
 public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory {
 
   @Override
-  public ThreadResourceUsageAccountant init(PinotConfiguration config) {
-    return new PerQueryCPUMemResourceUsageAccountant(config);
+  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId) {
+    return new PerQueryCPUMemResourceUsageAccountant(config, instanceId);
   }
 
   public static class PerQueryCPUMemResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
@@ -125,10 +125,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     // the periodical task that aggregates and preempts queries
     private final WatcherTask _watcherTask;
 
-    public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config) {
+    // instance id of the current instance, for logging purpose
+    private final String _instanceId;
+
+    public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId) {
 
       LOGGER.info("Initializing PerQueryCPUMemResourceUsageAccountant");
       _config = config;
+      _instanceId = instanceId;
 
       boolean threadCpuTimeMeasurementEnabled = ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled();
       boolean threadMemoryMeasurementEnabled = ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled();
@@ -540,6 +544,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS,
               CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS) * 1000_000L;
 
+      //
+      private final boolean _isQueryKilledMetricEnabled =
+          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
+              CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
+
       private final InstanceType _instanceType =
           InstanceType.valueOf(_config.getProperty(CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE,
           CommonConstants.Accounting.DEFAULT_CONFIG_OF_INSTANCE_TYPE.toString()));
@@ -730,7 +739,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               killedCount += 1;
             }
           }
-          _metrics.addMeteredGlobalValue(_queryKilledMeter, killedCount);
+          if (_isQueryKilledMetricEnabled) {
+            _metrics.addMeteredGlobalValue(_queryKilledMeter, killedCount);
+          }
           try {
             Thread.sleep(_normalSleepTime);
           } catch (InterruptedException ignored) {
@@ -778,8 +789,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           if (shouldKill) {
             maxUsageTuple._exceptionAtomicReference
                 .set(new RuntimeException(String.format(
-                    " Query %s got killed because using %d bytes of memory on %s, exceeding the quota",
-                    maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType)));
+                    " Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
+                    maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
             interruptRunnerThread(maxUsageTuple.getAnchorThread());
             LOGGER.error("Query {} got picked because using {} bytes of memory, actual kill committed true}",
                 maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
@@ -797,8 +808,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           if (_oomKillQueryEnabled) {
             maxUsageTuple._exceptionAtomicReference
                 .set(new RuntimeException(String.format(
-                    " Query %s got killed because memory pressure, using %d ns of CPU time on %s",
-                    maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType)));
+                    " Query %s got killed because memory pressure, using %d ns of CPU time on %s: %s",
+                    maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
             interruptRunnerThread(maxUsageTuple.getAnchorThread());
             LOGGER.error("Query {} got picked because using {} ns of cpu time, actual kill committed true",
                 maxUsageTuple._allocatedBytes, maxUsageTuple._queryId);
@@ -819,8 +830,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             LOGGER.error("Query {} got picked because using {} ns of cpu time, greater than threshold {}",
                 value._queryId, value.getCpuNS(), _cpuTimeBasedKillingThresholdNS);
             value._exceptionAtomicReference.set(new RuntimeException(
-                String.format("Query %s got killed on %s because using %d CPU time exceeding limit of %d ns CPU time",
-                    value._queryId, _instanceType, value.getCpuNS(), _cpuTimeBasedKillingThresholdNS)));
+                String.format("Query %s got killed on %s: %s because using %d "
+                        + "CPU time exceeding limit of %d ns CPU time",
+                    value._queryId, _instanceType, _instanceId, value.getCpuNS(), _cpuTimeBasedKillingThresholdNS)));
             interruptRunnerThread(value.getAnchorThread());
           }
         }
@@ -829,7 +841,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       private void interruptRunnerThread(Thread thread) {
         thread.interrupt();
-        _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
+        if (_isQueryKilledMetricEnabled) {
+          _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
+        }
         _numQueriesKilledConsecutively += 1;
       }
     }
