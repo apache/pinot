@@ -19,7 +19,6 @@
 package org.apache.pinot.perf;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -42,8 +41,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
-import org.openjdk.jmh.profile.LinuxPerfAsmProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -62,10 +59,9 @@ public class BenchmarkPinotDataBuffer {
   private static final Random RANDOM = new Random();
   private static final int BUFFER_SIZE = 1_000_000;
 
-  //@Param({"1", "32", "1024"})
-  @Param({"1024"})
+  @Param({"1", "32", "1024"})
   private int _valueLength;
-  @Param({"bytebuffer", "larray", "unsafe"})
+  @Param({"bytebuffer", "larray", "unsafe", "wrapper+unsafe"})
   private String _bufferLibrary;
   private byte[] _bytes;
   private PinotDataBuffer _buffer;
