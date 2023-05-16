@@ -119,7 +119,8 @@ public class BenchmarkPinotDataBuffer {
   @Benchmark
   public void allocate(Blackhole bh)
       throws IOException {
-    try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(_valueLength, ByteOrder.nativeOrder(), null)) {
+    ByteOrder byteOrder = ByteOrder.nativeOrder();
+    try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(_valueLength, byteOrder, null)) {
       bh.consume(pinotDataBuffer);
     }
   }
