@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -49,8 +48,6 @@ public abstract class SetOperator extends MultiStageOperator {
   private final MultiStageOperator _rightChildOperator;
 
   private final DataSchema _dataSchema;
-  private TransferableBlock _currentLeftBlock;
-  private Iterator<Object[]> _currentLeftIterator;
 
   private boolean _isRightSetBuilt;
   private TransferableBlock _upstreamErrorBlock;
@@ -115,7 +112,7 @@ public abstract class SetOperator extends MultiStageOperator {
 
   protected TransferableBlock constructResultBlockSet(TransferableBlock leftBlock) {
     List<Object[]> rows = new ArrayList<>();
-    if (leftBlock.isErrorBlock()) {
+    if (_upstreamErrorBlock != null || leftBlock.isErrorBlock()) {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
     }
