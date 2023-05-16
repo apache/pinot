@@ -29,7 +29,6 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
-import org.apache.pinot.query.runtime.operator.exchange.ExchangeService;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -61,8 +60,6 @@ public class MailboxSendOperatorTest {
   private MultiStageOperator _sourceOperator;
   @Mock
   private MailboxService _mailboxService;
-  @Mock
-  private ExchangeService _exchangeService;
   @Mock
   private BlockExchange _exchange;
 
@@ -186,8 +183,8 @@ public class MailboxSendOperatorTest {
         .setWorkerMetadataList(Collections.singletonList(
             new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, _exchangeService, null, 0, SENDER_STAGE_ID, _server,
-            Long.MAX_VALUE, Long.MAX_VALUE, stageMetadata, false);
+        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE, Long.MAX_VALUE,
+            stageMetadata, false);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

@@ -82,7 +82,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
     _isSortOnSender = isSortOnSender;
-    _context.getExchangeService().submitExchangeRequest(context.getId(), exchange);
+    _context.getMailboxService().submitExchangeRequest(context.getId(), exchange);
   }
 
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type exchangeType,

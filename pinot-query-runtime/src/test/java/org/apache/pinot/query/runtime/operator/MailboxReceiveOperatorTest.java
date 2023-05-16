@@ -124,21 +124,27 @@ public class MailboxReceiveOperatorTest {
         .setWorkerMetadataList(Stream.of(server1, server2).map(
             s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build()).collect(Collectors.toList()))
         .build();
-    OpChainExecutionContext context = getContext(stageMetadata);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            stageMetadata, false);
     //noinspection resource
     new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only one mailbox is.*")
   public void shouldThrowReceiveSingletonFromMultiMatchMailboxServer() {
-    OpChainExecutionContext context = getContext(_stageMetadataBoth);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataBoth, false);
     //noinspection resource
     new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
   public void shouldThrowRangeDistributionNotSupported() {
-    OpChainExecutionContext context = getContext(null);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            null, false);
     //noinspection resource
     new MailboxReceiveOperator(context, RelDistribution.Type.RANGE_DISTRIBUTED, 1);
   }
@@ -150,8 +156,8 @@ public class MailboxReceiveOperatorTest {
 
     // Short timeoutMs should result in timeout
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, null, null, 0, 0, RECEIVER_ADDRESS, 10L,
-            System.currentTimeMillis() + 10L, _stageMetadata1, false);
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10L, System.currentTimeMillis() + 10L,
+            _stageMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       Thread.sleep(100L);
       TransferableBlock mailbox = receiveOp.nextBlock();
@@ -161,7 +167,7 @@ public class MailboxReceiveOperatorTest {
     }
 
     // Longer timeout or default timeout (10s) doesn't result in timeout
-    context = new OpChainExecutionContext(_mailboxService, null, null, 0, 0, RECEIVER_ADDRESS, 10_000L,
+    context = new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, 10_000L,
         System.currentTimeMillis() + 10_000L, _stageMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       Thread.sleep(100L);
@@ -174,7 +180,9 @@ public class MailboxReceiveOperatorTest {
   public void shouldReceiveSingletonNullMailbox() {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
 
-    OpChainExecutionContext context = getContext(_stageMetadata1);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       assertTrue(receiveOp.nextBlock().isNoOpBlock());
     }
@@ -185,7 +193,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    OpChainExecutionContext context = getContext(_stageMetadata1);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
     }
@@ -198,7 +208,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    OpChainExecutionContext context = getContext(_stageMetadata1);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
       assertEquals(actualRows.size(), 1);
@@ -214,7 +226,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox1.poll()).thenReturn(
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
 
-    OpChainExecutionContext context = getContext(_stageMetadata1);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadata1, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
@@ -231,7 +245,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    OpChainExecutionContext context = getContext(_stageMetadataBoth);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataBoth, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
         1)) {
       List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
@@ -253,7 +269,9 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    OpChainExecutionContext context = getContext(_stageMetadataBoth);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataBoth, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
         1)) {
       // Receive first block from server1
@@ -277,18 +295,14 @@ public class MailboxReceiveOperatorTest {
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    OpChainExecutionContext context = getContext(_stageMetadataBoth);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
+            _stageMetadataBoth, false);
     try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
         1)) {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
       assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
     }
-  }
-
-  private OpChainExecutionContext getContext(StageMetadata stageMetadata) {
-    return
-    new OpChainExecutionContext(_mailboxService, null, null, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-        stageMetadata, false);
   }
 }

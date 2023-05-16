@@ -23,11 +23,17 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,9 +45,14 @@ import org.slf4j.LoggerFactory;
 public class MailboxService {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxService.class);
   private static final int DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS = 300;
+  private static final int DANGLING_EXCHANGE_EXPIRY_SECONDS = 300;
 
-  // We use a cache to ensure the receiving mailbox are not leaked in the cases where the corresponding OpChain is
-  // either never registered or died before the sender finished sending data.
+  /**
+   * Cached receiving mailboxes that contains the received blocks queue.
+   *
+   * We use a cache to ensure the receiving mailbox are not leaked in the cases where the corresponding OpChain is
+   * either never registered or died before the sender finished sending data.
+   */
   private final Cache<String, ReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS, TimeUnit.SECONDS)
           .removalListener((RemovalListener<String, ReceivingMailbox>) notification -> {
@@ -53,20 +64,40 @@ public class MailboxService {
               }
             }
           }).build();
+  /**
+   * Cached the executing thread that send blocks from {@link BlockExchange}.
+   *
+   * There's the  executor service used to run the actual underlying connection and data transfer on a separate thread
+   * so that the query stage execution can properly decoupled with the data transfer mechanism.
+   */
+  private final Cache<OpChainId, Future<?>> _submittedExchangeCache =
+      CacheBuilder.newBuilder().expireAfterAccess(DANGLING_EXCHANGE_EXPIRY_SECONDS, TimeUnit.SECONDS)
+          .removalListener((RemovalListener<OpChainId, Future<?>>) notification -> {
+            if (notification.wasEvicted()) {
+              Future<?> future = notification.getValue();
+              if (!future.isDone()) {
+                LOGGER.warn("Evicting dangling exchange request for {}}", notification.getKey());
+                future.cancel(true);
+              }
+            }
+          }).build();
 
   private final String _hostname;
   private final int _port;
   private final PinotConfiguration _config;
-  private final Consumer<OpChainId> _receiveMailCallback;
+  private final Consumer<OpChainId> _unblockOpChainCallback;
+  private final ExecutorService _exchangeExecutor;
   private final ChannelManager _channelManager = new ChannelManager();
 
   private GrpcMailboxServer _grpcMailboxServer;
 
-  public MailboxService(String hostname, int port, PinotConfiguration config, Consumer<OpChainId> receiveMailCallback) {
+  public MailboxService(String hostname, int port, PinotConfiguration config,
+      Consumer<OpChainId> unblockOpChainCallback) {
     _hostname = hostname;
     _port = port;
     _config = config;
-    _receiveMailCallback = receiveMailCallback;
+    _unblockOpChainCallback = unblockOpChainCallback;
+    _exchangeExecutor = Executors.newCachedThreadPool();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
@@ -95,6 +126,10 @@ public class MailboxService {
     return _port;
   }
 
+  public Consumer<OpChainId> getCallback() {
+    return _unblockOpChainCallback;
+  }
+
   /**
    * Returns a sending mailbox for the given mailbox id. The returned sending mailbox is uninitialized, i.e. it will
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
@@ -114,7 +149,7 @@ public class MailboxService {
    */
   public ReceivingMailbox getReceivingMailbox(String mailboxId) {
     try {
-      return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId, _receiveMailCallback));
+      return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId, _unblockOpChainCallback));
     } catch (ExecutionException e) {
       throw new RuntimeException(e);
     }
@@ -133,5 +168,26 @@ public class MailboxService {
    */
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
+  }
+
+  /**
+   * submit a block exchange to sending service for a single OpChain.
+   *
+   * Notice that the logic inside the {@link BlockExchange#send()} should guarantee the submitted Runnable object
+   *     to be terminated successfully or after opChain timeout.
+   *
+   * @param blockExchange the exchange object of the OpChain with all the pending data to be sent.
+   */
+  public void submitExchangeRequest(OpChainId opChainId, BlockExchange blockExchange) {
+    _submittedExchangeCache.put(opChainId, _exchangeExecutor.submit(() -> {
+      TransferableBlock block = blockExchange.send();
+      while (!TransferableBlockUtils.isEndOfStream(block)) {
+        block = blockExchange.send();
+      }
+    }));
+  }
+
+  public void cancelExchangeRequest(OpChainId opChainId, Throwable t) {
+    _submittedExchangeCache.invalidate(opChainId);
   }
 }

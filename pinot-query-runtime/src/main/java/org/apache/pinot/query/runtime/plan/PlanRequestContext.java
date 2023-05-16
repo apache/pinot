@@ -20,18 +20,13 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.operator.OpChainId;
-import org.apache.pinot.query.runtime.operator.exchange.ExchangeService;
 
 
 public class PlanRequestContext {
   protected final MailboxService _mailboxService;
-  protected final ExchangeService _exchangeService;
-  protected final Consumer<OpChainId> _callback;
   protected final long _requestId;
   protected final int _stageId;
   // TODO: Timeout is not needed since deadline is already present.
@@ -43,12 +38,9 @@ public class PlanRequestContext {
   private final OpChainExecutionContext _opChainExecutionContext;
   private final boolean _traceEnabled;
 
-  public PlanRequestContext(MailboxService mailboxService, ExchangeService exchangeService,
-      Consumer<OpChainId> callback, long requestId, int stageId, long timeoutMs, long deadlineMs,
+  public PlanRequestContext(MailboxService mailboxService, long requestId, int stageId, long timeoutMs, long deadlineMs,
       VirtualServerAddress server, StageMetadata stageMetadata, boolean traceEnabled) {
     _mailboxService = mailboxService;
-    _exchangeService = exchangeService;
-    _callback = callback;
     _requestId = requestId;
     _stageId = stageId;
     _timeoutMs = timeoutMs;
@@ -85,14 +77,6 @@ public class PlanRequestContext {
 
   public MailboxService getMailboxService() {
     return _mailboxService;
-  }
-
-  public ExchangeService getExchangeService() {
-    return _exchangeService;
-  }
-
-  public Consumer<OpChainId> getCallback() {
-    return _callback;
   }
 
   public void addReceivingMailboxIds(List<String> receivingMailboxIds) {

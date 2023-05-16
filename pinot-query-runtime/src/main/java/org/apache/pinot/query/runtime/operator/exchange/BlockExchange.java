@@ -38,6 +38,10 @@ import org.apache.pinot.query.runtime.operator.OpChainId;
 /**
  * This class contains the shared logic across all different exchange types for
  * exchanging data across different servers.
+ *
+ * {@link BlockExchange} is used by {@link org.apache.pinot.query.runtime.operator.MailboxSendOperator} to
+ * exchange data between underlying {@link org.apache.pinot.query.mailbox.MailboxService} and the query stage execution
+ * engine running the actual {@link org.apache.pinot.query.runtime.operator.OpChain}.
  */
 public abstract class BlockExchange {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
