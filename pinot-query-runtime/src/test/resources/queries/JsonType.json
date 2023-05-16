@@ -14,9 +14,28 @@
       }
     },
     "queries": [
-      {"sql": "SELECT jsonCol FROM {jsonTbl}"},
-      {"sql": "SELECT jsonCol, stringCol FROM {jsonTbl}"},
-      {"sql": "SELECT jsonCol, stringCol FROM {jsonTbl} where stringCol='str33'"}
+      {
+        "sql": "SELECT jsonCol FROM {jsonTbl}",
+        "outputs": [
+          ["{\"key1\":\"val1\",\"key2\":\"val2\"}"],
+          ["{\"key11\":\"val11\",\"key22\":\"val22\"}"],
+          ["{\"key111\":\"val111\",\"key222\":{\"key222_a\":\"val222_a\"}}"]
+        ]
+      },
+      {
+        "sql": "SELECT jsonCol, stringCol FROM {jsonTbl}",
+        "outputs": [
+          ["{\"key1\":\"val1\",\"key2\":\"val2\"}", "str1"],
+          ["{\"key11\":\"val11\",\"key22\":\"val22\"}", "str22"],
+          ["{\"key111\":\"val111\",\"key222\":{\"key222_a\":\"val222_a\"}}", "str33"]
+        ]
+      },
+      {
+        "sql": "SELECT jsonCol, stringCol FROM {jsonTbl} where stringCol='str33'",
+        "outputs": [
+          ["{\"key111\":\"val111\",\"key222\":{\"key222_a\":\"val222_a\"}}", "str33"]
+        ]
+      }
     ]
   }
 }
