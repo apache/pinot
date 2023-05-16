@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -28,7 +27,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -49,13 +47,10 @@ public abstract class SetOperator extends MultiStageOperator {
   private final MultiStageOperator _leftChildOperator;
   private final MultiStageOperator _rightChildOperator;
 
-  private final List<Object[]> _resultRowBlock;
-
   private final DataSchema _dataSchema;
-  private TransferableBlock _currentLeftBlock;
-  private Iterator<Object[]> _currentLeftIterator;
 
-  private boolean _isRightBlockConsumed;
+  private boolean _isRightSetBuilt;
+  private TransferableBlock _upstreamErrorBlock;
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
@@ -65,7 +60,6 @@ public abstract class SetOperator extends MultiStageOperator {
     _leftChildOperator = getChildOperators().get(0);
     _rightChildOperator = getChildOperators().get(1);
     _rightRowSet = new HashSet<>();
-    _resultRowBlock = new ArrayList<>();
   }
 
   @Override
@@ -96,10 +90,11 @@ public abstract class SetOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     // A blocking call to construct a set with all the right side rows.
-    if (!_isRightBlockConsumed) {
+    if (!_isRightSetBuilt) {
       constructRightBlockSet();
     }
-    return constructResultBlockSet();
+    TransferableBlock leftBlock = _leftChildOperator.nextBlock();
+    return constructResultBlockSet(leftBlock);
   }
 
   protected void constructRightBlockSet() {
@@ -112,36 +107,27 @@ public abstract class SetOperator extends MultiStageOperator {
       }
       block = _rightChildOperator.nextBlock();
     }
-    _isRightBlockConsumed = true;
+    _isRightSetBuilt = true;
   }
 
-  protected TransferableBlock constructResultBlockSet() {
-    _resultRowBlock.clear();
-    // First time initialization.
-    if (_currentLeftBlock == null) {
-      _currentLeftBlock = _leftChildOperator.nextBlock();
+  protected TransferableBlock constructResultBlockSet(TransferableBlock leftBlock) {
+    List<Object[]> rows = new ArrayList<>();
+    if (_upstreamErrorBlock != null || leftBlock.isErrorBlock()) {
+      _upstreamErrorBlock = leftBlock;
+      return _upstreamErrorBlock;
     }
-    while (!_currentLeftBlock.isEndOfStreamBlock()) {
-      if (_currentLeftBlock.getType() == DataBlock.Type.METADATA) {
-        _currentLeftBlock = _leftChildOperator.nextBlock();
-        continue;
+    if (leftBlock.isNoOpBlock() || leftBlock.isSuccessfulEndOfStreamBlock()) {
+      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
-      _currentLeftIterator = _currentLeftBlock.getContainer().iterator();
-      while (_currentLeftIterator.hasNext()) {
-        Object[] row = _currentLeftIterator.next();
-        if (handleRowMatched(row)) {
-          _resultRowBlock.add(row);
-          if (_resultRowBlock.size() == SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY) {
-            return new TransferableBlock(_resultRowBlock, _dataSchema, DataBlock.Type.ROW);
-          }
-        }
+      return leftBlock;
+    }
+    for (Object[] row : leftBlock.getContainer()) {
+      if (handleRowMatched(row)) {
+        rows.add(row);
       }
-      _currentLeftBlock = _leftChildOperator.nextBlock();
     }
-    if (!_resultRowBlock.isEmpty()) {
-      return new TransferableBlock(_resultRowBlock, _dataSchema, DataBlock.Type.ROW);
-    }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
   }
 
   /**
