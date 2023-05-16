@@ -48,7 +48,7 @@ public interface RexExpression {
       return new RexExpression.InputRef(((RexInputRef) rexNode).getIndex());
     } else if (rexNode instanceof RexLiteral) {
       RexLiteral rexLiteral = ((RexLiteral) rexNode);
-      FieldSpec.DataType dataType = RelToStageConverter.convertToFieldSpecDataType(rexLiteral.getType());
+      FieldSpec.DataType dataType = RelToPlanNodeConverter.convertToFieldSpecDataType(rexLiteral.getType());
       return new RexExpression.Literal(dataType, toRexValue(dataType, rexLiteral.getValue()));
     } else if (rexNode instanceof RexCall) {
       RexCall rexCall = (RexCall) rexNode;
@@ -70,7 +70,7 @@ public interface RexExpression {
         List<RexExpression> operands =
             rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
         return new RexExpression.FunctionCall(rexCall.getKind(),
-            RelToStageConverter.convertToFieldSpecDataType(rexCall.getType()),
+            RelToPlanNodeConverter.convertToFieldSpecDataType(rexCall.getType()),
             rexCall.getOperator().getName(), operands);
     }
   }
@@ -78,7 +78,7 @@ public interface RexExpression {
   static RexExpression toRexExpression(AggregateCall aggCall) {
     List<RexExpression> operands = aggCall.getArgList().stream().map(InputRef::new).collect(Collectors.toList());
     return new RexExpression.FunctionCall(aggCall.getAggregation().getKind(),
-        RelToStageConverter.convertToFieldSpecDataType(aggCall.getType()), aggCall.getAggregation().getName(),
+        RelToPlanNodeConverter.convertToFieldSpecDataType(aggCall.getType()), aggCall.getAggregation().getName(),
         operands);
   }
 

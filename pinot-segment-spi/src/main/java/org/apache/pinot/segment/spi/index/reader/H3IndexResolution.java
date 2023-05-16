@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 
 /**
@@ -72,5 +73,22 @@ public class H3IndexResolution {
   @JsonIgnore
   public int getLowestResolution() {
     return Integer.numberOfTrailingZeros(_resolutions);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    H3IndexResolution that = (H3IndexResolution) o;
+    return _resolutions == that._resolutions;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_resolutions);
   }
 }

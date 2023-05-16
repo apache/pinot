@@ -36,10 +36,11 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
@@ -61,12 +62,15 @@ public class QueryServerTest extends QueryTestSet {
   private static final int QUERY_SERVER_COUNT = 2;
   private static final String KEY_OF_SERVER_INSTANCE_HOST = "pinot.query.runner.server.hostname";
   private static final String KEY_OF_SERVER_INSTANCE_PORT = "pinot.query.runner.server.port";
-  private static final ExecutorService LEAF_WORKER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryDispatcherTest_LeafWorker"));
-  private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
-  private static final ExecutorService RUNNER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_RUNNER_THREADS, new NamedThreadFactory("QueryServerTest_Runner"));
+  private static final ExecutorService LEAF_WORKER_EXECUTOR_SERVICE =
+      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+          new NamedThreadFactory("QueryDispatcherTest_LeafWorker"));
+  private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE =
+      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+          new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
+  private static final ExecutorService RUNNER_EXECUTOR_SERVICE =
+      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
+          new NamedThreadFactory("QueryServerTest_Runner"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -108,32 +112,36 @@ public class QueryServerTest extends QueryTestSet {
   @Test(dataProvider = "testSql")
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
 
-    for (int stageId : queryPlan.getDispatchablePlanMetadataMap().keySet()) {
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       if (stageId > 0) { // we do not test reduce stage.
         // only get one worker request out.
-        Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
+        Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, stageId);
 
         // submit the request for testing.
         submitRequest(queryRequest);
 
-        PlanFragmentMetadata planFragmentMetadata = queryPlan.getStageMetadata(stageId);
+        DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
+
+        StageMetadata stageMetadata = dispatchablePlanFragment.toStageMetadata();
 
         // ensure mock query runner received correctly deserialized payload.
-        QueryRunner mockRunner = _queryRunnerMap.get(
-            Integer.parseInt(queryRequest.getMetadataOrThrow(KEY_OF_SERVER_INSTANCE_PORT)));
+        QueryRunner mockRunner =
+            _queryRunnerMap.get(Integer.parseInt(queryRequest.getMetadataOrThrow(KEY_OF_SERVER_INSTANCE_PORT)));
         String requestIdStr = queryRequest.getMetadataOrThrow(QueryConfig.KEY_OF_BROKER_REQUEST_ID);
 
         // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
+        int finalStageId = stageId;
         TestUtils.waitForCondition(aVoid -> {
           try {
             Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
-              PlanNode planNode = queryPlan.getQueryStageMap().get(stageId);
-              return isStageNodesEqual(planNode, distributedStagePlan.getStageRoot())
-                  && isStageMetadataEqual(planFragmentMetadata, distributedStagePlan.getStageMetadata());
-            }), Mockito.argThat(requestMetadataMap ->
-                requestIdStr.equals(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))));
+              PlanNode planNode =
+                  dispatchableSubPlan.getQueryStageList().get(finalStageId).getPlanFragment().getFragmentRoot();
+              return isStageNodesEqual(planNode, distributedStagePlan.getStageRoot()) && isStageMetadataEqual(
+                  stageMetadata, distributedStagePlan.getStageMetadata());
+            }), Mockito.argThat(requestMetadataMap -> requestIdStr.equals(
+                requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))));
             return true;
           } catch (Throwable t) {
             return false;
@@ -146,20 +154,21 @@ public class QueryServerTest extends QueryTestSet {
     }
   }
 
-  private boolean isStageMetadataEqual(PlanFragmentMetadata expected, PlanFragmentMetadata actual) {
-    if (!EqualityUtils.isEqual(PlanFragmentMetadata.getTableName(expected),
-        PlanFragmentMetadata.getTableName(actual))) {
+  private boolean isStageMetadataEqual(StageMetadata expected, StageMetadata actual) {
+    if (!EqualityUtils.isEqual(StageMetadata.getTableName(expected),
+        StageMetadata.getTableName(actual))) {
       return false;
     }
-    TimeBoundaryInfo expectedTimeBoundaryInfo = PlanFragmentMetadata.getTimeBoundary(expected);
-    TimeBoundaryInfo actualTimeBoundaryInfo = PlanFragmentMetadata.getTimeBoundary(actual);
+    TimeBoundaryInfo expectedTimeBoundaryInfo = StageMetadata.getTimeBoundary(expected);
+    TimeBoundaryInfo actualTimeBoundaryInfo = StageMetadata.getTimeBoundary(actual);
     if (expectedTimeBoundaryInfo == null && actualTimeBoundaryInfo != null
         || expectedTimeBoundaryInfo != null && actualTimeBoundaryInfo == null) {
       return false;
     }
-    if (expectedTimeBoundaryInfo != null && actualTimeBoundaryInfo != null
-        && (!EqualityUtils.isEqual(expectedTimeBoundaryInfo.getTimeColumn(), actualTimeBoundaryInfo.getTimeColumn())
-        || !EqualityUtils.isEqual(expectedTimeBoundaryInfo.getTimeValue(), actualTimeBoundaryInfo.getTimeValue()))) {
+    if (expectedTimeBoundaryInfo != null && actualTimeBoundaryInfo != null && (
+        !EqualityUtils.isEqual(expectedTimeBoundaryInfo.getTimeColumn(), actualTimeBoundaryInfo.getTimeColumn())
+            || !EqualityUtils.isEqual(expectedTimeBoundaryInfo.getTimeValue(),
+            actualTimeBoundaryInfo.getTimeValue()))) {
       return false;
     }
     List<WorkerMetadata> expectedWorkerMetadataList = expected.getWorkerMetadataList();
@@ -213,16 +222,16 @@ public class QueryServerTest extends QueryTestSet {
     channel.shutdown();
   }
 
-  private Worker.QueryRequest getQueryRequest(QueryPlan queryPlan, int stageId) {
+  private Worker.QueryRequest getQueryRequest(DispatchableSubPlan dispatchableSubPlan, int stageId) {
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
-        queryPlan.getDispatchablePlanMetadataMap().get(stageId).getServerInstanceToWorkerIdMap();
+        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
     // this particular test set requires the request to have a single QueryServerInstance to dispatch to
     // as it is not testing the multi-tenancy dispatch (which is in the QueryDispatcherTest)
     QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
     int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
 
     return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(
-            QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId,
+            QueryDispatcher.constructDistributedStagePlan(dispatchableSubPlan, stageId,
                 new VirtualServerAddress(serverInstance, workerId))))
         // the default configurations that must exist.
         .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))

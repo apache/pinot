@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.plan;
 
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
@@ -37,13 +37,13 @@ public class OpChainExecutionContext {
   private final VirtualServerAddress _server;
   private final long _timeoutMs;
   private final long _deadlineMs;
-  private final PlanFragmentMetadata _planFragmentMetadata;
+  private final StageMetadata _stageMetadata;
   private final OpChainId _id;
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long timeoutMs, long deadlineMs, PlanFragmentMetadata planFragmentMetadata,
+      VirtualServerAddress server, long timeoutMs, long deadlineMs, StageMetadata stageMetadata,
       boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
@@ -51,7 +51,7 @@ public class OpChainExecutionContext {
     _server = server;
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
-    _planFragmentMetadata = planFragmentMetadata;
+    _stageMetadata = stageMetadata;
     _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
     _traceEnabled = traceEnabled;
@@ -87,8 +87,8 @@ public class OpChainExecutionContext {
     return _deadlineMs;
   }
 
-  public PlanFragmentMetadata getStageMetadata() {
-    return _planFragmentMetadata;
+  public StageMetadata getStageMetadata() {
+    return _stageMetadata;
   }
 
   public OpChainId getId() {

@@ -48,20 +48,16 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    * Default cancel signal retention, this should be set to several times larger than
    * {@link org.apache.pinot.query.service.QueryConfig#DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS}.
    */
-  private static final long DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
+  private static final long SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
-  private final Cache<Long, Long> _cancelledRequests;
+  private final Cache<Long, Long> _cancelledRequests = CacheBuilder.newBuilder()
+      .expireAfterWrite(SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS, TimeUnit.MILLISECONDS).build();
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
-    this(scheduler, workerPool, DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS);
-  }
-
-  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long cancelRetentionMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
-    _cancelledRequests = CacheBuilder.newBuilder().expireAfterWrite(cancelRetentionMs, TimeUnit.MILLISECONDS).build();
   }
 
   @Override

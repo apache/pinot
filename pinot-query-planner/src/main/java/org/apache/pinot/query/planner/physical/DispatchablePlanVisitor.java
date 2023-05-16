@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -41,56 +40,10 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   private DispatchablePlanVisitor() {
   }
 
-  /**
-   * Entry point for attaching dispatch metadata to a query plan. It walks through the plan via the global
-   * {@link PlanNode} root of the query and:
-   * <ul>
-   *   <li>break down the {@link PlanNode}s into Stages that can run on a single worker.</li>
-   *   <li>each stage is represented by a subset of {@link PlanNode}s without data exchange.</li>
-   *   <li>attach worker execution information including physical server address, worker ID to each stage.</li>
-   * </ul>
-   *
-   * @param globalReceiverNode the entrypoint of the stage plan.
-   * @param dispatchablePlanContext dispatchable plan context used to record the walk of the stage node tree.
-   */
-  public QueryPlan constructDispatchablePlan(PlanNode globalReceiverNode,
-      DispatchablePlanContext dispatchablePlanContext) {
-    // 1. start by visiting the stage root.
-    globalReceiverNode.visit(DispatchablePlanVisitor.INSTANCE, dispatchablePlanContext);
-    // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
-    dispatchablePlanContext.getDispatchablePlanStageRootMap().put(0, globalReceiverNode);
-    // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
-    computeWorkerAssignment(globalReceiverNode, dispatchablePlanContext);
-    // 4. compute the mailbox assignment for each stage.
-    // TODO: refactor this to be a pluggable interface.
-    computeMailboxAssignment(dispatchablePlanContext);
-    // 5. convert it into query plan.
-    // TODO: refactor this to be a pluggable interface.
-    return finalizeQueryPlan(dispatchablePlanContext);
-  }
-
-  private void computeMailboxAssignment(DispatchablePlanContext dispatchablePlanContext) {
-    dispatchablePlanContext.getDispatchablePlanStageRootMap().get(0).visit(MailboxAssignmentVisitor.INSTANCE,
-        dispatchablePlanContext);
-  }
-
-  private static QueryPlan finalizeQueryPlan(DispatchablePlanContext dispatchablePlanContext) {
-    return new QueryPlan(dispatchablePlanContext.getResultFields(),
-        dispatchablePlanContext.getDispatchablePlanStageRootMap(),
-        dispatchablePlanContext.getDispatchablePlanMetadataMap());
-  }
-
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
       DispatchablePlanContext context) {
     return context.getDispatchablePlanMetadataMap().computeIfAbsent(node.getPlanFragmentId(),
         (id) -> new DispatchablePlanMetadata());
-  }
-
-  private static void computeWorkerAssignment(PlanNode node, DispatchablePlanContext context) {
-    int planFragmentId = node.getPlanFragmentId();
-    context.getWorkerManager()
-        .assignWorkerToStage(planFragmentId, context.getDispatchablePlanMetadataMap().get(planFragmentId),
-            context.getRequestId(), context.getPlannerContext().getOptions(), context.getTableNames());
   }
 
   @Override
@@ -150,9 +103,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getOrCreateDispatchablePlanMetadata(node, context);
-
     context.getDispatchablePlanStageRootMap().put(node.getPlanFragmentId(), node);
-    computeWorkerAssignment(node, context);
     return null;
   }
 

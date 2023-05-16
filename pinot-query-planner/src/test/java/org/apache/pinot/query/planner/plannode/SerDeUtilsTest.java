@@ -23,7 +23,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -34,14 +35,16 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "testQueryDataProvider")
   public void testQueryStagePlanSerDe(String query)
       throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    for (PlanNode planNode : queryPlan.getQueryStageMap().values()) {
-      Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) planNode);
-      PlanNode deserializedPlanNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);
-      Assert.assertTrue(isObjectEqual(planNode, deserializedPlanNode));
-      Assert.assertEquals(deserializedPlanNode.getPlanFragmentId(), planNode.getPlanFragmentId());
-      Assert.assertEquals(deserializedPlanNode.getDataSchema(), planNode.getDataSchema());
-      Assert.assertEquals(deserializedPlanNode.getInputs().size(), planNode.getInputs().size());
+
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStageList()) {
+      PlanNode stageNode = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
+      Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stageNode);
+      PlanNode deserializedStageNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);
+      Assert.assertTrue(isObjectEqual(stageNode, deserializedStageNode));
+      Assert.assertEquals(deserializedStageNode.getPlanFragmentId(), stageNode.getPlanFragmentId());
+      Assert.assertEquals(deserializedStageNode.getDataSchema(), stageNode.getDataSchema());
+      Assert.assertEquals(deserializedStageNode.getInputs().size(), stageNode.getInputs().size());
     }
   }
 

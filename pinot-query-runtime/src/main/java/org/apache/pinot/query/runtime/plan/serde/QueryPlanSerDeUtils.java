@@ -28,7 +28,7 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.PlanFragmentMetadata;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -79,8 +79,8 @@ public class QueryPlanSerDeUtils {
     return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
   }
 
-  private static PlanFragmentMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
-    PlanFragmentMetadata.Builder builder = new PlanFragmentMetadata.Builder();
+  private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
+    StageMetadata.Builder builder = new StageMetadata.Builder();
     List<WorkerMetadata> workerMetadataList = new ArrayList<>();
     for (Worker.WorkerMetadata protoWorkerMetadata : protoStageMetadata.getWorkerMetadataList()) {
       workerMetadataList.add(fromProtoWorkerMetadata(protoWorkerMetadata));
@@ -119,12 +119,12 @@ public class QueryPlanSerDeUtils {
     return mailboxMetadata;
   }
 
-  private static Worker.StageMetadata toProtoStageMetadata(PlanFragmentMetadata planFragmentMetadata) {
+  private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {
     Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
-    for (WorkerMetadata workerMetadata : planFragmentMetadata.getWorkerMetadataList()) {
+    for (WorkerMetadata workerMetadata : stageMetadata.getWorkerMetadataList()) {
       builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
     }
-    builder.putAllCustomProperty(planFragmentMetadata.getCustomProperties());
+    builder.putAllCustomProperty(stageMetadata.getCustomProperties());
     return builder.build();
   }
 

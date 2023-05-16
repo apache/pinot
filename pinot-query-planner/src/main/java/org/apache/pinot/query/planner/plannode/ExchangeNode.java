@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
+import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
@@ -46,11 +47,17 @@ public class ExchangeNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RelFieldCollation> _collations;
 
+  /**
+   * The set of tables that are scanned in this planFragment.
+   */
+  @ProtoProperties
+  private Set<String> _tableNames;
+
   public ExchangeNode(int planFragmentId) {
     super(planFragmentId);
   }
 
-  public ExchangeNode(int currentStageId, DataSchema dataSchema, RelDistribution distribution,
+  public ExchangeNode(int currentStageId, DataSchema dataSchema, Set<String> tableNames, RelDistribution distribution,
       List<RelFieldCollation> collations, boolean isSortOnSender,
       boolean isSortOnReceiver) {
     super(currentStageId, dataSchema);
@@ -59,6 +66,7 @@ public class ExchangeNode extends AbstractPlanNode {
     _isSortOnSender = isSortOnSender;
     _isSortOnReceiver = isSortOnReceiver;
     _collations = collations;
+    _tableNames = tableNames;
   }
 
   @Override
@@ -89,5 +97,9 @@ public class ExchangeNode extends AbstractPlanNode {
 
   public List<RelFieldCollation> getCollations() {
     return _collations;
+  }
+
+  public Set<String> getTableNames() {
+    return _tableNames;
   }
 }

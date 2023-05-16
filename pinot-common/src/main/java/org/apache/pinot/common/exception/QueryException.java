@@ -54,7 +54,7 @@ public class QueryException {
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
-  public static final int QUERY_CANCELLATION_ERROR_CODE = 205;
+  public static final int QUERY_CANCELLATION_ERROR_CODE = 503;
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
