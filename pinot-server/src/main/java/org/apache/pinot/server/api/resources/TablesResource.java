@@ -468,9 +468,15 @@ public class TablesResource {
    * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
    * when segment store copy is unavailable for committed low level consumer segments.
    * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it. There's a query parameter to configure how long the segment-uploader should wait for the upload to
-   * deep-store to finish.
-   * @see <a>href="https://tinyurl.com/f63ru4sb</a>
+   * to upload it.
+   *
+   * @see <a href="https://tinyurl.com/f63ru4sb></a>
+   * @param realtimeTableName table name with type.
+   * @param segmentName name of the segment to be uploaded
+   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+   *                  would be used.
+   * @return full url where the segment is uploaded
+   * @throws Exception if an error occurred during the segment upload.
    */
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
@@ -531,6 +537,7 @@ public class TablesResource {
       SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
       URI segmentDownloadUrl;
       if (timeoutMs <= 0) {
+        // Use default timeout if passed timeout is not positive
         segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
       } else {
         segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);

@@ -484,8 +484,8 @@ public class PinotLLCRealtimeSegmentManager {
       return;
     }
 
-    URI tableDirURI = getTableDirURI(rawTableName);
-    PinotFS pinotFS = createPinotFS(rawTableName);
+    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
+    PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
     String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
     // Cleans up tmp segment files under table dir.
@@ -1405,7 +1405,7 @@ public class PinotLLCRealtimeSegmentManager {
           retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
     }
 
-    PinotFS pinotFS = createPinotFS(rawTableName);
+    PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_controllerConf.getDataDir()).getScheme());
 
     // Iterate through LLC segments and upload missing deep store copy by following steps:
     //  1. Ask servers which have online segment replica to upload to deep store.
@@ -1573,16 +1573,8 @@ public class PinotLLCRealtimeSegmentManager {
     return uriToMoveTo.toString();
   }
 
+  @VisibleForTesting
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
-  }
-
-  private PinotFS createPinotFS(String rawTableName) {
-    URI tableDirURI = getTableDirURI(rawTableName);
-    return PinotFSFactory.create(tableDirURI.getScheme());
-  }
-
-  private URI getTableDirURI(String rawTableName) {
-    return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
   }
 }
