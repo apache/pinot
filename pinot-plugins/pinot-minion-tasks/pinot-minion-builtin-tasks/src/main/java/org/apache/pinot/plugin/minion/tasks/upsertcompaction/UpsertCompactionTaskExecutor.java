@@ -74,8 +74,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     Set<Integer> validIds = getValidIds(tableNameWithType, validDocIds, indexDir, columns);
 
     MINION_CONTEXT.setRecordPurgerFactory(x -> row -> {
-      if (validIds.isEmpty())
+      if (validIds.isEmpty()) {
         return true;
+      }
 
       List<String> values = new ArrayList<>();
       for (String column : columns) {
@@ -129,8 +130,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       File indexDir, List<String> columns) throws IOException {
     Set<Integer> validIds = new HashSet<>();
 
-    if (validDocIds.isEmpty())
+    if (validDocIds.isEmpty()) {
       return validIds;
+    }
 
     PeekableIntIterator iterator = validDocIds.getIntIterator();
     PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
@@ -155,7 +157,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     IdealState idealState =
         clusterManagementTool.getResourceIdealState(MINION_CONTEXT.getClusterName(), tableNameWithType);
     if (idealState == null) {
-      throw new IllegalStateException("Ideal state does not exist for table: "+ tableNameWithType);
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();

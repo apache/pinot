@@ -38,8 +38,12 @@ public class UpsertCompactionTaskExecutorFactory implements PinotTaskExecutorFac
   }
 
   @Override
-  public String getTaskType() { return MinionConstants.UpsertCompactionTask.TASK_TYPE; }
+  public String getTaskType() {
+    return MinionConstants.UpsertCompactionTask.TASK_TYPE;
+  }
 
   @Override
-  public PinotTaskExecutor create() { return new UpsertCompactionTaskExecutor(); }
+  public PinotTaskExecutor create() {
+    return new UpsertCompactionTaskExecutor();
+  }
 }
