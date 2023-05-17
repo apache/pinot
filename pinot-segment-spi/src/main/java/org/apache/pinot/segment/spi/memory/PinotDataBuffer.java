@@ -111,15 +111,15 @@ public abstract class PinotDataBuffer implements Closeable {
   public static PinotDataBuffer allocateDirect(long size, ByteOrder byteOrder, @Nullable String description) {
     PinotDataBuffer buffer;
     try {
-      if (size <= Integer.MAX_VALUE) {
-        buffer = PinotByteBuffer.allocateDirect((int) size, byteOrder);
-      } else {
+//      if (size <= Integer.MAX_VALUE) {
+//        buffer = PinotByteBuffer.allocateDirect((int) size, byteOrder);
+//      } else {
         if (byteOrder == NATIVE_ORDER) {
           buffer = PinotNativeOrderLBuffer.allocateDirect(size);
         } else {
           buffer = PinotNonNativeOrderLBuffer.allocateDirect(size);
         }
-      }
+//      }
     } catch (Exception e) {
       LOGGER
           .error("Caught exception while allocating direct buffer of size: {} with description: {}", size, description,
@@ -144,15 +144,15 @@ public abstract class PinotDataBuffer implements Closeable {
       throws IOException {
     PinotDataBuffer buffer;
     try {
-      if (size <= Integer.MAX_VALUE) {
-        buffer = PinotByteBuffer.loadFile(file, offset, (int) size, byteOrder);
-      } else {
+//      if (size <= Integer.MAX_VALUE) {
+//        buffer = PinotByteBuffer.loadFile(file, offset, (int) size, byteOrder);
+//      } else {
         if (byteOrder == NATIVE_ORDER) {
           buffer = PinotNativeOrderLBuffer.loadFile(file, offset, size);
         } else {
           buffer = PinotNonNativeOrderLBuffer.loadFile(file, offset, size);
         }
-      }
+//      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while loading file: {} from offset: {} of size: {} with description: {}",
           file.getAbsolutePath(), offset, size, description, e);
@@ -187,15 +187,15 @@ public abstract class PinotDataBuffer implements Closeable {
       throws IOException {
     PinotDataBuffer buffer;
     try {
-      if (size <= Integer.MAX_VALUE) {
-        buffer = PinotByteBuffer.mapFile(file, readOnly, offset, (int) size, byteOrder);
-      } else {
+//      if (size <= Integer.MAX_VALUE) {
+//        buffer = PinotByteBuffer.mapFile(file, readOnly, offset, (int) size, byteOrder);
+//      } else {
         if (byteOrder == NATIVE_ORDER) {
           buffer = PinotNativeOrderLBuffer.mapFile(file, readOnly, offset, size);
         } else {
           buffer = PinotNonNativeOrderLBuffer.mapFile(file, readOnly, offset, size);
         }
-      }
+//      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while mapping file: {} from offset: {} of size: {} with description: {}",
           file.getAbsolutePath(), offset, size, description, e);
