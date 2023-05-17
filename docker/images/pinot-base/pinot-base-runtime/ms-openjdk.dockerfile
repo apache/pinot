@@ -25,7 +25,7 @@ FROM ${JDK_IMAGE}:${JAVA_VERSION}-ubuntu
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim less wget curl git python sysstat procps linux-tools-generic && \
+    apt-get install -y --no-install-recommends vim less wget curl git python sysstat procps linux-tools-generic libtasn1-6 && \
     rm -rf /var/lib/apt/lists/*
 
 RUN case `uname -m` in \
