@@ -78,11 +78,6 @@ jobs:
         testset: [ 1, 2 ]
         java: [ 11, 17 ]
         distribution: [ "temurin" ]
-        include:
-          # This just adds this element to the matrix.
-          # Being ea, Java 21 is not in temurin (or other vendor)
-          - java: 21-ea
-            distribution: "openjdk"
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -135,11 +130,6 @@ jobs:
         testset: [ 1, 2 ]
         java: [ 11, 17 ]
         distribution: [ "temurin" ]
-        include:
-          # This just adds this element to the matrix.
-          # Being ea, Java 21 is not in temurin (or other vendor)
-          - java: 21-ea
-            distribution: "openjdk"
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -246,15 +236,11 @@ jobs:
       matrix:
         # We only test LTS Java versions
         # TODO: add JDK 17 once ready. see: https://github.com/apache/pinot/issues/8529
-        java: [ 11, 17 ]
+        java: [ 11, 17, 20 ]
         distribution: [ "temurin" ]
         include:
           - java: 8
             distribution: "adopt"
-          # This just adds this element to the matrix.
-          # Being ea, Java 21 is not in temurin (or other vendor)
-          - java: 21-ea
-            distribution: "openjdk"
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v3
