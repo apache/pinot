@@ -52,7 +52,7 @@
       },
       {
         "description": "Like clause is very general, should return all rows.",
-        "sql": "SELECT jsonCol, stringCol FROM {jsonTbl} where jsonCol like '%key%'",
+        "sql": "SELECT jsonCol, stringCol FROM {jsonTbl} where jsonCol like '%key%' ",
         "outputs": [
           ["{\"key1\":\"val1\",\"key2\":\"val2\"}", "str1"],
           ["{\"key11\":\"val11\",\"key22\":\"val22\"}", "str22"],
