@@ -1419,8 +1419,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
-    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
-    _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
+    try {
+      StreamMessageDecoder streamMessageDecoder =
+          StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
+      _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
+    } catch (Exception e) {
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
+      throw e;
+    }
     _transformPipeline = new TransformPipeline(tableConfig, schema);
     // Acquire semaphore to create stream consumers
     try {
