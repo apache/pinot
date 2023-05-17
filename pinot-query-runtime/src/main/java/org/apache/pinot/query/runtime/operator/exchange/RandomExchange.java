@@ -21,10 +21,12 @@ package org.apache.pinot.query.runtime.operator.exchange;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
@@ -36,13 +38,15 @@ class RandomExchange extends BlockExchange {
 
   private final IntFunction<Integer> _rand;
 
-  RandomExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
-    this(sendingMailboxes, RANDOM::nextInt, splitter);
+  RandomExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
+    this(opChainId, sendingMailboxes, RANDOM::nextInt, splitter, callback, deadlineMs);
   }
 
   @VisibleForTesting
-  RandomExchange(List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand, BlockSplitter splitter) {
-    super(sendingMailboxes, splitter);
+  RandomExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand,
+      BlockSplitter splitter, Consumer<OpChainId> callback, long deadlineMs) {
+    super(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
     _rand = rand;
   }
 
