@@ -152,13 +152,13 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public static PinotBufferFactory createDefaultFactory() {
     String factoryClassName;
-    if (JavaVersion.VERSION < 16) {
-      LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
-      factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
-    } else {
+//    if (JavaVersion.VERSION < 16) {
+//      LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
+//      factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
+//    } else {
       LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
       factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
-    }
+//    }
     return createFactory(factoryClassName, false);
   }
 
