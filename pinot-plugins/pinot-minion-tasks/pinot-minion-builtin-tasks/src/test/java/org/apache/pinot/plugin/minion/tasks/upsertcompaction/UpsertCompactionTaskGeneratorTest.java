@@ -23,15 +23,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -68,17 +63,6 @@ public class UpsertCompactionTaskGeneratorTest {
 
     tableConfigBuilder = tableConfigBuilder
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
-
-    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    Map<String, String> compactionConfigs = new HashMap<>();
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    tableConfigBuilder = tableConfigBuilder.setTaskConfig(new TableTaskConfig(tableTaskConfigs));
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
-
-    tableConfigBuilder.setSegmentPartitionConfig(new SegmentPartitionConfig(
-        Collections.singletonMap("memberId",
-            new ColumnPartitionConfig("murmur", 1))));
     assertTrue(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
   }
 
@@ -105,18 +89,12 @@ public class UpsertCompactionTaskGeneratorTest {
     UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
     Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
     Map<String, String> compactionConfigs = new HashMap<>();
-    compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
-    compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(RAW_TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("memberId",
-                new ColumnPartitionConfig("murmur", 1))))
         .build();
     ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
@@ -133,18 +111,12 @@ public class UpsertCompactionTaskGeneratorTest {
     UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
     Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
     Map<String, String> compactionConfigs = new HashMap<>();
-    compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
-    compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(RAW_TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("memberId",
-                new ColumnPartitionConfig("murmur", 1))))
         .build();
     ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
     SegmentZKMetadata consumingSegment = new SegmentZKMetadata("testTable__0");
@@ -163,18 +135,12 @@ public class UpsertCompactionTaskGeneratorTest {
     UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
     Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
     Map<String, String> compactionConfigs = new HashMap<>();
-    compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, "1d");
-    compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "7d");
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "5000000");
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(RAW_TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("memberId",
-                new ColumnPartitionConfig("murmur", 1))))
         .build();
     ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
     SegmentZKMetadata completedSegment = new SegmentZKMetadata("testTable__0");
@@ -191,143 +157,5 @@ public class UpsertCompactionTaskGeneratorTest {
     List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(tableConfig));
 
     assertEquals(pinotTaskConfigs.size(), 0);
-  }
-
-  @Test
-  public void testGenerateTasksWithOlderCompletedSegments() {
-    UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
-    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    Map<String, String> compactionConfigs = new HashMap<>();
-    String bucketPeriod = "1d";
-    compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, bucketPeriod);
-    String bufferPeriod = "7d";
-    compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, bufferPeriod);
-    String maxRecordsPerSegment = "5000000";
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxRecordsPerSegment);
-    String invalidRecordsThreshold = "2500000";
-    compactionConfigs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, invalidRecordsThreshold);
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("memberId",
-                new ColumnPartitionConfig("murmur", 1))))
-        .build();
-    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
-
-    SegmentZKMetadata completedSegment0 = new SegmentZKMetadata("testTable__0");
-    completedSegment0.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    Long endTime = System.currentTimeMillis()
-        - TimeUtils.convertPeriodToMillis(bufferPeriod)
-        - TimeUtils.convertPeriodToMillis("1d");
-    Long startTime = endTime - TimeUtils.convertPeriodToMillis("1d");
-    completedSegment0.setStartTime(startTime);
-    completedSegment0.setEndTime(endTime);
-    completedSegment0.setTimeUnit(TimeUnit.MILLISECONDS);
-    completedSegment0.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(
-        "memberId", new ColumnPartitionMetadata(
-            "murmur", 1, Collections.singleton(0), null))));
-
-    SegmentZKMetadata completedSegment1 = new SegmentZKMetadata("testTable__1");
-    completedSegment1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    endTime = System.currentTimeMillis() - TimeUtils.convertPeriodToMillis(bufferPeriod);
-    startTime = endTime - TimeUtils.convertPeriodToMillis("1d");
-    completedSegment1.setStartTime(startTime);
-    completedSegment1.setEndTime(endTime);
-    completedSegment1.setTimeUnit(TimeUnit.MILLISECONDS);
-    completedSegment1.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(
-        "memberId", new ColumnPartitionMetadata(
-            "murmur", 1, Collections.singleton(0), null))));
-
-    when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(completedSegment0, completedSegment1));
-    taskGenerator.init(mockClusterInfoAccessor);
-
-    List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(tableConfig));
-
-    assertEquals(pinotTaskConfigs.size(), 1);
-    Map<String, String> configs = pinotTaskConfigs.get(0).getConfigs();
-    assertEquals(configs.get(MinionConstants.TABLE_NAME_KEY), REALTIME_TABLE_NAME);
-    String[] segmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY)
-        .split(MinionConstants.SEGMENT_NAME_SEPARATOR);
-    assertEquals(segmentNames[0], completedSegment0.getSegmentName());
-    assertEquals(segmentNames[1], completedSegment1.getSegmentName());
-    assertEquals(configs.get(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY), bucketPeriod);
-    assertEquals(configs.get(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY), maxRecordsPerSegment);
-    assertEquals(configs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD), invalidRecordsThreshold);
-  }
-
-  @Test
-  public void testGenerateTasksPartitionedTable() {
-    UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
-    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    Map<String, String> compactionConfigs = new HashMap<>();
-    String bucketPeriod = "1d";
-    compactionConfigs.put(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY, bucketPeriod);
-    String bufferPeriod = "7d";
-    compactionConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, bufferPeriod);
-    String maxRecordsPerSegment = "5000000";
-    compactionConfigs.put(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxRecordsPerSegment);
-    String invalidRecordsThreshold = "2500000";
-    compactionConfigs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, invalidRecordsThreshold);
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("memberId",
-                new ColumnPartitionConfig("murmur", 2))))
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .build();
-    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
-    Long endTime = System.currentTimeMillis() - TimeUtils.convertPeriodToMillis(bufferPeriod);
-    Long startTime = endTime - TimeUtils.convertPeriodToMillis("1d");
-    SegmentZKMetadata completedSegment0 = new SegmentZKMetadata("testTable__0");
-    completedSegment0.setStartTime(startTime);
-    completedSegment0.setEndTime(endTime);
-    completedSegment0.setTimeUnit(TimeUnit.MILLISECONDS);
-    SegmentPartitionMetadata partitionMetadata0 = new SegmentPartitionMetadata(
-        Collections.singletonMap("memberId",
-            new ColumnPartitionMetadata("murmur", 2,
-                Collections.singleton(0), null)));
-    completedSegment0.setPartitionMetadata(partitionMetadata0);
-    completedSegment0.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    SegmentZKMetadata completedSegment1 = new SegmentZKMetadata("testTable__1");
-    SegmentPartitionMetadata partitionMetadata1 = new SegmentPartitionMetadata(
-        Collections.singletonMap("memberId",
-            new ColumnPartitionMetadata("murmur", 2,
-                Collections.singleton(1), null)));
-    completedSegment1.setPartitionMetadata(partitionMetadata1);
-    completedSegment1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    completedSegment1.setStartTime(startTime);
-    completedSegment1.setEndTime(endTime);
-    completedSegment1.setTimeUnit(TimeUnit.MILLISECONDS);
-    when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(completedSegment0, completedSegment1));
-    taskGenerator.init(mockClusterInfoAccessor);
-
-    List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(tableConfig));
-
-    assertEquals(pinotTaskConfigs.size(), 2);
-    boolean foundTaskConfig0 = false;
-    boolean foundTaskConfig1 = false;
-    for (PinotTaskConfig pinotTaskConfig : pinotTaskConfigs) {
-      Map<String, String> configs = pinotTaskConfig.getConfigs();
-      assertEquals(configs.get(MinionConstants.TABLE_NAME_KEY), REALTIME_TABLE_NAME);
-      String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
-      if (segmentName == completedSegment0.getSegmentName()) {
-        foundTaskConfig0 = true;
-      } else if (segmentName == completedSegment1.getSegmentName()) {
-        foundTaskConfig1 = true;
-      }
-      assertEquals(configs.get(UpsertCompactionTask.BUCKET_TIME_PERIOD_KEY), bucketPeriod);
-      assertEquals(configs.get(UpsertCompactionTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY), maxRecordsPerSegment);
-      assertEquals(configs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD), invalidRecordsThreshold);
-    }
-    assertTrue(foundTaskConfig0 && foundTaskConfig1);
   }
 }

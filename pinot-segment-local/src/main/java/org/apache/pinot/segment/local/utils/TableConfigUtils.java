@@ -532,17 +532,10 @@ public final class TableConfigUtils {
               "Upsert must be enabled for UpsertCompactionTask");
           // check no malformed period
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
           // check maxNumRecordsPerSegment
           Preconditions.checkState(Integer.parseInt(
                   taskTypeConfig.getOrDefault("maxNumRecordsPerSegment", "5000000")) > 0,
               "maxNumRecordsPerSegment must be > 0");
-          // check segmentPartitionConfig
-          IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-          Preconditions.checkState(indexingConfig != null,
-              "indexingConfig must be configured for UpsertCompactionTask");
-//          Preconditions.checkState(indexingConfig.getSegmentPartitionConfig() != null,
-//              "segmentPartitionConfig must be configured for UpsertCompactionTask");
         }
       }
     }

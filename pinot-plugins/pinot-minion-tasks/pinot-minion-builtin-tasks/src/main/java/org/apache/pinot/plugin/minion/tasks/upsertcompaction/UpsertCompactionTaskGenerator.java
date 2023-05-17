@@ -222,12 +222,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       LOGGER.warn(message, taskType, tableNameWithType);
       return false;
     }
-//    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-//    if (indexingConfig == null || indexingConfig.getSegmentPartitionConfig() == null) {
-//      LOGGER.warn("Skip generation task: {} for table: {}, unable to find segment partition config",
-//          taskType, tableNameWithType);
-//      return false;
-//    }
     return true;
   }
 }
