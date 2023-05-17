@@ -123,6 +123,9 @@ public class PinotQueryRuleSets {
       PinotJoinExchangeNodeInsertRule.INSTANCE,
       PinotAggregateExchangeNodeInsertRule.INSTANCE,
       PinotWindowExchangeNodeInsertRule.INSTANCE,
-      PinotSetOpExchangeNodeInsertRule.INSTANCE
+      PinotSetOpExchangeNodeInsertRule.INSTANCE,
+
+      // apply dynamic broadcast rule after exchange is inserted/
+      PinotJoinToDynamicBroadcastRule.INSTANCE
   );
 }

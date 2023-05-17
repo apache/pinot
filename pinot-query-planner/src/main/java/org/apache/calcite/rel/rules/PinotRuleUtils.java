@@ -24,6 +24,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 
@@ -53,5 +54,21 @@ public class PinotRuleUtils {
       reference = ((HepRelVertex) reference).getCurrentRel();
     }
     return reference instanceof Project;
+  }
+
+  // TODO: optimize this part out as it is not efficient to scan the entire subtree for exchanges.
+  public static boolean noExchangeInSubtree(RelNode relNode) {
+    if (relNode instanceof HepRelVertex) {
+      relNode = ((HepRelVertex) relNode).getCurrentRel();
+    }
+    if (relNode instanceof LogicalExchange) {
+      return false;
+    }
+    for (RelNode child : relNode.getInputs()) {
+      if (!noExchangeInSubtree(child)) {
+        return false;
+      }
+    }
+    return true;
   }
 }
