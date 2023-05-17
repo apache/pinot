@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import com.google.common.base.Preconditions;
@@ -29,16 +47,24 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
   public static final String RECORD_PURGER_KEY = "recordPurger";
   public static final String NUM_RECORDS_PURGED_KEY = "numRecordsPurged";
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
     throws Exception {
+    _eventObserver.notifyProgress(pinotTaskConfig, "Compacting segment: " + indexDir);
     Map<String, String> configs = pinotTaskConfig.getConfigs();
+    String taskType = pinotTaskConfig.getTaskType();
+    LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
+    long startMillis = System.currentTimeMillis();
+
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     List<String> columns = getSchema(rawTableName).getPrimaryKeyColumns();
@@ -48,28 +74,35 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     Set<Integer> validIds = getValidIds(tableNameWithType, validDocIds, indexDir, columns);
 
     MINION_CONTEXT.setRecordPurgerFactory(x -> row -> {
+      if (validIds.isEmpty())
+        return true;
+
       List<String> values = new ArrayList<>();
       for (String column : columns) {
         values.add(row.getValue(column).toString());
       }
       return !validIds.contains(values.hashCode());
     });
-    SegmentPurger.RecordPurger recordPurger = MINION_CONTEXT
-        .getRecordPurgerFactory()
-        .getRecordPurger(rawTableName);
+    SegmentPurger.RecordPurger recordPurger = MINION_CONTEXT.getRecordPurgerFactory().getRecordPurger(rawTableName);
 
+    _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segment");
     SegmentPurger segmentPurger = new SegmentPurger(indexDir, workingDir, tableConfig, recordPurger, null);
     File compactedSegmentFile = segmentPurger.purgeSegment();
     if (compactedSegmentFile == null) {
       compactedSegmentFile = indexDir;
     }
 
-    return new SegmentConversionResult.Builder().setFile(compactedSegmentFile)
+    SegmentConversionResult result = new SegmentConversionResult.Builder()
+        .setFile(compactedSegmentFile)
         .setTableNameWithType(tableNameWithType)
         .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
         .setCustomProperty(RECORD_PURGER_KEY, segmentPurger.getRecordPurger())
-        .setCustomProperty(NUM_RECORDS_PURGED_KEY, segmentPurger.getNumRecordsPurged())
-        .build();
+        .setCustomProperty(NUM_RECORDS_PURGED_KEY, segmentPurger.getNumRecordsPurged()).build();
+
+    long endMillis = System.currentTimeMillis();
+    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
+
+    return result;
   }
 
   private static ImmutableRoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs) {
@@ -94,11 +127,15 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
   private Set<Integer> getValidIds(String tableNameWithType, ImmutableRoaringBitmap validDocIds,
       File indexDir, List<String> columns) throws IOException {
+    Set<Integer> validIds = new HashSet<>();
+
+    if (validDocIds.isEmpty())
+      return validIds;
+
     PeekableIntIterator iterator = validDocIds.getIntIterator();
     PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
     recordReader.init(indexDir, new HashSet<>(columns), null);
     GenericRow genericRow = new GenericRow();
-    Set<Integer> validIds = new HashSet<>();
 
     while (iterator.hasNext()) {
       int validDocId = iterator.next();
