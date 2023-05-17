@@ -115,11 +115,15 @@ public class MinionContext {
     _clusterManagementTool = clusterManagementTool;
   }
 
-  public HelixAdmin getClusterManagementTool() { return _clusterManagementTool; }
+  public HelixAdmin getClusterManagementTool() {
+    return _clusterManagementTool;
+  }
 
   public void setClusterName(String clusterName) {
     _clusterName = clusterName;
   }
 
-  public String getClusterName() { return _clusterName; }
+  public String getClusterName() {
+    return _clusterName;
+  }
 }
