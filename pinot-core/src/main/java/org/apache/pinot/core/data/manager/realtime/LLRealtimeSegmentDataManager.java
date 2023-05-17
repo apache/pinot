@@ -1465,6 +1465,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
       _partitionGroupConsumerSemaphore.release();
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
+          "Failed to initialize segment data manager", e));
       throw e;
     }
   }
