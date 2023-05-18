@@ -115,9 +115,7 @@ public class SelectionCombineOperatorTest {
 
     RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
         .setTableNameWithType(REALTIME_TABLE_NAME).setSegmentName(segmentName).setSchema(SCHEMA).setCapacity(100000)
-        .setAvgNumMultiValues(2).setNoDictionaryColumns(Collections.emptySet())
-        .setJsonIndexConfigs(Collections.emptyMap()).setVarLengthDictionaryColumns(Collections.emptySet())
-        .setInvertedIndexColumns(Collections.emptySet()).setSegmentZKMetadata(new SegmentZKMetadata(segmentName))
+        .setAvgNumMultiValues(2).setSegmentZKMetadata(new SegmentZKMetadata(segmentName))
         .setMemoryManager(new DirectMemoryManager(segmentName)).setStatsHistory(statsHistory).setAggregateMetrics(false)
         .setNullHandlingEnabled(true).setIngestionAggregationConfigs(Collections.emptyList()).build();
     MutableSegment mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfig, null);
