@@ -56,13 +56,13 @@ import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
  * this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
  * v1 operators at this point in time.
  *
- * <p>This class should be used statically via {@link #build(PlanNode, PlanRequestContext)}
+ * <p>This class should be used statically via {@link #walkPlanNode(PlanNode, PlanRequestContext)}
  */
 public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, PlanRequestContext> {
 
   private static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
 
-  public static OpChain build(PlanNode node, PlanRequestContext context) {
+  public static OpChain walkPlanNode(PlanNode node, PlanRequestContext context) {
     MultiStageOperator root = node.visit(INSTANCE, context);
     return new OpChain(context.getOpChainExecutionContext(), root, context.getReceivingMailboxIds());
   }
