@@ -293,6 +293,10 @@ public class MutableSegmentImpl implements MutableSegment {
       if (isDictionary) {
         DictionaryIndexConfig dictionaryIndexConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
         if (dictionaryIndexConfig.isDisabled()) {
+          // Even if dictionary is disabled in the config, isNoDictionaryColumn(...) returned false, so
+          // we are going to create a dictionary.
+          // This may happen for several reasons. For example, when there is a inverted index on the column.
+          // See isNoDictionaryColumn to have more context.
           dictionaryIndexConfig = DictionaryIndexConfig.DEFAULT;
         }
         dictionary = DictionaryIndexType.createMutableDictionary(context, dictionaryIndexConfig);
