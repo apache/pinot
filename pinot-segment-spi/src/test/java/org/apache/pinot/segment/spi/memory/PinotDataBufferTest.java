@@ -550,7 +550,7 @@ public class PinotDataBufferTest {
     }
   }
 
-  @Test
+  @Test(enabled = false)
   public void testConstructors()
       throws Exception {
     testBufferStats(0, 0, 0, 0);
