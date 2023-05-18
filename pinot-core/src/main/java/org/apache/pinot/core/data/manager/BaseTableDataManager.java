@@ -628,19 +628,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
         maxStreamRateInByte);
     String uri = zkMetadata.getDownloadUrl();
     try {
-      try {
         File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxStreamRateInByte);
-        LOGGER.info("Download and untarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
+        LOGGER.info("Downloaded and untarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
         return ret;
-      } catch (Exception e) {
-        _serverMetrics.addMeteredTableValue(_tableNameWithType,
-            ServerMeter.SEGMENT_TOTAL_STREAMED_DOWNLOAD_UNTAR_FAILURES, 1L);
-        throw e;
+    } catch (Exception e) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
+          1L);
+      if (e instanceof AttemptsExceededException) {
+        LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
+            segmentName, _tableNameWithType, uri, tempRootDir);
       }
-    } catch (AttemptsExceededException e) {
-      LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
-          segmentName, _tableNameWithType, uri, tempRootDir);
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, 1L);
       throw e;
     } finally {
       if (_segmentDownloadSemaphore != null) {
