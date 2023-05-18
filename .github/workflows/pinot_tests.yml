@@ -76,7 +76,7 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17 ]
+        java: [ 11, 17, 20 ]
         distribution: [ "temurin" ]
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
@@ -128,7 +128,7 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17 ]
+        java: [ 11, 17, 20 ]
         distribution: [ "temurin" ]
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:

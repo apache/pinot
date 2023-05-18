@@ -119,7 +119,7 @@ public class MmapMemory implements Memory {
       List<Finder<? extends MapFun>> candidates = Lists.newArrayList(
           new Map0Fun.Java11(),
           new Map0Fun.Java17(),
-          new MapFun.Java20()
+          new Java20()
       );
 
       for (Finder<? extends MapFun> candidate : candidates) {
@@ -150,16 +150,24 @@ public class MmapMemory implements Memory {
 
         return (file, readOnly, offset, size) -> {
           FileChannel.MapMode mapMode = readOnly ? FileChannel.MapMode.READ_ONLY : FileChannel.MapMode.READ_WRITE;
-          // see https://github.com/openjdk/jdk/blob/1330d4eaa54790b468f69e61574b3c5d522be120/src/java.base/share/
-          // classes/sun/nio/ch/FileChannelImpl.java#L1361
+          // see https://github.com/openjdk/jdk/blob/cc9f7ad9ce33dc44d335fb7fb5483795c62ba936/src/java.base/share/
+          // classes/sun/nio/ch/FileChannelImpl.java#L1223
           int prot = readOnly ? 0 : 1;
 
           String mode = readOnly ? "r" : "rw";
           try (RandomAccessFile raf = new RandomAccessFile(file, mode); FileChannel fc = raf.getChannel()) {
             Object unmapper = mapMethod.invoke(fc, mapMode, offset, size, prot, false);
-            long address = (long) addressMethod.invoke(unmapper);
-
-            UnmapFun unmapFun = () -> unmapMethod.invoke(unmapper);
+            long address;
+            UnmapFun unmapFun;
+            if (unmapper == null) {
+              // unmapper may be null if the size is 0 or if the file descriptor is closed while mapInternal was called
+              address = 0;
+              unmapFun = () -> {
+              };
+            } else {
+              address = (long) addressMethod.invoke(unmapper);;
+              unmapFun = () -> unmapMethod.invoke(unmapper);
+            }
 
             return new MapSection(address, unmapFun);
           } catch (InvocationTargetException | IllegalAccessException e) {
