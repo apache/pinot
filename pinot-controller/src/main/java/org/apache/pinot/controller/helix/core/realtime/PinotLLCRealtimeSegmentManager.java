@@ -1455,6 +1455,8 @@ public class PinotLLCRealtimeSegmentManager {
         persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
         LOGGER.info("Successfully uploaded LLC segment {} to deep store with download url: {}", segmentName,
             segmentDownloadUrl);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName,
+            ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_SUCCESS, 1L);
       } catch (Exception e) {
         _controllerMetrics.addMeteredTableValue(realtimeTableName,
             ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
