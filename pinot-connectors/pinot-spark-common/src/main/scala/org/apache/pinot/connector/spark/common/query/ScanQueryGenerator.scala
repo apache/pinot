@@ -46,7 +46,11 @@ private[pinot] class ScanQueryGenerator(
 
   /** Get all columns if selecting columns empty(eg: resultDataFrame.count()) */
   private def columnsAsExpression(): String = {
-    if (columns.isEmpty) "*" else columns.mkString(",")
+    if (columns.isEmpty) "*" else columns.map(escapeCol).mkString(",")
+  }
+
+  private def escapeCol(col: String): String = {
+      if (col.contains("\"")) col else s""""$col""""
   }
 
   /** Build realtime or offline SQL selection query. */

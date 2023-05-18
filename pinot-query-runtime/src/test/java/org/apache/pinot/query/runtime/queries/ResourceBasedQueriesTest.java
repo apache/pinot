@@ -44,8 +44,8 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.routing.WorkerInstance;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -54,6 +54,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -69,7 +70,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 
-  private static Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
 
   @BeforeClass
   public void setUp()
@@ -92,6 +93,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
+        boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
@@ -110,17 +112,21 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         for (GenericRow row : genericRows) {
           if (row == SEGMENT_BREAKER_ROW) {
-            factory1.addSegment(tableNameWithType, rows1);
-            factory2.addSegment(tableNameWithType, rows2);
-            rows1 = new ArrayList<>();
-            rows2 = new ArrayList<>();
+            if (allowEmptySegment || rows1.size() > 0) {
+              factory1.addSegment(tableNameWithType, rows1);
+              rows1 = new ArrayList<>();
+            }
+            if (allowEmptySegment || rows2.size() > 0) {
+              factory2.addSegment(tableNameWithType, rows2);
+              rows2 = new ArrayList<>();
+            }
           } else {
             long partition = 0;
             if (partitionColumns == null) {
               partition = RANDOM.nextInt(2);
             } else {
               for (String field : partitionColumns) {
-                partition = (partition + ((GenericRow) row).getValue(field).hashCode()) % 42;
+                partition = (partition + row.getValue(field).hashCode()) % 42;
               }
             }
             if (partition % 2 == 0) {
@@ -130,8 +136,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             }
           }
         }
-        factory1.addSegment(tableNameWithType, rows1);
-        factory2.addSegment(tableNameWithType, rows2);
+        if (allowEmptySegment || rows1.size() > 0) {
+          factory1.addSegment(tableNameWithType, rows1);
+        }
+        if (allowEmptySegment || rows2.size() > 0) {
+          factory2.addSegment(tableNameWithType, rows2);
+        }
       }
 
       boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null);
@@ -162,7 +172,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService = new GrpcMailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
         new PinotConfiguration(reducerConfig), ignored -> {
     });
     _mailboxService.start();
@@ -191,8 +201,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // this is only use for test identifier purpose.
     int port1 = server1.getPort();
     int port2 = server2.getPort();
-    _servers.put(new WorkerInstance("localhost", port1, port1, port1, port1), server1);
-    _servers.put(new WorkerInstance("localhost", port2, port2, port2, port2), server2);
+    _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
+    _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
   }
 
   @AfterClass
@@ -307,7 +317,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderBoth()
+  private Object[][] testResourceQueryTestCaseProviderBoth()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -333,8 +343,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             expectedRows.add(objs.toArray());
           }
           Object[] testEntry = new Object[]{
-              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder
+              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException, queryCase._keepOutputRowOrder
           };
           providerContent.add(testEntry);
         }
@@ -344,13 +353,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderWithMetadata()
+  private Object[][] testResourceQueryTestCaseProviderWithMetadata()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
     Set<String> validTestCases = new HashSet<>();
-    validTestCases.add("basic_test");
-    validTestCases.add("framework_test");
+    validTestCases.add("metadata_test");
 
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
       String testCaseName = testCaseEntry.getKey();
@@ -375,9 +383,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
               : replaceTableName(testCaseName, queryCase._sql);
 
           int segmentCount = 0;
-          for (String tableName : testCaseEntry.getValue()._tables.keySet()) {
-            segmentCount +=
-                _tableToSegmentMap.getOrDefault(testCaseName + "_" + tableName + "_OFFLINE", new HashSet<>()).size();
+          if (queryCase._expectedNumSegments != null) {
+            segmentCount = queryCase._expectedNumSegments;
+          } else {
+            throw new RuntimeException("Unable to test metadata without expected num segments configuration!");
           }
 
           Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
@@ -389,7 +398,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderInputOnly()
+  private Object[][] testResourceQueryTestCaseProviderInputOnly()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -423,7 +432,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   // TODO: cache this test case generator
-  private static Map<String, QueryTestCase> getTestCases()
+  private Map<String, QueryTestCase> getTestCases()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = new HashMap<>();
     ClassLoader classLoader = ResourceBasedQueriesTest.class.getClassLoader();
@@ -465,5 +474,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       }
     }
     return testCaseMap;
+  }
+
+  private static Object extractExtraProps(Map<String, Object> extraProps, String propKey) {
+    if (extraProps == null) {
+      return null;
+    }
+    return extraProps.getOrDefault(propKey, null);
   }
 }

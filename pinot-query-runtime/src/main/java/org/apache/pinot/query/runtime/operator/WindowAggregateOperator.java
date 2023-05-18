@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,7 +38,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
@@ -52,8 +53,10 @@ import org.slf4j.LoggerFactory;
  * columns and in addition will add the aggregation columns to the output data.
  * [input columns, aggregate result1, ... aggregate resultN]
  *
- * The window functions supported today are SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations. Window functions also
- * include other types of functions such as rank and value functions.
+ * The window functions supported today are:
+ * Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations [RANGE window type only]
+ * Ranking: ROW_NUMBER ranking functions [ROWS window type only]
+ * Value: [none]
  *
  * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
  * will output as many rows as input rows.
@@ -67,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  *
  * TODO:
- *     1. Add support for rank window functions
+ *     1. Add support for additional rank window functions
  *     2. Add support for value window functions
  *     3. Add support for custom frames (including ROWS support)
  *     4. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
@@ -76,6 +79,9 @@ import org.slf4j.LoggerFactory;
 public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
   private static final Logger LOGGER = LoggerFactory.getLogger(WindowAggregateOperator.class);
+
+  // List of window functions which can only be applied as ROWS window frame type
+  private static final Set<String> ROWS_ONLY_FUNCTION_NAMES = ImmutableSet.of("ROW_NUMBER");
 
   private final MultiStageOperator _inputOperator;
   private final List<RexExpression> _groupSet;
@@ -118,8 +124,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
     _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection, _isPartitionByOnly);
     _windowFrame = new WindowFrame(lowerBound, upperBound, windowFrameType);
 
-    Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
-        "Only RANGE type frames are supported at present");
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
     Preconditions.checkState(_windowFrame.isUnboundedFollowing() || _windowFrame.isUpperBoundCurrentRow(),
@@ -135,9 +139,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     for (int i = 0; i < aggCallsSize; i++) {
       RexExpression.FunctionCall agg = _aggCalls.get(i);
       String functionName = agg.getFunctionName();
-      if (!mergers.containsKey(functionName)) {
-        throw new IllegalStateException("Unexpected aggregation function name: " + functionName);
-      }
+      validateAggregationCalls(functionName, mergers);
       _windowAccumulators[i] = new WindowAggregateAccumulator(agg, mergers, functionName, inputSchema, _orderSetInfo);
     }
 
@@ -182,6 +184,22 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
   }
 
+  private void validateAggregationCalls(String functionName,
+      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers) {
+    if (!mergers.containsKey(functionName)) {
+      throw new IllegalStateException("Unexpected aggregation function name: " + functionName);
+    }
+
+    if (ROWS_ONLY_FUNCTION_NAMES.contains(functionName)) {
+      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.ROW
+              && _windowFrame.isUpperBoundCurrentRow(),
+          String.format("%s must be of ROW frame type and have CURRENT ROW as the upper bound", functionName));
+    } else {
+      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
+          String.format("Only RANGE type frames are supported at present for function: %s", functionName));
+    }
+  }
+
   private boolean isPartitionByOnlyQuery(List<RexExpression> groupSet, List<RexExpression> orderSet) {
     if (CollectionUtils.isEmpty(orderSet)) {
       return true;
@@ -205,18 +223,44 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private TransferableBlock produceWindowAggregatedBlock() {
     Key emptyOrderKey = AggregationUtils.extractEmptyKey();
     List<Object[]> rows = new ArrayList<>(_numRows);
-    for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
-      Key partitionKey = e.getKey();
-      List<Object[]> rowList = e.getValue();
-      for (Object[] existingRow : rowList) {
-        Object[] row = new Object[existingRow.length + _aggCalls.size()];
-        Key orderKey = _isPartitionByOnly ? emptyOrderKey
-            : AggregationUtils.extractRowKey(existingRow, _orderSetInfo.getOrderSet());
-        System.arraycopy(existingRow, 0, row, 0, existingRow.length);
-        for (int i = 0; i < _windowAccumulators.length; i++) {
-          row[i + existingRow.length] = _windowAccumulators[i].getResultForKeys(partitionKey, orderKey);
+    if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
+      // All aggregation window functions only support RANGE type today (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
+      for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
+        Key partitionKey = e.getKey();
+        List<Object[]> rowList = e.getValue();
+        for (Object[] existingRow : rowList) {
+          Object[] row = new Object[existingRow.length + _aggCalls.size()];
+          Key orderKey = _isPartitionByOnly ? emptyOrderKey
+              : AggregationUtils.extractRowKey(existingRow, _orderSetInfo.getOrderSet());
+          System.arraycopy(existingRow, 0, row, 0, existingRow.length);
+          for (int i = 0; i < _windowAccumulators.length; i++) {
+            row[i + existingRow.length] = _windowAccumulators[i].getRangeResultForKeys(partitionKey, orderKey);
+          }
+          rows.add(row);
         }
-        rows.add(row);
+      }
+    } else {
+      // Only ROW_NUMBER() window function is supported as ROWS type today
+      Key previousPartitionKey = null;
+      Object[] previousRowValues = new Object[_windowAccumulators.length];
+      for (int i = 0; i < _windowAccumulators.length; i++) {
+        previousRowValues[i] = null;
+      }
+
+      for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
+        Key partitionKey = e.getKey();
+        List<Object[]> rowList = e.getValue();
+        for (Object[] existingRow : rowList) {
+          Object[] row = new Object[existingRow.length + _aggCalls.size()];
+          System.arraycopy(existingRow, 0, row, 0, existingRow.length);
+          for (int i = 0; i < _windowAccumulators.length; i++) {
+            row[i + existingRow.length] = _windowAccumulators[i].computeRowResultForCurrentRow(partitionKey,
+                previousPartitionKey, row, previousRowValues[i]);
+            previousRowValues[i] = row[i + existingRow.length];
+          }
+          previousPartitionKey = partitionKey;
+          rows.add(row);
+        }
       }
     }
     _hasReturnedWindowAggregateBlock = true;
@@ -244,16 +288,29 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
 
       List<Object[]> container = block.getContainer();
-      for (Object[] row : container) {
-        _numRows++;
-        // TODO: Revisit null direction handling for all query types
-        Key key = AggregationUtils.extractRowKey(row, _groupSet);
-        Key orderKey = _isPartitionByOnly ? emptyOrderKey
-            : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
-        _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
-        int aggCallsSize = _aggCalls.size();
-        for (int i = 0; i < aggCallsSize; i++) {
-          _windowAccumulators[i].accumulate(key, orderKey, row);
+      if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
+        // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
+        // we output the rows since the aggregation value depends on the neighboring rows.
+        for (Object[] row : container) {
+          _numRows++;
+          // TODO: Revisit null direction handling for all query types
+          Key key = AggregationUtils.extractRowKey(row, _groupSet);
+          _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+          // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
+          // we output the rows since the aggregation value depends on the neighboring rows.
+          Key orderKey = _isPartitionByOnly ? emptyOrderKey
+              : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
+          int aggCallsSize = _aggCalls.size();
+          for (int i = 0; i < aggCallsSize; i++) {
+            _windowAccumulators[i].accumulateRangeResults(key, orderKey, row);
+          }
+        }
+      } else {
+        for (Object[] row : container) {
+          _numRows++;
+          // TODO: Revisit null direction handling for all query types
+          Key key = AggregationUtils.extractRowKey(row, _groupSet);
+          _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
         }
       }
       block = _inputOperator.nextBlock();
@@ -342,25 +399,59 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
   }
 
+  private static class MergeRowNumber implements AggregationUtils.Merger {
+
+    @Override
+    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
+      return 1L;
+    }
+
+    @Override
+    public Object merge(Object left, Object right) {
+      return ((Number) left).longValue() + 1L;
+    }
+  }
+
   private static class WindowAggregateAccumulator extends AggregationUtils.Accumulator {
     private static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> WIN_AGG_MERGERS =
         ImmutableMap.<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>>builder()
             .putAll(AggregationUtils.Accumulator.MERGERS)
+            .put("ROW_NUMBER", cdt -> new MergeRowNumber())
             .build();
 
-    private final Map<Key, OrderKeyResult> _orderByResults = new HashMap<>();
     private final boolean _isPartitionByOnly;
-    private final Key _emptyOrderKey;
+
+    // Fields needed only for RANGE frame type queries (ORDER BY)
+    private final Map<Key, OrderKeyResult> _orderByResults = new HashMap<>();
 
     WindowAggregateAccumulator(RexExpression.FunctionCall aggCall, Map<String,
         Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
         DataSchema inputSchema, OrderSetInfo orderSetInfo) {
       super(aggCall, merger, functionName, inputSchema);
       _isPartitionByOnly = CollectionUtils.isEmpty(orderSetInfo.getOrderSet()) || orderSetInfo.isPartitionByOnly();
-      _emptyOrderKey = AggregationUtils.extractEmptyKey();
     }
 
-    public void accumulate(Key key, Key orderKey, Object[] row) {
+    /**
+     * For ROW type queries the aggregation function value depends on the order of the rows rather than on the actual
+     * keys. For such queries compute the current row value based on the previous row and previous partition key.
+     * This should only be called for ROW type queries.
+     */
+    public Object computeRowResultForCurrentRow(Key currentPartitionKey, Key previousPartitionKey, Object[] row,
+        Object previousRowOutputValue) {
+      Object value = _inputRef == -1 ? _literal : row[_inputRef];
+      if (previousPartitionKey == null || !currentPartitionKey.equals(previousPartitionKey)) {
+        return _merger.initialize(currentPartitionKey, _dataType);
+      } else {
+        return _merger.merge(previousRowOutputValue, value);
+      }
+    }
+
+    /**
+     * For RANGE type queries, accumulate the function values for each PARTITION BY key and ORDER BY key based on
+     * the current row. Should only be called for RANGE type queries where the aggregation values are tied to the
+     * RANGE key and not to the row ordering. This should only be called for RANGE type queries.
+     */
+    public void accumulateRangeResults(Key key, Key orderKey, Object[] row) {
       if (_isPartitionByOnly) {
         accumulate(key, row);
         return;
@@ -388,7 +479,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
     }
 
-    public Object getResultForKeys(Key key, Key orderKey) {
+    public Object getRangeResultForKeys(Key key, Key orderKey) {
       if (_isPartitionByOnly) {
         return _results.get(key);
       } else {
@@ -396,7 +487,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
     }
 
-    public Map<Key, OrderKeyResult> getOrderByResults() {
+    public Map<Key, OrderKeyResult> getRangeOrderByResults() {
       return _orderByResults;
     }
 

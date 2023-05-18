@@ -61,7 +61,7 @@ public class H3IndexConfigTest {
   }
 
   @Test
-  public void withDissabledTrue()
+  public void withDisabledTrue()
       throws JsonProcessingException {
     String confStr = "{\"disabled\": true}";
     H3IndexConfig config = JsonUtils.stringToObject(confStr, H3IndexConfig.class);

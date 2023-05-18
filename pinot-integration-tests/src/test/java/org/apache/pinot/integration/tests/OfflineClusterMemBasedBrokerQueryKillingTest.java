@@ -36,6 +36,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactoryForTest;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -200,7 +201,7 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryconfig()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setQueryConfig(getQueryConfig()).setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
@@ -254,6 +255,8 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
     LOGGER.info("testDigestOOMMultipleQueries: {}", queryResponse1);
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains(
         "Interrupted in broker reduce phase"));
+    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":"
+        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));

@@ -19,14 +19,17 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.util.function.LongToIntFunction;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
@@ -44,7 +47,7 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
         // TODO: Need to add timezone_hour and timezone_minute
 //      "timezone_hour",
 //      "timezone_minute",
-      //@formatter:on
+        //@formatter:on
     };
   }
 
@@ -61,6 +64,25 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
     int[] value = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
       assertEquals(value[i], expected.applyAsInt(_timeValues[i]));
+    }
+  }
+
+  @Test(dataProvider = "testCases")
+  public void testExtractTransformFunctionNull(String field, LongToIntFunction expected) {
+    // NOTE: functionality of ExtractTransformFunction is covered in ExtractTransformFunctionTest
+    // SELECT EXTRACT(YEAR FROM '2017-10-10')
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("extract(%s FROM %s)", field, TIMESTAMP_COLUMN_NULL));
+
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ExtractTransformFunction);
+    Pair<int[], RoaringBitmap> valuesSVWithNull = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+    for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
+      if (i % 2 == 0) {
+        assertEquals(valuesSVWithNull.getLeft()[i], expected.applyAsInt(_timeValues[i]));
+      } else {
+        assertTrue(valuesSVWithNull.getRight().contains(i));
+      }
     }
   }
 }

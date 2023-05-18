@@ -263,6 +263,12 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
     assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigest(column, 99.9999)");
 
+    function = getFunction("PeRcEnTiLeTdIgEsT", "(column, 99.9999, 1000)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
+    assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigest(column, 99.9999, 1000)");
+
     function = getFunction("PeRcEnTiLeRaWtDiGeSt", "(column, 99)");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
@@ -270,6 +276,24 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getResultColumnName(), "percentilerawtdigest(column, 99.0)");
 
     function = getFunction("PeRcEnTiLeRaWtDiGeSt", "(column, 99.9999)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilerawtdigest(column, 99.9999)");
+
+    function = getFunction("PeRcEntiLEkll", "(column, 99.9999)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileKLLAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEKLL);
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilekll(column, 99.9999)");
+
+    function = getFunction("PeRcEnTiLeRaWtDiGeSt", "(column, 99.9999, 500)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilerawtdigest(column, 99.9999, 500)");
+
+    function = getFunction("PeRcEnTiLeRaWtDiGeSt", "(column, 99.9999, 100)");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
@@ -383,11 +407,23 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
     assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigestmv(column, 95.0)");
 
+    function = getFunction("PeRcEnTiLeTdIgEsTmV", "(column, 95, 1000)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
+    assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigestmv(column, 95.0, 1000)");
+
     function = getFunction("PeRcEnTiLe_TdIgEsT_mV", "(column, 95)");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof PercentileTDigestMVAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
     assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigestmv(column, 95.0)");
+
+    function = getFunction("PeRcEnTiLe_TdIgEsT_mV", "(column, 95, 200)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
+    assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigestmv(column, 95.0, 200)");
 
     function = getFunction("bool_and");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);

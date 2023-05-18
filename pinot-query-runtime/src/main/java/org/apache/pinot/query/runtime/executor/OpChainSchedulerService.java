@@ -24,9 +24,9 @@ import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,20 +48,16 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    * Default cancel signal retention, this should be set to several times larger than
    * {@link org.apache.pinot.query.service.QueryConfig#DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS}.
    */
-  private static final long DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
+  private static final long SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS = 60_000L;
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
-  private final Cache<Long, Long> _cancelledRequests;
+  private final Cache<Long, Long> _cancelledRequests = CacheBuilder.newBuilder()
+      .expireAfterWrite(SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS, TimeUnit.MILLISECONDS).build();
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
-    this(scheduler, workerPool, DEFAULT_SCHEDULER_CANCELLATION_SIGNAL_RETENTION_MS);
-  }
-
-  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long cancelRetentionMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
-    _cancelledRequests = CacheBuilder.newBuilder().expireAfterWrite(cancelRetentionMs, TimeUnit.MILLISECONDS).build();
   }
 
   @Override
@@ -138,9 +134,8 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     operatorChain.getStats().queued();
     _scheduler.register(operatorChain);
     LOGGER.debug("({}): Scheduler is now handling operator chain listening to mailboxes {}. "
-            + "There are a total of {} chains awaiting execution.",
-        operatorChain,
-        operatorChain.getReceivingMailbox(),
+            + "There are a total of {} chains awaiting execution.", operatorChain,
+        operatorChain.getReceivingMailboxIds(),
         _scheduler.size());
   }
 
@@ -154,14 +149,13 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   }
 
   /**
-   * This method should be called whenever data is available in a given mailbox.
-   * Implementations of this method should be idempotent, it may be called in the
-   * scenario that no mail is available.
+   * This method should be called whenever data is available for an {@link OpChain} to consume.
+   * Implementations of this method should be idempotent, it may be called in the scenario that no data is available.
    *
-   * @param mailbox the identifier of the mailbox that now has data
+   * @param opChainId the identifier of the operator chain
    */
-  public final void onDataAvailable(MailboxIdentifier mailbox) {
-    _scheduler.onDataAvailable(mailbox);
+  public final void onDataAvailable(OpChainId opChainId) {
+    _scheduler.onDataAvailable(opChainId);
   }
 
   // TODO: remove this method after we pipe down the proper executor pool to the v1 engine

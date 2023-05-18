@@ -55,6 +55,17 @@ public class AggregationFunctionFactory {
         if (remainingFunctionName.equals("SMARTTDIGEST")) {
           return new PercentileSmartTDigestAggregationFunction(arguments);
         }
+        if (remainingFunctionName.contains("KLL")) {
+          if (remainingFunctionName.equals("KLL")) {
+            return new PercentileKLLAggregationFunction(arguments);
+          } else if (remainingFunctionName.equals("KLLMV")) {
+            return new PercentileKLLMVAggregationFunction(arguments);
+          } else if (remainingFunctionName.equals("RAWKLL")) {
+            return new PercentileRawKLLAggregationFunction(arguments);
+          } else if (remainingFunctionName.equals("RAWKLLMV")) {
+            return new PercentileRawKLLMVAggregationFunction(arguments);
+          }
+        }
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
@@ -77,6 +88,14 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigest
             String percentileString = remainingFunctionName.substring(10);
             return new PercentileRawTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("KLL\\d+")) {
+            // PercentileKLL
+            String percentileString = remainingFunctionName.substring(3);
+            return new PercentileKLLAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("RAWKLL\\d+")) {
+            // PercentileRawKLL
+            String percentileString = remainingFunctionName.substring(6);
+            return new PercentileRawKLLAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("\\d+MV")) {
             // PercentileMV
             String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
@@ -97,6 +116,14 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigestMV
             String percentileString = remainingFunctionName.substring(10, remainingFunctionName.length() - 2);
             return new PercentileRawTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("KLL\\d+MV")) {
+            // PercentileKLLMV
+            String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
+            return new PercentileKLLMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("RAWKLL\\d+MV")) {
+            // PercentileRawKLLMV
+            String percentileString = remainingFunctionName.substring(6, remainingFunctionName.length() - 2);
+            return new PercentileRawKLLMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           }
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
@@ -123,6 +150,14 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigest
             return new PercentileRawTDigestAggregationFunction(firstArgument, percentile);
           }
+          if (remainingFunctionName.equals("KLL")) {
+            // PercentileKLL
+            return new PercentileKLLAggregationFunction(firstArgument, percentile);
+          }
+          if (remainingFunctionName.equals("RAWKLL")) {
+            // PercentileRawKLL
+            return new PercentileRawKLLAggregationFunction(firstArgument, percentile);
+          }
           if (remainingFunctionName.equals("MV")) {
             // PercentileMV
             return new PercentileMVAggregationFunction(firstArgument, percentile);
@@ -142,6 +177,39 @@ public class AggregationFunctionFactory {
           if (remainingFunctionName.equals("RAWTDIGESTMV")) {
             // PercentileRawTDigestMV
             return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile);
+          }
+          if (remainingFunctionName.equals("KLLMV")) {
+            // PercentileKLLMV
+            return new PercentileKLLMVAggregationFunction(firstArgument, percentile);
+          }
+          if (remainingFunctionName.equals("RAWKLLMV")) {
+            // PercentileRawKLLMV
+            return new PercentileRawKLLMVAggregationFunction(firstArgument, percentile);
+          }
+        } else if (numArguments == 3) {
+          // Triple arguments percentile (e.g. percentileTDigest(bar, 95, 1000), etc.) where the
+          // second argument is a decimal number from 0.0 to 100.0 and third argument is a decimal number indicating
+          // the compression_factor for the TDigest. This can only be used for TDigest type percentile functions to
+          // pass in a custom compression_factor. If the two argument version is used the default compression_factor
+          // of 100.0 is used.
+          // Have to use literal string because we need to cast int to double here.
+          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
+          int compressionFactor = parseCompressionFactorToInt(arguments.get(2).getLiteral().getStringValue());
+          if (remainingFunctionName.equals("TDIGEST")) {
+            // PercentileTDigest
+            return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("RAWTDIGEST")) {
+            // PercentileRawTDigest
+            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("TDIGESTMV")) {
+            // PercentileTDigestMV
+            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("RAWTDIGESTMV")) {
+            // PercentileRawTDigestMV
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
           }
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
@@ -300,6 +368,18 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
+          case PARENTARGMAX:
+            return new ParentArgMinMaxAggregationFunction(arguments, true);
+          case PARENTARGMIN:
+            return new ParentArgMinMaxAggregationFunction(arguments, false);
+          case CHILDARGMAX:
+            return new ChildArgMinMaxAggregationFunction(arguments, true);
+          case CHILDARGMIN:
+            return new ChildArgMinMaxAggregationFunction(arguments, false);
+          case ARGMAX:
+          case ARGMIN:
+            throw new IllegalArgumentException("Aggregation function: " + function
+                + " is only supported in selection without alias.");
           default:
             throw new IllegalArgumentException();
         }
@@ -320,5 +400,11 @@ public class AggregationFunctionFactory {
     double percentile = Double.parseDouble(percentileString);
     Preconditions.checkArgument(percentile >= 0d && percentile <= 100d, "Invalid percentile: %s", percentile);
     return percentile;
+  }
+
+  private static int parseCompressionFactorToInt(String compressionFactorString) {
+    int compressionFactor = Integer.parseInt(compressionFactorString);
+    Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
+    return compressionFactor;
   }
 }

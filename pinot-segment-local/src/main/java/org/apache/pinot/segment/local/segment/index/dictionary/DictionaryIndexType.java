@@ -19,12 +19,16 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -70,6 +74,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +113,11 @@ public class DictionaryIndexType
   @Override
   public DictionaryIndexConfig getDefaultConfig() {
     return DictionaryIndexConfig.DEFAULT;
+  }
+
+  @Override
+  public String getPrettyName() {
+    return getId();
   }
 
   @Override
@@ -155,7 +165,7 @@ public class DictionaryIndexType
         .withFallbackAlternative(fromNoDictCol)
         .withFallbackAlternative(fromFieldConfigList)
         .withFallbackAlternative(fromIndexingConfig)
-        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass()));
+        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()));
   }
 
   @Override
@@ -259,7 +269,7 @@ public class DictionaryIndexType
       throws IOException {
     PinotDataBuffer dataBuffer =
         segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
-    return read(dataBuffer, columnMetadata, DictionaryIndexConfig.DEFAULT_OFFHEAP);
+    return read(dataBuffer, columnMetadata, DictionaryIndexConfig.DEFAULT);
   }
 
   public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
@@ -338,5 +348,63 @@ public class DictionaryIndexType
           throws IOException, IndexReaderConstraintException {
       return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
     }
+  }
+
+  @Override
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns() == null
+        ? Lists.newArrayList()
+        : indexingConfig.getNoDictionaryColumns();
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
+        ? Lists.newArrayList()
+        : tableConfig.getFieldConfigList();
+
+    List<FieldConfig> configsToUpdate = new ArrayList<>();
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      // skip further computation of field configs which already has RAW encodingType
+      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+        continue;
+      }
+      // ensure encodingType is RAW on noDictionaryColumns
+      if (noDictionaryColumns.remove(fieldConfig.getName())) {
+        configsToUpdate.add(fieldConfig);
+      }
+      if (fieldConfig.getIndexes() == null || fieldConfig.getIndexes().get(getPrettyName()) == null) {
+        continue;
+      }
+      try {
+        DictionaryIndexConfig indexConfig = JsonUtils.jsonNodeToObject(
+            fieldConfig.getIndexes().get(getPrettyName()),
+            DictionaryIndexConfig.class);
+        // ensure encodingType is RAW where dictionary index config has disabled = true
+        if (indexConfig.isDisabled()) {
+          configsToUpdate.add(fieldConfig);
+        }
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+
+    // update the encodingType to RAW on the selected field configs
+    for (FieldConfig fieldConfig : configsToUpdate) {
+      FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
+      builder.withEncodingType(FieldConfig.EncodingType.RAW);
+      fieldConfigList.remove(fieldConfig);
+      fieldConfigList.add(builder.build());
+    }
+
+    // create the missing field config for the remaining noDictionaryColumns
+    for (String column : noDictionaryColumns) {
+      FieldConfig.Builder builder = new FieldConfig.Builder(column);
+      builder.withEncodingType(FieldConfig.EncodingType.RAW);
+      fieldConfigList.add(builder.build());
+    }
+
+    // old configs cleanup
+    indexingConfig.setNoDictionaryConfig(null);
+    indexingConfig.setNoDictionaryColumns(null);
+    indexingConfig.setOnHeapDictionaryColumns(null);
+    indexingConfig.setVarLengthDictionaryColumns(null);
   }
 }

@@ -98,6 +98,7 @@ import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -180,6 +181,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
 
     setupHelixSystemProperties();
+    HelixHelper.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
     inferHostnameIfNeeded(_config);
@@ -408,6 +410,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
     _helixResourceManager.start(_helixParticipantManager);
+
+    // Initialize segment lifecycle event listeners
+    PinotSegmentLifecycleEventListenerManager.getInstance().init(_helixParticipantManager);
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager =

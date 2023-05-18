@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.startree.SegmentInfoProvider;
 import org.apache.pinot.integration.tests.startree.StarTreeQueryGenerator;
@@ -33,10 +34,11 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -65,6 +67,9 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
           AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE,
           AggregationFunctionType.DISTINCTCOUNTBITMAP);
   private static final int NUM_QUERIES_TO_GENERATE = 100;
+
+  private final long _randomSeed = System.currentTimeMillis();
+  private final Random _random = new Random(_randomSeed);
 
   private StarTreeQueryGenerator _starTree1QueryGenerator;
   private StarTreeQueryGenerator _starTree2QueryGenerator;
@@ -95,27 +100,26 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     Schema schema = createSchema();
     addSchema(schema);
 
-    // Randomly pick some dimensions and metrics for star-trees
-    List<String> starTree1Dimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
-    List<String> starTree2Dimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
+    // Pick fixed dimensions and metrics for the first star-tree
+    List<String> starTree1Dimensions =
+        Arrays.asList("OriginCityName", "DepTimeBlk", "LongestAddGTime", "CRSDepTime", "DivArrDelay");
+    List<String> starTree1Metrics =
+        Arrays.asList("CarrierDelay", "DepDelay", "LateAircraftDelay", "ArrivalDelayGroups", "ArrDel15");
+    int starTree1MaxLeafRecords = 10;
+
+    // Randomly pick some dimensions and metrics for the second star-tree
     List<String> allDimensions = new ArrayList<>(schema.getDimensionNames());
-    Collections.shuffle(allDimensions);
-    for (int i = 0; i < NUM_STAR_TREE_DIMENSIONS; i++) {
-      starTree1Dimensions.add(allDimensions.get(2 * i));
-      starTree2Dimensions.add(allDimensions.get(2 * i + 1));
-    }
-    List<String> starTree1Metrics = new ArrayList<>(NUM_STAR_TREE_METRICS);
-    List<String> starTree2Metrics = new ArrayList<>(NUM_STAR_TREE_METRICS);
+    Collections.shuffle(allDimensions, _random);
+    List<String> starTree2Dimensions = allDimensions.subList(0, NUM_STAR_TREE_DIMENSIONS);
     List<String> allMetrics = new ArrayList<>(schema.getMetricNames());
-    Collections.shuffle(allMetrics);
-    for (int i = 0; i < NUM_STAR_TREE_METRICS; i++) {
-      starTree1Metrics.add(allMetrics.get(2 * i));
-      starTree2Metrics.add(allMetrics.get(2 * i + 1));
-    }
+    Collections.shuffle(allMetrics, _random);
+    List<String> starTree2Metrics = allMetrics.subList(0, NUM_STAR_TREE_METRICS);
+    int starTree2MaxLeafRecords = 100;
+
     TableConfig tableConfig = createOfflineTableConfig();
     tableConfig.getIndexingConfig().setStarTreeIndexConfigs(
-        Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics),
-            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics)));
+        Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics, starTree1MaxLeafRecords),
+            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics, starTree2MaxLeafRecords)));
     addTableConfig(tableConfig);
 
     // Unpack the Avro files
@@ -132,22 +136,23 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       aggregationFunctions.add(functionType.getName());
     }
     _starTree1QueryGenerator = new StarTreeQueryGenerator(DEFAULT_TABLE_NAME, starTree1Dimensions, starTree1Metrics,
-        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions);
+        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions, _random);
     _starTree2QueryGenerator = new StarTreeQueryGenerator(DEFAULT_TABLE_NAME, starTree2Dimensions, starTree2Metrics,
-        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions);
+        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions, _random);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
   }
 
-  private static StarTreeIndexConfig getStarTreeIndexConfig(List<String> dimensions, List<String> metrics) {
+  private static StarTreeIndexConfig getStarTreeIndexConfig(List<String> dimensions, List<String> metrics,
+      int maxLeafRecords) {
     List<String> functionColumnPairs = new ArrayList<>();
     for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
       for (String metric : metrics) {
         functionColumnPairs.add(new AggregationFunctionColumnPair(functionType, metric).toColumnName());
       }
     }
-    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, 100);
+    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, maxLeafRecords);
   }
 
   @Test
@@ -160,23 +165,13 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testPredicateOnMetrics()
+  public void testHardCodedQueries()
       throws Exception {
-    String starQuery;
-
-    // Query containing predicate on one metric only
-    starQuery = "SELECT SUM(DepDelayMinutes) FROM mytable WHERE DepDelay > 0";
-    testStarQuery(starQuery);
-    starQuery = "SELECT SUM(DepDelayMinutes) FROM mytable WHERE DepDelay BETWEEN 0 and 10000";
-    testStarQuery(starQuery);
-
-    // Query containing predicate on multiple metrics
-    starQuery = "SELECT SUM(DepDelayMinutes) FROM mytable WHERE DepDelay > 0 AND ArrDelay > 0";
-    testStarQuery(starQuery);
-
-    // Query containing predicate on multiple metrics and dimensions
-    starQuery = "SELECT SUM(DepDelayMinutes) FROM mytable WHERE DepDelay > 0 AND ArrDelay > 0 AND OriginStateName = "
-        + "'Massachusetts'";
+    // This query can test the case of one predicate matches all the child nodes but star-node cannot be used because
+    // the predicate is included as remaining predicate from another branch
+    String starQuery = "SELECT DepTimeBlk, COUNT(*) FROM mytable "
+        + "WHERE CRSDepTime BETWEEN 1137 AND 1849 AND DivArrDelay > 218 AND CRSDepTime NOT IN (35, 1633, 1457, 140) "
+        + "AND LongestAddGTime NOT IN (17, 105, 20, 22) GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery);
   }
 
@@ -185,9 +180,10 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     String referenceQuery = "SET useStarTree = false; " + starQuery;
     JsonNode starResponse = postQuery(starQuery);
     JsonNode referenceResponse = postQuery(referenceQuery);
-    Assert.assertEquals(starResponse.get("resultTable"), referenceResponse.get("resultTable"),
-        "Query comparison failed for: \nStar Query: " + starQuery + "\nStar Response: " + starResponse
-            + "\nReference Query: " + referenceQuery + "\nReference Response: " + referenceResponse);
+    assertEquals(starResponse.get("resultTable"), referenceResponse.get("resultTable"), String.format(
+        "Query comparison failed for: \n"
+            + "Star Query: %s\nStar Response: %s\nReference Query: %s\nReference Response: %s\nRandom Seed: %d",
+        starQuery, starResponse, referenceQuery, referenceResponse, _randomSeed));
   }
 
   @AfterClass

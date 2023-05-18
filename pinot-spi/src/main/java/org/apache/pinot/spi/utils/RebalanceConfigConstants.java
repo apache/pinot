@@ -71,4 +71,6 @@ public class RebalanceConfigConstants {
   public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1_000L; // 1 second
   public static final String EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = "externalViewStabilizationTimeoutInMs";
   public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 60 * 60_000L; // 1 hour
+  public static final String UPDATE_TARGET_TIER = "updateTargetTier";
+  public static final boolean DEFAULT_UPDATE_TARGET_TIER = false;
 }

@@ -71,7 +71,7 @@ public class JsonIndexConfigTest {
   }
 
   @Test
-  public void withDissabledTrue()
+  public void withDisabledTrue()
       throws JsonProcessingException {
     String confStr = "{\"disabled\": true}";
     JsonIndexConfig config = JsonUtils.stringToObject(confStr, JsonIndexConfig.class);

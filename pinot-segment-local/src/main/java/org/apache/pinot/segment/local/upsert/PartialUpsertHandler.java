@@ -66,12 +66,16 @@ public class PartialUpsertHandler {
    */
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
     for (String column : previousRecord.getFieldToValueMap().keySet()) {
-      if (!_primaryKeyColumns.contains(column) && !_comparisonColumns.contains(column)) {
+      if (!_primaryKeyColumns.contains(column)) {
         if (!previousRecord.isNullValue(column)) {
           if (newRecord.isNullValue(column)) {
+            // Note that we intentionally want to overwrite any previous _comparisonColumn value in the case of using
+            // multiple comparison columns. We never apply a merge function to it, rather we just take any/all non-null
+            // comparison column values from the previous record, and the sole non-null comparison column value from
+            // the new record.
             newRecord.putValue(column, previousRecord.getValue(column));
             newRecord.removeNullValueField(column);
-          } else {
+          } else if (!_comparisonColumns.contains(column)) {
             PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
             newRecord.putValue(column,
                 merger.merge(previousRecord.getValue(column), newRecord.getValue(column)));

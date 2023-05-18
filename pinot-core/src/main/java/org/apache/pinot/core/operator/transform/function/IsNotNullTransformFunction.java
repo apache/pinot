@@ -18,71 +18,17 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.roaringbitmap.PeekableIntIterator;
 
 
-public class IsNotNullTransformFunction extends BaseTransformFunction {
-  private PeekableIntIterator _nullValueVectorIterator;
-
+public class IsNotNullTransformFunction extends IsNullTransformFunction {
   @Override
   public String getName() {
     return TransformFunctionType.IS_NOT_NULL.getName();
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NOT_NULL");
-    TransformFunction transformFunction = arguments.get(0);
-    Preconditions.checkArgument(transformFunction instanceof IdentifierTransformFunction,
-        "Only column names are supported in IS_NOT_NULL. Support for functions is planned for future release");
-    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    ColumnContext columnContext = columnContextMap.get(columnName);
-    Preconditions.checkArgument(columnContext.getDataSource() != null,
-        "Column must be projected from the original table in IS_NOT_NULL");
-    NullValueVectorReader nullValueVectorReader = columnContext.getDataSource().getNullValueVector();
-    if (nullValueVectorReader != null) {
-      _nullValueVectorIterator = nullValueVectorReader.getNullBitmap().getIntIterator();
-    } else {
-      _nullValueVectorIterator = null;
-    }
-  }
-
-  @Override
-  public TransformResultMetadata getResultMetadata() {
-    return BOOLEAN_SV_NO_DICTIONARY_METADATA;
-  }
-
-  @Override
-  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initIntValuesSV(length);
-    Arrays.fill(_intValuesSV, 1);
-    int[] docIds = valueBlock.getDocIds();
-    assert docIds != null;
-    if (_nullValueVectorIterator != null) {
-      int currentDocIdIndex = 0;
-      while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
-        _nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);
-        if (_nullValueVectorIterator.hasNext()) {
-          currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, _nullValueVectorIterator.next());
-          if (currentDocIdIndex >= 0) {
-            _intValuesSV[currentDocIdIndex] = 0;
-            currentDocIdIndex++;
-          } else {
-            currentDocIdIndex = -currentDocIdIndex - 1;
-          }
-        }
-      }
-    }
-    return _intValuesSV;
+  protected int getIsNullValue() {
+    return 0;
   }
 }

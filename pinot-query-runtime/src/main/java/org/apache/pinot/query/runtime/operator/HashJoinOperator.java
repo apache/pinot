@@ -34,7 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.planner.stage.JoinNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
@@ -75,8 +75,8 @@ public class HashJoinOperator extends MultiStageOperator {
   private final MultiStageOperator _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
-  private final int _leftRowSize;
-  private final int _resultRowSize;
+  private final int _leftColumnSize;
+  private final int _resultColumnSize;
   private final List<TransformOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
 
@@ -98,12 +98,13 @@ public class HashJoinOperator extends MultiStageOperator {
     _rightKeySelector = node.getJoinKeys().getRightJoinKeySelector();
     Preconditions.checkState(_leftKeySelector != null, "LeftKeySelector for join cannot be null");
     Preconditions.checkState(_rightKeySelector != null, "RightKeySelector for join cannot be null");
-    _leftRowSize = leftSchema.size();
-    Preconditions.checkState(_leftRowSize > 0, "leftRowSize has to be greater than zero:" + _leftRowSize);
+    _leftColumnSize = leftSchema.size();
+    Preconditions.checkState(_leftColumnSize > 0, "leftColumnSize has to be greater than zero:" + _leftColumnSize);
     _resultSchema = node.getDataSchema();
-    _resultRowSize = _resultSchema.size();
-    Preconditions.checkState(_resultRowSize >= _leftRowSize,
-        "Result row size" + _leftRowSize + " has to be greater than or equal to left row size:" + _leftRowSize);
+    _resultColumnSize = _resultSchema.size();
+    Preconditions.checkState(_resultColumnSize >= _leftColumnSize,
+        "Result column size" + _leftColumnSize + " has to be greater than or equal to left column size:"
+            + _leftColumnSize);
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
     _joinClauseEvaluators = new ArrayList<>(node.getJoinClauses().size());
@@ -264,7 +265,7 @@ public class HashJoinOperator extends MultiStageOperator {
   }
 
   private Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
-    Object[] resultRow = new Object[_resultRowSize];
+    Object[] resultRow = new Object[_resultColumnSize];
     int idx = 0;
     if (leftRow != null) {
       for (Object obj : leftRow) {
@@ -272,7 +273,7 @@ public class HashJoinOperator extends MultiStageOperator {
       }
     }
     // This is needed since left row can be null and we need to advance the idx to the beginning of right row.
-    idx = _leftRowSize;
+    idx = _leftColumnSize;
     if (rightRow != null) {
       for (Object obj : rightRow) {
         resultRow[idx++] = obj;

@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -57,6 +58,8 @@ public enum AggregationFunctionType {
   PERCENTILETDIGEST("percentileTDigest"),
   PERCENTILERAWTDIGEST("percentileRawTDigest"),
   PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
+  PERCENTILEKLL("percentileKLL"),
+  PERCENTILERAWKLL("percentileRawKLL"),
   IDSET("idSet"),
   HISTOGRAM("histogram"),
   COVARPOP("covarPop"),
@@ -90,11 +93,21 @@ public enum AggregationFunctionType {
   PERCENTILERAWESTMV("percentileRawEstMV"),
   PERCENTILETDIGESTMV("percentileTDigestMV"),
   PERCENTILERAWTDIGESTMV("percentileRawTDigestMV"),
+  PERCENTILEKLLMV("percentileKLLMV"),
+  PERCENTILERAWKLLMV("percentileRawKLLMV"),
   DISTINCT("distinct"),
 
   // boolean aggregate functions
   BOOLAND("boolAnd"),
-  BOOLOR("boolOr");
+  BOOLOR("boolOr"),
+
+  // argMin and argMax
+  ARGMIN("argMin"),
+  ARGMAX("argMax"),
+  PARENTARGMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + ARGMIN.getName()),
+  PARENTARGMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + ARGMAX.getName()),
+  CHILDARGMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + ARGMIN.getName()),
+  CHILDARGMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + ARGMAX.getName());
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
       func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());
@@ -142,6 +155,10 @@ public enum AggregationFunctionType {
         return PERCENTILETDIGEST;
       } else if (remainingFunctionName.equals("RAWTDIGEST") || remainingFunctionName.matches("RAWTDIGEST\\d+")) {
         return PERCENTILERAWTDIGEST;
+      } else if (remainingFunctionName.equals("KLL") || remainingFunctionName.matches("KLL\\d+")) {
+        return PERCENTILEKLL;
+      } else if (remainingFunctionName.equals("RAWKLL") || remainingFunctionName.matches("RAWKLL\\d+")) {
+        return PERCENTILERAWKLL;
       } else if (remainingFunctionName.equals("MV") || remainingFunctionName.matches("\\d+MV")) {
         return PERCENTILEMV;
       } else if (remainingFunctionName.equals("ESTMV") || remainingFunctionName.matches("EST\\d+MV")) {
@@ -152,6 +169,10 @@ public enum AggregationFunctionType {
         return PERCENTILETDIGESTMV;
       } else if (remainingFunctionName.equals("RAWTDIGESTMV") || remainingFunctionName.matches("RAWTDIGEST\\d+MV")) {
         return PERCENTILERAWTDIGESTMV;
+      } else if (remainingFunctionName.equals("KLLMV") || remainingFunctionName.matches("KLL\\d+MV")) {
+        return PERCENTILEKLLMV;
+      } else if (remainingFunctionName.equals("RAWKLLMV") || remainingFunctionName.matches("RAWKLL\\d+MV")) {
+        return PERCENTILEKLLMV;
       } else {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }

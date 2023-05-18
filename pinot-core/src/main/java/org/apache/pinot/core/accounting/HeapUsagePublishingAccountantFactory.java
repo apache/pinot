@@ -38,7 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFactory {
 
   @Override
-  public ThreadResourceUsageAccountant init(PinotConfiguration config) {
+  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId) {
     int period = config.getProperty(CommonConstants.Accounting.CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS,
         CommonConstants.Accounting.DEFAULT_HEAP_USAGE_PUBLISH_PERIOD);
     return new HeapUsagePublishingResourceUsageAccountant(period);

@@ -21,14 +21,18 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 
 
@@ -42,10 +46,11 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   private final int _segmentUploadRequestTimeoutMs;
   private final ServerMetrics _serverMetrics;
   private final AuthProvider _authProvider;
+  private final String _rawTableName;
 
   public Server2ControllerSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
       String controllerSegmentUploadCommitUrl, String segmentName, int segmentUploadRequestTimeoutMs,
-      ServerMetrics serverMetrics, AuthProvider authProvider)
+      ServerMetrics serverMetrics, AuthProvider authProvider, String tableName)
       throws URISyntaxException {
     _segmentLogger = segmentLogger;
     _fileUploadDownloadClient = fileUploadDownloadClient;
@@ -54,27 +59,41 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     _segmentUploadRequestTimeoutMs = segmentUploadRequestTimeoutMs;
     _serverMetrics = serverMetrics;
     _authProvider = authProvider;
+    _rawTableName = TableNameBuilder.extractRawTableName(tableName);
   }
 
   @Override
   public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
-    SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile);
+    return uploadSegment(segmentFile, segmentName, _segmentUploadRequestTimeoutMs);
+  }
+
+  @Override
+  public URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis) {
+    SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile, timeoutInMillis);
     if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS) {
       try {
-        return new URI(response.getSegmentLocation());
+        URI uri = new URI(response.getSegmentLocation());
+        _serverMetrics.addMeteredTableValue(_rawTableName, ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
+        return uri;
       } catch (URISyntaxException e) {
         _segmentLogger.error("Error in segment location format: ", e);
       }
     }
+    _serverMetrics.addMeteredTableValue(_rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
     return null;
   }
 
   public SegmentCompletionProtocol.Response uploadSegmentToController(File segmentFile) {
+    return uploadSegmentToController(segmentFile, _segmentUploadRequestTimeoutMs);
+  }
+
+  private SegmentCompletionProtocol.Response uploadSegmentToController(File segmentFile, int timeoutInMillis) {
     SegmentCompletionProtocol.Response response;
+    long startTime = System.currentTimeMillis();
     try {
       String responseStr = _fileUploadDownloadClient
           .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile,
-              AuthProviderUtils.toRequestHeaders(_authProvider), null, _segmentUploadRequestTimeoutMs).getResponse();
+              AuthProviderUtils.toRequestHeaders(_authProvider), null, timeoutInMillis).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerSegmentUploadCommitUrl);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
@@ -88,6 +107,10 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
       // hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
+    } finally {
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     }
     SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(_serverMetrics, response);
     return response;

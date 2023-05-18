@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -89,7 +90,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
@@ -948,6 +954,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     ControllerConf controllerConfig = new ControllerConf();
     controllerConfig.setProperty(
         ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
+    controllerConfig.setDataDir(TEMP_DIR.toString());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
     Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
@@ -990,11 +997,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
             "segments",
             REALTIME_TABLE_NAME,
             segmentsZKMetadata.get(0).getSegmentName(),
-            "upload");
-    String segmentDownloadUrl0 = String.format("segmentDownloadUr_%s", segmentsZKMetadata.get(0)
-        .getSegmentName());
+            "upload") + "?uploadTimeoutMs=-1";
+    // tempSegmentFileLocation is the location where the segment uploader will upload the segment. This usually ends
+    // with a random UUID
+    File tempSegmentFileLocation = new File(TEMP_DIR, segmentsZKMetadata.get(0).getSegmentName() + UUID.randomUUID());
+    FileUtils.write(tempSegmentFileLocation, "test");
+    // After the deep-store retry task gets the segment location returned by Pinot server, it will move the segment to
+    // its final location. This is the expected segment location.
+    String expectedSegmentLocation = segmentManager.createSegmentPath(RAW_TABLE_NAME,
+        segmentsZKMetadata.get(0).getSegmentName()).toString();
     when(segmentManager._mockedFileUploadDownloadClient
-        .uploadToSegmentStore(serverUploadRequestUrl0)).thenReturn(segmentDownloadUrl0);
+        .uploadToSegmentStore(serverUploadRequestUrl0)).thenReturn(tempSegmentFileLocation.getPath());
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1013,7 +1026,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
             "segments",
             REALTIME_TABLE_NAME,
             segmentsZKMetadata.get(1).getSegmentName(),
-            "upload");
+            "upload") + "?uploadTimeoutMs=-1";
     when(segmentManager._mockedFileUploadDownloadClient
         .uploadToSegmentStore(serverUploadRequestUrl1))
         .thenThrow(new HttpErrorStatusException(
@@ -1041,11 +1054,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
         .thenReturn(segmentManager._tableConfig);
 
+
     // Verify the result
     segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
-        segmentDownloadUrl0);
+        expectedSegmentLocation);
+    assertFalse(tempSegmentFileLocation.exists(),
+        "Deep-store retry task should move the file from temp location to permanent location");
+
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
         CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);

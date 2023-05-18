@@ -257,7 +257,7 @@ public class Tracing {
       Tracing.getThreadAccountant().clear();
     }
 
-    public static void initializeThreadAccountant(PinotConfiguration config) {
+    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       if (factoryName == null) {
         LOGGER.warn("No thread accountant factory provided, using default implementation");
@@ -266,7 +266,7 @@ public class Tracing {
         try {
           ThreadAccountantFactory threadAccountantFactory =
               (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
-          boolean registered = Tracing.register(threadAccountantFactory.init(config));
+          boolean registered = Tracing.register(threadAccountantFactory.init(config, instanceId));
           LOGGER.info("Using accountant provided by {}", factoryName);
           if (!registered) {
             LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);

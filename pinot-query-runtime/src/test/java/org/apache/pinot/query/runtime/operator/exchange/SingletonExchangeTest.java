@@ -23,6 +23,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -37,9 +38,9 @@ public class SingletonExchangeTest {
   private AutoCloseable _mocks;
 
   @Mock
-  TransferableBlock _block;
+  private SendingMailbox _mailbox1;
   @Mock
-  private SendingMailbox<TransferableBlock> _mailbox1;
+  TransferableBlock _block;
 
   @BeforeMethod
   public void setUp() {
@@ -57,10 +58,11 @@ public class SingletonExchangeTest {
   public void shouldRouteSingleton()
       throws Exception {
     // Given:
-    ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
+    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
 
     // When:
-    new SingletonExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
+    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock,
+        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);

@@ -28,11 +28,13 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -42,6 +44,7 @@ public class PinotFSSegmentUploaderTest {
   private static final int TIMEOUT_IN_MS = 100;
   private File _file;
   private LLCSegmentName _llcSegmentName;
+  private ServerMetrics _serverMetrics = Mockito.mock(ServerMetrics.class);
 
   @BeforeClass
   public void setUp()
@@ -61,7 +64,7 @@ public class PinotFSSegmentUploaderTest {
 
   @Test
   public void testSuccessfulUpload() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS);
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertTrue(segmentURI.toString().startsWith(StringUtil
         .join(File.separator, "hdfs://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
@@ -69,7 +72,7 @@ public class PinotFSSegmentUploaderTest {
 
   @Test
   public void testSegmentAlreadyExist() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS);
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS, _serverMetrics);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertTrue(segmentURI.toString().startsWith(StringUtil
         .join(File.separator, "existing://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
@@ -77,14 +80,14 @@ public class PinotFSSegmentUploaderTest {
 
   @Test
   public void testUploadTimeOut() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("timeout://root", TIMEOUT_IN_MS);
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("timeout://root", TIMEOUT_IN_MS, _serverMetrics);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertNull(segmentURI);
   }
 
   @Test
   public void testNoSegmentStoreConfigured() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS);
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS, _serverMetrics);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertNull(segmentURI);
   }

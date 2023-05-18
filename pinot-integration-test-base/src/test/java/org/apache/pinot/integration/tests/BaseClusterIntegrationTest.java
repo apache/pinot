@@ -262,7 +262,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  protected QueryConfig getQueryconfig() {
+  protected QueryConfig getQueryConfig() {
     // Enable groovy for tables used in the tests
     return new QueryConfig(null, false, null, null);
   }
@@ -275,11 +275,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected SegmentPartitionConfig getSegmentPartitionConfig() {
     return null;
   }
-
-  /**
-   * The following methods are based on the getters. Override the getters for non-default settings before calling these
-   * methods.
-   */
 
   /**
    * Creates a new schema.
@@ -323,7 +318,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
@@ -394,7 +389,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
@@ -603,11 +598,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true);
-  }
-
-  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
-    waitForDocsLoaded(timeoutMs, raiseError, getTableName());
+    waitForDocsLoaded(timeoutMs, true, getTableName());
   }
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
@@ -622,7 +613,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           return null;
         }
       }
-    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", raiseError);
+    }, 100L, timeoutMs, String.format("Failed to load %d documents", countStarResult), raiseError);
   }
 
   /**
@@ -649,22 +640,5 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
         getH2Connection());
-  }
-
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
-  protected void testQueryViaController(String query)
-      throws Exception {
-    testQueryViaController(query, query);
-  }
-
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
-  protected void testQueryViaController(String pinotQuery, String h2Query)
-      throws Exception {
-    ClusterIntegrationTestUtils.testQueryViaController(pinotQuery, _controllerBaseApiUrl, getPinotConnection(), h2Query,
-        getH2Connection(), null, null);
   }
 }

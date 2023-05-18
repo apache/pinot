@@ -81,25 +81,29 @@ private[pinot] object FilterPushDown {
     case _ => value
   }
 
+  private def escapeAttr(attr: String): String = {
+    if (attr.contains("\"")) attr else s""""$attr""""
+  }
+
   private def compileFilter(filter: Filter): Option[String] = {
     val whereCondition = filter match {
-      case EqualTo(attr, value) => s"$attr = ${compileValue(value)}"
+      case EqualTo(attr, value) => s"${escapeAttr(attr)} = ${compileValue(value)}"
       case EqualNullSafe(attr, value) =>
-        s"NOT ($attr != ${compileValue(value)} OR $attr IS NULL OR " +
+        s"NOT (${escapeAttr(attr)} != ${compileValue(value)} OR ${escapeAttr(attr)} IS NULL OR " +
           s"${compileValue(value)} IS NULL) OR " +
-          s"($attr IS NULL AND ${compileValue(value)} IS NULL)"
-      case LessThan(attr, value) => s"$attr < ${compileValue(value)}"
-      case GreaterThan(attr, value) => s"$attr > ${compileValue(value)}"
-      case LessThanOrEqual(attr, value) => s"$attr <= ${compileValue(value)}"
-      case GreaterThanOrEqual(attr, value) => s"$attr >= ${compileValue(value)}"
-      case IsNull(attr) => s"$attr IS NULL"
-      case IsNotNull(attr) => s"$attr IS NOT NULL"
-      case StringStartsWith(attr, value) => s"$attr LIKE '$value%'"
-      case StringEndsWith(attr, value) => s"$attr LIKE '%$value'"
-      case StringContains(attr, value) => s"$attr LIKE '%$value%'"
+          s"(${escapeAttr(attr)} IS NULL AND ${compileValue(value)} IS NULL)"
+      case LessThan(attr, value) => s"${escapeAttr(attr)} < ${compileValue(value)}"
+      case GreaterThan(attr, value) => s"${escapeAttr(attr)} > ${compileValue(value)}"
+      case LessThanOrEqual(attr, value) => s"${escapeAttr(attr)} <= ${compileValue(value)}"
+      case GreaterThanOrEqual(attr, value) => s"${escapeAttr(attr)} >= ${compileValue(value)}"
+      case IsNull(attr) => s"${escapeAttr(attr)} IS NULL"
+      case IsNotNull(attr) => s"${escapeAttr(attr)} IS NOT NULL"
+      case StringStartsWith(attr, value) => s"${escapeAttr(attr)} LIKE '$value%'"
+      case StringEndsWith(attr, value) => s"${escapeAttr(attr)} LIKE '%$value'"
+      case StringContains(attr, value) => s"${escapeAttr(attr)} LIKE '%$value%'"
       case In(attr, value) if value.isEmpty =>
-        s"CASE WHEN $attr IS NULL THEN NULL ELSE FALSE END"
-      case In(attr, value) => s"$attr IN (${compileValue(value)})"
+        s"CASE WHEN ${escapeAttr(attr)} IS NULL THEN NULL ELSE FALSE END"
+      case In(attr, value) => s"${escapeAttr(attr)} IN (${compileValue(value)})"
       case Not(f) => compileFilter(f).map(p => s"NOT ($p)").orNull
       case Or(f1, f2) =>
         val or = Seq(f1, f2).flatMap(compileFilter)

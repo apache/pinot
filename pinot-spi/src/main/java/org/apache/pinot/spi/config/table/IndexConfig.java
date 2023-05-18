@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -51,5 +52,22 @@ public class IndexConfig extends BaseJsonConfig {
   @JsonIgnore
   public boolean isEnabled() {
     return !_disabled;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    IndexConfig that = (IndexConfig) o;
+    return _disabled == that._disabled;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_disabled);
   }
 }

@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.joda.time.Chronology;
 import org.joda.time.DateTimeField;
 import org.joda.time.chrono.ISOChronology;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class ExtractTransformFunction extends BaseTransformFunction {
@@ -99,5 +100,10 @@ public class ExtractTransformFunction extends BaseTransformFunction {
           throw new IllegalArgumentException("Unsupported FIELD type");
       }
     }
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }

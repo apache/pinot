@@ -34,6 +34,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.rewriter.ResultRewriteUtils;
+import org.apache.pinot.core.query.utils.rewriter.RewriterResult;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
@@ -142,12 +144,21 @@ public class AggregationDataTableReducer implements DataTableReducer {
         new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema());
     DataSchema dataSchema = postAggregationHandler.getResultDataSchema();
     Object[] row = postAggregationHandler.getResult(finalResults);
+
+    RewriterResult resultRewriterResult =
+        ResultRewriteUtils.rewriteResult(dataSchema, Collections.singletonList(row));
+    dataSchema = resultRewriterResult.getDataSchema();
+    List<Object[]> rows = resultRewriterResult.getRows();
+
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
-    for (int i = 0; i < numColumns; i++) {
-      row[i] = columnDataTypes[i].format(row[i]);
+    for (Object[] rewrittenRow : rows) {
+      for (int j = 0; j < numColumns; j++) {
+        rewrittenRow[j] = columnDataTypes[j].format(rewrittenRow[j]);
+      }
     }
-    return new ResultTable(dataSchema, Collections.singletonList(row));
+
+    return new ResultTable(dataSchema, rows);
   }
 
   /**

@@ -19,9 +19,11 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
@@ -29,12 +31,13 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 class BroadcastExchange extends BlockExchange {
 
-  protected BroadcastExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
-    super(sendingMailboxes, splitter);
+  protected BroadcastExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
+    super(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
   }
 
   @Override
-  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block)
+  protected void route(List<SendingMailbox> destinations, TransferableBlock block)
       throws Exception {
     for (SendingMailbox mailbox : destinations) {
       sendBlock(mailbox, block);
