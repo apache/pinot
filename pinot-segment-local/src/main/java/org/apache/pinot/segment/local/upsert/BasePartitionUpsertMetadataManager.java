@@ -418,7 +418,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * persist before.
    */
   @Override
-  public void persistSnapshotForStableSegment(long expiredTimestamp) {
+  public void persistSnapshotForStableSegments(long expiredTimestamp) {
     if (_upsertTTLConfig != null && _upsertTTLConfig.getTtlInMs() > 0) {
       doPersistSnapshotForStableSegment(expiredTimestamp);
     }

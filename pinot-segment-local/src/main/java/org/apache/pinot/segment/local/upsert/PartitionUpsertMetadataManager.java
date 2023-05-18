@@ -92,7 +92,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /**
    * Persist validDocIds snapshot when the validDocIds is stable if TTL is enabled.
    */
-  void persistSnapshotForStableSegment(long expiredTimestamp);
+  void persistSnapshotForStableSegments(long expiredTimestamp);
 
   /**
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.

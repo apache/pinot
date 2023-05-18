@@ -535,8 +535,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /**
    * Handle Upsert TTL during segment state change from CONSUMING to ONLINE.
    *
-   * When a new segments commit, we will remove primary key indexes from heap that has timestamp < (eventTime - TTL).
-   * For all segments sealed before (eventTime-TTL), their validDocIds won't get updated. We do an one-time persistance.
+   * When a new segments commits, we will remove primary keys from PK indexes that has timestamp < (eventTime - TTL).
+   * For all segments sealed before (eventTime-TTL), their validDocIds won't get updated. We do an one-time persistence.
    */
   protected void handleUpsertTTL(String segmentName, SegmentZKMetadata segmentZKMetadata,
       UpsertTTLConfig upsertTTLConfig) {
@@ -548,7 +548,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     long expiredTimestamp = endTimeInMillis - upsertTTLConfig.getTtlInMs();
 
     partitionUpsertMetadataManager.removeExpiredPrimaryKeys(expiredTimestamp);
-    partitionUpsertMetadataManager.persistSnapshotForStableSegment(expiredTimestamp);
+    partitionUpsertMetadataManager.persistSnapshotForStableSegments(expiredTimestamp);
   }
 
   private void handleUpsert(ImmutableSegment immutableSegment) {

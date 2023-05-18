@@ -488,12 +488,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 100);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment3);
 
-    upsertMetadataManager.persistSnapshotForStableSegment(120);
+    upsertMetadataManager.persistSnapshotForStableSegments(120);
     assertEquals(nonPersistedSegmentsQueue.size(), 2);
     assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 120);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment1);
 
-    upsertMetadataManager.persistSnapshotForStableSegment(130);
+    upsertMetadataManager.persistSnapshotForStableSegments(130);
     assertEquals(nonPersistedSegmentsQueue.size(), 1);
     assertEquals(nonPersistedSegmentsQueue.peek().getEndTimeMs(), 130);
     assertEquals(nonPersistedSegmentsQueue.peek().getSegment(), segment2);
