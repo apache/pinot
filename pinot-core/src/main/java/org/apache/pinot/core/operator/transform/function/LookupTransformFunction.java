@@ -92,7 +92,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // TODO: Proper support for null in groovy functions.
+    // TODO: Proper support for null in lookup functions.
     super.init(arguments, columnContextMap);
     // Check that there are correct number of arguments
     Preconditions.checkArgument(arguments.size() >= 4,

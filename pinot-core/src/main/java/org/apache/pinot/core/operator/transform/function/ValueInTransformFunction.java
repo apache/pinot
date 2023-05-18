@@ -69,7 +69,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // TODO: Proper support for null in groovy functions.
+    // TODO: Proper support for null in value in functions.
     super.init(arguments, columnContextMap);
     // Check that there are more than 1 arguments
     int numArguments = arguments.size();

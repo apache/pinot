@@ -60,7 +60,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // TODO: Proper support for null in groovy functions.
+    // TODO: Proper support for null in map value functions.
     super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 3,
         "3 arguments are required for MAP_VALUE transform function: keyColumn, keyValue, valueColumn, e.g. MAP_VALUE"
