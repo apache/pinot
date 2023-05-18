@@ -83,7 +83,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // TODO: Proper support for null in json relateds functions.
+    // TODO: Proper support for null in json related functions.
     super.init(arguments, columnContextMap);
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
