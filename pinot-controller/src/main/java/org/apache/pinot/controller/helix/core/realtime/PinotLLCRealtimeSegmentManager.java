@@ -167,6 +167,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
+  private final int _deepstoreUploadRetryTimeoutMs;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
 
@@ -191,6 +192,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
     _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
   }
 
@@ -481,12 +483,10 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.info("No moving needed for segment on peer servers: {}", segmentLocation);
       return;
     }
-    URI segmentFileURI = URIUtils.getUri(segmentLocation);
+
     URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
-    URI uriToMoveTo = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
-    Preconditions.checkState(pinotFS.move(segmentFileURI, uriToMoveTo, true),
-        "Failed to move segment file for segment: %s from: %s to: %s", segmentName, segmentLocation, uriToMoveTo);
+    String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
     // Cleans up tmp segment files under table dir.
     // We only clean up tmp segment files in table level dir, so there's no need to list recursively.
@@ -502,7 +502,7 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
     }
-    committingSegmentDescriptor.setSegmentLocation(uriToMoveTo.toString());
+    committingSegmentDescriptor.setSegmentLocation(uriToMoveTo);
   }
 
   /**
@@ -1392,6 +1392,7 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
 
     // Use this retention value to avoid the data racing between segment upload and retention management.
     RetentionStrategy retentionStrategy = null;
@@ -1403,6 +1404,8 @@ public class PinotLLCRealtimeSegmentManager {
       retentionStrategy = new TimeRetentionStrategy(TimeUnit.MILLISECONDS,
           retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
     }
+
+    PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_controllerConf.getDataDir()).getScheme());
 
     // Iterate through LLC segments and upload missing deep store copy by following steps:
     //  1. Ask servers which have online segment replica to upload to deep store.
@@ -1438,9 +1441,13 @@ public class PinotLLCRealtimeSegmentManager {
         // Randomly ask one server to upload
         URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
         String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
+        serverUploadRequestUrl =
+            String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
         LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
             serverUploadRequestUrl);
-        String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
+        String tempSegmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
+        String segmentDownloadUrl =
+            moveSegmentFile(rawTableName, segmentName, tempSegmentDownloadUrl, pinotFS);
         LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
         // Update segment ZK metadata by adding the download URL
         segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
@@ -1554,5 +1561,20 @@ public class PinotLLCRealtimeSegmentManager {
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     Set<String> consumingSegments = findConsumingSegments(idealState);
     return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null);
+  }
+
+  @VisibleForTesting
+  String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
+      throws IOException {
+    URI segmentFileURI = URIUtils.getUri(segmentLocation);
+    URI uriToMoveTo = createSegmentPath(rawTableName, segmentName);
+    Preconditions.checkState(pinotFS.move(segmentFileURI, uriToMoveTo, true),
+        "Failed to move segment file for segment: %s from: %s to: %s", segmentName, segmentLocation, uriToMoveTo);
+    return uriToMoveTo.toString();
+  }
+
+  @VisibleForTesting
+  URI createSegmentPath(String rawTableName, String segmentName) {
+    return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
 }
