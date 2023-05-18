@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -34,6 +37,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
@@ -47,6 +51,32 @@ public class UpsertCompactionTaskGeneratorTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
+  private UpsertCompactionTaskGenerator _taskGenerator;
+  private TableConfig _tableConfig;
+  private ClusterInfoAccessor _mockClusterInfoAccessor;
+  private SegmentZKMetadata _completedSegment;
+
+  @BeforeClass
+  public void setUp() {
+    _taskGenerator = new UpsertCompactionTaskGenerator();
+    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
+    Map<String, String> compactionConfigs = new HashMap<>();
+    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
+    _tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
+        .build();
+    _mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
+    _completedSegment = new SegmentZKMetadata("testTable__0");
+    _completedSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    Long endTime = System.currentTimeMillis();
+    Long startTime = endTime - TimeUtils.convertPeriodToMillis("1d");
+    _completedSegment.setStartTime(startTime);
+    _completedSegment.setEndTime(endTime);
+    _completedSegment.setTimeUnit(TimeUnit.MILLISECONDS);
+  }
 
   @Test
   public void testValidate() {
@@ -86,76 +116,75 @@ public class UpsertCompactionTaskGeneratorTest {
 
   @Test
   public void testGenerateTasksWithNoSegments() {
-    UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
-    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    Map<String, String> compactionConfigs = new HashMap<>();
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .build();
-    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
-    when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
+    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(Collections.emptyList()));
-    taskGenerator.init(mockClusterInfoAccessor);
+    _taskGenerator.init(_mockClusterInfoAccessor);
 
-    List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(tableConfig));
+    List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
 
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
   @Test
   public void testGenerateTasksWithConsumingSegment() {
-    UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
-    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    Map<String, String> compactionConfigs = new HashMap<>();
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .build();
-    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
     SegmentZKMetadata consumingSegment = new SegmentZKMetadata("testTable__0");
     consumingSegment.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-    when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
+    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(consumingSegment));
-    taskGenerator.init(mockClusterInfoAccessor);
+    _taskGenerator.init(_mockClusterInfoAccessor);
 
-    List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(tableConfig));
+    List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
 
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
   @Test
   public void testGenerateTasksWithNewlyCompletedSegment() {
-    UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
-    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    Map<String, String> compactionConfigs = new HashMap<>();
-    tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .build();
-    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
-    SegmentZKMetadata completedSegment = new SegmentZKMetadata("testTable__0");
-    completedSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    Long endTime = System.currentTimeMillis();
-    Long startTime = endTime - TimeUtils.convertPeriodToMillis("1d");
-    completedSegment.setStartTime(startTime);
-    completedSegment.setEndTime(endTime);
-    completedSegment.setTimeUnit(TimeUnit.MILLISECONDS);
-    when(mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(completedSegment));
-    taskGenerator.init(mockClusterInfoAccessor);
+    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(_completedSegment));
+    _taskGenerator.init(_mockClusterInfoAccessor);
 
-    List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(tableConfig));
+    List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
 
     assertEquals(pinotTaskConfigs.size(), 0);
+  }
+
+  @Test
+  public void testGetUrlToSegmentMappings() {
+    List<SegmentZKMetadata> completedSegments = Lists.newArrayList(_completedSegment);
+    Map<String, String> segmentToServer = new HashMap<>();
+    segmentToServer.put(_completedSegment.getSegmentName(), "server1");
+    BiMap<String, String> serverToEndpoints = HashBiMap.create(1);
+    serverToEndpoints.put("server1", "endpoint1");
+
+    Map<String, SegmentZKMetadata> urlToSegment =
+        UpsertCompactionTaskGenerator.getUrlToSegmentMappings(
+            REALTIME_TABLE_NAME, completedSegments, segmentToServer, serverToEndpoints);
+
+    String expectedUrl = String.format("%s/tables/%s/segments/%s/invalidRecordCount",
+        "endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName());
+    SegmentZKMetadata seg = urlToSegment.get(expectedUrl);
+    assertEquals(seg.getSegmentName(), _completedSegment.getSegmentName());
+  }
+
+  @Test
+  public void testGetMaxTasks() {
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "10");
+
+    int maxTasks =
+        UpsertCompactionTaskGenerator.getMaxTasks(UpsertCompactionTask.TASK_TYPE, REALTIME_TABLE_NAME, taskConfigs);
+
+    assertEquals(maxTasks, 10);
+  }
+
+  @Test
+  public void testGetSegmentToServer() {
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    serverToSegments.put("server1", Lists.newArrayList(_completedSegment.getSegmentName()));
+
+    Map<String, String> segmentToServer = UpsertCompactionTaskGenerator.getSegmentToServer(serverToSegments);
+
+    assertEquals(segmentToServer.get(_completedSegment.getSegmentName()), "server1");
   }
 }

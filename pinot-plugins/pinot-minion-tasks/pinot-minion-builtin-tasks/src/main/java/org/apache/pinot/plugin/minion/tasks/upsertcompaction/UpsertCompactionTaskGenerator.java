@@ -146,7 +146,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return completedSegments;
   }
 
-  private static Map<String, SegmentZKMetadata> getUrlToSegmentMappings(String tableNameWithType,
+  @VisibleForTesting
+  public static Map<String, SegmentZKMetadata> getUrlToSegmentMappings(String tableNameWithType,
       List<SegmentZKMetadata> completedSegments, Map<String, String> segmentToServer,
       BiMap<String, String> serverToEndpoints) {
     // get url to segment mappings
@@ -162,7 +163,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return urlToSegment;
   }
 
-  private static int getMaxTasks(String taskType, String tableNameWithType, Map<String, String> taskConfigs) {
+  @VisibleForTesting
+  public static int getMaxTasks(String taskType, String tableNameWithType, Map<String, String> taskConfigs) {
     int maxTasks = Integer.MAX_VALUE;
     String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
     if (tableMaxNumTasksConfig != null) {
@@ -175,7 +177,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return maxTasks;
   }
 
-  private Map<String, String> getSegmentToServer(Map<String, List<String>> serverToSegments) {
+  @VisibleForTesting
+  public static Map<String, String> getSegmentToServer(Map<String, List<String>> serverToSegments) {
     Map<String, String> segmentToServer = new HashMap<>();
     for (String server : serverToSegments.keySet()) {
       List<String> segments = serverToSegments.get(server);
