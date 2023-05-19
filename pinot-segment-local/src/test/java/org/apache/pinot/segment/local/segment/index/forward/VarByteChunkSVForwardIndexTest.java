@@ -253,7 +253,7 @@ public class VarByteChunkSVForwardIndexTest {
     // (75000 characters in each row and 10000 rows will hit this scenario).
     // So we specifically test for mapping the index file using the default factory
     // trying to exercise the buffer used in larger cases
-    buffer = PinotDataBuffer.createDefaultFactory()
+    buffer = PinotDataBuffer.createDefaultFactory(false)
         .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN);
     assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
 
