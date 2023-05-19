@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -71,7 +72,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     columns.add(tableConfig.getValidationConfig().getTimeColumnName());
     ImmutableRoaringBitmap validDocIds = getValidDocIds(tableNameWithType, configs);
-    Set<Integer> validIds = getValidIds(tableNameWithType, validDocIds, indexDir, columns);
+    Set<Integer> validIds = getValidIds(validDocIds, indexDir, columns);
 
     MINION_CONTEXT.setRecordPurgerFactory(x -> row -> {
       if (validIds.isEmpty()) {
@@ -126,7 +127,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     return validDocIds;
   }
 
-  private Set<Integer> getValidIds(String tableNameWithType, ImmutableRoaringBitmap validDocIds,
+  @VisibleForTesting
+  public static Set<Integer> getValidIds(ImmutableRoaringBitmap validDocIds,
       File indexDir, List<String> columns) throws IOException {
     Set<Integer> validIds = new HashSet<>();
 
@@ -151,7 +153,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     recordReader.close();
     return validIds;
   }
-  private static String getServer(String segmentName, String tableNameWithType) {
+
+  @VisibleForTesting
+  public static String getServer(String segmentName, String tableNameWithType) {
     String server = null;
     HelixAdmin clusterManagementTool = MINION_CONTEXT.getClusterManagementTool();
     IdealState idealState =
