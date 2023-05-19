@@ -125,40 +125,33 @@ public class BenchmarkPinotDataBuffer {
   }
 
   @Benchmark
-  public void batchRead(Blackhole bh) {
+  public void batchRead() {
     long index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
     _buffer.copyTo(index, _bytes);
-
-    bh.consume(_bytes);
   }
 
   @Benchmark
-  public void nonBatchRead(Blackhole bh) {
+  public void nonBatchRead() {
     int index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
     for (int j = 0; j < _valueLength; j++) {
       _bytes[j] = _buffer.getByte(j + index);
     }
-    bh.consume(_bytes);
   }
 
   @Benchmark
-  public void batchWrite(Blackhole bh) {
+  public void batchWrite() {
     int index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
 
     _buffer.readFrom(index, _bytes);
-
-    bh.consume(_bytes);
   }
 
   @Benchmark
-  public void nonBatchWrite(Blackhole bh) {
+  public void nonBatchWrite() {
     int index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
 
     for (int j = 0; j < _valueLength; j++) {
       _buffer.putByte(j + index, _bytes[j]);
     }
-
-    bh.consume(_buffer);
   }
 
   public static void main(String[] args)
