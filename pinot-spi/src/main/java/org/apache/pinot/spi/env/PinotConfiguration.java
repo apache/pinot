@@ -169,6 +169,7 @@ public class PinotConfiguration {
   }
 
   private static String getProperty(String name, Configuration configuration) {
+    // getStringArray() interpolates configs automatically
     return Optional.of(configuration.getStringArray(relaxPropertyName(name)))
 
         .filter(values -> values.length > 0)
@@ -357,6 +358,9 @@ public class PinotConfiguration {
    */
   public String getProperty(String name, String defaultValue) {
     Object rawProperty = getRawProperty(name, defaultValue);
+    if (CommonsConfigurationUtils.needInterpolate(rawProperty)) {
+      return _configuration.getString(relaxPropertyName(name), defaultValue);
+    }
     if (rawProperty instanceof List) {
       return StringUtils.join(((ArrayList) rawProperty).toArray(), ',');
     } else {
@@ -372,8 +376,11 @@ public class PinotConfiguration {
     if (!_configuration.containsKey(relaxedPropertyName)) {
       return defaultValue;
     }
-
-    return PropertyConverter.convert(getRawProperty(name, defaultValue), returnType);
+    Object rawProperty = getRawProperty(name, defaultValue);
+    if (CommonsConfigurationUtils.needInterpolate(rawProperty)) {
+      return CommonsConfigurationUtils.interpolate(_configuration, relaxPropertyName(name), defaultValue, returnType);
+    }
+    return CommonsConfigurationUtils.convert(rawProperty, returnType);
   }
 
   /**
