@@ -270,7 +270,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
     boolean caseInsensitive =
-        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, true) || _brokerConf.getProperty(
+        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, true) && _brokerConf.getProperty(
             Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY, true);
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
