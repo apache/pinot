@@ -71,7 +71,7 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
-  private final Random RANDOM = new Random();
+  private final Random _random = new Random();
   private final String _reducerHostname;
   private final int _reducerPort;
   private final long _defaultBrokerTimeoutMs;
@@ -79,7 +79,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final MailboxService _mailboxService;
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
-  private final Supplier<Long> _multistageRequestIdGenerator = () -> RANDOM.nextLong() & Long.MAX_VALUE;
+  private final Supplier<Long> _multistageRequestIdGenerator = () -> _random.nextLong() & Long.MAX_VALUE;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
