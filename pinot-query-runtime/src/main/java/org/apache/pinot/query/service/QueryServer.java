@@ -22,7 +22,10 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -47,6 +50,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private final int _port;
   private Server _server = null;
   private final QueryRunner _queryRunner;
+
+  private final ExecutorService _executorService = Executors.newCachedThreadPool();
 
   public QueryServer(int port, QueryRunner queryRunner) {
     _port = port;
@@ -83,11 +88,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Deserialize the request
-    DistributedStagePlan distributedStagePlan;
+    List<DistributedStagePlan> distributedStagePlans;
     Map<String, String> requestMetadataMap;
     long requestId = -1;
     try {
-      distributedStagePlan = QueryPlanSerDeUtils.deserialize(request.getStagePlan());
+      distributedStagePlans = QueryPlanSerDeUtils.deserialize(request);
       requestMetadataMap = request.getMetadataMap();
       requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     } catch (Exception e) {
@@ -95,20 +100,23 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
-
-    try {
-      _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
-      responseObserver.onNext(Worker.QueryResponse.newBuilder()
-          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
-      responseObserver.onCompleted();
-    } catch (Throwable t) {
-      LOGGER.error("Caught exception while compiling opChain for request: {}, stage: {}", requestId,
-          distributedStagePlan.getStageId(), t);
-      responseObserver.onNext(Worker.QueryResponse.newBuilder()
-          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, QueryException.getTruncatedStackTrace(t))
-          .build());
-      responseObserver.onCompleted();
-    }
+    distributedStagePlans.forEach(distributedStagePlan -> {
+          _executorService.submit(() -> {
+            try {
+              _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+              responseObserver.onNext(Worker.QueryResponse.newBuilder()
+                  .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
+              responseObserver.onCompleted();
+            } catch (Throwable t) {
+              responseObserver.onNext(Worker.QueryResponse.newBuilder()
+                  .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR,
+                      QueryException.getTruncatedStackTrace(t))
+                  .build());
+              responseObserver.onCompleted();
+            }
+          });
+        }
+    );
   }
 
   @Override

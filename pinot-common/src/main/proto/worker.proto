@@ -56,10 +56,10 @@ message CancelResponse {
   // intentionally left empty
 }
 
-// QueryRequest is the dispatched content for a specific query stage on a specific worker.
+// QueryRequest is the dispatched content for all query stages to a physical worker.
 message QueryRequest {
-  map<string, string> metadata = 1;
-  StagePlan stagePlan = 2;
+  repeated StagePlan stagePlan = 1;
+  map<string, string> metadata = 2;
 }
 
 // QueryResponse is the dispatched response from worker, it doesn't contain actual data, only dispatch status.

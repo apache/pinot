@@ -140,21 +140,24 @@ public class QueryDispatcher {
         for (Map.Entry<QueryServerInstance, List<Integer>> queryServerEntry
             : dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap().entrySet()) {
           QueryServerInstance queryServerInstance = queryServerEntry.getKey();
+          Worker.QueryRequest.Builder queryRequestBuilder = Worker.QueryRequest.newBuilder();
+          String host = queryServerInstance.getHostname();
+          int servicePort = queryServerInstance.getQueryServicePort();
+          int mailboxPort = queryServerInstance.getQueryMailboxPort();
           for (int workerId : queryServerEntry.getValue()) {
-            String host = queryServerInstance.getHostname();
-            int servicePort = queryServerInstance.getQueryServicePort();
-            int mailboxPort = queryServerInstance.getQueryMailboxPort();
             VirtualServerAddress virtualServerAddress = new VirtualServerAddress(host, mailboxPort, workerId);
-            DispatchClient client = getOrCreateDispatchClient(host, servicePort);
             dispatchCalls++;
-            int finalStageId = stageId;
-            _executorService.submit(() -> client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
-                        QueryPlanSerDeUtils.serialize(dispatchableSubPlan, finalStageId, virtualServerAddress))
-                    .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-                    .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
-                    .putAllMetadata(queryOptions).build(), finalStageId, queryServerInstance, deadline,
-                dispatchCallbacks::offer));
+            queryRequestBuilder.addStagePlan(
+                QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, virtualServerAddress));
           }
+          Worker.QueryRequest queryRequest =
+              queryRequestBuilder.putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
+                  .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
+                  .putAllMetadata(queryOptions).build();
+          DispatchClient client = getOrCreateDispatchClient(host, servicePort);
+          int finalStageId = stageId;
+          _executorService.submit(() -> client.submit(queryRequest, finalStageId, queryServerInstance, deadline,
+              dispatchCallbacks::offer));
         }
       }
     }

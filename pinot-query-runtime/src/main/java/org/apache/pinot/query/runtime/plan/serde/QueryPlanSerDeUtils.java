@@ -53,6 +53,14 @@ public class QueryPlanSerDeUtils {
     return distributedStagePlan;
   }
 
+  public static List<DistributedStagePlan> deserialize(Worker.QueryRequest request) {
+    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
+    for (Worker.StagePlan stagePlan : request.getStagePlanList()) {
+      distributedStagePlans.add(deserialize(stagePlan));
+    }
+    return distributedStagePlans;
+  }
+
   public static Worker.StagePlan serialize(DispatchableSubPlan dispatchableSubPlan, int stageId,
       VirtualServerAddress serverAddress) {
     return Worker.StagePlan.newBuilder()

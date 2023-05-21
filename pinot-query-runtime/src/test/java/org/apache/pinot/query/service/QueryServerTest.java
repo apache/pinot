@@ -231,7 +231,7 @@ public class QueryServerTest extends QueryTestSet {
     QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
     int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
 
-    return Worker.QueryRequest.newBuilder().setStagePlan(
+    return Worker.QueryRequest.newBuilder().addStagePlan(
             QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, new VirtualServerAddress(serverInstance,
                 workerId)))
         // the default configurations that must exist.
