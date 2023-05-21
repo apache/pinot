@@ -33,12 +33,7 @@
         "sql": "SELECT concat(strCol, strCol, ',') FROM {stringTbl}"
       },
       { "sql": "SELECT trim(strCol) FROM {stringTbl}" },
-      { "sql": "SELECT lower(strCol), regexp_Replace(strCol, 'e.*o', 'le') FROM {stringTbl}" },
-      {
-        "ignored": true,
-        "comment": "split returns a MV array, we don't yet support that",
-        "sql": "SELECT split(strCol, ' ') FROM {stringTbl}"
-      }
+      { "sql": "SELECT lower(strCol), regexp_Replace(strCol, 'e.*o', 'le') FROM {stringTbl}" }
     ]
   },
   "string_functions_noh2": {
@@ -62,6 +57,12 @@
       }
     },
     "queries": [
+      {
+        "sql": "SELECT split(strCol, ' ') FROM {stringTbl} where strCol like '%wiTH%'",
+        "outputs": [
+          [["wiTH", "Mixed", "CaSe"]]
+        ]
+      },
       {
         "sql": "SELECT strpos(strCol, 'hello') FROM {stringTbl}",
         "outputs": [

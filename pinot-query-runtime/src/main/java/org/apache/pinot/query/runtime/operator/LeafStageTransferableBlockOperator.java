@@ -239,6 +239,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           + " Column Ordering: " + Arrays.toString(columnIndices));
       return composeColumnIndexedTransferableBlock(responseBlock, adjustedResultSchema, columnIndices);
     } else {
+      handleBytesDataType(desiredDataSchema.getColumnDataTypes(), resultSchema.getColumnDataTypes());
       return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
     }
   }
@@ -345,5 +346,19 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       }
     }
     return true;
+  }
+
+  /**
+   * This util function handles the ColumnDataType BYTES and set the desiredType as per the result DataSchema.
+   * @param desiredTypes
+   * @param givenTypes
+   */
+  private static void handleBytesDataType(DataSchema.ColumnDataType[] desiredTypes,
+      DataSchema.ColumnDataType[] givenTypes) {
+    for (int i = 0; i < desiredTypes.length; i++) {
+      if (desiredTypes[i] == DataSchema.ColumnDataType.BYTES) {
+        desiredTypes[i] = givenTypes[i];
+      }
+    }
   }
 }

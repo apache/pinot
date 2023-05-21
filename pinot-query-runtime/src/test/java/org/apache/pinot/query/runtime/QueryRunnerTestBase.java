@@ -286,7 +286,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
               }
             }
           } else {
-            String[] rarray = (String[]) r;
+            String[] rarray;
+            if (r instanceof List) {
+              rarray = ((List<String>) r).toArray(new String[0]);
+            } else {
+              rarray = (String[]) r;
+            }
+
             for (int idx = 0; idx < larray.length; idx++) {
               if (!larray[idx].equals(rarray[idx])) {
                 return -1;
