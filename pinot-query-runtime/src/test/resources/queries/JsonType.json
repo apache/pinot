@@ -40,6 +40,31 @@
         ]
       },
       {
+        "sql": "SELECT stringCol FROM {jsonTbl} where jsonCol='{\"key111\":\"val111\",\"key222\":{\"key222_a\":\"val222_a\"}}'",
+        "outputs": [
+          ["str33"]
+        ]
+      },
+      {
+        "description": "Like clause checking specific key.",
+        "sql": "SELECT jsonCol, stringCol FROM {jsonTbl} where jsonCol like '%key111%' OR jsonCol like '%val22%'",
+        "outputs": [
+          ["{\"key11\":\"val11\",\"key22\":\"val22\"}", "str22"],
+          ["{\"key111\":\"val111\",\"key222\":{\"key222_a\":\"val222_a\"}}", "str33"],
+          ["{\"key1111\":22.23,\"key2222\":\"val2222\"}", "str44"]
+        ]
+      },
+      {
+        "description": "Like clause is very general, should return all rows.",
+        "sql": "SELECT jsonCol, stringCol FROM {jsonTbl} where jsonCol like '%key%' ",
+        "outputs": [
+          ["{\"key1\":\"val1\",\"key2\":\"val2\"}", "str1"],
+          ["{\"key11\":\"val11\",\"key22\":\"val22\"}", "str22"],
+          ["{\"key111\":\"val111\",\"key222\":{\"key222_a\":\"val222_a\"}}", "str33"],
+          ["{\"key1111\":22.23,\"key2222\":\"val2222\"}", "str44"]
+        ]
+      },
+      {
         "sql": "SELECT JSONEXTRACTKEY(jsonCol,'$.*') AS keys FROM {jsonTbl} where stringCol='str33'",
         "outputs": [
           [["$['key111']","$['key222']"]]
