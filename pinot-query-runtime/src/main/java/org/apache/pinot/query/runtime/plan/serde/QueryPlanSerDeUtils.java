@@ -25,13 +25,15 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 
 
 /**
@@ -51,12 +53,15 @@ public class QueryPlanSerDeUtils {
     return distributedStagePlan;
   }
 
-  public static Worker.StagePlan serialize(DistributedStagePlan distributedStagePlan) {
+  public static Worker.StagePlan serialize(DispatchableSubPlan dispatchableSubPlan, int stageId,
+      VirtualServerAddress serverAddress) {
     return Worker.StagePlan.newBuilder()
-        .setStageId(distributedStagePlan.getStageId())
-        .setVirtualAddress(addressToProto(distributedStagePlan.getServer()))
-        .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) distributedStagePlan.getStageRoot()))
-        .setStageMetadata(toProtoStageMetadata(distributedStagePlan.getStageMetadata())).build();
+        .setStageId(stageId)
+        .setVirtualAddress(addressToProto(serverAddress))
+        .setStageRoot(StageNodeSerDeUtils.serializeStageNode(
+            (AbstractPlanNode) dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
+                .getFragmentRoot()))
+        .setStageMetadata(toProtoStageMetadata(dispatchableSubPlan.getQueryStageList().get(stageId))).build();
   }
 
   private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
@@ -125,6 +130,15 @@ public class QueryPlanSerDeUtils {
       builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
     }
     builder.putAllCustomProperty(stageMetadata.getCustomProperties());
+    return builder.build();
+  }
+
+  private static Worker.StageMetadata toProtoStageMetadata(DispatchablePlanFragment planFragment) {
+    Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
+    for (WorkerMetadata workerMetadata : planFragment.getWorkerMetadataList()) {
+      builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
+    }
+    builder.putAllCustomProperty(planFragment.getCustomProperties());
     return builder.build();
   }
 

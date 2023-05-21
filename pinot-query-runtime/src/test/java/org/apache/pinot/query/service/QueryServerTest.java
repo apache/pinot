@@ -40,12 +40,11 @@ import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -124,7 +123,9 @@ public class QueryServerTest extends QueryTestSet {
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
 
-        StageMetadata stageMetadata = dispatchablePlanFragment.toStageMetadata();
+        StageMetadata stageMetadata = new StageMetadata.Builder()
+            .setWorkerMetadataList(dispatchablePlanFragment.getWorkerMetadataList())
+            .addCustomProperties(dispatchablePlanFragment.getCustomProperties()).build();
 
         // ensure mock query runner received correctly deserialized payload.
         QueryRunner mockRunner =
@@ -230,9 +231,9 @@ public class QueryServerTest extends QueryTestSet {
     QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
     int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
 
-    return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(
-            QueryDispatcher.constructDistributedStagePlan(dispatchableSubPlan, stageId,
-                new VirtualServerAddress(serverInstance, workerId))))
+    return Worker.QueryRequest.newBuilder().setStagePlan(
+            QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, new VirtualServerAddress(serverInstance,
+                workerId)))
         // the default configurations that must exist.
         .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))
         .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,

@@ -16,12 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.routing;
+package org.apache.pinot.query.runtime.plan;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
@@ -31,7 +32,7 @@ public class StageMetadata {
   private final List<WorkerMetadata> _workerMetadataList;
   private final Map<String, String> _customProperties;
 
-  public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
+  StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
     _workerMetadataList = workerMetadataList;
     _customProperties = customProperties;
   }
@@ -68,6 +69,16 @@ public class StageMetadata {
     public Builder addTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
       _customProperties.put(TIME_BOUNDARY_COLUMN_KEY, timeBoundaryInfo.getTimeColumn());
       _customProperties.put(TIME_BOUNDARY_VALUE_KEY, timeBoundaryInfo.getTimeValue());
+      return this;
+    }
+
+    public Builder addCustomProperty(String key, String value) {
+      _customProperties.put(key, value);
+      return this;
+    }
+
+    public Builder addCustomProperties(Map<String, String> customPropertyMap) {
+      _customProperties.putAll(customPropertyMap);
       return this;
     }
 
