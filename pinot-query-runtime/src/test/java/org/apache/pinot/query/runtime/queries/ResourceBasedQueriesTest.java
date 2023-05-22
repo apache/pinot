@@ -292,7 +292,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   private Optional<List<Object[]>> runQuery(String sql, final String except,
-      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap)
+      throws InterruptedException {
     try {
       // query pinot
       List<Object[]> resultRows = queryRunner(sql, executionStatsAggregatorMap);
