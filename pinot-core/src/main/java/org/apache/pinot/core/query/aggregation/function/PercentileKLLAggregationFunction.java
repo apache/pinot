@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
+
 /**
  * <p>
  *  {@code PercentileKLLAggregationFunction} provides an approximate percentile calculator using the KLL algorithm
@@ -60,10 +61,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </p>
  */
 public class PercentileKLLAggregationFunction
-    extends BaseSingleInputAggregationFunction<KllDoublesSketch, Comparable> {
+    extends BaseSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
+  protected static final int DEFAULT_K_VALUE = 200;
 
   protected final double _percentile;
-  protected int _kValue = 200; // size of the sketch. This is the default size used by DataSketches lib as well
+  protected int _kValue;
 
   public PercentileKLLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
@@ -71,20 +73,13 @@ public class PercentileKLLAggregationFunction
     // Check that there are correct number of arguments
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments == 2 || numArguments == 3,
-        "Expecting 2 or 3 arguments for PercentileKLL function: "
-            + "PERCENTILE_KLL(column, percentile, k=200");
+        "Expecting 2 or 3 arguments for PercentileKLL function: PERCENTILE_KLL(column, percentile, k=200");
 
     _percentile = arguments.get(1).getLiteral().getDoubleValue();
     Preconditions.checkArgument(_percentile >= 0 && _percentile <= 100,
-            "Percentile value needs to be in range 0-100, inclusive");
-    if (numArguments == 3) {
-      _kValue = arguments.get(2).getLiteral().getIntValue();
-    }
-  }
+        "Percentile value needs to be in range 0-100, inclusive");
 
-  public PercentileKLLAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression);
-    _percentile = percentile;
+    _kValue = numArguments == 3 ? arguments.get(2).getLiteral().getIntValue() : DEFAULT_K_VALUE;
   }
 
   @Override
@@ -111,8 +106,7 @@ public class PercentileKLLAggregationFunction
 
     if (valueType == DataType.BYTES) {
       // Assuming the column contains serialized data sketch
-      KllDoublesSketch[] deserializedSketches =
-          deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
+      KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       for (int i = 0; i < length; i++) {
         sketch.merge(deserializedSketches[i]);
       }
@@ -132,8 +126,7 @@ public class PercentileKLLAggregationFunction
 
     if (valueType == DataType.BYTES) {
       // serialized sketch
-      KllDoublesSketch[] deserializedSketches =
-          deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
+      KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       for (int i = 0; i < length; i++) {
         KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
         sketch.merge(deserializedSketches[i]);
@@ -155,8 +148,7 @@ public class PercentileKLLAggregationFunction
 
     if (valueType == DataType.BYTES) {
       // serialized sketch
-      KllDoublesSketch[] deserializedSketches =
-          deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
+      KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
           KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
@@ -244,12 +236,11 @@ public class PercentileKLLAggregationFunction
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILEKLL.getName().toLowerCase()
-        + "(" + _expression + ", " + _percentile + ")";
+    return AggregationFunctionType.PERCENTILEKLL.getName().toLowerCase() + "(" + _expression + ", " + _percentile + ")";
   }
 
   @Override
-  public Comparable extractFinalResult(KllDoublesSketch sketch) {
+  public Comparable<?> extractFinalResult(KllDoublesSketch sketch) {
     return sketch.getQuantile(_percentile / 100);
   }
 }

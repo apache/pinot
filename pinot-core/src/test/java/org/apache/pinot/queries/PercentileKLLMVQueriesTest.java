@@ -87,8 +87,8 @@ public class PercentileKLLMVQueriesTest extends PercentileKLLQueriesTest {
 
   @Override
   protected String getAggregationQuery(int percentile) {
-    return String.format("SELECT PERCENTILE%1$dMV(%2$s), PERCENTILEKLL%1$dMV(%2$s), PERCENTILEKLL%1$d(%3$s), "
-            + "PERCENTILEMV(%2$s, %1$d), PERCENTILEKLLMV(%2$s, %1$d), PERCENTILEKLL(%3$s, %1$d) FROM %4$s",
-        percentile, DOUBLE_COLUMN, KLL_COLUMN, TABLE_NAME);
+    return String.format(
+        "SELECT PERCENTILEMV(%2$s, %1$d), PERCENTILEKLLMV(%2$s, %1$d), PERCENTILEKLL(%3$s, %1$d) FROM %4$s", percentile,
+        DOUBLE_COLUMN, KLL_COLUMN, TABLE_NAME);
   }
 }

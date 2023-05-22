@@ -554,19 +554,17 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
   }
 
   private void testPercentileRawKLLMV(int percentile) {
-    Function<Object, Object> quantileExtractor =
-        value -> {
-          try {
-            KllDoublesSketch sketch =
-                (KllDoublesSketch) ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(Base64.decode((String) value));
-            return sketch.getQuantile(percentile / 100.0);
-          } catch (IOException e) {
-            return null;
-          }
-        };
+    Function<Object, Object> quantileExtractor = value -> {
+      try {
+        KllDoublesSketch sketch = ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(Base64.decode((String) value));
+        return sketch.getQuantile(percentile / 100.0);
+      } catch (IOException e) {
+        return null;
+      }
+    };
 
-    String rawKllQuery = String.format("SELECT PERCENTILERAWKLL%dMV(column6) AS value FROM testTable", percentile);
-    String regularQuery = String.format("SELECT PERCENTILE%dMV(column6) AS value FROM testTable", percentile);
+    String rawKllQuery = String.format("SELECT PERCENTILERAWKLLMV(column6, %d) AS value FROM testTable", percentile);
+    String regularQuery = String.format("SELECT PERCENTILEMV(column6, %d) AS value FROM testTable", percentile);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery), getBrokerResponse(regularQuery),
         quantileExtractor, PERCENTILE_KLL_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery + FILTER),
