@@ -183,7 +183,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    * Test compares against its desired exceptions.
    */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
+  public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg)
+      throws InterruptedException {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =

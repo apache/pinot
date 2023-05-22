@@ -91,7 +91,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
    * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
    * ser/de dispatches.
    */
-  protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+  protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap)
+      throws InterruptedException {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult =

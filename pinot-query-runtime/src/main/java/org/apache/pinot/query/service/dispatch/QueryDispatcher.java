@@ -189,7 +189,8 @@ public class QueryDispatcher {
   @VisibleForTesting
   public static ResultTable runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, int reduceStageId,
       long timeoutMs,
-      MailboxService mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled) {
+      MailboxService mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled)
+      throws InterruptedException {
     MailboxReceiveNode reduceNode =
         (MailboxReceiveNode) dispatchableSubPlan.getQueryStageList().get(reduceStageId).getPlanFragment()
             .getFragmentRoot();
@@ -218,7 +219,7 @@ public class QueryDispatcher {
   private static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
       @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap,
       DispatchableSubPlan dispatchableSubPlan,
-      OpChainStats stats) {
+      OpChainStats stats) throws InterruptedException {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
     long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
@@ -231,6 +232,9 @@ public class QueryDispatcher {
             "Received error query execution result block: " + transferableBlock.getDataBlock().getExceptions());
       }
       if (transferableBlock.isNoOpBlock()) {
+        // If all mailbox return no-op block, then we sleep for some time before retrying. This can increase the latency
+        // of the query a little bit but it will prevent the broker from running into a busy-waiting loop.
+        Thread.sleep(10);
         continue;
       } else if (transferableBlock.isEndOfStreamBlock()) {
         if (executionStatsAggregatorMap != null) {
