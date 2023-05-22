@@ -193,7 +193,15 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <argLine>
+          --add-opens=java.base/java.nio=ALL-UNNAMED
+          --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+          --add-opens=java.base/java.lang=ALL-UNNAMED
+          --add-opens=java.base/java.util=ALL-UNNAMED
+          --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
+          -Xms4g -Xmx4g
+          -Dlog4j2.configurationFile=log4j2.xml
+        </argLine>
       </properties>
     </profile>
     <!-- jfim: this profile is overridden in pinot-integration-tests -->
