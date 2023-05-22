@@ -83,19 +83,19 @@
         ]
       },
       {
-        "sql": "SELECT jsonextractscalar(jsonCol,'$.key1', 'STRING') AS keys FROM {jsonTbl} where stringCol='str1' option(timeoutMs=3600000)",
+        "sql": "SELECT jsonextractscalar(jsonCol,'$.key1', 'STRING') AS keys FROM {jsonTbl} where stringCol='str1'",
         "outputs": [
           ["val1"]
         ]
       },
       {
-        "sql": "SELECT jsonextractscalar(jsonCol,'$.key22', 'STRING', 'dummy') AS keys FROM {jsonTbl} where stringCol='str1' option(timeoutMs=3600000)",
+        "sql": "SELECT jsonextractscalar(jsonCol,'$.key22', 'STRING', 'dummy') AS keys FROM {jsonTbl} where stringCol='str1'",
         "outputs": [
           ["dummy"]
         ]
       },
       {
-        "sql": "SELECT jsonextractscalar(jsonCol,'$.key1111', 'FLOAT') AS keys FROM {jsonTbl} where stringCol='str44' option(timeoutMs=3600000)",
+        "sql": "SELECT jsonextractscalar(jsonCol,'$.key1111', 'FLOAT') AS keys FROM {jsonTbl} where stringCol='str44'",
         "outputs": [
           [22.23]
         ]
