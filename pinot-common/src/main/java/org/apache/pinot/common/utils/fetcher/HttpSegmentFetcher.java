@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
@@ -97,7 +98,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   }
 
   @Override
-  public File fetchUntarSegmentToLocalStreamed(URI downloadURI, File dest, long maxStreamRateInByte)
+  public File fetchUntarSegmentToLocalStreamed(URI downloadURI, File dest, long maxStreamRateInByte,
+      AtomicInteger attempts)
       throws Exception {
     // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
     // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
@@ -106,7 +108,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     AtomicReference<File> ret = new AtomicReference<>(); // return the untared segment directory
     _logger.info("Retry downloading for {} times. retryCount from pinot server config: {}, number of IP addresses for "
         + "download URI: {}", retryCount, _retryCount, uriProvider.numAddresses());
-    RetryPolicies.exponentialBackoffRetryPolicy(retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+    int tries = RetryPolicies.exponentialBackoffRetryPolicy(retryCount, _retryWaitMs,
+        _retryDelayScaleFactor).attempt(() -> {
       URI uri = uriProvider.next();
       try {
         String hostName = downloadURI.getHost();
@@ -145,6 +148,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         return false;
       }
     });
+    attempts.set(tries);
     return ret.get();
   }
 
