@@ -49,6 +49,38 @@
         ]
       },
       {
+        "description": "semi-join with dynamic_broadcast join strategy then group-by on same key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast'), aggFinalStage */ a.col1, SUM(a.col3) FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0) GROUP BY 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalExchange(distribution=[single])",
+          "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n    LogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col2=[$1], col3=[$2])",
+          "\n        LogicalFilter(condition=[>($2, 0)])",
+          "\n          LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "semi-join with dynamic_broadcast join strategy then group-by on different key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ a.col2, SUM(a.col3) FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0) GROUP BY 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalExchange(distribution=[single])",
+          "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n    LogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col2=[$1], col3=[$2])",
+          "\n        LogicalFilter(condition=[>($2, 0)])",
+          "\n          LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "aggregate with skip leaf stage hint, group by aggregate",
         "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a' GROUP BY a.col1, a.col2",
         "output": [
