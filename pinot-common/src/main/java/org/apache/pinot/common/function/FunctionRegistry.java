@@ -205,16 +205,5 @@ public class FunctionRegistry {
     public static boolean jsonMatch(String text, String pattern) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
-
-    @ScalarFunction(names = {"clpDecode", "clp_decode"}, isPlaceholder = true)
-    public static Object clpDecode(String logtypeFieldName, String dictVarsFieldName, String encodedVarsFieldName) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"clpDecode", "clp_decode"}, isPlaceholder = true)
-    public static Object clpDecode(String logtypeFieldName, String dictVarsFieldName, String encodedVarsFieldName,
-        String defaultValue) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
   }
 }
