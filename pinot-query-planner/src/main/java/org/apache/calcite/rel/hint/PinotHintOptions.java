@@ -21,7 +21,7 @@ package org.apache.calcite.rel.hint;
 /**
  * {@code PinotHintOptions} specified the supported hint options by Pinot based a particular type of relation node.
  *
- * <p>for each {@link org.apache.calcite.rel.RelNode} type we support a option hint name.</p>
+ * <p>for each {@link org.apache.calcite.rel.RelNode} type we support an option hint name.</p>
  * <p>for each option hint name there's a corresponding {@link RelHint} that supported only key-value option stored
  * in {@link RelHint#kvOptions}</p>
  */
@@ -34,11 +34,11 @@ public class PinotHintOptions {
   }
 
   public static class AggregateOptions {
-    public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "partitioned_by_group_by_keys";
+    public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
   }
 
   public static class JoinHintOptions {
     public static final String JOIN_STRATEGY = "join_strategy";
-    public static final String IS_COLOCATED_BY_JOIN_KEYS = "colocated_by_join_keys";
+    public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
   }
 }

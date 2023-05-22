@@ -21,7 +21,9 @@ package org.apache.calcite.rel.rules;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.logical.LogicalExchange;
@@ -40,20 +42,28 @@ public class PinotRuleUtils {
     // do not instantiate.
   }
 
-  public static boolean isExchange(RelNode rel) {
-    RelNode reference = rel;
-    if (reference instanceof HepRelVertex) {
-      reference = ((HepRelVertex) reference).getCurrentRel();
+  public static RelNode unboxRel(RelNode rel) {
+    if (rel instanceof HepRelVertex) {
+      return ((HepRelVertex) rel).getCurrentRel();
+    } else {
+      return rel;
     }
-    return reference instanceof Exchange;
+  }
+
+  public static boolean isExchange(RelNode rel) {
+    return unboxRel(rel) instanceof Exchange;
   }
 
   public static boolean isProject(RelNode rel) {
-    RelNode reference = rel;
-    if (reference instanceof HepRelVertex) {
-      reference = ((HepRelVertex) reference).getCurrentRel();
-    }
-    return reference instanceof Project;
+    return unboxRel(rel) instanceof Project;
+  }
+
+  public static boolean isJoin(RelNode rel) {
+    return unboxRel(rel) instanceof Join;
+  }
+
+  public static boolean isAggregate(RelNode rel) {
+    return unboxRel(rel) instanceof Aggregate;
   }
 
   // TODO: optimize this part out as it is not efficient to scan the entire subtree for exchanges.
