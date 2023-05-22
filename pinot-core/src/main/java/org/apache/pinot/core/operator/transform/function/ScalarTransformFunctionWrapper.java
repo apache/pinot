@@ -174,7 +174,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
       Object result = _functionInvoker.invoke(_scalarArguments);
       if (result != null) {
-        _intValuesSV[i] = (int) result;
+        _intValuesSV[i] = (int) _resultType.toInternal(result);
       } else {
         bitmap.add(i);
       }
