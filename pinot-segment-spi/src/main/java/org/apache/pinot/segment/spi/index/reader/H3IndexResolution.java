@@ -20,6 +20,8 @@ package org.apache.pinot.segment.spi.index.reader;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.util.StdConverter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +33,7 @@ import java.util.Objects;
  * To efficiently serialize the resolutions, we use two bytes for encoding th enabled resolutions. The resolution level
  * maps to the corresponding bit.
  */
+@JsonSerialize(converter = H3IndexResolution.ToIntListConverted.class)
 public class H3IndexResolution {
   private short _resolutions;
 
@@ -90,5 +93,12 @@ public class H3IndexResolution {
   @Override
   public int hashCode() {
     return Objects.hash(_resolutions);
+  }
+
+  public static class ToIntListConverted extends StdConverter<H3IndexResolution, List<Integer>> {
+    @Override
+    public List<Integer> convert(H3IndexResolution value) {
+      return value.getResolutions();
+    }
   }
 }

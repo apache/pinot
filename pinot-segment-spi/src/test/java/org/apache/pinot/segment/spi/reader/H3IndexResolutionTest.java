@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.spi.reader;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
@@ -29,6 +31,24 @@ public class H3IndexResolutionTest {
   @Test
   public void testH3IndexResolution() {
     H3IndexResolution resolution = new H3IndexResolution(Lists.newArrayList(13, 5, 6));
+    Assert.assertEquals(resolution.size(), 3);
+    Assert.assertEquals(resolution.getLowestResolution(), 5);
+    Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
+  }
+
+  @Test
+  public void serialization()
+      throws JsonProcessingException {
+    H3IndexResolution resolution = new H3IndexResolution(Lists.newArrayList(13, 5, 6));
+    String string = JsonUtils.objectToString(resolution);
+    Assert.assertEquals(string, "[5,6,13]");
+  }
+
+  @Test
+  public void deserialization()
+      throws JsonProcessingException {
+    H3IndexResolution resolution =
+        JsonUtils.stringToObject("[5,6,13]", H3IndexResolution.class);
     Assert.assertEquals(resolution.size(), 3);
     Assert.assertEquals(resolution.getLowestResolution(), 5);
     Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
