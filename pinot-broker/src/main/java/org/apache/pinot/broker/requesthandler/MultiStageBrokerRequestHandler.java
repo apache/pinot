@@ -330,26 +330,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    * requestId generator addresses that by:
    * <ol>
    *   <li>
-   *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't come to the same
-   *     requestId. This mask is applied to the most significant 32 bits.
+   *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't arrive at the same
+   *     requestId. This mask becomes the most significant 9 digits (in base-10).
    *   </li>
    *   <li>
-   *     Using a auto-incrementing counter for the least significant 32 bits. This should make debugging a bit easier
-   *     (it's possible to infer from two requestIds which one came first).
+   *     Using a auto-incrementing counter for the least significant 9 digits (in base-10).
    *   </li>
    * </ol>
    */
   static class MultiStageRequestIdGenerator {
+    private static final long OFFSET = 1_000_000_000L;
     private final long _mask;
     private final AtomicLong _incrementingId = new AtomicLong(0);
 
     public MultiStageRequestIdGenerator(String brokerId) {
-      _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) << 32;
+      _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) * OFFSET;
     }
 
     public long get() {
-      long normalized = (_incrementingId.getAndIncrement() & ((1L << 32) - 1));
-      return _mask | normalized;
+      long normalized = (_incrementingId.getAndIncrement() & Long.MAX_VALUE) % OFFSET;
+      return _mask + normalized;
     }
   }
 }
