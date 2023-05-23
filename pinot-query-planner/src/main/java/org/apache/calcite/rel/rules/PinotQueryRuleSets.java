@@ -73,6 +73,7 @@ public class PinotQueryRuleSets {
           // join rules
           CoreRules.JOIN_PUSH_EXPRESSIONS,
           CoreRules.PROJECT_TO_SEMI_JOIN,
+          PinotAggregateToSemiJoinRule.INSTANCE,
 
           // convert non-all union into all-union + distinct
           CoreRules.UNION_TO_DISTINCT,
@@ -123,6 +124,9 @@ public class PinotQueryRuleSets {
       PinotJoinExchangeNodeInsertRule.INSTANCE,
       PinotAggregateExchangeNodeInsertRule.INSTANCE,
       PinotWindowExchangeNodeInsertRule.INSTANCE,
-      PinotSetOpExchangeNodeInsertRule.INSTANCE
+      PinotSetOpExchangeNodeInsertRule.INSTANCE,
+
+      // apply dynamic broadcast rule after exchange is inserted/
+      PinotJoinToDynamicBroadcastRule.INSTANCE
   );
 }
