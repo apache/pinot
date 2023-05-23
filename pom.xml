@@ -160,14 +160,7 @@
     <audienceannotations.version>0.13.0</audienceannotations.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>
-      --add-opens=java.base/java.nio=ALL-UNNAMED
-      --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
-      --add-opens=java.base/java.lang=ALL-UNNAMED
-      --add-opens=java.base/java.util=ALL-UNNAMED
-      --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
-      -Xms4g -Xmx4g
-    </argLine>
+    <argLine>-Xms4g -Xmx4g</argLine>
 
     <!-- handle kafka imports
     kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
@@ -193,15 +186,7 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>
-          --add-opens=java.base/java.nio=ALL-UNNAMED
-          --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
-          --add-opens=java.base/java.lang=ALL-UNNAMED
-          --add-opens=java.base/java.util=ALL-UNNAMED
-          --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
-          -Xms4g -Xmx4g
-          -Dlog4j2.configurationFile=log4j2.xml
-        </argLine>
+        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <!-- jfim: this profile is overridden in pinot-integration-tests -->
@@ -1370,6 +1355,14 @@
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
+            <argLine>
+              ${argLine}
+              --add-opens=java.base/java.nio=ALL-UNNAMED
+              --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+              --add-opens=java.base/java.lang=ALL-UNNAMED
+              --add-opens=java.base/java.util=ALL-UNNAMED
+              --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
+            </argLine>
           </configuration>
         </plugin>
         <plugin>
