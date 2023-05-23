@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
@@ -41,10 +42,19 @@ class SingletonExchange extends BlockExchange {
   @Override
   protected void route(List<SendingMailbox> mailbox, TransferableBlock block)
       throws Exception {
+    boolean isLocalExchangeSent = false;
     for (SendingMailbox sendingMailbox : mailbox) {
       if (isLocal(sendingMailbox)) {
-        sendBlock(sendingMailbox, block);
+        if (!isLocalExchangeSent) {
+          sendBlock(sendingMailbox, block);
+          isLocalExchangeSent = true;
+        } else {
+          throw new IOException("Local exchange has already been sent for singleton exchange!");
+        }
       }
+    }
+    if (!isLocalExchangeSent) {
+      throw new IOException("Local exchange has not been sent successfully!");
     }
   }
 
