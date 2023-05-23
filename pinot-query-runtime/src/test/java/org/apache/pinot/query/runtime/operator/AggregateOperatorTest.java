@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
@@ -201,7 +202,7 @@ public class AggregateOperatorTest {
 
     AggregationUtils.Merger merger = Mockito.mock(AggregationUtils.Merger.class);
     Mockito.when(merger.merge(Mockito.any(), Mockito.any())).thenReturn(12d);
-    Mockito.when(merger.initialize(Mockito.any(), Mockito.any())).thenReturn(1d);
+    Mockito.when(merger.init(Mockito.any(), Mockito.any())).thenReturn(1d);
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group, inSchema,
@@ -213,7 +214,7 @@ public class AggregateOperatorTest {
     // Then:
     // should call merger twice, one from second row in first block and two from the first row
     // in second block
-    Mockito.verify(merger, Mockito.times(1)).initialize(Mockito.any(), Mockito.any());
+    Mockito.verify(merger, Mockito.times(1)).init(Mockito.any(), Mockito.any());
     Mockito.verify(merger, Mockito.times(2)).merge(Mockito.any(), Mockito.any());
     Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 12d},
         "Expected two columns (group by key, agg value)");
@@ -226,8 +227,8 @@ public class AggregateOperatorTest {
     RexExpression.FunctionCall agg = getSum(new RexExpression.InputRef(0));
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     AggregateOperator sum0GroupBy1 = new AggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator,
-        OperatorTestUtil.getDataSchema(OperatorTestUtil.OP_1), Arrays.asList(agg),
-        Arrays.asList(new RexExpression.InputRef(1)), inSchema);
+        OperatorTestUtil.getDataSchema(OperatorTestUtil.OP_1), Collections.singletonList(agg),
+        Collections.singletonList(new RexExpression.InputRef(1)), inSchema);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     while (result.isNoOpBlock()) {
       result = sum0GroupBy1.getNextBlock();
