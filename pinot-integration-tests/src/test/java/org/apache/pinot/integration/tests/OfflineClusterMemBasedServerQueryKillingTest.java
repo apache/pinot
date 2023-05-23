@@ -141,7 +141,6 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
         .setLevel(Level.INFO);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
     LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
   }
 
   protected void startBrokers()
