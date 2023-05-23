@@ -157,9 +157,6 @@ public class BenchmarkPinotDataBuffer {
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkPinotDataBuffer.class.getSimpleName());
-    //opt = opt.addProfiler(JavaFlightRecorderProfiler.class)
-    //        .jvmArgsAppend("-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints");
-    //opt.addProfiler(LinuxPerfAsmProfiler.class);
     new Runner(opt.build()).run();
   }
 }
