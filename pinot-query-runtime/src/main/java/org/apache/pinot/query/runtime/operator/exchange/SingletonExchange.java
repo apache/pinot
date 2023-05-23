@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.List;
 import java.util.function.Consumer;
+import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -41,7 +42,13 @@ class SingletonExchange extends BlockExchange {
   protected void route(List<SendingMailbox> mailbox, TransferableBlock block)
       throws Exception {
     for (SendingMailbox sendingMailbox : mailbox) {
-      sendBlock(sendingMailbox, block);
+      if (isLocal(sendingMailbox)) {
+        sendBlock(sendingMailbox, block);
+      }
     }
+  }
+
+  private static boolean isLocal(SendingMailbox sendingMailbox) {
+    return sendingMailbox instanceof InMemorySendingMailbox;
   }
 }
