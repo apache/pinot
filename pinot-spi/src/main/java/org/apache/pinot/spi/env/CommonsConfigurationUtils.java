@@ -136,6 +136,8 @@ public abstract class CommonsConfigurationUtils {
   public static boolean needInterpolate(Object rawProperty) {
     if (rawProperty instanceof String) {
       String strProperty = (String) rawProperty;
+      // e.g. if config value is '${sys:FOO}', it's replaced by value of system property FOO; If config value is
+      // '${env:FOO}', it's replaced by value of env var FOO.
       return StringUtils.isNotEmpty(strProperty) && strProperty.startsWith("${") && strProperty.endsWith("}");
     }
     return false;
@@ -143,6 +145,7 @@ public abstract class CommonsConfigurationUtils {
 
   @SuppressWarnings("unchecked")
   public static <T> T interpolate(Configuration configuration, String key, T defaultValue, Class<T> returnType) {
+    // Different from the generic getProperty() method, those type specific getters do config interpolation.
     if (Integer.class.equals(returnType)) {
       return (T) configuration.getInteger(key, (Integer) defaultValue);
     } else if (Boolean.class.equals(returnType)) {

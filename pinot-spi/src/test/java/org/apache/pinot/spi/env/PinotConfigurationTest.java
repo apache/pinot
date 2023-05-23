@@ -211,18 +211,52 @@ public class PinotConfigurationTest {
   public void assertPropertyInterpolation() {
     Map<String, Object> configs = new HashMap<>();
     configs.put("config.property.1", "${sys:PINOT_CONFIGURATION_TEST_VAR}");
-    configs.put("config.enable.interpolation", "true");
-
     PinotConfiguration pinotConfiguration = new PinotConfiguration(configs);
 
-    System.setProperty("PINOT_CONFIGURATION_TEST_VAR", "val1");
+    try {
+      // Env var is not defined, thus interpolation doesn't happen
+      Assert.assertEquals(pinotConfiguration.getProperty("config.property.1"), "${sys:PINOT_CONFIGURATION_TEST_VAR}");
 
-    Assert.assertEquals(pinotConfiguration.getProperty("config.property.1"), "val1");
-    Assert.assertEquals(pinotConfiguration.getProperty("config.property.1", "defaultVal"), "val1");
-    Map<String, Object> properties = pinotConfiguration.toMap();
-    Assert.assertEquals(properties.get("config.property.1"), "val1");
+      // String value
+      System.setProperty("PINOT_CONFIGURATION_TEST_VAR", "val1");
+      Assert.assertEquals(pinotConfiguration.getProperty("config.property.1"), "val1");
+      Assert.assertEquals(pinotConfiguration.getProperty("config.property.1", "defaultVal"), "val1");
+      Map<String, Object> properties = pinotConfiguration.toMap();
+      Assert.assertEquals(properties.get("config.property.1"), "val1");
 
-    System.clearProperty("PINOT_CONFIGURATION_TEST_VAR");
+      // Boolean value
+      System.setProperty("PINOT_CONFIGURATION_TEST_VAR", "true");
+      Assert.assertTrue(pinotConfiguration.getProperty("config.property.1", false));
+      properties = pinotConfiguration.toMap();
+      Assert.assertEquals(properties.get("config.property.1"), "true");
+      Assert.assertTrue(new PinotConfiguration(properties).getProperty("config.property.1", false));
+
+      // Number value
+      System.setProperty("PINOT_CONFIGURATION_TEST_VAR", "10");
+      Assert.assertEquals(pinotConfiguration.getProperty("config.property.1", 0), 10);
+      properties = pinotConfiguration.toMap();
+      Assert.assertEquals(properties.get("config.property.1"), "10");
+      Assert.assertEquals(new PinotConfiguration(properties).getProperty("config.property.1", 0), 10);
+
+      // String array, with elements specified as env vars separately.
+      System.setProperty("PINOT_CONFIGURATION_TEST_VAR", "a");
+      System.setProperty("PINOT_CONFIGURATION_TEST_VAR2", "b");
+      configs.put("config.property.1", "${sys:PINOT_CONFIGURATION_TEST_VAR},${sys:PINOT_CONFIGURATION_TEST_VAR2}");
+      pinotConfiguration = new PinotConfiguration(configs);
+      Assert.assertEquals(pinotConfiguration.getProperty("config.property.1", Arrays.asList()),
+          Arrays.asList("a", "b"));
+      Assert.assertEquals(pinotConfiguration.getProperty("config.property.1", "val1"), "a,b");
+      Assert.assertEquals(pinotConfiguration.getProperty("config.property.1"), "a,b");
+      properties = pinotConfiguration.toMap();
+      Assert.assertEquals(properties.get("config.property.1"), "a,b");
+      Assert.assertEquals(new PinotConfiguration(properties).getProperty("config.property.1", Arrays.asList()),
+          Arrays.asList("a", "b"));
+      Assert.assertEquals(new PinotConfiguration(properties).getProperty("config.property.1", "val1"), "a,b");
+      Assert.assertEquals(new PinotConfiguration(properties).getProperty("config.property.1"), "a,b");
+    } finally {
+      System.clearProperty("PINOT_CONFIGURATION_TEST_VAR");
+      System.clearProperty("PINOT_CONFIGURATION_TEST_VAR2");
+    }
   }
 
   private void copyClasspathResource(String classpathResource, String target)

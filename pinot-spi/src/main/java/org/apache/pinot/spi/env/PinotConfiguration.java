@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.env;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -32,7 +31,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
 
@@ -169,7 +167,6 @@ public class PinotConfiguration {
   }
 
   private static String getProperty(String name, Configuration configuration) {
-    // getStringArray() interpolates configs automatically
     return Optional.of(configuration.getStringArray(relaxPropertyName(name)))
 
         .filter(values -> values.length > 0)
@@ -357,18 +354,12 @@ public class PinotConfiguration {
    * @return the property String value. Fallback to default value if missing.
    */
   public String getProperty(String name, String defaultValue) {
-    Object rawProperty = getRawProperty(name, defaultValue);
-    if (CommonsConfigurationUtils.needInterpolate(rawProperty)) {
-      return _configuration.getString(relaxPropertyName(name), defaultValue);
+    String relaxedPropertyName = relaxPropertyName(name);
+    if (!_configuration.containsKey(relaxedPropertyName)) {
+      return defaultValue;
     }
-    if (rawProperty instanceof List) {
-      return StringUtils.join(((ArrayList) rawProperty).toArray(), ',');
-    } else {
-      if (rawProperty == null) {
-        return null;
-      }
-      return rawProperty.toString();
-    }
+    // Method below calls getStringArray() which can interpolate multi values properly.
+    return getProperty(name, _configuration);
   }
 
   private <T> T getProperty(String name, T defaultValue, Class<T> returnType) {
@@ -376,9 +367,9 @@ public class PinotConfiguration {
     if (!_configuration.containsKey(relaxedPropertyName)) {
       return defaultValue;
     }
-    Object rawProperty = getRawProperty(name, defaultValue);
+    Object rawProperty = _configuration.getProperty(relaxedPropertyName);
     if (CommonsConfigurationUtils.needInterpolate(rawProperty)) {
-      return CommonsConfigurationUtils.interpolate(_configuration, relaxPropertyName(name), defaultValue, returnType);
+      return CommonsConfigurationUtils.interpolate(_configuration, relaxedPropertyName, defaultValue, returnType);
     }
     return CommonsConfigurationUtils.convert(rawProperty, returnType);
   }
