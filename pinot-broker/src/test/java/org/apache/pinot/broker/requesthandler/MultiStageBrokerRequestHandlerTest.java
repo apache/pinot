@@ -20,8 +20,8 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -78,15 +78,20 @@ public class MultiStageBrokerRequestHandlerTest {
     JsonNode jsonRequest = objectMapper.readTree(sampleJsonRequest);
     RequestContext requestContext = new DefaultRequestContext();
 
-    Set<Long> requestIds = new HashSet<>();
-    // Request id is a long and generated randomly each time. Running it a bunch of times should yield a unique id
-    // each time. Also, the requestId should always be non-negative.
+    List<Long> requestIds = new ArrayList<>();
+    // Request id should be unique each time, and there should be a difference of 1 between consecutive requestIds.
     for (int iteration = 0; iteration < 10; iteration++) {
       _requestHandler.handleRequest(jsonRequest, null, null, requestContext);
       Assert.assertTrue(requestContext.getRequestId() >= 0, "Request ID should be non-negative");
       requestIds.add(requestContext.getRequestId());
+      if (iteration != 0) {
+        Assert.assertEquals(1, requestIds.get(iteration) - requestIds.get(iteration - 1),
+            "Request Id should have difference of 1");
+      }
     }
-    Assert.assertEquals(10, requestIds.size(), "Random request-id should generate unique ids across 10 runs");
+    Assert.assertEquals(10, requestIds.stream().distinct().count(), "Request Id should be unique");
+    Assert.assertEquals(1, requestIds.stream().map(x -> (x >> 32)).distinct().count(),
+        "Request Id should have a broker-id specific mask for the 32 MSB");
   }
 
   @AfterClass

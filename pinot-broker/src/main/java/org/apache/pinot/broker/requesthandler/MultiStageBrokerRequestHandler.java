@@ -23,10 +23,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.commons.lang3.StringUtils;
@@ -71,7 +70,6 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
-  private final Random _random = new Random();
   private final String _reducerHostname;
   private final int _reducerPort;
   private final long _defaultBrokerTimeoutMs;
@@ -79,7 +77,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final MailboxService _mailboxService;
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
-  private final Supplier<Long> _multistageRequestIdGenerator = () -> _random.nextLong() & Long.MAX_VALUE;
+  private final MultiStageRequestIdGenerator _multistageRequestIdGenerator;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -113,6 +111,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
+
+    _multistageRequestIdGenerator = new MultiStageRequestIdGenerator(brokerIdFromConfig);
   }
 
   @Override
@@ -321,5 +321,35 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
+  }
+
+  /**
+   * OpChains in Multistage queries are identified by the requestId and the stage-id. v1 Engine uses an incrementing
+   * long to generate requestId, so the requestIds are numbered [0, 1, 2, ...]. When running with multiple brokers,
+   * it could be that two brokers end up generating the same requestId which could lead to weird query errors. This
+   * requestId generator addresses that by:
+   * <ol>
+   *   <li>
+   *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't come to the same
+   *     requestId. This mask is applied to the most significant 32 bits.
+   *   </li>
+   *   <li>
+   *     Using a auto-incrementing counter for the least significant 32 bits. This should make debugging a bit easier
+   *     (it's possible to infer from two requestIds which one came first).
+   *   </li>
+   * </ol>
+   */
+  static class MultiStageRequestIdGenerator {
+    private final long _mask;
+    private final AtomicLong _incrementingId = new AtomicLong(0);
+
+    public MultiStageRequestIdGenerator(String brokerId) {
+      _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) << 32;
+    }
+
+    public long get() {
+      long normalized = (_incrementingId.getAndIncrement() & ((1L << 32) - 1));
+      return _mask | normalized;
+    }
   }
 }
