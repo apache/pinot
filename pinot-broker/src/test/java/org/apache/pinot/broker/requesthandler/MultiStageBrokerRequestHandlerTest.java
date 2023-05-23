@@ -92,6 +92,7 @@ public class MultiStageBrokerRequestHandlerTest {
     Assert.assertEquals(10, requestIds.stream().distinct().count(), "Request Id should be unique");
     Assert.assertEquals(1, requestIds.stream().map(x -> (x >> 32)).distinct().count(),
         "Request Id should have a broker-id specific mask for the 32 MSB");
+    Assert.assertTrue(requestIds.stream().noneMatch(x -> x < 0), "Request Id should not be negative");
   }
 
   @AfterClass
