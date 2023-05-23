@@ -234,8 +234,6 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        # We only test LTS Java versions
-        # TODO: add JDK 17 once ready. see: https://github.com/apache/pinot/issues/8529
         java: [ 11, 17, 20 ]
         distribution: [ "temurin" ]
         include:
