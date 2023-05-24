@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -75,6 +76,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +103,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected AuthProvider _authProvider;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
+  protected boolean _isRetrySegmentDownloadUntarFailure;
+  protected int _segmentDownloadUntarRetryCount;
+  protected int _segmentDownloadUntarRetryWaitMs;
+  protected int _segmentDownloadUntarRetryDelayScaleFactor;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
@@ -153,6 +160,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
               + "The rate limit interval for streamed download-untar is {} bytes/s",
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
+    _isRetrySegmentDownloadUntarFailure = tableDataManagerParams.isRetrySegmentDownloadUntarFailure();
+    _segmentDownloadUntarRetryCount = tableDataManagerParams.getSegmentDownloadUntarRetryCount();
+    _segmentDownloadUntarRetryWaitMs = tableDataManagerParams.getSegmentDownloadUntarRetryWaitMs();
+    _segmentDownloadUntarRetryDelayScaleFactor = tableDataManagerParams.getSegmentDownloadUntarRetryDelayScaleFactor();
+
     int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
     if (maxParallelSegmentDownloads > 0) {
       LOGGER.info(
@@ -526,6 +538,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } else {
       try {
         File tarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
+        if (_isRetrySegmentDownloadUntarFailure) {
+          return untarAndMoveSegmentWithRetries(segmentName, tarFile, tempRootDir, zkMetadata);
+        }
         return untarAndMoveSegment(segmentName, tarFile, tempRootDir);
       } finally {
         FileUtils.deleteQuietly(tempRootDir);
@@ -548,7 +563,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @VisibleForTesting
-  File downloadAndDecrypt(String segmentName, SegmentZKMetadata zkMetadata, File tempRootDir)
+  protected File downloadAndDecrypt(String segmentName, SegmentZKMetadata zkMetadata, File tempRootDir)
       throws Exception {
     File tarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     String uri = zkMetadata.getDownloadUrl();
@@ -644,7 +659,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @VisibleForTesting
-  File untarAndMoveSegment(String segmentName, File tarFile, File tempRootDir)
+  protected File untarAndMoveSegment(String segmentName, File tarFile, File tempRootDir)
       throws IOException {
     File untarDir = new File(tempRootDir, segmentName);
     try {
@@ -665,6 +680,40 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UNTAR_FAILURES, 1L);
       throw e;
     }
+  }
+
+  @VisibleForTesting
+  File untarAndMoveSegmentWithRetries(String segmentName, File tarFile, File tempRootDir, SegmentZKMetadata zkMetadata)
+      throws AttemptsExceededException {
+    AtomicReference<File> file = new AtomicReference<>();
+    try {
+      file.set(untarAndMoveSegment(segmentName, tarFile, tempRootDir));
+    } catch (Exception e) {
+      try {
+        RetryPolicies.exponentialBackoffRetryPolicy(_segmentDownloadUntarRetryCount, _segmentDownloadUntarRetryWaitMs,
+            _segmentDownloadUntarRetryDelayScaleFactor).attempt(() -> {
+          File retriedTarFile = null;
+          try {
+            retriedTarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
+            file.set(untarAndMoveSegment(segmentName, retriedTarFile, tempRootDir));
+            return true;
+          } catch (Exception ex) {
+            return false;
+          } finally {
+            FileUtils.deleteQuietly(retriedTarFile);
+          }
+        });
+      } catch (AttemptsExceededException ex) {
+        LOGGER.error("Failed to untar segment: {} of table: {} from: {}, even after {} retries", segmentName,
+            _tableNameWithType, tarFile, _segmentDownloadUntarRetryCount);
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UNTAR_FAILURES_POST_RETRIES, 1L);
+        throw ex;
+      } catch (RetriableOperationException ex) {
+        LOGGER.warn("Failed to untar segment: {} of table: {}, for file {}, retrying untar", segmentName,
+            _tableNameWithType, tarFile);
+      }
+    }
+    return file.get();
   }
 
   @VisibleForTesting

@@ -63,6 +63,14 @@ public interface InstanceDataManagerConfig {
 
   long getStreamSegmentDownloadUntarRateLimit();
 
+  boolean isRetrySegmentDownloadUntarFailure();
+
+  int getSegmentDownloadUntarRetryWaitMs();
+
+  int getSegmentDownloadUntarRetryCount();
+
+  int getSegmentDownloadUntarRetryDelayScaleFactor();
+
   int getDeletedSegmentsCacheSize();
 
   int getDeletedSegmentsCacheTtlMinutes();

@@ -25,6 +25,10 @@ public class TableDataManagerParams {
   private boolean _isStreamSegmentDownloadUntar; // whether to turn on stream segment download-untar
   private long _streamSegmentDownloadUntarRateLimitBytesPerSec; // the per segment rate limit for stream download-untar
   private int _maxParallelSegmentDownloads; // max number of segment download in parallel per table
+  private boolean _isRetrySegmentDownloadUntarFailure; // whether to retry segment untar failures
+  private int _segmentDownloadUntarRetryCount;
+  private int _segmentDownloadUntarRetryWaitMs;
+  private int _segmentDownloadUntarRetryDelayScaleFactor;
 
   public TableDataManagerParams(int maxParallelSegmentDownloads, boolean isStreamSegmentDownloadUntar,
       long streamSegmentDownloadUntarRateLimitBytesPerSec) {
@@ -36,8 +40,26 @@ public class TableDataManagerParams {
   public TableDataManagerParams(InstanceDataManagerConfig instanceDataManagerConfig) {
     _maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
     _isStreamSegmentDownloadUntar = instanceDataManagerConfig.isStreamSegmentDownloadUntar();
+    _isRetrySegmentDownloadUntarFailure = instanceDataManagerConfig.isRetrySegmentDownloadUntarFailure();
+    _segmentDownloadUntarRetryCount = instanceDataManagerConfig.getSegmentDownloadUntarRetryCount();
+    _segmentDownloadUntarRetryWaitMs = instanceDataManagerConfig.getSegmentDownloadUntarRetryWaitMs();
+    _segmentDownloadUntarRetryDelayScaleFactor =
+        instanceDataManagerConfig.getSegmentDownloadUntarRetryDelayScaleFactor();
     _streamSegmentDownloadUntarRateLimitBytesPerSec =
         instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
+  }
+
+  public TableDataManagerParams(int maxParallelSegmentDownloads, boolean isStreamSegmentDownloadUntar,
+      boolean isRetrySegmentDownloadUntarFailure, int segmentDownloadUntarRetryCount,
+      int segmentDownloadUntarRetryWaitMs, int segmentDownloadUntarRetryDelayScaleFactor,
+      long streamSegmentDownloadUntarRateLimitBytesPerSec) {
+    _maxParallelSegmentDownloads = maxParallelSegmentDownloads;
+    _isStreamSegmentDownloadUntar = isStreamSegmentDownloadUntar;
+    _isRetrySegmentDownloadUntarFailure = isRetrySegmentDownloadUntarFailure;
+    _segmentDownloadUntarRetryCount = segmentDownloadUntarRetryCount;
+    _segmentDownloadUntarRetryWaitMs = segmentDownloadUntarRetryWaitMs;
+    _segmentDownloadUntarRetryDelayScaleFactor = segmentDownloadUntarRetryDelayScaleFactor;
+    _streamSegmentDownloadUntarRateLimitBytesPerSec = streamSegmentDownloadUntarRateLimitBytesPerSec;
   }
 
   public boolean isStreamSegmentDownloadUntar() {
@@ -54,6 +76,38 @@ public class TableDataManagerParams {
 
   public void setStreamSegmentDownloadUntarRateLimitBytesPerSec(long streamSegmentDownloadUntarRateLimitBytesPerSec) {
     _streamSegmentDownloadUntarRateLimitBytesPerSec = streamSegmentDownloadUntarRateLimitBytesPerSec;
+  }
+
+  public boolean isRetrySegmentDownloadUntarFailure() {
+    return _isRetrySegmentDownloadUntarFailure;
+  }
+
+  public void setRetrySegmentDownloadUntarFailure(boolean retrySegmentDownloadUntarFailure) {
+    _isRetrySegmentDownloadUntarFailure = retrySegmentDownloadUntarFailure;
+  }
+
+  public int getSegmentDownloadUntarRetryCount() {
+    return _segmentDownloadUntarRetryCount;
+  }
+
+  public void setSegmentDownloadUntarRetryCount(int retryCount) {
+    _segmentDownloadUntarRetryCount = retryCount;
+  }
+
+  public int getSegmentDownloadUntarRetryWaitMs() {
+    return _segmentDownloadUntarRetryWaitMs;
+  }
+
+  public void setSegmentDownloadUntarRetryWaitMs(int retryWaitMs) {
+    _segmentDownloadUntarRetryWaitMs = retryWaitMs;
+  }
+
+  public int getSegmentDownloadUntarRetryDelayScaleFactor() {
+    return _segmentDownloadUntarRetryDelayScaleFactor;
+  }
+
+  public void setSegmentDownloadUntarRetryDelayScaleFactor(int retryDelayScaleFactor) {
+    _segmentDownloadUntarRetryDelayScaleFactor = retryDelayScaleFactor;
   }
 
   public int getMaxParallelSegmentDownloads() {
