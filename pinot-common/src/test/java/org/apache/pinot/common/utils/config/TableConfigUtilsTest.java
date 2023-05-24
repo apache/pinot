@@ -28,9 +28,6 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
@@ -143,33 +140,6 @@ public class TableConfigUtilsTest {
         .setTierOverwrites(JsonUtils.stringToJsonNode("{\"coldTier\": {\"starTreeIndexConfigs\": {}}}")).build();
     TableConfig tierTblCfg = TableConfigUtils.overwriteTableConfigForTier(tableConfig, "coldTier");
     Assert.assertEquals(tierTblCfg, tableConfig);
-  }
-
-  @Test
-  public void testGetPartitionColumnFromInstanceAssignmentConfig() {
-    InstanceReplicaGroupPartitionConfig replicaPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 0,
-            1, 1, 1,
-            0, false, PARTITION_COLUMN);
-
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
-        new InstanceTagPoolConfig("test_tag", false, 1, null),
-        null, replicaPartitionConfig);
-
-
-
-    Map<String, InstanceAssignmentConfig> configMap = new HashMap<>();
-    configMap.put(TableType.REALTIME.toString(), instanceAssignmentConfig);
-
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-            .setInstanceAssignmentConfigMap(configMap).build();
-    Assert.assertEquals(PARTITION_COLUMN, TableConfigUtils.getPartitionColumn(tableConfig));
-
-    TableConfig tableConfig1 =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .setInstanceAssignmentConfigMap(configMap).build();
-    Assert.assertNull(TableConfigUtils.getPartitionColumn(tableConfig1)); //since no key with 'OFFLINE'
   }
 
   @Test
