@@ -22,8 +22,9 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
@@ -93,43 +94,44 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
     SegmentGenerationAndPushTaskExecutor executor = new SegmentGenerationAndPushTaskExecutor();
     Schema schema = new Schema.SchemaBuilder().build();
     FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
-    Map<String, String> configMap = Map.ofEntries(
-        Pair.of(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc.toString() + "dummyTable.json"),
-        Pair.of(BatchConfigProperties.INPUT_FORMAT, ""),
-        Pair.of(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass"),
-        Pair.of(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass"),
-        Pair.of(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop1", "value1"),
-        Pair.of(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop.2", "value2"),
-        Pair.of(BatchConfigProperties.AUTH_TOKEN, "not_used"),
-        Pair.of(BatchConfigProperties.TABLE_NAME, "not_used"),
-        Pair.of(BatchConfigProperties.SCHEMA, schema.toSingleLineJsonString()),
-        Pair.of(BatchConfigProperties.SCHEMA_URI, "not_used"),
-        Pair.of(BatchConfigProperties.TABLE_CONFIGS,
-            new String(SegmentGenerationAndPushTaskGeneratorTest.class.getClassLoader()
-                .getResourceAsStream("dummyTable.json").readAllBytes())),
-        Pair.of(BatchConfigProperties.TABLE_CONFIGS_URI, "not_used"),
-        Pair.of(BatchConfigProperties.SEQUENCE_ID, "42"),
-        Pair.of(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT, "true"),
-        Pair.of(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputtext"),
-        Pair.of(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".prop.seg.1", "valseg1"),
-        Pair.of(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".propseg2", "valseg2"),
-        Pair.of(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true"));
+    Map<String, String> configMap = Stream.of(new String[][] {
+      {BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc.toString() + "dummyTable.json"},
+      {BatchConfigProperties.INPUT_FORMAT, ""},
+      {BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass"},
+      {BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass"},
+      {BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop1", "value1"},
+      {BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop.2", "value2"},
+      {BatchConfigProperties.AUTH_TOKEN, "not_used"},
+      {BatchConfigProperties.TABLE_NAME, "not_used"},
+      {BatchConfigProperties.SCHEMA, schema.toSingleLineJsonString()},
+      {BatchConfigProperties.SCHEMA_URI, "not_used"},
+      {BatchConfigProperties.TABLE_CONFIGS,
+          new String(SegmentGenerationAndPushTaskGeneratorTest.class.getClassLoader()
+              .getResourceAsStream("dummyTable.json").readAllBytes())},
+      {BatchConfigProperties.TABLE_CONFIGS_URI, "not_used"},
+      {BatchConfigProperties.SEQUENCE_ID, "42"},
+      {BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT, "true"},
+      {BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputtext"},
+      {BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".prop.seg.1", "valseg1"},
+      {BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".propseg2", "valseg2"},
+      {BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true"}
+    }).collect(Collectors.toMap(data -> data[0], data -> data[1]));
 
     SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, Paths.get(resourcesLoc.toURI()).toFile());
     Assert.assertEquals(spec.getSequenceId(), 42);
     Assert.assertEquals("file:" + spec.getInputFilePath(), resourcesLoc.toString() + "input/dummyTable.json");
     Assert.assertEquals(spec.getRecordReaderSpec().getClassName(), "AReaderClass");
     Assert.assertEquals(spec.getRecordReaderSpec().getConfigClassName(), "AReaderConfigClass");
-    Assert.assertEqualsDeep(spec.getRecordReaderSpec().getConfigs(), Map.ofEntries(
-        Pair.of("prop1", "value1"),
-        Pair.of("prop.2", "value2")
-    ));
+    Assert.assertEqualsDeep(spec.getRecordReaderSpec().getConfigs(), Stream.of(new String[][] {
+        {"prop1", "value1"},
+        {"prop.2", "value2"}
+    }).collect(Collectors.toMap(data -> data[0], data -> data[1])));
     Assert.assertEquals(spec.isFailOnEmptySegment(), true);
     Assert.assertEquals(spec.getSegmentNameGeneratorSpec().getType(), "inputtext");
-    Assert.assertEqualsDeep(spec.getSegmentNameGeneratorSpec().getConfigs(), Map.ofEntries(
-        Pair.of("prop.seg.1", "valseg1"),
-        Pair.of("propseg2", "valseg2"),
-        Pair.of(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME, "true")
-    ));
+    Assert.assertEqualsDeep(spec.getSegmentNameGeneratorSpec().getConfigs(), Stream.of(new String[][] {
+        {"prop.seg.1", "valseg1"},
+        {"propseg2", "valseg2"},
+        {SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME, "true"}
+    }).collect(Collectors.toMap(data -> data[0], data -> data[1])));
   }
 }
