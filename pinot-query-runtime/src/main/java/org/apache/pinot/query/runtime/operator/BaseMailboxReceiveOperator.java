@@ -29,7 +29,6 @@ import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -63,15 +62,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     Preconditions.checkState(senderMailBoxMetadatas != null && !senderMailBoxMetadatas.getMailBoxIdList().isEmpty(),
         "Failed to find mailbox for stage: %s",
         senderStageId);
-    if (exchangeType == RelDistribution.Type.SINGLETON) {
-      Preconditions.checkState(senderMailBoxMetadatas.getMailBoxIdList().size() == 1,
-          "Only one mailbox is expected for SINGLETON exchange type");
-      VirtualServerAddress virtualServerAddress = senderMailBoxMetadatas.getVirtualAddressList().get(0);
-      Preconditions.checkState(virtualServerAddress.hostname().equals(_mailboxService.getHostname()),
-          "Mailbox host mismatch for SINGLETON exchange type");
-      Preconditions.checkState(virtualServerAddress.port() == _mailboxService.getPort(),
-          "Mailbox port mismatch for SINGLETON exchange type");
-    }
     _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
     _mailboxes = _mailboxIds.stream()
         .map(mailboxId -> _mailboxService.getReceivingMailbox(mailboxId))

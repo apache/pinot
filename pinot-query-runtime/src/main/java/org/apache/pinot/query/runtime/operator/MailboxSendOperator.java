@@ -35,7 +35,6 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -96,15 +95,6 @@ public class MailboxSendOperator extends MultiStageOperator {
     int workerId = context.getServer().workerId();
     MailboxMetadata receiverMailboxMetadatas =
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(receiverStageId);
-    if (exchangeType == RelDistribution.Type.SINGLETON) {
-      Preconditions.checkState(receiverMailboxMetadatas.getMailBoxIdList().size() == 1,
-          "Multiple instances found for SINGLETON exchange type");
-      VirtualServerAddress virtualServerAddress = receiverMailboxMetadatas.getVirtualAddress(0);
-      Preconditions.checkState(virtualServerAddress.hostname().equals(mailboxService.getHostname()),
-          "SINGLETON exchange hostname should be the same as mailbox service hostname");
-      Preconditions.checkState(virtualServerAddress.port() == mailboxService.getPort(),
-          "SINGLETON exchange port should be the same as mailbox service port");
-    }
     List<String> sendingMailboxIds = MailboxIdUtils.toMailboxIds(requestId, receiverMailboxMetadatas);
     List<SendingMailbox> sendingMailboxes = new ArrayList<>(sendingMailboxIds.size());
     for (int i = 0; i < receiverMailboxMetadatas.getMailBoxIdList().size(); i++) {

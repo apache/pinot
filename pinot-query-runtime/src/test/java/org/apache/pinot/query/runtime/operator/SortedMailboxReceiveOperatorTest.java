@@ -141,16 +141,6 @@ public class SortedMailboxReceiveOperatorTest {
         COLLATION_DIRECTIONS, false, 1);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only one mailbox is.*")
-  public void shouldThrowReceiveSingletonFromMultiMatchMailboxServer() {
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, 0, RECEIVER_ADDRESS, Long.MAX_VALUE, Long.MAX_VALUE,
-            _stageMetadataBoth, false);
-    //noinspection resource
-    new SortedMailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS,
-        COLLATION_DIRECTIONS, false, 1);
-  }
-
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
   public void shouldThrowRangeDistributionNotSupported() {
     OpChainExecutionContext context =
