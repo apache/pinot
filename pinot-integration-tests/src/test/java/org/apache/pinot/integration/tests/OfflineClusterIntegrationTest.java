@@ -80,6 +80,8 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -95,6 +97,7 @@ import static org.testng.Assert.*;
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterIntegrationTest.class);
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 12;
@@ -293,6 +296,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testRefreshTableConfigAndQueryTimeout()
       throws Exception {
+    LOGGER.warn("Running testRefreshTableConfigAndQueryTimeout");
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQueryConfig(new QueryConfig(5L, null, null, null));
@@ -2219,6 +2223,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testDistinctQuery()
       throws Exception {
+    LOGGER.warn("Running testDistinctQuery");
     // by default 10 rows will be returned, so use high limit
     String pinotQuery = "SELECT DISTINCT Carrier FROM mytable LIMIT 1000000";
     String h2Query = "SELECT DISTINCT Carrier FROM mytable";
