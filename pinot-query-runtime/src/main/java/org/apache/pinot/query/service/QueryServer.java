@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -59,8 +60,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     _queryRunner = queryRunner;
     int queryServerExecutorServiceNumThreads =
         configuration.getProperty(QueryConfig.KEY_OF_QUERY_SUBMISSION_EXECUTOR_SERVICE_NUM_THREADS, 0);
-    _querySubmissionExecutorService = queryServerExecutorServiceNumThreads <= 0 ?
-        Executors.newCachedThreadPool() : Executors.newFixedThreadPool(queryServerExecutorServiceNumThreads);
+    _querySubmissionExecutorService = queryServerExecutorServiceNumThreads <= 0
+        ? Executors.newCachedThreadPool() : Executors.newFixedThreadPool(queryServerExecutorServiceNumThreads);
   }
 
   public void start() {
@@ -105,23 +106,26 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
-    distributedStagePlans.forEach(distributedStagePlan -> {
-          _querySubmissionExecutorService.submit(() -> {
-            try {
-              _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
-              responseObserver.onNext(Worker.QueryResponse.newBuilder()
-                  .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
-              responseObserver.onCompleted();
-            } catch (Throwable t) {
-              responseObserver.onNext(Worker.QueryResponse.newBuilder()
-                  .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR,
-                      QueryException.getTruncatedStackTrace(t))
-                  .build());
-              responseObserver.onCompleted();
-            }
-          });
-        }
+    // This throwable exception only carries one exception, meanwhile it could have multiple in submission phase.
+    AtomicReference<Throwable> throwableException = new AtomicReference<>();
+    distributedStagePlans.forEach(distributedStagePlan -> _querySubmissionExecutorService.submit(() -> {
+          try {
+            _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+          } catch (Throwable t) {
+            throwableException.set(t);
+          }
+        })
     );
+    if (throwableException.get() == null) {
+      responseObserver.onNext(Worker.QueryResponse.newBuilder()
+          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
+    } else {
+      responseObserver.onNext(Worker.QueryResponse.newBuilder()
+          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR,
+              QueryException.getTruncatedStackTrace(throwableException.get()))
+          .build());
+    }
+    responseObserver.onCompleted();
   }
 
   @Override
