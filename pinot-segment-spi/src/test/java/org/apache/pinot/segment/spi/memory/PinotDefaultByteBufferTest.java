@@ -29,14 +29,6 @@ public class PinotDefaultByteBufferTest extends PinotDataBufferTest {
 
   @Override
   protected boolean prioritizeByteBuffer() {
-    // TODO (more-buffers): Change to false once we test the code
     return false;
-  }
-
-  @BeforeClass
-  public void abortOnModernJava() {
-    if (JavaVersion.VERSION > 11) {
-//      throw new SkipException("Skipping LArray tests because they cannot run in Java " + JavaVersion.VERSION);
-    }
   }
 }
