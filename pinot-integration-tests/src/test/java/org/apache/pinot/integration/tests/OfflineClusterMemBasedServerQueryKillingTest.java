@@ -50,8 +50,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -60,7 +58,6 @@ import org.testng.annotations.Test;
  * Integration test for heap size based server query killing, this works only for xmx4G
  */
 public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterIntegrationTestSet {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterMemBasedServerQueryKillingTest.class);
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
   public static final String INT_DIM_SV1 = "intDimSV1";
@@ -69,7 +66,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   public static final String BOOLEAN_DIM_SV1 = "booleanDimSV1";
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
-private static final int NUM_DOCS = 3_000_000;
+  private static final int NUM_DOCS = 3_000_000;
 
   private static final String OOM_QUERY =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest, intDimSV1 FROM mytable GROUP BY intDimSV1"
@@ -77,7 +74,7 @@ private static final int NUM_DOCS = 3_000_000;
 
   private static final String OOM_QUERY_2 =
       "SELECT stringDimSV2 FROM mytable GROUP BY stringDimSV2"
-          + " ORDER BY stringDimSV2 LIMIT 1000000";
+          + " ORDER BY stringDimSV2 LIMIT 3000000";
 
   private static final String DIGEST_QUERY_1 =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest FROM mytable";
@@ -101,13 +98,8 @@ private static final int NUM_DOCS = 3_000_000;
   @BeforeClass
   public void setUp()
       throws Exception {
-    // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterMemBasedServerQueryKillingTest.class).setLevel(Level.INFO);
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
-    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
+        .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
 
@@ -142,6 +134,13 @@ private static final int NUM_DOCS = 3_000_000;
 
     //Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
+
+    // Setup logging and resource accounting
+    LogManager.getLogger(OfflineClusterMemBasedServerQueryKillingTest.class).setLevel(Level.INFO);
+    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
+        .setLevel(Level.INFO);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
+    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
   }
 
   protected void startBrokers()
@@ -158,7 +157,7 @@ private static final int NUM_DOCS = 3_000_000;
     serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
     serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.25f);
+        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.15f);
     serverConf.setProperty(
         CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
@@ -216,7 +215,6 @@ private static final int NUM_DOCS = 3_000_000;
   public void testDigestOOM()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY);
-    LOGGER.info("testDigestOOM: {}", queryResponse);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
         + QueryException.QUERY_CANCELLATION_ERROR_CODE));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
@@ -227,7 +225,6 @@ private static final int NUM_DOCS = 3_000_000;
   public void testDigestOOM2()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
-    LOGGER.info("testDigestOOM: {}", queryResponse);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
@@ -269,7 +266,6 @@ private static final int NUM_DOCS = 3_000_000;
         }
     );
     countDownLatch.await();
-    LOGGER.info("testDigestOOMMultipleQueries: {}", queryResponse1);
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":503"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
