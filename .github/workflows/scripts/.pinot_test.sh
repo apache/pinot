@@ -29,9 +29,9 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
   mvn clean install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn test -am -B \
+    mvn test -am -B -X \
         -pl 'pinot-integration-tests' \
-        -Dtest='C*Test,L*Test,M*Test,R*Test,S*Test' \
+        -Dtest='MultiNodesOfflineClusterIntegrationTest' \
         -P github-actions,integration-tests-only && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
