@@ -174,7 +174,10 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       assertEquals(exceptions.size(), 2);
       JsonNode firstException = exceptions.get(0);
       assertEquals(firstException.get("errorCode").intValue(), QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
-      assertTrue(firstException.get("message").textValue().contains("Connection refused"));
+      String firstExceptionMessage = firstException.get("message").textValue();
+      assertTrue(firstExceptionMessage.contains("Connection refused"),
+          "first exception message is " + firstExceptionMessage + ", which does not contain "
+              + "\"Connection refused\"");
       JsonNode secondException = exceptions.get(1);
       assertEquals(secondException.get("errorCode").intValue(), QueryException.SERVER_NOT_RESPONDING_ERROR_CODE);
     } else {
