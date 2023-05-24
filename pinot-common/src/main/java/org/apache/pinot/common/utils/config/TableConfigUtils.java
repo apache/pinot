@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -449,7 +448,7 @@ public class TableConfigUtils {
   }
 
   /**
-   * Get the partition column from InstanceAssignmentConfigUtils
+   * Get the partition column from tableConfig instance assignment config map.
    * @param tableConfig table config
    * @return partition column
    */
@@ -458,12 +457,12 @@ public class TableConfigUtils {
 
     // check getInstanceAssignmentConfigMap is null or empty,
     if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
-      for (String key : tableConfig.getInstanceAssignmentConfigMap().keySet()) {
-        //check getInstanceAssignmentConfigMap has the key of TableType
-        if (Objects.equals(key, tableConfig.getTableType().toString())) {
+      for (Map.Entry<String, InstanceAssignmentConfig> entry: tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+        InstanceAssignmentConfig instanceAssignmentConfig = entry.getValue();
+        //check InstanceAssignmentConfig has the InstanceReplicaGroupPartitionConfig with non-empty partitionColumn
+        if (StringUtils.isNotEmpty(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn())) {
           // if true, set the partitionColumn value.
-          partitionColumn = tableConfig.getInstanceAssignmentConfigMap().get(key).
-              getReplicaGroupPartitionConfig().getPartitionColumn();
+          partitionColumn = instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
         }
       }
     }
