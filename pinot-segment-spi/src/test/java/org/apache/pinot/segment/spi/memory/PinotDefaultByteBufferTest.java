@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.segment.spi.memory;
 
-import org.apache.pinot.segment.spi.utils.JavaVersion;
-import org.testng.annotations.BeforeClass;
-
 
 public class PinotDefaultByteBufferTest extends PinotDataBufferTest {
   public PinotDefaultByteBufferTest() {
