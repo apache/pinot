@@ -71,6 +71,11 @@ public class QueryConfig {
    */
   public static final String KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS = "pinot.query.scheduler.release.timeout.ms";
   public static final long DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS = 10_000;
+  /**
+   * The number of threads for query submission executor service.
+   */
+  public static final String KEY_OF_QUERY_SUBMISSION_EXECUTOR_SERVICE_NUM_THREADS =
+      "pinot.query.server.submission.executor.service.numThreads";
 
   private QueryConfig() {
     // do not instantiate.

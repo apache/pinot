@@ -34,6 +34,7 @@ import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,11 +52,15 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private Server _server = null;
   private final QueryRunner _queryRunner;
 
-  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private final ExecutorService _querySubmissionExecutorService;
 
-  public QueryServer(int port, QueryRunner queryRunner) {
-    _port = port;
+  public QueryServer(PinotConfiguration configuration, QueryRunner queryRunner) {
+    _port = configuration.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT);
     _queryRunner = queryRunner;
+    int queryServerExecutorServiceNumThreads =
+        configuration.getProperty(QueryConfig.KEY_OF_QUERY_SUBMISSION_EXECUTOR_SERVICE_NUM_THREADS, 0);
+    _querySubmissionExecutorService = queryServerExecutorServiceNumThreads <= 0 ?
+        Executors.newCachedThreadPool() : Executors.newFixedThreadPool(queryServerExecutorServiceNumThreads);
   }
 
   public void start() {
@@ -101,7 +106,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
     distributedStagePlans.forEach(distributedStagePlan -> {
-          _executorService.submit(() -> {
+          _querySubmissionExecutorService.submit(() -> {
             try {
               _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
               responseObserver.onNext(Worker.QueryResponse.newBuilder()
@@ -128,5 +133,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
+  }
+
+  public int getPort() {
+    return _port;
   }
 }
