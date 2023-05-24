@@ -28,6 +28,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.reduce.function.InternalReduceFunctions;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.roaringbitmap.RoaringBitmap;
@@ -201,7 +202,7 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   @Override
   public Long extractFinalResult(Long intermediateResult) {
-    return intermediateResult;
+    return InternalReduceFunctions.countReduce(intermediateResult);
   }
 
   @Override

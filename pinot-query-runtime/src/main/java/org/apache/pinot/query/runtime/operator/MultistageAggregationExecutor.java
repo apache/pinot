@@ -38,7 +38,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * Class that executes all aggregation functions (without group-bys) for the multistage AggregateOperator.
  */
 public class MultistageAggregationExecutor {
-  private final NewAggregateOperator.Mode _mode;
+  private final AggregateOperator.Mode _mode;
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // from column name to their index.
   private final Map<String, Integer> _colNameToIndexMap;
@@ -50,7 +50,7 @@ public class MultistageAggregationExecutor {
   private final Object[] _mergeResultHolder;
   private final Object[] _finalResultHolder;
 
-  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, NewAggregateOperator.Mode mode,
+  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, AggregateOperator.Mode mode,
       Map<String, Integer> colNameToIndexMap) {
     _aggFunctions = aggFunctions;
     _mode = mode;
@@ -69,11 +69,11 @@ public class MultistageAggregationExecutor {
    * Performs aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
+    if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
       processAggregate(block, inputDataSchema);
-    } else if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
+    } else if (_mode.equals(AggregateOperator.Mode.MERGE)) {
       processMerge(block);
-    } else if (_mode.equals(NewAggregateOperator.Mode.EXTRACT_RESULT)) {
+    } else if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
       collectResult(block);
     }
   }
@@ -99,14 +99,14 @@ public class MultistageAggregationExecutor {
 
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
-      if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
+      if (_mode.equals(AggregateOperator.Mode.MERGE)) {
         Object value = _mergeResultHolder[i];
         row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-      } else if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
+      } else if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
         Object value = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
         row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
       } else {
-        assert _mode.equals(NewAggregateOperator.Mode.EXTRACT_RESULT);
+        assert _mode.equals(AggregateOperator.Mode.EXTRACT_RESULT);
         Comparable result = aggFunction.extractFinalResult(_finalResultHolder[i]);
         row[i] = result == null ? null : aggFunction.getFinalResultColumnType().convert(result);
       }

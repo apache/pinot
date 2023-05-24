@@ -29,6 +29,12 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 public class PinotHintStrategyTable {
   public static final String INTERNAL_AGG_INTERMEDIATE_STAGE = "aggIntermediateStage";
   public static final String INTERNAL_AGG_FINAL_STAGE = "aggFinalStage";
+  // Hint to denote that an aggregate reduce function was added. This is needed to allow the reuse of the same function
+  // name for aggregation types in the intermediate and final stages as the original function name
+  public static final String INTERNAL_AGG_REDUCE_PRESENT = "aggReducePresent";
+  // Hint to denote that aggregation is to be run as a single stage rather than split into an intermediate and a final
+  // stage
+  public static final String INTERNAL_IS_SINGLE_STAGE_AGG = "isSingleStageAgg";
 
   public static final String SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION = "skipLeafStageGroupByAggregation";
 
@@ -40,6 +46,8 @@ public class PinotHintStrategyTable {
   public static final HintStrategyTable PINOT_HINT_STRATEGY_TABLE = HintStrategyTable.builder()
       .hintStrategy(INTERNAL_AGG_INTERMEDIATE_STAGE, HintPredicates.AGGREGATE)
       .hintStrategy(INTERNAL_AGG_FINAL_STAGE, HintPredicates.AGGREGATE)
+      .hintStrategy(INTERNAL_AGG_REDUCE_PRESENT, HintPredicates.AGGREGATE)
+      .hintStrategy(INTERNAL_IS_SINGLE_STAGE_AGG, HintPredicates.AGGREGATE)
       .hintStrategy(SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION, HintPredicates.AGGREGATE)
       .hintStrategy(PinotHintOptions.AGGREGATE_HINT_OPTIONS, HintPredicates.AGGREGATE)
       .hintStrategy(PinotHintOptions.JOIN_HINT_OPTIONS, HintPredicates.JOIN)

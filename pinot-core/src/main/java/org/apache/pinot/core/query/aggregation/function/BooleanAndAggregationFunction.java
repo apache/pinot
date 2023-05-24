@@ -20,6 +20,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.query.reduce.function.InternalReduceFunctions;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -36,5 +37,10 @@ public class BooleanAndAggregationFunction extends BaseBooleanAggregationFunctio
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.BOOLAND;
+  }
+
+  @Override
+  public Integer extractFinalResult(Integer intermediateResult) {
+    return InternalReduceFunctions.boolAndReduce(intermediateResult);
   }
 }

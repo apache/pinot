@@ -35,17 +35,61 @@ public class InternalReduceFunctions {
   }
 
   @ScalarFunction
-  public static double skewnessReduce(PinotFourthMoment fourthMoment) {
+  public static Double skewnessReduce(PinotFourthMoment fourthMoment) {
+    if (fourthMoment == null) {
+      return null;
+    }
     return fourthMoment.skew();
   }
 
   @ScalarFunction
-  public static double kurtosisReduce(PinotFourthMoment fourthMoment) {
+  public static Double kurtosisReduce(PinotFourthMoment fourthMoment) {
+    if (fourthMoment == null) {
+      return null;
+    }
     return fourthMoment.kurtosis();
   }
 
   @ScalarFunction
-  public static int countDistinctReduce(Set<?> values) {
+  public static Integer countDistinctReduce(Set<?> values) {
     return values.size();
+  }
+
+  @ScalarFunction
+  public static Double maxReduce(Double intermediateResult) {
+    return intermediateResult;
+  }
+
+  @ScalarFunction
+  public static Double sumReduce(Double intermediateResult) {
+    return intermediateResult;
+  }
+
+  @ScalarFunction
+  public static Double minReduce(Double intermediateResult) {
+    return intermediateResult;
+  }
+
+  @ScalarFunction
+  public static Long countReduce(Long intermediateResult) {
+    return intermediateResult;
+  }
+
+  @ScalarFunction
+  public static Integer boolAndReduce(Integer intermediateResult) {
+    return intermediateResult;
+  }
+
+  @ScalarFunction
+  public static Integer boolOrReduce(Integer intermediateResult) {
+    return intermediateResult;
+  }
+
+  @ScalarFunction
+  public static Double avgReduce(Double intermediateResultSum, Long intermediateResultCount) {
+    if (intermediateResultCount == null || intermediateResultCount == 0L || intermediateResultSum == null) {
+      return null;
+    }
+    return intermediateResultSum / intermediateResultCount;
   }
 }

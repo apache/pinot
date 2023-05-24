@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.reduce.function.InternalReduceFunctions;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -62,6 +63,6 @@ public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggre
 
   @Override
   public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+    return InternalReduceFunctions.countDistinctReduce(intermediateResult);
   }
 }

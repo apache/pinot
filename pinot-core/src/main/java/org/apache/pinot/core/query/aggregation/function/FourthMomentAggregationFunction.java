@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunctionUtils;
+import org.apache.pinot.core.query.reduce.function.InternalReduceFunctions;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -152,15 +153,11 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public Double extractFinalResult(PinotFourthMoment m4) {
-    if (m4 == null) {
-      return null;
-    }
-
     switch (_type) {
       case KURTOSIS:
-        return m4.kurtosis();
+        return InternalReduceFunctions.kurtosisReduce(m4);
       case SKEWNESS:
-        return m4.skew();
+        return InternalReduceFunctions.skewnessReduce(m4);
       case MOMENT:
         // this should never happen, as we're not extracting
         // final result when using this method

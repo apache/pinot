@@ -241,11 +241,6 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
     return DataSchema.ColumnDataType.BOOLEAN;
   }
 
-  @Override
-  public Integer extractFinalResult(Integer intermediateResult) {
-    return intermediateResult;
-  }
-
   private int getInt(Integer val) {
     return val == null ? _merger.getDefaultValue() : val;
   }

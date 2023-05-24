@@ -100,17 +100,14 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
     DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
     DataSchema resultSchema = node.getDataSchema();
 
-    // TODO(Sonam): Rename to AggregateOperator when the planner changes are merged.
-//    boolean extractFinalResult = AggregateNode.isFinalStage(node);
-//    boolean isIntermediateStage = AggregateNode.isIntermediateStage(node);
-//    boolean isLeafStage = AggregateNode.isLeafStage(node);
-//    boolean treatIntermediateAsLeaf = node.isTreatIntermediateStageAsLeaf();
-//
-//    return new NewAggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema, inputSchema,
-//        node.getAggCalls(), node.getGroupSet(), isLeafStage, isIntermediateStage, extractFinalResult,
-//        treatIntermediateAsLeaf);
-    return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
-        node.getAggCalls(), node.getGroupSet(), node.getInputs().get(0).getDataSchema());
+    boolean extractFinalResult = AggregateNode.isFinalStage(node);
+    boolean isIntermediateStage = AggregateNode.isIntermediateStage(node);
+    boolean isLeafStage = AggregateNode.isLeafStage(node);
+    boolean treatIntermediateAsLeaf = node.isTreatIntermediateStageAsLeaf();
+
+    return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema, inputSchema,
+        node.getAggCalls(), node.getGroupSet(), isLeafStage, isIntermediateStage, extractFinalResult,
+        treatIntermediateAsLeaf);
   }
 
   @Override

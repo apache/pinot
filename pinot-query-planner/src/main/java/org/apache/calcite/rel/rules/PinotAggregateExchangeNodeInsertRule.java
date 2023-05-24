@@ -20,13 +20,12 @@ package org.apache.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
@@ -46,8 +45,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.fun.SqlCountAggFunction;
-import org.apache.calcite.sql.fun.SqlSumEmptyIsZeroAggFunction;
+import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -74,12 +72,13 @@ import org.apache.calcite.util.ImmutableIntList;
 public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   public static final PinotAggregateExchangeNodeInsertRule INSTANCE =
       new PinotAggregateExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
-  private static final Set<SqlKind> SUPPORTED_AGG_KIND = ImmutableSet.of(
-      SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.OTHER_FUNCTION);
+
   private static final RelHint FINAL_STAGE_HINT = RelHint.builder(
       PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE).build();
   private static final RelHint INTERMEDIATE_STAGE_HINT = RelHint.builder(
       PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE).build();
+  private static final RelHint SINGLE_STAGE_AGG_HINT = RelHint.builder(
+      PinotHintStrategyTable.INTERNAL_IS_SINGLE_STAGE_AGG).build();
 
   public PinotAggregateExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalAggregate.class, any()), factory, null);
@@ -95,8 +94,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       ImmutableList<RelHint> hints = agg.getHints();
       return !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE)
           && !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE)
-          && !PinotHintStrategyTable.containsHintOption(hints, PinotHintOptions.AGGREGATE_HINT_OPTIONS,
-          PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS);
+          && !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_IS_SINGLE_STAGE_AGG);
     }
     return false;
   }
@@ -114,6 +112,20 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   public void onMatch(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
     ImmutableList<RelHint> oldHints = oldAggRel.getHints();
+
+    // If the "is_partitioned_by_group_by_keys" aggregate hint option is set, just add an additional hint indicating
+    // this is a single stage aggregation. This only applies to GROUP BY aggregations.
+    if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHintOption(oldHints,
+        PinotHintOptions.AGGREGATE_HINT_OPTIONS, PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)) {
+      // 1. attach leaf agg RelHint to original agg.
+      ImmutableList<RelHint> newLeafAggHints =
+          new ImmutableList.Builder<RelHint>().addAll(oldHints).add(SINGLE_STAGE_AGG_HINT).build();
+      Aggregate newLeafAgg =
+          new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
+              oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
+      call.transformTo(newLeafAgg);
+      return;
+    }
 
     // If "skipLeafStageGroupByAggregation" SQLHint is passed, the leaf stage aggregation is skipped. This only
     // applies for Group By Aggregations.
@@ -173,8 +185,12 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
+    // if the aggregation isn't split between intermediate and final stages, indicate that this is a single stage
+    // aggregation so that the execution engine knows whether to aggregate or merge
+    List<RelHint> additionalHints = isLeafStageAggregationPresent ? Collections.singletonList(FINAL_STAGE_HINT)
+        : Arrays.asList(FINAL_STAGE_HINT, SINGLE_STAGE_AGG_HINT);
     ImmutableList<RelHint> newIntermediateAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(FINAL_STAGE_HINT).build();
+        new ImmutableList.Builder<RelHint>().addAll(orgHints).addAll(additionalHints).build();
     ImmutableBitSet groupSet = groupByList == null ? ImmutableBitSet.range(nGroups) : ImmutableBitSet.of(groupByList);
     relBuilder.aggregate(
         relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)),
@@ -197,25 +213,22 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     final int nGroups = oldAggRel.getGroupCount();
     final SqlAggFunction oldAggregation = oldCall.getAggregation();
     final SqlKind aggKind = oldAggregation.getKind();
+    final String aggName = oldAggregation.getName();
     // Check only the supported AGG functions are provided.
-    Preconditions.checkState(SUPPORTED_AGG_KIND.contains(aggKind), "Unsupported SQL aggregation "
-        + "kind: {}. Only splittable aggregation functions are supported!", aggKind);
+    Preconditions.checkState(PinotOperatorTable.isAggregationFunctionRegisteredWithOperatorTable(aggName)
+        || PinotOperatorTable.isAggregationKindSupported(aggKind),
+        String.format("Unsupported SQL aggregation kind: %s or function name: %s. Only splittable aggregation "
+            + "functions are supported!", aggKind, aggName));
 
     AggregateCall newCall;
     if (isLeafStageAggregationPresent) {
-
-      // Special treatment for Count. If count is performed at the Leaf Stage, a Sum needs to be performed at the
-      // intermediate stage.
-      if (oldAggregation instanceof SqlCountAggFunction) {
-        newCall =
-            AggregateCall.create(new SqlSumEmptyIsZeroAggFunction(), oldCall.isDistinct(), oldCall.isApproximate(),
-                oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, Collections.singletonList(oldCallIndex)),
-                oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
-      } else {
-        newCall = AggregateCall.create(oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(),
-            oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, oldCall.getArgList()), oldCall.filterArg,
-            oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
-      }
+      // Make sure COUNT in the final stage takes an argument
+      List<Integer> oldArgList = (oldAggregation.getKind() == SqlKind.COUNT && !oldCall.isDistinct())
+          ? Collections.singletonList(oldCallIndex)
+          : oldCall.getArgList();
+      newCall = AggregateCall.create(oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(),
+          oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, oldArgList), oldCall.filterArg,
+          oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
     } else {
       List<Integer> newArgList = oldCall.getArgList().size() == 0 ? Collections.emptyList()
           : Collections.singletonList(argList.get(oldCallIndex));

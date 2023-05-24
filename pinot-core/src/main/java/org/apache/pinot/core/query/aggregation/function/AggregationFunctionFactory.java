@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -43,8 +42,8 @@ public class AggregationFunctionFactory {
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
-      // TODO(Sonam): Replace $ removal with a util function
-      String upperCaseFunctionName = StringUtils.remove(function.getFunctionName(), '_').toUpperCase();
+      String upperCaseFunctionName =
+          AggregationFunctionType.getNormalizedAggregationFunctionName(function.getFunctionName());
       List<ExpressionContext> arguments = function.getArguments();
       ExpressionContext firstArgument = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
@@ -189,8 +188,7 @@ public class AggregationFunctionFactory {
           case MAX:
             return new MaxAggregationFunction(firstArgument, nullHandlingEnabled);
           case SUM:
-          // TODO(Sonam): Uncomment SUM0 when merging planner changes
-          // case SUM0:
+          case SUM0:
             return new SumAggregationFunction(firstArgument, nullHandlingEnabled);
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);

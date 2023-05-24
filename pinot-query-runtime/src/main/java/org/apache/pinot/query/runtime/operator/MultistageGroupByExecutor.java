@@ -41,7 +41,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * Class that executes the group by aggregations for the multistage AggregateOperator.
  */
 public class MultistageGroupByExecutor {
-  private final NewAggregateOperator.Mode _mode;
+  private final AggregateOperator.Mode _mode;
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // between column name to their index which is used in v2 engine.
   private final Map<String, Integer> _colNameToIndexMap;
@@ -64,7 +64,7 @@ public class MultistageGroupByExecutor {
   private final Map<Key, Object[]> _groupByKeyHolder;
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      NewAggregateOperator.Mode mode, Map<String, Integer> colNameToIndexMap) {
+      AggregateOperator.Mode mode, Map<String, Integer> colNameToIndexMap) {
     _mode = mode;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
@@ -88,11 +88,11 @@ public class MultistageGroupByExecutor {
    * Performs group-by aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
+    if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
       processAggregate(block, inputDataSchema);
-    } else if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
+    } else if (_mode.equals(AggregateOperator.Mode.MERGE)) {
       processMerge(block);
-    } else if (_mode.equals(NewAggregateOperator.Mode.EXTRACT_RESULT)) {
+    } else if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
       collectResult(block);
     }
   }
@@ -103,7 +103,7 @@ public class MultistageGroupByExecutor {
   public List<Object[]> getResult() {
     List<Object[]> rows = new ArrayList<>();
 
-    if (_mode.equals(NewAggregateOperator.Mode.EXTRACT_RESULT)) {
+    if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
       return extractFinalGroupByResult();
     }
 
@@ -118,10 +118,10 @@ public class MultistageGroupByExecutor {
       for (int i = 0; i < _aggFunctions.length; i++) {
         int index = i + _groupSet.size();
         int groupId = _groupKeyToIdMap.get(e.getKey());
-        if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
+        if (_mode.equals(AggregateOperator.Mode.MERGE)) {
           Object value = _mergeResultHolder.get(groupId)[i];
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-        } else if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
+        } else if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
           Object value = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
         }
