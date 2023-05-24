@@ -76,6 +76,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -637,8 +638,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
             _tableNameWithType, uri, attempts.get());
         return ret;
     } catch (AttemptsExceededException e) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
+          e.getAttempts());
       LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
-              segmentName, _tableNameWithType, uri, tempRootDir);
+          segmentName, _tableNameWithType, uri, tempRootDir);
+      throw e;
+    } catch (RetriableOperationException e) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
+          e.getAttempts());
       throw e;
     } finally {
       if (_segmentDownloadSemaphore != null) {

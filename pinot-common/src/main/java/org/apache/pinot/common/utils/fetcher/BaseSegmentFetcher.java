@@ -50,7 +50,6 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   protected int _retryDelayScaleFactor;
   protected AuthProvider _authProvider;
 
-
   @Override
   public void init(PinotConfiguration config) {
     _retryCount = config.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
