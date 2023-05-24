@@ -106,7 +106,7 @@ public class RetryPolicyTest {
         Assert.fail();
       } catch (AttemptsExceededException e) {
         // Expected
-        Assert.assertEquals(e.getAttempts(), MAX_NUM_ATTEMPTS - 1);
+        Assert.assertEquals(e.getAttempts(), MAX_NUM_ATTEMPTS);
       }
 
       try {
@@ -114,7 +114,7 @@ public class RetryPolicyTest {
         Assert.fail();
       } catch (AttemptsExceededException e) {
         // Expected
-        Assert.assertEquals(e.getAttempts(), MAX_NUM_ATTEMPTS - 1);
+        Assert.assertEquals(e.getAttempts(), MAX_NUM_ATTEMPTS);
       }
 
       try {

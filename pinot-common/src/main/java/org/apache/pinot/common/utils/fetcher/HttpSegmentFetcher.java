@@ -110,7 +110,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     AtomicReference<File> ret = new AtomicReference<>(); // return the untared segment directory
     _logger.info("Retry downloading for {} times. retryCount from pinot server config: {}, number of IP addresses for "
         + "download URI: {}", retryCount, _retryCount, uriProvider.numAddresses());
-    int tries = 0;
+    int tries;
     try {
       tries = RetryPolicies.exponentialBackoffRetryPolicy(retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(
           () -> {
@@ -135,8 +135,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
             // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
             // if singe host is down, can retry with another host.
             _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode,
-                uri,
-                dest, e);
+                uri, dest, e);
             return false;
           } else {
             // Permanent exception

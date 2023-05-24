@@ -76,7 +76,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -629,23 +628,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     LOGGER.info("Trying to download segment {} using streamed download-untar with maxStreamRateInByte {}", segmentName,
         maxStreamRateInByte);
     String uri = zkMetadata.getDownloadUrl();
+    AtomicInteger attempts = new AtomicInteger(0);
     try {
-        AtomicInteger attempts = new AtomicInteger(0);
         File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxStreamRateInByte, attempts);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
             attempts.get());
         LOGGER.info("Downloaded and untarred segment: {} for table: {} from: {} attempts: {}", segmentName,
             _tableNameWithType, uri, attempts.get());
         return ret;
-    } catch (AttemptsExceededException e) {
+    } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
-          e.getAttempts());
-      LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
-          segmentName, _tableNameWithType, uri, tempRootDir);
-      throw e;
-    } catch (RetriableOperationException e) {
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
-          e.getAttempts());
+          attempts.get());
+      if (e instanceof AttemptsExceededException) {
+        LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
+            segmentName, _tableNameWithType, uri, tempRootDir);
+      }
       throw e;
     } finally {
       if (_segmentDownloadSemaphore != null) {

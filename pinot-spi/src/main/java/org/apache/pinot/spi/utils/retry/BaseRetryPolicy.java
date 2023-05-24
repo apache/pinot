@@ -62,6 +62,6 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
     } catch (Exception e) {
       throw new RetriableOperationException(e, attempt + 1);
     }
-    throw new AttemptsExceededException("Operation failed after " + _maxNumAttempts + " attempts", attempt);
+    throw new AttemptsExceededException("Operation failed after " + _maxNumAttempts + " attempts", _maxNumAttempts);
   }
 }
