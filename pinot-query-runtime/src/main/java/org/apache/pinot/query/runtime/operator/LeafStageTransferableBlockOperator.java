@@ -239,7 +239,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           + " Column Ordering: " + Arrays.toString(columnIndices));
       return composeColumnIndexedTransferableBlock(responseBlock, adjustedResultSchema, columnIndices);
     } else {
-      handleBytesDataType(desiredDataSchema.getColumnDataTypes(), resultSchema.getColumnDataTypes());
       return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
     }
   }
@@ -275,15 +274,16 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private static TransferableBlock composeDirectTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
     Collection<Object[]> resultRows = responseBlock.getRows();
+    DataSchema resultDataSchema = responseBlock.getDataSchema();
     List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
     if (resultRows instanceof List) {
       for (Object[] orgRow : resultRows) {
-        extractedRows.add(canonicalizeRow(orgRow, desiredDataSchema));
+        extractedRows.add(canonicalizeRow(orgRow, desiredDataSchema, resultDataSchema));
       }
     } else if (resultRows instanceof PriorityQueue) {
       PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
       while (!priorityQueue.isEmpty()) {
-        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema));
+        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema, resultDataSchema));
       }
     } else {
       throw new UnsupportedOperationException("Unsupported collection type: " + resultRows.getClass());
@@ -309,13 +309,16 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
    * @param dataSchema data schema desired for the row.
    * @return canonicalize row.
    */
-  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema) {
+  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema, DataSchema resultSchema) {
     Object[] resultRow = new Object[row.length];
     for (int colId = 0; colId < row.length; colId++) {
       Object value = row[colId];
       if (value != null) {
         if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.OBJECT) {
           resultRow[colId] = value;
+        } else if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.BYTES) {
+          dataSchema.getColumnDataTypes()[colId] = resultSchema.getColumnDataType(colId);
+          resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
         } else {
           resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
         }
@@ -346,19 +349,5 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       }
     }
     return true;
-  }
-
-  /**
-   * This util function handles the ColumnDataType BYTES and set the desiredType as per the result DataSchema.
-   * @param desiredTypes
-   * @param givenTypes
-   */
-  private static void handleBytesDataType(DataSchema.ColumnDataType[] desiredTypes,
-      DataSchema.ColumnDataType[] givenTypes) {
-    for (int i = 0; i < desiredTypes.length; i++) {
-      if (desiredTypes[i] == DataSchema.ColumnDataType.BYTES) {
-        desiredTypes[i] = givenTypes[i];
-      }
-    }
   }
 }
