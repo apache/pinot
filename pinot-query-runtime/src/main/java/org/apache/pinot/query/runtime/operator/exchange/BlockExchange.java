@@ -24,6 +24,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -33,6 +34,8 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,6 +48,7 @@ import org.apache.pinot.query.runtime.operator.OpChainId;
  */
 public abstract class BlockExchange {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
+  private static final Logger LOGGER = LoggerFactory.getLogger(BlockExchange.class);
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
@@ -56,7 +60,7 @@ public abstract class BlockExchange {
   private final long _deadlineMs;
 
   private final BlockingQueue<TransferableBlock> _queue = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
-
+  private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
 
   public static BlockExchange getExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector, BlockSplitter splitter,
@@ -100,6 +104,10 @@ public abstract class BlockExchange {
     try {
       TransferableBlock block;
       long timeoutMs = _deadlineMs - System.currentTimeMillis();
+      if (_errorBlock.get() != null) {
+        LOGGER.debug("Exchange: {} is already cancelled or errored out internally, ignore the late block", _opChainId);
+        return _errorBlock.get();
+      }
       block = _queue.poll(timeoutMs, TimeUnit.MILLISECONDS);
       if (block == null) {
         block = TransferableBlockUtils.getErrorTransferableBlock(
@@ -117,8 +125,10 @@ public abstract class BlockExchange {
       }
       return block;
     } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(
+      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(
           new RuntimeException("Exception while sending data via exchange for opChain: " + _opChainId));
+      setErrorBlock(errorBlock);
+      return errorBlock;
     }
   }
 
@@ -134,6 +144,19 @@ public abstract class BlockExchange {
     Iterator<TransferableBlock> splits = _splitter.split(block, type, MAX_MAILBOX_CONTENT_SIZE_BYTES);
     while (splits.hasNext()) {
       sendingMailbox.send(splits.next());
+    }
+  }
+
+  private void setErrorBlock(TransferableBlock errorBlock) {
+    if (_errorBlock.compareAndSet(null, errorBlock)) {
+      try {
+        for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+          sendBlock(sendingMailbox, errorBlock);
+        }
+      } catch (Exception e) {
+        LOGGER.error("error while sending exception block via exchange for opChain: " + _opChainId, e);
+      }
+      _queue.clear();
     }
   }
 
