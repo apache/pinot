@@ -133,7 +133,6 @@ public class ObjectSerDeUtils {
     VarianceTuple(33),
     PinotFourthMoment(34),
     ArgMinMaxObject(35),
-    ArgMinMaxObject(35),
     KllDataSketch(36),
     IntegerTupleSketch(37);
 
