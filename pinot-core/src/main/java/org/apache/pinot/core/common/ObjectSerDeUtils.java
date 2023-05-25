@@ -60,6 +60,8 @@ import java.util.Set;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -131,7 +133,8 @@ public class ObjectSerDeUtils {
     VarianceTuple(33),
     PinotFourthMoment(34),
     ArgMinMaxObject(35),
-    KllDataSketch(36);
+    KllDataSketch(36),
+    IntegerTupleSketch(37);
 
     private final int _value;
 
@@ -219,6 +222,8 @@ public class ObjectSerDeUtils {
         return ObjectType.VarianceTuple;
       } else if (value instanceof PinotFourthMoment) {
         return ObjectType.PinotFourthMoment;
+      } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
+        return ObjectType.IntegerTupleSketch;
       } else if (value instanceof ArgMinMaxObject) {
         return ObjectType.ArgMinMaxObject;
       } else {
@@ -926,6 +931,28 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>> DATA_SKETCH_INT_TUPLE_SER_DE =
+      new ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>>() {
+        @Override
+        public byte[] serialize(org.apache.datasketches.tuple.Sketch<IntegerSummary> value) {
+          return value.compact().toByteArray();
+        }
+
+        @Override
+        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(byte[] bytes) {
+          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+              new IntegerSummaryDeserializer());
+        }
+
+        @Override
+        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(ByteBuffer byteBuffer) {
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+              new IntegerSummaryDeserializer());
+        }
+      };
+
   public static final ObjectSerDe<KllDoublesSketch> KLL_SKETCH_SER_DE = new ObjectSerDe<KllDoublesSketch>() {
 
     @Override
@@ -1298,6 +1325,7 @@ public class ObjectSerDeUtils {
       PINOT_FOURTH_MOMENT_OBJECT_SER_DE,
       ARG_MIN_MAX_OBJECT_SER_DE,
       KLL_SKETCH_SER_DE,
+      DATA_SKETCH_INT_TUPLE_SER_DE,
   };
   //@formatter:on
 

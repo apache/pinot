@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -336,6 +337,15 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
+          case DISTINCTCOUNTTUPLESKETCH:
+            // mode actually doesn't matter here because we only care about keys, not values
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case SUMVALUESINTEGERSUMTUPLESKETCH:
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case AVGVALUEINTEGERSUMTUPLESKETCH:
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case PARENTARGMAX:
             return new ParentArgMinMaxAggregationFunction(arguments, true);
           case PARENTARGMIN:

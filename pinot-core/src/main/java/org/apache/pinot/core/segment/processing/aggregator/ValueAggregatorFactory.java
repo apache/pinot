@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -46,6 +47,11 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH:
         return new DistinctCountThetaSketchAggregator();
+      case DISTINCTCOUNTTUPLESKETCH:
+      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+      case SUMVALUESINTEGERSUMTUPLESKETCH:
+      case AVGVALUEINTEGERSUMTUPLESKETCH:
+        return new IntegerTupleSketchAggregator(IntegerSummary.Mode.Sum);
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

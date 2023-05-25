@@ -44,6 +44,8 @@ public class SketchFunctionsTest {
     }
     Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null)), 0.0);
     Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null, 1024)), 0.0);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object()));
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object(), 1024));
   }
 
   private long hllEstimate(byte[] bytes) {
@@ -58,5 +60,22 @@ public class SketchFunctionsTest {
     }
     Assert.assertEquals(hllEstimate(SketchFunctions.toHLL(null)), 0);
     Assert.assertEquals(hllEstimate(SketchFunctions.toHLL(null, 8)), 0);
+  }
+
+  private double intTupleEstimate(byte[] bytes) {
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(bytes).getEstimate();
+  }
+
+  @Test
+  public void intTupleSumCreation() {
+    for (Object i : _inputs) {
+      Assert.assertEquals(intTupleEstimate(SketchFunctions.toIntegerSumTupleSketch(i, 1)), 1.0d);
+      Assert.assertEquals(intTupleEstimate(SketchFunctions.toIntegerSumTupleSketch(i, 1, 16)), 1.0d);
+    }
+    Assert.assertEquals(intTupleEstimate(SketchFunctions.toIntegerSumTupleSketch(null, 1)), 0.0d);
+    Assert.assertEquals(intTupleEstimate(SketchFunctions.toIntegerSumTupleSketch(null, 1, 16)), 0.0d);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1, 1024));
   }
 }
