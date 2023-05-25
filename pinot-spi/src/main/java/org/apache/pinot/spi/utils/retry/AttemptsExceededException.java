@@ -24,7 +24,18 @@ package org.apache.pinot.spi.utils.retry;
  */
 public class AttemptsExceededException extends AttemptFailureException {
 
+  private int _attempts = 0;
+
   public AttemptsExceededException(String message) {
     super(message);
+  }
+
+  public AttemptsExceededException(String message, int attempts) {
+    super(message);
+    _attempts = attempts;
+  }
+
+  public int getAttempts() {
+    return _attempts;
   }
 }

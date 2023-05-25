@@ -33,7 +33,8 @@ public interface RetryPolicy {
    * @param operation The operation to attempt, which returns true on success and false on failure.
    * @throws AttemptsExceededException
    * @throws RetriableOperationException
+   * @return the number of attempts used for the operation. 0 means the first try was successful.
    */
-  void attempt(Callable<Boolean> operation)
+  int attempt(Callable<Boolean> operation)
       throws AttemptsExceededException, RetriableOperationException;
 }

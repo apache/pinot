@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -105,6 +106,7 @@ public class RetryPolicyTest {
         Assert.fail();
       } catch (AttemptsExceededException e) {
         // Expected
+        Assert.assertEquals(e.getAttempts(), MAX_NUM_ATTEMPTS);
       }
 
       try {
@@ -112,6 +114,7 @@ public class RetryPolicyTest {
         Assert.fail();
       } catch (AttemptsExceededException e) {
         // Expected
+        Assert.assertEquals(e.getAttempts(), MAX_NUM_ATTEMPTS);
       }
 
       try {
@@ -121,7 +124,17 @@ public class RetryPolicyTest {
         Assert.fail();
       } catch (RetriableOperationException e) {
         // Expected
+        Assert.assertEquals(e.getAttempts(), 1);
       }
+
+      // Function returns false MAX_NUM_ATTEMPTS - 2 times and does not throw, make sure
+      // we return the correct value of attempts.
+      // Use MAX_NUM_ATTEMPTS - 1 to make sure we do not throw and return attempts
+      AtomicInteger atomicInteger = new AtomicInteger(MAX_NUM_ATTEMPTS - 1);
+      int retries = retryPolicy.attempt(() -> {
+          return (atomicInteger.decrementAndGet() <= 0);
+      });
+      Assert.assertEquals(retries, MAX_NUM_ATTEMPTS - 2);
     }
   }
 }

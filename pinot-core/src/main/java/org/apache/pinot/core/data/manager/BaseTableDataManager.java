@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -627,14 +628,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     LOGGER.info("Trying to download segment {} using streamed download-untar with maxStreamRateInByte {}", segmentName,
         maxStreamRateInByte);
     String uri = zkMetadata.getDownloadUrl();
+    AtomicInteger attempts = new AtomicInteger(0);
     try {
-      File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxStreamRateInByte);
-      LOGGER.info("Download and untarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
-      return ret;
-    } catch (AttemptsExceededException e) {
-      LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
-          segmentName, _tableNameWithType, uri, tempRootDir);
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, 1L);
+        File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxStreamRateInByte, attempts);
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
+            attempts.get());
+        LOGGER.info("Downloaded and untarred segment: {} for table: {} from: {} attempts: {}", segmentName,
+            _tableNameWithType, uri, attempts.get());
+        return ret;
+    } catch (Exception e) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
+          attempts.get());
+      if (e instanceof AttemptsExceededException) {
+        LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
+            segmentName, _tableNameWithType, uri, tempRootDir);
+      }
       throw e;
     } finally {
       if (_segmentDownloadSemaphore != null) {

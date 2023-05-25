@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.auth.AuthConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.crypt.PinotCrypter;
@@ -166,14 +167,17 @@ public class SegmentFetcherFactory {
    * @return the untared directory
    * @throws Exception
    */
-  public static File fetchAndStreamUntarToLocal(String uri, File tempRootDir, long maxStreamRateInByte)
+  public static File fetchAndStreamUntarToLocal(String uri, File tempRootDir,
+      long maxStreamRateInByte, AtomicInteger attempts)
       throws Exception {
-    return getInstance().fetchAndStreamUntarToLocalInternal(new URI(uri), tempRootDir, maxStreamRateInByte);
+    return getInstance().fetchAndStreamUntarToLocalInternal(new URI(uri), tempRootDir, maxStreamRateInByte, attempts);
   }
 
-  private File fetchAndStreamUntarToLocalInternal(URI uri, File tempRootDir, long maxStreamRateInByte)
+  private File fetchAndStreamUntarToLocalInternal(URI uri, File tempRootDir,
+      long maxStreamRateInByte, AtomicInteger attempts)
       throws Exception {
-    return getSegmentFetcher(uri.getScheme()).fetchUntarSegmentToLocalStreamed(uri, tempRootDir, maxStreamRateInByte);
+    return getSegmentFetcher(uri.getScheme()).fetchUntarSegmentToLocalStreamed(uri, tempRootDir, maxStreamRateInByte,
+        attempts);
   }
 
   /**
