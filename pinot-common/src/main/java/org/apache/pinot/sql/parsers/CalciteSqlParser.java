@@ -628,23 +628,34 @@ public class CalciteSqlParser {
 
   private static List<Expression> convertOrderByList(SqlNodeList orderList) {
     List<Expression> orderByExpr = new ArrayList<>();
-    final Iterator<SqlNode> iterator = orderList.iterator();
-    while (iterator.hasNext()) {
-      final SqlNode next = iterator.next();
-      orderByExpr.add(convertOrderBy(next));
+    for (SqlNode sqlNode : orderList) {
+      orderByExpr.add(convertOrderBy(sqlNode, true));
     }
     return orderByExpr;
   }
 
-  private static Expression convertOrderBy(SqlNode node) {
+  private static Expression convertOrderBy(SqlNode node, boolean createAscExpression) {
+    // If the order is ASC, the SqlNode will not have an ASC operator. In this case we need to create an ASC function in
+    // the expression.
+    // The SqlNode puts the NULLS FIRST/LAST operator in an outer level of the DESC operator.
     Expression expression;
-    if (node.getKind() == SqlKind.DESCENDING) {
+    if (node.getKind() == SqlKind.NULLS_LAST) {
+      SqlBasicCall basicCall = (SqlBasicCall) node;
+      expression = RequestUtils.getFunctionExpression("nullslast");
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+    } else if (node.getKind() == SqlKind.NULLS_FIRST) {
+      SqlBasicCall basicCall = (SqlBasicCall) node;
+      expression = RequestUtils.getFunctionExpression("nullsfirst");
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+    } else if (node.getKind() == SqlKind.DESCENDING) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
       expression = RequestUtils.getFunctionExpression("desc");
-      expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperandList().get(0)));
-    } else {
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), false));
+    } else if (createAscExpression) {
       expression = RequestUtils.getFunctionExpression("asc");
       expression.getFunctionCall().addToOperands(toExpression(node));
+    } else {
+      return toExpression(node);
     }
     return expression;
   }
