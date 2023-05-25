@@ -106,7 +106,10 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise, may always try to
     // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
-    int retryCount = Math.max(_retryCount, uriProvider.numAddresses());
+
+    // Use the minimal value of configured retry count and number of IP addresses.
+    int retryCount = Math.min(_retryCount, uriProvider.numAddresses());
+
     AtomicReference<File> ret = new AtomicReference<>(); // return the untared segment directory
     _logger.info("Retry downloading for {} times. retryCount from pinot server config: {}, number of IP addresses for "
         + "download URI: {}", retryCount, _retryCount, uriProvider.numAddresses());
