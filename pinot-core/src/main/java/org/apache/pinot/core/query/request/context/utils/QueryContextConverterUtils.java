@@ -131,6 +131,7 @@ public class QueryContextConverterUtils {
         // NOTE: Order-by is always a Function with the ordering of the Expression
         Function thriftFunction = orderBy.getFunctionCall();
         ExpressionContext expression = RequestContextUtils.getExpression(thriftFunction.getOperands().get(0));
+        // Skip duplicate order by expressions, e.g.: SELECT name FROM employees ORDER BY name, name
         if (expressionSet.add(expression)) {
           boolean isAsc = thriftFunction.getOperator().equalsIgnoreCase("ASC");
           orderByExpressions.add(new OrderByExpressionContext(expression, isAsc));

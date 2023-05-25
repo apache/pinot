@@ -649,4 +649,14 @@ public class BrokerRequestToQueryContextConverterTest {
       }
     }
   }
+
+  @Test
+  void testSkipDuplicateOrderByExpressions() {
+    String query = "SELECT name FROM employees ORDER BY name, name";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    assertEquals(queryContext.getOrderByExpressions().size(), 1);
+  }
 }
