@@ -932,7 +932,6 @@ public class ObjectSerDeUtils {
     }
   };
 
-<<<<<<< HEAD
   public static final ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>> DATA_SKETCH_INT_TUPLE_SER_DE =
       new ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>>() {
         @Override
@@ -954,7 +953,7 @@ public class ObjectSerDeUtils {
               new IntegerSummaryDeserializer());
         }
       };
-=======
+
   public static final ObjectSerDe<KllDoublesSketch> KLL_SKETCH_SER_DE = new ObjectSerDe<KllDoublesSketch>() {
 
     @Override
@@ -974,7 +973,6 @@ public class ObjectSerDeUtils {
       return KllDoublesSketch.wrap(Memory.wrap(bytes));
     }
   };
->>>>>>> master
 
   public static final ObjectSerDe<Geometry> GEOMETRY_SER_DE = new ObjectSerDe<Geometry>() {
 
@@ -1326,13 +1324,9 @@ public class ObjectSerDeUtils {
       COVARIANCE_TUPLE_OBJECT_SER_DE,
       VARIANCE_TUPLE_OBJECT_SER_DE,
       PINOT_FOURTH_MOMENT_OBJECT_SER_DE,
-<<<<<<< HEAD
-      DATA_SKETCH_INT_TUPLE_SER_DE,
-      ARG_MIN_MAX_OBJECT_SER_DE
-=======
       ARG_MIN_MAX_OBJECT_SER_DE,
       KLL_SKETCH_SER_DE,
->>>>>>> master
+      DATA_SKETCH_INT_TUPLE_SER_DE,
   };
   //@formatter:on
 
