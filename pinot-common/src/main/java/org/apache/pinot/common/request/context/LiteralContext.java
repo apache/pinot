@@ -109,7 +109,7 @@ public class LiteralContext {
         break;
       case LONG_VALUE:
         _bigDecimalValue = new BigDecimal(literal.getFieldValue().toString());
-        if (_bigDecimalValue.longValue() <= Integer.MAX_VALUE && _bigDecimalValue.longValue() >= Integer.MIN_VALUE) {
+        if (_bigDecimalValue.longValue() == _bigDecimalValue.intValue()) {
           _type = FieldSpec.DataType.INT;
           _value = _bigDecimalValue.intValue();
         } else {
