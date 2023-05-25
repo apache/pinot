@@ -82,12 +82,12 @@ public class LiteralTransformFunction implements TransformFunction {
     return _longLiteral;
   }
 
-  public double getDoubleLiteral() {
-    return _doubleLiteral;
-  }
-
   public float getFloatLiteral() {
     return _floatLiteral;
+  }
+
+  public double getDoubleLiteral() {
+    return _doubleLiteral;
   }
 
   public BigDecimal getBigDecimalLiteral() {
