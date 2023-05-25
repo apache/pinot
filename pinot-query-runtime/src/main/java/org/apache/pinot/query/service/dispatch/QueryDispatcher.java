@@ -143,13 +143,10 @@ public class QueryDispatcher {
           Worker.QueryRequest.Builder queryRequestBuilder = Worker.QueryRequest.newBuilder();
           String host = queryServerInstance.getHostname();
           int servicePort = queryServerInstance.getQueryServicePort();
-          int mailboxPort = queryServerInstance.getQueryMailboxPort();
-          for (int workerId : queryServerEntry.getValue()) {
-            VirtualServerAddress virtualServerAddress = new VirtualServerAddress(host, mailboxPort, workerId);
-            dispatchCalls++;
-            queryRequestBuilder.addStagePlan(
-                QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, virtualServerAddress));
-          }
+          queryRequestBuilder.addStagePlan(
+              QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, queryServerInstance,
+                  queryServerEntry.getValue()));
+          dispatchCalls++;
           Worker.QueryRequest queryRequest =
               queryRequestBuilder.putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
                   .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))

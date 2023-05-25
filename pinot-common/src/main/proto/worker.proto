@@ -70,14 +70,15 @@ message QueryResponse {
 
 message StagePlan {
   int32 stageId = 1;
-  string virtualAddress = 2;
-  StageNode stageRoot = 3;
-  StageMetadata stageMetadata = 4;
+  StageNode stageRoot = 2;
+  StageMetadata stageMetadata = 3;
 }
 
 message StageMetadata {
   repeated WorkerMetadata workerMetadata = 1;
   map<string, string> customProperty = 2;
+  QueryServerInstance queryServerInstance = 3;
+  repeated int32 workerIds = 4;
 }
 
 message WorkerMetadata {
@@ -90,4 +91,10 @@ message MailboxMetadata {
   repeated string mailboxId = 1;
   repeated string virtualAddress = 2;
   map<string, string> customProperty = 3;
+}
+
+message QueryServerInstance {
+  string hostname = 1;
+  int32 queryServicePort = 2;
+  int32 queryMailboxPort = 3;
 }

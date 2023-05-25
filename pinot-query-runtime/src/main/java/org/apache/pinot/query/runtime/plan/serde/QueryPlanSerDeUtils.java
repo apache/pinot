@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -45,31 +46,47 @@ public class QueryPlanSerDeUtils {
     // do not instantiate.
   }
 
-  public static DistributedStagePlan deserialize(Worker.StagePlan stagePlan) {
-    DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
-    distributedStagePlan.setServer(protoToAddress(stagePlan.getVirtualAddress()));
-    distributedStagePlan.setStageRoot(StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot()));
-    distributedStagePlan.setStageMetadata(fromProtoStageMetadata(stagePlan.getStageMetadata()));
-    return distributedStagePlan;
+  public static List<DistributedStagePlan> deserialize(Worker.StagePlan stagePlan) {
+    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
+    QueryServerInstance queryServerInstance =
+        fromProtoQueryServerInstance(stagePlan.getStageMetadata().getQueryServerInstance());
+    AbstractPlanNode stageRoot = StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot());
+    StageMetadata stageMetadata = fromProtoStageMetadata(stagePlan.getStageMetadata());
+    for (int workerId : stagePlan.getStageMetadata().getWorkerIdsList()) {
+      DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
+      VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerInstance, workerId);
+      distributedStagePlan.setServer(virtualServerAddress);
+      distributedStagePlan.setStageRoot(stageRoot);
+      distributedStagePlan.setStageMetadata(stageMetadata);
+      distributedStagePlans.add(distributedStagePlan);
+    }
+    return distributedStagePlans;
+  }
+
+  private static QueryServerInstance fromProtoQueryServerInstance(Worker.QueryServerInstance protoQueryServerInstance) {
+    return new QueryServerInstance(protoQueryServerInstance.getHostname(),
+        protoQueryServerInstance.getQueryServicePort(),
+        protoQueryServerInstance.getQueryMailboxPort());
   }
 
   public static List<DistributedStagePlan> deserialize(Worker.QueryRequest request) {
     List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
     for (Worker.StagePlan stagePlan : request.getStagePlanList()) {
-      distributedStagePlans.add(deserialize(stagePlan));
+      distributedStagePlans.addAll(deserialize(stagePlan));
     }
     return distributedStagePlans;
   }
 
   public static Worker.StagePlan serialize(DispatchableSubPlan dispatchableSubPlan, int stageId,
-      VirtualServerAddress serverAddress) {
+      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
     return Worker.StagePlan.newBuilder()
         .setStageId(stageId)
-        .setVirtualAddress(addressToProto(serverAddress))
         .setStageRoot(StageNodeSerDeUtils.serializeStageNode(
             (AbstractPlanNode) dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
                 .getFragmentRoot()))
-        .setStageMetadata(toProtoStageMetadata(dispatchableSubPlan.getQueryStageList().get(stageId))).build();
+        .setStageMetadata(
+            toProtoStageMetadata(dispatchableSubPlan.getQueryStageList().get(stageId), queryServerInstance, workerIds))
+        .build();
   }
 
   private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
@@ -141,12 +158,23 @@ public class QueryPlanSerDeUtils {
     return builder.build();
   }
 
-  private static Worker.StageMetadata toProtoStageMetadata(DispatchablePlanFragment planFragment) {
+  private static Worker.StageMetadata toProtoStageMetadata(DispatchablePlanFragment planFragment,
+      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
     Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
     for (WorkerMetadata workerMetadata : planFragment.getWorkerMetadataList()) {
       builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
     }
     builder.putAllCustomProperty(planFragment.getCustomProperties());
+    builder.setQueryServerInstance(toProtoQueryServerInstance(queryServerInstance));
+    builder.addAllWorkerIds(workerIds);
+    return builder.build();
+  }
+
+  private static Worker.QueryServerInstance toProtoQueryServerInstance(QueryServerInstance queryServerInstance) {
+    Worker.QueryServerInstance.Builder builder = Worker.QueryServerInstance.newBuilder();
+    builder.setHostname(queryServerInstance.getHostname());
+    builder.setQueryServicePort(queryServerInstance.getQueryServicePort());
+    builder.setQueryMailboxPort(queryServerInstance.getQueryMailboxPort());
     return builder.build();
   }
 
