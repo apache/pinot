@@ -24,6 +24,5 @@ import java.io.Closeable;
 public interface Memory extends Closeable {
    long getAddress();
    long getSize();
-
    void flush();
 }

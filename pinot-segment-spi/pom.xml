@@ -90,5 +90,14 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>net.openhft</groupId>
+      <artifactId>posix</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.openhft</groupId>
+      <artifactId>chronicle-core</artifactId>
+    </dependency>
+
   </dependencies>
 </project>

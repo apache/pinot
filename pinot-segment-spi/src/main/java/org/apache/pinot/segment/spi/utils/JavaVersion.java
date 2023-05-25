@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.segment.spi.utils;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import net.openhft.chronicle.core.Jvm;
 
 
 public class JavaVersion {
@@ -27,25 +26,8 @@ public class JavaVersion {
   public static final int VERSION;
 
   static {
-    int version;
-    try {
-      Method versionMethod = Runtime.class.getMethod("version");
-      Object versionObject = versionMethod.invoke(null);
-      try {
-        Method featureMethod = versionObject.getClass().getMethod("feature");
-        Object featureVersionValue = featureMethod.invoke(versionObject);
-        version = (int) featureVersionValue;
-      } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
-        // If Runtime.version() can be called but Version.feature() cannot be called,
-        // we have to be in Java = 9
-        version = 9;
-      }
-    } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
-      // If Runtime.version() cannot be called, we have to be in Java <= 9
-      // it could be an older version, but Pinot only supports Java >= 8
-      version = 8;
-    }
-    VERSION = version;
+    Jvm.init();
+    VERSION = Jvm.majorVersion();
   }
 
   private JavaVersion() {

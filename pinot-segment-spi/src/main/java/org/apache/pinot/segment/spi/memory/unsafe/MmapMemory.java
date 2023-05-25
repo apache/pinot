@@ -22,11 +22,16 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.function.BiConsumer;
+import net.openhft.chronicle.core.Jvm;
+import net.openhft.chronicle.core.OS;
+import net.openhft.posix.MSyncFlag;
+import net.openhft.posix.PosixAPI;
 import org.apache.pinot.segment.spi.utils.JavaVersion;
 
 
@@ -34,12 +39,29 @@ public class MmapMemory implements Memory {
 
   private static final MapFun MAP_FUN;
 
+  /**
+   * The address actually mapped. It has to be page aligned.
+   *
+   * {@code _address = _offset - offset % pageSize}
+   */
   private final long _address;
+  /**
+   * The offset requested to map.
+   *
+   * {@code _address = _offset - offset % pageSize}
+   */
+  private final long _offset;
+  /**
+   * How many bytes have been requested to be mapped.
+   * The actual mapped size may be larger (up to the next page), but the actual mapped size
+   * is stored by {@link #_section}.
+   */
   private final long _size;
   private final MapSection _section;
 
   static {
     try {
+      Jvm.init();
       MAP_FUN = MapFun.find();
     } catch (ClassNotFoundException | NoSuchMethodException e) {
       throw new RuntimeException(e);
@@ -48,6 +70,7 @@ public class MmapMemory implements Memory {
 
   public MmapMemory(File file, boolean readOnly, long offset, long size) {
     _size = size;
+    _offset = offset;
 
     try {
       _section = MAP_FUN.map(file, readOnly, offset, size);
@@ -69,7 +92,8 @@ public class MmapMemory implements Memory {
 
   @Override
   public void flush() {
-    // TODO
+    MSyncFlag mode = MSyncFlag.MS_SYNC;
+    PosixAPI.posix().msync(_offset, _size, mode);
   }
 
   @Override
@@ -117,6 +141,7 @@ public class MmapMemory implements Memory {
     static MapFun find()
         throws ClassNotFoundException, NoSuchMethodException {
       List<Finder<? extends MapFun>> candidates = Lists.newArrayList(
+          new Map0Fun.ChronicleCore(),
           new Map0Fun.Java11(),
           new Map0Fun.Java17(),
           new Java20()
@@ -125,7 +150,7 @@ public class MmapMemory implements Memory {
       for (Finder<? extends MapFun> candidate : candidates) {
         try {
           return candidate.tryFind();
-        } catch (NoSuchMethodException | ClassNotFoundException e) {
+        } catch (NoSuchMethodException | ClassNotFoundException | AssertionError e) {
           // IGNORE
         }
       }
@@ -190,7 +215,7 @@ public class MmapMemory implements Memory {
      * @param offset It has to be a positive value that is page aligned.
      */
     MapSection map0(FileChannel fc, boolean readOnly, long offset, long size)
-        throws InvocationTargetException, IllegalAccessException;
+        throws InvocationTargetException, IllegalAccessException, IOException;
 
     default MapSection map(File file, boolean readOnly, long offset, long size) throws IOException {
       String mode = readOnly ? "r" : "rw";
@@ -237,6 +262,28 @@ public class MmapMemory implements Memory {
           throw new RuntimeException(e);
         }
       };
+    }
+
+    class ChronicleCore implements Finder<Map0Fun> {
+      @Override
+      public Map0Fun tryFind() {
+        OS.mapAlignment();
+        return (fc, readOnly, offset, size) -> {
+          if (size == 0) {
+            return MapSection.EMPTY;
+          }
+          FileChannel.MapMode mapMode = readOnly ? FileChannel.MapMode.READ_ONLY : FileChannel.MapMode.READ_WRITE;
+          long alignedSize = OS.pageAlign(size);
+          long address = OS.map(fc, mapMode, offset, alignedSize);
+          return new MapSection(address, () -> {
+            try {
+              OS.unmap(address, alignedSize);
+            } catch (IOException e) {
+              throw new UncheckedIOException(e);
+            }
+          });
+        };
+      }
     }
 
     class Java11 implements Finder<Map0Fun> {

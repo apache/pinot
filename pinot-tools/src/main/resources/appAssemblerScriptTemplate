@@ -205,6 +205,7 @@ if [ "$(jdk_version)" -gt 11 ]; then
   --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
   --add-opens=java.base/java.lang=ALL-UNNAMED \
   --add-opens=java.base/java.util=ALL-UNNAMED \
+  --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
   $JAVA_OPTS"
 fi
 
