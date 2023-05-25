@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -65,6 +66,10 @@ public class OpChainExecutionContext {
 
   public MailboxService getMailboxService() {
     return _mailboxService;
+  }
+
+  public Consumer<OpChainId> getCallback() {
+    return _mailboxService.getCallback();
   }
 
   public long getRequestId() {

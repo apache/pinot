@@ -180,19 +180,19 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // lets create a new realtime segment
     _segmentLogger.info("Started {} stream provider", _streamConfig.getType());
     final int capacity = _streamConfig.getFlushThresholdRows();
+    boolean nullHandlingEnabled = indexingConfig != null && indexingConfig.isNullHandlingEnabled();
     RealtimeSegmentConfig realtimeSegmentConfig =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType).setSegmentName(_segmentName)
+        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
+            .setSegmentName(_segmentName)
             .setStreamName(_streamConfig.getTopicName()).setSchema(schema).setTimeColumnName(_timeColumnName)
             .setCapacity(capacity).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
-            .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
-            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setSegmentZKMetadata(segmentZKMetadata)
+            .setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation()).setMemoryManager(
             getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
                 indexLoadingConfig.isRealtimeOffHeapAllocation(),
                 indexLoadingConfig.isDirectRealtimeOffHeapAllocation(), serverMetrics))
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-            .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
+            .setNullHandlingEnabled(nullHandlingEnabled).build();
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
 
     _notifier = realtimeTableDataManager;

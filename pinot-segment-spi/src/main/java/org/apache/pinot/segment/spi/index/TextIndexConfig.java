@@ -92,7 +92,7 @@ public class TextIndexConfig extends IndexConfig {
 
   public static abstract class AbstractBuilder {
     @Nullable
-    private final FSTType _fstType;
+    protected FSTType _fstType;
     @Nullable
     protected Object _rawValueForTextIndex;
     protected boolean _enableQueryCache = false;

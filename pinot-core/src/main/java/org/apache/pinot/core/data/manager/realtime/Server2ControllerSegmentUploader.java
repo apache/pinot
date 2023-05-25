@@ -64,7 +64,12 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
 
   @Override
   public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
-    SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile);
+    return uploadSegment(segmentFile, segmentName, _segmentUploadRequestTimeoutMs);
+  }
+
+  @Override
+  public URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis) {
+    SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile, timeoutInMillis);
     if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS) {
       try {
         URI uri = new URI(response.getSegmentLocation());
@@ -79,12 +84,16 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   }
 
   public SegmentCompletionProtocol.Response uploadSegmentToController(File segmentFile) {
+    return uploadSegmentToController(segmentFile, _segmentUploadRequestTimeoutMs);
+  }
+
+  private SegmentCompletionProtocol.Response uploadSegmentToController(File segmentFile, int timeoutInMillis) {
     SegmentCompletionProtocol.Response response;
     long startTime = System.currentTimeMillis();
     try {
       String responseStr = _fileUploadDownloadClient
           .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile,
-              AuthProviderUtils.toRequestHeaders(_authProvider), null, _segmentUploadRequestTimeoutMs).getResponse();
+              AuthProviderUtils.toRequestHeaders(_authProvider), null, timeoutInMillis).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerSegmentUploadCommitUrl);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

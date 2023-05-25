@@ -59,7 +59,13 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     _serverMetrics = serverMetrics;
   }
 
+  @Override
   public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
+    return uploadSegment(segmentFile, segmentName, _timeoutInMs);
+  }
+
+  @Override
+  public URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis) {
     if (_segmentStoreUriStr == null || _segmentStoreUriStr.isEmpty()) {
       LOGGER.error("Missing segment store uri. Failed to upload segment file {} for {}.", segmentFile.getName(),
           segmentName.getSegmentName());
@@ -89,7 +95,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     };
     Future<URI> future = _executorService.submit(uploadTask);
     try {
-      URI segmentLocation = future.get(_timeoutInMs, TimeUnit.MILLISECONDS);
+      URI segmentLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
       LOGGER.info("Successfully upload segment {} to {}.", segmentName, segmentLocation);
       _serverMetrics.addMeteredTableValue(rawTableName,
           segmentLocation == null ? ServerMeter.SEGMENT_UPLOAD_FAILURE : ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);

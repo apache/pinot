@@ -159,6 +159,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         }
       }
     }
+
+    // Remove last sealed segments such that the table can still create new consuming segments if it's paused
+    segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(realtimeTableName));
+
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
@@ -214,6 +218,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         // Write back to the lineage entry
         if (SegmentLineageAccessHelper.writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
             segmentLineage, expectedVersion)) {
+          // Remove last sealed segments such that the table can still create new consuming segments if it's paused
+          if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+            segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(tableNameWithType));
+          }
           // Delete segments based on the segment lineage
           if (!segmentsToDelete.isEmpty()) {
             _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);

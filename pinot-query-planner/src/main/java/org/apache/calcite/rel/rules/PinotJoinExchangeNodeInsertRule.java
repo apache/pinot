@@ -25,6 +25,8 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
+import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -63,7 +65,13 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     RelNode rightExchange;
     JoinInfo joinInfo = join.analyzeCondition();
 
-    if (joinInfo.leftKeys.isEmpty()) {
+    boolean isColocatedJoin = PinotHintStrategyTable.containsHintOption(join.getHints(),
+        PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
+    if (isColocatedJoin) {
+      // join exchange are colocated, we should directly pass through via join key
+      leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
+      rightExchange = LogicalExchange.create(rightInput, RelDistributions.SINGLETON);
+    } else if (joinInfo.leftKeys.isEmpty()) {
       // when there's no JOIN key, use broadcast.
       leftExchange = LogicalExchange.create(leftInput, RelDistributions.RANDOM_DISTRIBUTED);
       rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);

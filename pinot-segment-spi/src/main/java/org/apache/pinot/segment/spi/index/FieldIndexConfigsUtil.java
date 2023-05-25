@@ -80,6 +80,17 @@ public class FieldIndexConfigsUtil {
         .collect(Collectors.toSet());
   }
 
+  /**
+   * Returns the columns on the map that whose given index type is disabled.
+   *
+   * It is recommended to use {@link #columnsWithIndexDisabled(Set, IndexType, Map)} when the map may not have an entry
+   * for all columns in the schema.
+   */
+  public static Set<String> columnsWithIndexDisabled(IndexType<?, ?, ?> indexType,
+      Map<String, FieldIndexConfigs> configByCol) {
+    return Sets.difference(configByCol.keySet(), columnsWithIndexEnabled(indexType, configByCol));
+  }
+
   public static Set<String> columnsWithIndexDisabled(Set<String> allColumns, IndexType<?, ?, ?> indexType,
       Map<String, FieldIndexConfigs> configByCol) {
     return Sets.difference(allColumns, columnsWithIndexEnabled(indexType, configByCol));

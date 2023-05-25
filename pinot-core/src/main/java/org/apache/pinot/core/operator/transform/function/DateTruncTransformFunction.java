@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.joda.time.DateTimeField;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -137,5 +138,10 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
               TimeUnit.MILLISECONDS);
     }
     return _longValuesSV;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }

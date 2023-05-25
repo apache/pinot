@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
+import org.apache.calcite.avatica.util.Base64;
+import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -41,6 +44,8 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
 
   // Allow 5% quantile error due to the randomness of TDigest merge
   private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
+  // Allow 2% quantile error due to the randomness of KLL merge
+  private static final double PERCENTILE_KLL_DELTA = 0.02 * Integer.MAX_VALUE;
 
   @Test
   public void testCountMV() {
@@ -538,6 +543,40 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         getBrokerResponse(regularQuery + MV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + MV_GROUP_BY),
         getBrokerResponse(regularQuery + FILTER + MV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+  }
+
+  @Test
+  public void testPercentileRawKLLMV() {
+    testPercentileRawKLLMV(50);
+    testPercentileRawKLLMV(90);
+    testPercentileRawKLLMV(95);
+    testPercentileRawKLLMV(99);
+  }
+
+  private void testPercentileRawKLLMV(int percentile) {
+    Function<Object, Object> quantileExtractor = value -> {
+      try {
+        KllDoublesSketch sketch = ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(Base64.decode((String) value));
+        return sketch.getQuantile(percentile / 100.0);
+      } catch (IOException e) {
+        return null;
+      }
+    };
+
+    String rawKllQuery = String.format("SELECT PERCENTILERAWKLLMV(column6, %d) AS value FROM testTable", percentile);
+    String regularQuery = String.format("SELECT PERCENTILEMV(column6, %d) AS value FROM testTable", percentile);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery), getBrokerResponse(regularQuery),
+        quantileExtractor, PERCENTILE_KLL_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery + FILTER),
+        getBrokerResponse(regularQuery + FILTER), quantileExtractor, PERCENTILE_KLL_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery + SV_GROUP_BY),
+        getBrokerResponse(regularQuery + SV_GROUP_BY), quantileExtractor, PERCENTILE_KLL_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery + FILTER + SV_GROUP_BY),
+        getBrokerResponse(regularQuery + FILTER + SV_GROUP_BY), quantileExtractor, PERCENTILE_KLL_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery + MV_GROUP_BY),
+        getBrokerResponse(regularQuery + MV_GROUP_BY), quantileExtractor, PERCENTILE_KLL_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawKllQuery + FILTER + MV_GROUP_BY),
+        getBrokerResponse(regularQuery + FILTER + MV_GROUP_BY), quantileExtractor, PERCENTILE_KLL_DELTA);
   }
 
   @Test

@@ -50,6 +50,14 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
           textIndexProperties.get(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES));
       _stopWordsInclude = TextIndexUtils.extractStopWordsInclude(textIndexProperties);
       _stopWordsExclude = TextIndexUtils.extractStopWordsExclude(textIndexProperties);
+
+      for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
+        if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
+          _fstType = FSTType.NATIVE;
+        } else {
+          _fstType = FSTType.LUCENE;
+        }
+      }
     }
     return this;
   }

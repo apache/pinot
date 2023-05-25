@@ -18,7 +18,9 @@
  */
 package org.apache.calcite.rel.hint;
 
-import com.google.common.collect.ImmutableList;
+import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
@@ -31,7 +33,6 @@ public class PinotHintStrategyTable {
   public static final String SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION = "skipLeafStageGroupByAggregation";
 
 
-
   private PinotHintStrategyTable() {
     // do not instantiate.
   }
@@ -40,14 +41,60 @@ public class PinotHintStrategyTable {
       .hintStrategy(INTERNAL_AGG_INTERMEDIATE_STAGE, HintPredicates.AGGREGATE)
       .hintStrategy(INTERNAL_AGG_FINAL_STAGE, HintPredicates.AGGREGATE)
       .hintStrategy(SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION, HintPredicates.AGGREGATE)
+      .hintStrategy(PinotHintOptions.AGGREGATE_HINT_OPTIONS, HintPredicates.AGGREGATE)
+      .hintStrategy(PinotHintOptions.JOIN_HINT_OPTIONS, HintPredicates.JOIN)
       .build();
 
-  public static boolean containsHint(ImmutableList<RelHint> hintList, String hintName) {
+  /**
+   * Check if a hint-able {@link org.apache.calcite.rel.RelNode} contains a specific {@link RelHint} by name.
+   *
+   * @param hintList hint list from the {@link org.apache.calcite.rel.RelNode}.
+   * @param hintName the name of the {@link RelHint} to be matched
+   * @return true if it contains the hint
+   */
+  public static boolean containsHint(List<RelHint> hintList, String hintName) {
     for (RelHint relHint : hintList) {
       if (relHint.hintName.equals(hintName)) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Check if a hint-able {@link org.apache.calcite.rel.RelNode} contains an option key for a specific hint name of
+   * {@link RelHint}.
+   *
+   * @param hintList hint list from the {@link org.apache.calcite.rel.RelNode}.
+   * @param hintName the name of the {@link RelHint}.
+   * @param optionKey the option key to look for in the {@link RelHint#kvOptions}.
+   * @return true if it contains the hint
+   */
+  public static boolean containsHintOption(List<RelHint> hintList, String hintName, String optionKey) {
+    for (RelHint relHint : hintList) {
+      if (relHint.hintName.equals(hintName)) {
+        return relHint.kvOptions.containsKey(optionKey) && BooleanUtils.toBoolean(relHint.kvOptions.get(optionKey));
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Retrieve the option value by option key in the {@link RelHint#kvOptions}. the option key is looked up from the
+   * specified hint name for a hint-able {@link org.apache.calcite.rel.RelNode}.
+   *
+   * @param hintList hint list from the {@link org.apache.calcite.rel.RelNode}.
+   * @param hintName the name of the {@link RelHint}.
+   * @param optionKey the option key to look for in the {@link RelHint#kvOptions}.
+   * @return true if it contains the hint
+   */
+  @Nullable
+  public static String getHintOption(List<RelHint> hintList, String hintName, String optionKey) {
+    for (RelHint relHint : hintList) {
+      if (relHint.hintName.equals(hintName)) {
+        return relHint.kvOptions.get(optionKey);
+      }
+    }
+    return null;
   }
 }

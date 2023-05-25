@@ -27,6 +27,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -42,8 +45,11 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexUtil;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -57,6 +63,11 @@ public class ForwardIndexType
     extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "forward";
+  // For multi-valued column, forward-index.
+  // Maximum number of multi-values per row. We assert on this.
+  private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
+  private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
+  private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
 
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
@@ -247,5 +258,62 @@ public class ForwardIndexType
       ColumnMetadata metadata)
       throws IndexReaderConstraintException, IOException {
     return StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);
+  }
+
+  @Nullable
+  @Override
+  public MutableIndex createMutableIndex(MutableIndexContext context, ForwardIndexConfig config) {
+    if (config.isDisabled()) {
+      return null;
+    }
+    String column = context.getFieldSpec().getName();
+    String segmentName = context.getSegmentName();
+    FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    boolean isSingleValue = context.getFieldSpec().isSingleValueField();
+    if (!context.hasDictionary()) {
+      if (isSingleValue) {
+        String allocationContext = IndexUtil.buildAllocationContext(context.getSegmentName(),
+            context.getFieldSpec().getName(), V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        if (storedType.isFixedWidth()) {
+          return new FixedByteSVMutableForwardIndex(false, storedType, context.getCapacity(),
+              context.getMemoryManager(), allocationContext);
+        } else {
+          // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming
+          // segments
+          // TODO: Add support for updating RealtimeSegmentStatsHistory with average column value size for no dictionary
+          //       columns as well
+          // TODO: Use the stats to get estimated average length
+          // Use a smaller capacity as opposed to segment flush size
+          int initialCapacity = Math.min(context.getCapacity(),
+              NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
+          return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
+              initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
+        }
+      } else {
+        // TODO: Add support for variable width (bytes, string, big decimal) MV RAW column types
+        assert storedType.isFixedWidth();
+        String allocationContext =
+            IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+                V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+        // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
+        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false,
+            storedType);
+      }
+    } else {
+      if (isSingleValue) {
+        String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
+            V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+        return new FixedByteSVMutableForwardIndex(true, FieldSpec.DataType.INT, context.getCapacity(),
+            context.getMemoryManager(), allocationContext);
+      } else {
+        String allocationContext = IndexUtil.buildAllocationContext(segmentName, column,
+            V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+        // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
+        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+            context.getCapacity(), Integer.BYTES, context.getMemoryManager(), allocationContext, true,
+            FieldSpec.DataType.INT);
+      }
+    }
   }
 }

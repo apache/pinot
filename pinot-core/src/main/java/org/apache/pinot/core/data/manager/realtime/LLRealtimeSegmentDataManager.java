@@ -1396,16 +1396,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType).setSegmentName(_segmentNameStr)
+        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
+            .setSegmentName(_segmentNameStr)
             .setStreamName(streamTopic).setSchema(_schema).setTimeColumnName(timeColumnName)
             .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
-            .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
-            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(indexLoadingConfig.getInvertedIndexColumns())
-            .setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
-            .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns())
-            .setJsonIndexConfigs(indexLoadingConfig.getJsonIndexConfigs())
-            .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
+            .setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics())
@@ -1419,8 +1414,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
-    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
-    _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
+    try {
+      StreamMessageDecoder streamMessageDecoder =
+          StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
+      _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
+    } catch (Exception e) {
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
+      throw e;
+    }
     _transformPipeline = new TransformPipeline(tableConfig, schema);
     // Acquire semaphore to create stream consumers
     try {
@@ -1458,6 +1460,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
       _partitionGroupConsumerSemaphore.release();
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
+          "Failed to initialize segment data manager", e));
       throw e;
     }
   }

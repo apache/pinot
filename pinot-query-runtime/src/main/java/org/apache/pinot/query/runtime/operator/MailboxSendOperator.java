@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -34,7 +35,6 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -81,6 +81,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
     _isSortOnSender = isSortOnSender;
+    _context.getMailboxService().submitExchangeRequest(context.getId(), exchange);
   }
 
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type exchangeType,
@@ -94,23 +95,14 @@ public class MailboxSendOperator extends MultiStageOperator {
     int workerId = context.getServer().workerId();
     MailboxMetadata receiverMailboxMetadatas =
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(receiverStageId);
-    if (exchangeType == RelDistribution.Type.SINGLETON) {
-      Preconditions.checkState(receiverMailboxMetadatas.getMailBoxIdList().size() == 1,
-          "Multiple instances found for SINGLETON exchange type");
-      VirtualServerAddress virtualServerAddress = receiverMailboxMetadatas.getVirtualAddress(0);
-      Preconditions.checkState(virtualServerAddress.hostname().equals(mailboxService.getHostname()),
-          "SINGLETON exchange hostname should be the same as mailbox service hostname");
-      Preconditions.checkState(virtualServerAddress.port() == mailboxService.getPort(),
-          "SINGLETON exchange port should be the same as mailbox service port");
-    }
     List<String> sendingMailboxIds = MailboxIdUtils.toMailboxIds(requestId, receiverMailboxMetadatas);
     List<SendingMailbox> sendingMailboxes = new ArrayList<>(sendingMailboxIds.size());
     for (int i = 0; i < receiverMailboxMetadatas.getMailBoxIdList().size(); i++) {
       sendingMailboxes.add(mailboxService.getSendingMailbox(receiverMailboxMetadatas.getVirtualAddress(i).hostname(),
           receiverMailboxMetadatas.getVirtualAddress(i).port(), sendingMailboxIds.get(i), deadlineMs));
     }
-    return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector,
-        TransferableBlockUtils::splitBlock);
+    return BlockExchange.getExchange(context.getId(), sendingMailboxes, exchangeType, keySelector,
+        TransferableBlockUtils::splitBlock, context.getCallback(), context.getDeadlineMs());
   }
 
   @Override
@@ -126,6 +118,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    boolean canContinue = true;
     TransferableBlock transferableBlock;
     try {
       transferableBlock = _sourceOperator.nextBlock();
@@ -137,23 +130,35 @@ public class MailboxSendOperator extends MultiStageOperator {
           // and the receiving opChain will not be able to access the stats from the previous opChain
           TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
               OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-          _exchange.send(eosBlockWithStats);
+          sendTransferableBlock(eosBlockWithStats);
         } else {
-          _exchange.send(transferableBlock);
+          sendTransferableBlock(transferableBlock);
         }
       } else { // normal blocks
         // check whether we should continue depending on exchange queue condition.
-        _exchange.send(transferableBlock);
+        canContinue = sendTransferableBlock(transferableBlock);
       }
     } catch (Exception e) {
       transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       try {
-        _exchange.send(transferableBlock);
+        LOGGER.error("Exception while transferring data on opChain: " + _context.getId(), e);
+        sendTransferableBlock(transferableBlock);
       } catch (Exception e2) {
-        LOGGER.error("Exception while sending block to mailbox.", e2);
+        LOGGER.error("Exception while sending error block.", e2);
       }
     }
-    return transferableBlock;
+    // yield if we cannot continue to put transferable block into the sending queue
+    return canContinue ? transferableBlock : TransferableBlockUtils.getNoOpTransferableBlock();
+  }
+
+  private boolean sendTransferableBlock(TransferableBlock block)
+      throws Exception {
+    long timeoutMs = _context.getDeadlineMs() - System.currentTimeMillis();
+    if (_exchange.offerBlock(block, timeoutMs)) {
+      return _exchange.getRemainingCapacity() > 0;
+    } else {
+      throw new TimeoutException("Timeout while offering data block into the sending queue.");
+    }
   }
 
   /**

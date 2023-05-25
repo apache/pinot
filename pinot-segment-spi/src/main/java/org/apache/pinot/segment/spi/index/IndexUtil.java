@@ -16,9 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.mutable.provider;
 
-public interface MutableIndexProvider
-    extends MutableForwardIndexProvider, MutableInvertedIndexProvider, MutableTextIndexReaderProvider,
-            MutableJsonIndexProvider, MutableDictionaryProvider {
+package org.apache.pinot.segment.spi.index;
+
+public class IndexUtil {
+
+  private IndexUtil() {
+  }
+
+  /**
+   * Helper method that builds allocation context that includes segment name, column name, and index type.
+   *
+   * @param segmentName Name of segment.
+   * @param columnName Name of column.
+   * @param suffix The suffix to use.
+   * @return Allocation context built from segment name, column name and index type.
+   */
+  public static String buildAllocationContext(String segmentName, String columnName, String suffix) {
+    return segmentName + ":" + columnName + suffix;
+  }
 }

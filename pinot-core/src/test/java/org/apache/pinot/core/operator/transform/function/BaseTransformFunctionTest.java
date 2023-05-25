@@ -98,6 +98,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_LONG_MV_COLUMN = "stringLongMV";
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
+  protected static final String TIMESTAMP_COLUMN_NULL = "timestampColumnNull";
+
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   protected final int[] _intSVValues = new int[NUM_ROWS];
@@ -200,6 +202,11 @@ public abstract class BaseTransformFunctionTest {
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
       map.put(STRING_LONG_MV_COLUMN, _stringLongFormatMVValues[i]);
       map.put(TIMESTAMP_COLUMN, _timeValues[i]);
+      if (i % 2 == 0) {
+        map.put(TIMESTAMP_COLUMN_NULL, _timeValues[i]);
+      } else {
+        map.put(TIMESTAMP_COLUMN_NULL, null);
+      }
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
       map.put(JSON_COLUMN, _jsonValues[i]);
@@ -230,6 +237,7 @@ public abstract class BaseTransformFunctionTest {
         .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_LONG_MV_COLUMN, FieldSpec.DataType.STRING)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addDateTime(TIMESTAMP_COLUMN_NULL, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)

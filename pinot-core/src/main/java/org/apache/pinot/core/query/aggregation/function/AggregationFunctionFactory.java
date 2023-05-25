@@ -26,7 +26,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -56,9 +56,22 @@ public class AggregationFunctionFactory {
         if (remainingFunctionName.equals("SMARTTDIGEST")) {
           return new PercentileSmartTDigestAggregationFunction(arguments);
         }
+        if (remainingFunctionName.equals("KLL")) {
+          return new PercentileKLLAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("KLLMV")) {
+          return new PercentileKLLMVAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("RAWKLL")) {
+          return new PercentileRawKLLAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("RAWKLLMV")) {
+          return new PercentileRawKLLMVAggregationFunction(arguments);
+        }
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
+          // NOTE: This convention is deprecated. DO NOT add new functions here
           if (remainingFunctionName.matches("\\d+")) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, parsePercentileToInt(remainingFunctionName));
@@ -195,13 +208,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType =
-                  FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
+              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
                   return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol,
-                      fieldDataType == FieldSpec.DataType.BOOLEAN);
+                      fieldDataType == DataType.BOOLEAN);
                 case LONG:
                   return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -225,13 +237,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType =
-                  FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
+              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
                   return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol,
-                      fieldDataType == FieldSpec.DataType.BOOLEAN);
+                      fieldDataType == DataType.BOOLEAN);
                 case LONG:
                   return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -345,8 +356,8 @@ public class AggregationFunctionFactory {
             return new ChildArgMinMaxAggregationFunction(arguments, false);
           case ARGMAX:
           case ARGMIN:
-            throw new IllegalArgumentException("Aggregation function: " + function
-                + " is only supported in selection without alias.");
+            throw new IllegalArgumentException(
+                "Aggregation function: " + function + " is only supported in selection without alias.");
           default:
             throw new IllegalArgumentException();
         }

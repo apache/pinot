@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.base.Function;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -603,17 +603,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          return getCurrentCountStarResult(tableName) == countStarResult;
-        } catch (Exception e) {
-          return null;
-        }
-      }
-    }, 100L, timeoutMs, String.format("Failed to load %d documents", countStarResult), raiseError);
+    TestUtils.waitForCondition(
+        () -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+        "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   /**

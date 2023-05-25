@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -115,10 +116,11 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit)
+    public File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit, AtomicInteger attempts)
         throws Exception {
       assertEquals(uri, new URI(TEST_URI));
       _fetchFileToLocalCalled++;
+      attempts.set(0);
       return new File("fakeSegmentIndexFile");
     }
 

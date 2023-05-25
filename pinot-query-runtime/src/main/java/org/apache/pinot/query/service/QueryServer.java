@@ -85,11 +85,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // Deserialize the request
     DistributedStagePlan distributedStagePlan;
     Map<String, String> requestMetadataMap;
+    long requestId = -1;
     try {
       distributedStagePlan = QueryPlanSerDeUtils.deserialize(request.getStagePlan());
       requestMetadataMap = request.getMetadataMap();
+      requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     } catch (Exception e) {
-      LOGGER.error("Caught exception while deserializing the request: {}", request, e);
+      LOGGER.error("Caught exception while deserializing the request: {}, payload: {}", requestId, request, e);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
@@ -100,6 +102,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
       responseObserver.onCompleted();
     } catch (Throwable t) {
+      LOGGER.error("Caught exception while compiling opChain for request: {}, stage: {}", requestId,
+          distributedStagePlan.getStageId(), t);
       responseObserver.onNext(Worker.QueryResponse.newBuilder()
           .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, QueryException.getTruncatedStackTrace(t))
           .build());
@@ -109,7 +113,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @Override
   public void cancel(Worker.CancelRequest request, StreamObserver<Worker.CancelResponse> responseObserver) {
-    _queryRunner.cancel(request.getRequestId());
+    try {
+      _queryRunner.cancel(request.getRequestId());
+    } catch (Throwable t) {
+      LOGGER.error("Caught exception while cancelling opChain for request: {}", request.getRequestId(), t);
+    }
+    // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
   }
 }

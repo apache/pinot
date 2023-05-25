@@ -30,11 +30,6 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 public class AggregateNode extends AbstractPlanNode {
-  public static final RelHint FINAL_STAGE_HINT = RelHint.builder(
-      PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE).build();
-  public static final RelHint INTERMEDIATE_STAGE_HINT = RelHint.builder(
-      PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE).build();
-
   private List<RelHint> _relHints;
   @ProtoProperties
   private List<RexExpression> _aggCalls;
@@ -57,11 +52,13 @@ public class AggregateNode extends AbstractPlanNode {
   }
 
   public static boolean isFinalStage(AggregateNode aggNode) {
-    return aggNode.getRelHints().contains(FINAL_STAGE_HINT);
+    return PinotHintStrategyTable.containsHint(aggNode.getRelHints(),
+        PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE);
   }
 
   public static boolean isIntermediateStage(AggregateNode aggNode) {
-    return aggNode.getRelHints().contains(INTERMEDIATE_STAGE_HINT);
+    return PinotHintStrategyTable.containsHint(aggNode.getRelHints(),
+        PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE);
   }
 
   public List<RexExpression> getAggCalls() {

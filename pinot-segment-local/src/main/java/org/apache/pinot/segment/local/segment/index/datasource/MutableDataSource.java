@@ -18,20 +18,16 @@
  */
 package org.apache.pinot.segment.local.segment.index.datasource;
 
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
-import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -44,24 +40,14 @@ public class MutableDataSource extends BaseDataSource {
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry, int cardinality,
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
-      @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
-      @Nullable InvertedIndexReader invertedIndex, @Nullable RangeIndexReader rangeIndex,
-      @Nullable TextIndexReader textIndex, @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex,
-      @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector, int maxRowLengthInBytes) {
+      @Nullable Comparable maxValue, Map<IndexType, MutableIndex> mutableIndexes,
+      @Nullable MutableDictionary dictionary, @Nullable MutableNullValueVector nullValueVector,
+      int maxRowLengthInBytes) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, cardinality,
             partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes),
         new ColumnIndexContainer.FromMap.Builder()
-            .with(StandardIndexes.forward(), forwardIndex)
+            .withAll(mutableIndexes)
             .with(StandardIndexes.dictionary(), dictionary)
-            .with(StandardIndexes.inverted(),
-        invertedIndex)
-            .with(StandardIndexes.range(), rangeIndex)
-            .with(StandardIndexes.text(), textIndex)
-            .with(StandardIndexes.fst(), fstIndex)
-            .with(StandardIndexes.json(), jsonIndex)
-            .with(StandardIndexes.h3(), h3Index)
-            .with(StandardIndexes.bloomFilter(), bloomFilter)
             .with(StandardIndexes.nullValueVector(), nullValueVector)
             .build());
   }

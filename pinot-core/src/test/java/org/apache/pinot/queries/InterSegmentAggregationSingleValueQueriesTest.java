@@ -40,6 +40,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   // Allow 5% quantile error due to the randomness of TDigest merge
   private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
+  // Allow 2% quantile error due to the randomness of KLL merge
+  private static final double PERCENTILE_KLL_DELTA = 0.02 * Integer.MAX_VALUE;
 
   @Test
   public void testCount() {
@@ -587,6 +589,115 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         getBrokerResponse(regularQuery + GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + GROUP_BY),
         getBrokerResponse(regularQuery + FILTER + GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+  }
+
+  @Test
+  public void testPercentileKLL() {
+    String query = "SELECT PERCENTILEKLL(column1, 50) AS v1, PERCENTILEKLL(column3, 50) AS v2 FROM testTable";
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1107310944L, 1082130431L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        240000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1139674505L, 509607935L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        49032L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        360000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        73548L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    query = "SELECT PERCENTILEKLL(column1, 90) AS v1, PERCENTILEKLL(column3, 90) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1946157055L, 1946157055L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        240000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1939865599L, 902299647L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        49032L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        360000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        73548L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    query = "SELECT PERCENTILEKLL(column1, 95) AS v1, PERCENTILEKLL(column3, 95) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2080374783L, 2051014655L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        240000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2109734911L, 950009855L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        49032L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        360000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        73548L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    query = "SELECT PERCENTILEKLL(column1, 99) AS v1, PERCENTILEKLL(column3, 99) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2143289343L, 2143289343L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        240000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405L, 991952895L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        49032L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L,
+        360000L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405L, 993001471L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L,
+        73548L, 120000L, expectedResultTable, PERCENTILE_KLL_DELTA);
   }
 
   @Test

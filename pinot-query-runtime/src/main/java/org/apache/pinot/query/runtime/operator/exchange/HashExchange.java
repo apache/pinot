@@ -20,10 +20,12 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
@@ -36,9 +38,9 @@ class HashExchange extends BlockExchange {
   // TODO: ensure that server instance list is sorted using same function in sender.
   private final KeySelector<Object[], Object[]> _keySelector;
 
-  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<Object[], Object[]> selector,
-      BlockSplitter splitter) {
-    super(sendingMailboxes, splitter);
+  HashExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, KeySelector<Object[], Object[]> selector,
+      BlockSplitter splitter, Consumer<OpChainId> callback, long deadlineMs) {
+    super(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
     _keySelector = selector;
   }
 

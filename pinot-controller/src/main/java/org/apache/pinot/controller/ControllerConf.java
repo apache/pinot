@@ -213,6 +213,8 @@ public class ControllerConf extends PinotConfiguration {
     // Default value is false.
     public static final String ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT =
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
+    public static final String DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS =
+        "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
@@ -918,6 +920,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
+  }
+
+  public int getDeepStoreRetryUploadTimeoutMs() {
+    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS, -1);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {
