@@ -42,30 +42,31 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
       /*
        - iterate over all columns
        - if any value in _values is greater than its counterpart in _other._values, keep _values as-is and return 1
-       - if any value in _values is less than its counterpart  in _other._values _and_ none are greater than their
-         counterpart in _other._values, keep _values as-is and return -1
-           - i.e. no value in _this_ is greater than its counterpart in _other
+       - if any value in _values is less than its counterpart  in _other._values, keep _values as-is and return -1
        - if all values between the two sets of Comparables are equal (compareTo == 0), keep _values as-is and return 0
        */
-    int comparisonResult;
-    int accumResult = 0;
-
     for (int i = 0; i < _values.length; i++) {
       Comparable comparisonValue = _values[i];
       Comparable otherComparisonValue = other.getValues()[i];
-      if (otherComparisonValue == null) {
+      if (comparisonValue == null && otherComparisonValue == null) {
         continue;
-      } else {
-        comparisonResult = comparisonValue.compareTo(otherComparisonValue);
       }
 
-      if (comparisonResult > 0) {
+      // Always keep the record with non-null value, or that with the greater comparisonResult
+      if (comparisonValue == null) {
+        // implies comparisonValue == null && otherComparisonValue != null
+        return -1;
+      } else if (otherComparisonValue == null) {
+        // implies comparisonValue != null && otherComparisonValue == null
         return 1;
       } else {
-        accumResult += comparisonResult;
+        int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
+        if (comparisonResult != 0) {
+          return comparisonResult;
+        }
       }
     }
-    return Math.max(accumResult, -1);
+    return 0;
   }
 
   @Override
