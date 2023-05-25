@@ -108,9 +108,8 @@ public class LiteralContext {
         }
         break;
       case LONG_VALUE:
-        Number integralNumber = NumberUtils.createNumber(literal.getFieldValue().toString());
         _bigDecimalValue = new BigDecimal(literal.getFieldValue().toString());
-        if (integralNumber instanceof Integer) {
+        if (_bigDecimalValue.longValue() <= Integer.MAX_VALUE && _bigDecimalValue.longValue() >= Integer.MIN_VALUE) {
           _type = FieldSpec.DataType.INT;
           _value = _bigDecimalValue.intValue();
         } else {
