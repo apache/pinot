@@ -100,8 +100,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
 
   private int getRetryCount(RoundRobinURIProvider uriProvider) {
     // Use the minimal value of configured retry count and number of IP addresses.
-    int retryCount = Math.min(_retryCount, uriProvider.numAddresses());
-    return retryCount;
+    return Math.min(_retryCount, uriProvider.numAddresses());
   }
 
   @Override
