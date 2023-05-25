@@ -1118,7 +1118,12 @@
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
-        <version>3.0.12</version>
+        <version>3.1.15</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.jnr</groupId>
+        <artifactId>jnr-constants</artifactId>
+        <version>0.10.3</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
@@ -1233,6 +1238,16 @@
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
         <version>2.24ea16</version>
+      </dependency>
+      <dependency>
+        <groupId>org.ow2.asm</groupId>
+        <artifactId>asm</artifactId>
+        <version>9.3</version>
+      </dependency>
+      <dependency>
+        <groupId>net.java.dev.jna</groupId>
+        <artifactId>jna</artifactId>
+        <version>5.5.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
