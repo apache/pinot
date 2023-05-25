@@ -319,7 +319,7 @@ public class WindowAggregateOperatorTest {
 
     AggregationUtils.Merger merger = Mockito.mock(AggregationUtils.Merger.class);
     Mockito.when(merger.merge(Mockito.any(), Mockito.any())).thenReturn(12d);
-    Mockito.when(merger.initialize(Mockito.any(), Mockito.any())).thenReturn(1d);
+    Mockito.when(merger.init(Mockito.any(), Mockito.any())).thenReturn(1d);
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
@@ -334,7 +334,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     // should call merger twice, one from second row in first block and two from the first row
     // in second block
-    Mockito.verify(merger, Mockito.times(1)).initialize(Mockito.any(), Mockito.any());
+    Mockito.verify(merger, Mockito.times(1)).init(Mockito.any(), Mockito.any());
     Mockito.verify(merger, Mockito.times(2)).merge(Mockito.any(), Mockito.any());
     Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 1, 12d},
         "Expected three columns (original two columns, agg literal value)");

@@ -40,12 +40,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
- *
  * AggregateOperator is used to aggregate values over a set of group by keys.
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
  * Currently, we only support SUM/COUNT/MIN/MAX aggregation.
@@ -60,7 +57,6 @@ import org.slf4j.LoggerFactory;
  */
 public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
 
   private final MultiStageOperator _inputOperator;
 
@@ -177,7 +173,7 @@ public class AggregateOperator extends MultiStageOperator {
   private TransferableBlock constructEmptyAggResultBlock() {
     Object[] row = new Object[_aggCalls.size()];
     for (int i = 0; i < _accumulators.length; i++) {
-      row[i] = _accumulators[i].getMerger().initialize(null, _accumulators[i].getDataType());
+      row[i] = _accumulators[i].getMerger().init(null, _accumulators[i].getDataType());
     }
     return new TransferableBlock(Collections.singletonList(row), _resultSchema, DataBlock.Type.ROW);
   }
@@ -220,43 +216,76 @@ public class AggregateOperator extends MultiStageOperator {
 
   private static class MergeFourthMomentNumeric implements AggregationUtils.Merger {
 
+    @Nullable
     @Override
-    public Object merge(Object left, Object right) {
-      ((PinotFourthMoment) left).increment(((Number) right).doubleValue());
-      return left;
+    public PinotFourthMoment init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
+      if (value == null) {
+        return null;
+      }
+      PinotFourthMoment moment = new PinotFourthMoment();
+      moment.increment(((Number) value).doubleValue());
+      return moment;
     }
 
+    @Nullable
     @Override
-    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
-      PinotFourthMoment moment = new PinotFourthMoment();
-      moment.increment(((Number) other).doubleValue());
+    public PinotFourthMoment merge(@Nullable Object agg, @Nullable Object value) {
+      PinotFourthMoment moment = (PinotFourthMoment) agg;
+      if (value == null) {
+        return moment;
+      }
+      if (moment == null) {
+        moment = new PinotFourthMoment();
+      }
+      moment.increment(((Number) value).doubleValue());
       return moment;
     }
   }
 
   private static class MergeFourthMomentObject implements AggregationUtils.Merger {
 
+    @Nullable
     @Override
-    public Object merge(Object left, Object right) {
-      PinotFourthMoment agg = (PinotFourthMoment) left;
-      agg.combine((PinotFourthMoment) right);
-      return agg;
+    public PinotFourthMoment merge(@Nullable Object agg, @Nullable Object value) {
+      PinotFourthMoment moment1 = (PinotFourthMoment) agg;
+      PinotFourthMoment moment2 = (PinotFourthMoment) value;
+      if (moment1 == null) {
+        return moment2;
+      }
+      if (moment2 == null) {
+        return moment1;
+      }
+      moment1.combine(moment2);
+      return moment1;
     }
   }
 
+  // TODO: this casts everything to `Set<?>` instead of using the primitive version (e.g. IntSet)
   private static class MergeCountDistinctScalars implements AggregationUtils.Merger {
-    @SuppressWarnings("unchecked")
+
+    @Nullable
     @Override
-    public Object merge(Object agg, Object value) {
-      // TODO: this casts everything to `Set<?>` instead of using the primitive version (e.g. IntSet)
-      ((Set<Object>) agg).add(value);
-      return agg;
+    public Set<Object> init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
+      if (value == null) {
+        return null;
+      }
+      Set<Object> set = new ObjectOpenHashSet<>();
+      set.add(value);
+      return set;
     }
 
+    @SuppressWarnings("unchecked")
+    @Nullable
     @Override
-    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
-      ObjectOpenHashSet<Object> set = new ObjectOpenHashSet<>();
-      set.add(other);
+    public Set<Object> merge(@Nullable Object agg, @Nullable Object value) {
+      Set<Object> set = (Set<Object>) agg;
+      if (value == null) {
+        return set;
+      }
+      if (set == null) {
+        set = new ObjectOpenHashSet<>();
+      }
+      set.add(value);
       return set;
     }
   }
@@ -264,11 +293,19 @@ public class AggregateOperator extends MultiStageOperator {
   private static class MergeCountDistinctSets implements AggregationUtils.Merger {
 
     @SuppressWarnings("unchecked")
+    @Nullable
     @Override
-    public Object merge(Object agg, Object value) {
-      // TODO: this casts everything to `Set<?>` instead of using the primitive version (e.g. IntSet)
-      ((Set<Object>) agg).addAll((Set<Object>) value);
-      return agg;
+    public Set<Object> merge(@Nullable Object agg, @Nullable Object value) {
+      Set<Object> set1 = (Set<Object>) agg;
+      Set<Object> set2 = (Set<Object>) value;
+      if (set1 == null) {
+        return set2;
+      }
+      if (set2 == null) {
+        return set1;
+      }
+      set1.addAll(set2);
+      return set1;
     }
   }
 
