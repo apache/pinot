@@ -32,53 +32,53 @@ public class ComparisonColumnsTest {
 
   @Test
   public void testRealtimeComparison() {
-    int comparisonIndex = 0;
     Comparable[] newComparables = new Comparable[3];
     Comparable[] persistedComparables = new Comparable[3];
-    ComparisonColumns alreadyPersisted = new ComparisonColumns(persistedComparables, comparisonIndex);
-    ComparisonColumns toBeIngested = new ComparisonColumns(newComparables, comparisonIndex);
+    ComparisonColumns alreadyPersisted = new ComparisonColumns(persistedComparables, 0);
+    ComparisonColumns toBeIngested = new ComparisonColumns(newComparables, 0);
 
     // reject same col with smaller value
-    newComparables[comparisonIndex] = 1;
-    persistedComparables[comparisonIndex] = 2;
+    newComparables[0] = 1;
+    persistedComparables[0] = 2;
     int comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, -1);
 
     // persist same col with equal value
     nullFill(newComparables, persistedComparables);
-    newComparables[comparisonIndex] = 2;
-    persistedComparables[comparisonIndex] = 2;
+    newComparables[0] = 2;
+    persistedComparables[0] = 2;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 0);
 
     // persist same col with larger value
     nullFill(newComparables, persistedComparables);
-    newComparables[comparisonIndex] = 2;
-    persistedComparables[comparisonIndex] = 1;
+    newComparables[0] = 2;
+    persistedComparables[0] = 1;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 1);
+    Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{2, null, null});
 
     // persist doc with col which was previously null, even though its value is smaller than the previous non-null col
     nullFill(newComparables, persistedComparables);
-    comparisonIndex = newComparables.length - 1;
-    toBeIngested = new ComparisonColumns(newComparables, comparisonIndex);
-    newComparables[comparisonIndex] = 1;
+    toBeIngested = new ComparisonColumns(newComparables, newComparables.length - 1);
+    newComparables[newComparables.length - 1] = 1;
     persistedComparables[0] = 2;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 1);
+    Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{2, null, 1});
 
     // persist new doc where existing doc has multiple non-null comparison values
     nullFill(newComparables, persistedComparables);
-    comparisonIndex = 1;
-    toBeIngested = new ComparisonColumns(newComparables, comparisonIndex);
-    newComparables[comparisonIndex] = 2;
+    toBeIngested = new ComparisonColumns(newComparables, 1);
+    newComparables[1] = 2;
     Arrays.fill(persistedComparables, 1);
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 1);
+    Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{1, 2, 1});
 
     // reject new doc where existing doc has multiple non-null comparison values
     nullFill(newComparables, persistedComparables);
-    newComparables[comparisonIndex] = 0;
+    newComparables[1] = 0;
     Arrays.fill(persistedComparables, 1);
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, -1);
@@ -111,6 +111,8 @@ public class ComparisonColumnsTest {
     persistedComparables[0] = 2;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 0);
+    // Verify unchanged comparables in the case of SEALED comparison
+    Assert.assertEquals(toBeIngested.getValues(), newComparables);
 
     // persist same col with larger value
     nullFill(newComparables, persistedComparables);
