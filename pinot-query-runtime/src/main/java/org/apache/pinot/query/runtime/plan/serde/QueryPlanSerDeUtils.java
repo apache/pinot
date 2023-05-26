@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
@@ -87,25 +88,21 @@ public class QueryPlanSerDeUtils {
 
   private static List<DistributedStagePlan> deserializeStagePlan(Worker.StagePlan stagePlan) {
     List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
-    QueryServerInstance queryServerInstance =
-        fromProtoQueryServerInstance(stagePlan.getStageMetadata().getQueryServerInstance());
+    String serverAddress = stagePlan.getStageMetadata().getServerAddress();
+    String[] hostPort = StringUtils.split(serverAddress, ':');
+    String hostname = hostPort[0];
+    int port = Integer.parseInt(hostPort[1]);
     AbstractPlanNode stageRoot = StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot());
     StageMetadata stageMetadata = fromProtoStageMetadata(stagePlan.getStageMetadata());
     for (int workerId : stagePlan.getStageMetadata().getWorkerIdsList()) {
       DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
-      VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerInstance, workerId);
+      VirtualServerAddress virtualServerAddress = new VirtualServerAddress(hostname, port, workerId);
       distributedStagePlan.setServer(virtualServerAddress);
       distributedStagePlan.setStageRoot(stageRoot);
       distributedStagePlan.setStageMetadata(stageMetadata);
       distributedStagePlans.add(distributedStagePlan);
     }
     return distributedStagePlans;
-  }
-
-  private static QueryServerInstance fromProtoQueryServerInstance(Worker.QueryServerInstance protoQueryServerInstance) {
-    return new QueryServerInstance(protoQueryServerInstance.getHostname(),
-        protoQueryServerInstance.getQueryServicePort(),
-        protoQueryServerInstance.getQueryMailboxPort());
   }
 
   private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
@@ -155,16 +152,9 @@ public class QueryPlanSerDeUtils {
       builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
     }
     builder.putAllCustomProperty(planFragment.getCustomProperties());
-    builder.setQueryServerInstance(toProtoQueryServerInstance(queryServerInstance));
+    builder.setServerAddress(String.format("%s:%d", queryServerInstance.getHostname(),
+        queryServerInstance.getQueryMailboxPort()));
     builder.addAllWorkerIds(workerIds);
-    return builder.build();
-  }
-
-  private static Worker.QueryServerInstance toProtoQueryServerInstance(QueryServerInstance queryServerInstance) {
-    Worker.QueryServerInstance.Builder builder = Worker.QueryServerInstance.newBuilder();
-    builder.setHostname(queryServerInstance.getHostname());
-    builder.setQueryServicePort(queryServerInstance.getQueryServicePort());
-    builder.setQueryMailboxPort(queryServerInstance.getQueryMailboxPort());
     return builder.build();
   }
 

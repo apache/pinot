@@ -77,7 +77,7 @@ message StagePlan {
 message StageMetadata {
   repeated WorkerMetadata workerMetadata = 1;
   map<string, string> customProperty = 2;
-  QueryServerInstance queryServerInstance = 3;
+  string serverAddress = 3;
   repeated int32 workerIds = 4;
 }
 
@@ -91,10 +91,4 @@ message MailboxMetadata {
   repeated string mailboxId = 1;
   repeated string virtualAddress = 2;
   map<string, string> customProperty = 3;
-}
-
-message QueryServerInstance {
-  string hostname = 1;
-  int32 queryServicePort = 2;
-  int32 queryMailboxPort = 3;
 }
