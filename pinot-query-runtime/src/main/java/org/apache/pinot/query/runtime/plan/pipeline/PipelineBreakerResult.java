@@ -18,36 +18,26 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
-/**
- * This class used to record the pipeline breaker operator that needs to be run before the main opChain.
- */
-public class PipelineBreakerContext {
-  private final Map<Integer, PlanNode> _pipelineBreakerMap = new HashMap<>();
-  private final Map<PlanNode, Integer> _planNodeObjectToIdMap = new HashMap<>();
+public class PipelineBreakerResult {
+  private final Map<PlanNode, Integer> _nodeIdMap;
+  private final Map<Integer, List<TransferableBlock>> _resultMap;
 
-  private int _currentNodeId = 0;
-
-  public void addPipelineBreaker(MailboxReceiveNode mailboxReceiveNode) {
-    int nodeId = _planNodeObjectToIdMap.get(mailboxReceiveNode);
-    _pipelineBreakerMap.put(nodeId, mailboxReceiveNode);
-  }
-
-  public void visitedNewPlanNode(PlanNode planNode) {
-    _planNodeObjectToIdMap.put(planNode, _currentNodeId);
-    _currentNodeId++;
+  public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<TransferableBlock>> resultMap) {
+    _nodeIdMap = nodeIdMap;
+    _resultMap = resultMap;
   }
 
   public Map<PlanNode, Integer> getNodeIdMap() {
-    return _planNodeObjectToIdMap;
+    return _nodeIdMap;
   }
 
-  public Map<Integer, PlanNode> getPipelineBreakerMap() {
-    return _pipelineBreakerMap;
+  public Map<Integer, List<TransferableBlock>> getResultMap() {
+    return _resultMap;
   }
 }

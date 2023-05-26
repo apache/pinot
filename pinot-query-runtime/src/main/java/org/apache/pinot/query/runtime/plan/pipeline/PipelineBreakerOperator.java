@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.plan.pipeline;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +35,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-public class PipelineBreakOperator extends MultiStageOperator {
+public class PipelineBreakerOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
   private final Deque<Map.Entry<Integer, Operator<TransferableBlock>>> _workerEntries;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
@@ -44,7 +43,7 @@ public class PipelineBreakOperator extends MultiStageOperator {
   private TransferableBlock _errorBlock;
 
 
-  public PipelineBreakOperator(OpChainExecutionContext context,
+  public PipelineBreakerOperator(OpChainExecutionContext context,
       Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap) {
     super(context);
     _resultMap = new HashMap<>();
@@ -53,17 +52,15 @@ public class PipelineBreakOperator extends MultiStageOperator {
     _workerDoneLatch = new CountDownLatch(1);
   }
 
-  public Map<Integer, List<TransferableBlock>> getResult() {
-    try {
-      boolean isWorkerDone =
-          _workerDoneLatch.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      if (isWorkerDone && _errorBlock == null) {
-        return _resultMap;
-      }
-    } catch (Exception e) {
-      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+  public Map<Integer, List<TransferableBlock>> getResult()
+      throws Exception {
+    boolean isWorkerDone =
+        _workerDoneLatch.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    if (isWorkerDone && _errorBlock == null) {
+      return _resultMap;
+    } else {
+      throw new RuntimeException("Unable to construct pipeline breaker results due to timeout.");
     }
-    return Collections.singletonMap(-1, Collections.singletonList(_errorBlock));
   }
 
   @Nullable
@@ -103,7 +100,10 @@ public class PipelineBreakOperator extends MultiStageOperator {
           return _errorBlock;
         }
         List<TransferableBlock> blockList = _resultMap.computeIfAbsent(worker.getKey(), (k) -> new ArrayList<>());
-        blockList.add(block);
+        // TODO: only data block is handled, we also need to handle metadata block from upstream in the future.
+        if (!block.isEndOfStreamBlock()) {
+          blockList.add(block);
+        }
       }
     }
 

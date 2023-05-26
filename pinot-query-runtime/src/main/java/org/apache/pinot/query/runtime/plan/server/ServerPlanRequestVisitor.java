@@ -54,8 +54,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
  * filtering and other auxiliary functionalities.
  */
-public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
-  private static final ServerRequestPlanVisitor INSTANCE = new ServerRequestPlanVisitor();
+public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
+  private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
   static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
@@ -108,8 +108,8 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
       staticSide = node.getInputs().get(1);
     }
     staticSide.visit(this, context);
-    int resultMapId = context.getPipelineBreakerContext().getNodeId(dynamicSide);
-    List<TransferableBlock> transferableBlocks = context.getPipelineBreakerContext().getResultMap().get(resultMapId);
+    int resultMapId = context.getPipelineBreakerResult().getNodeIdMap().get(dynamicSide);
+    List<TransferableBlock> transferableBlocks = context.getPipelineBreakerResult().getResultMap().get(resultMapId);
     List<Object[]> resultDataContainer = new ArrayList<>();
     DataSchema dataSchema = dynamicSide.getDataSchema();
     for (TransferableBlock block : transferableBlocks) {

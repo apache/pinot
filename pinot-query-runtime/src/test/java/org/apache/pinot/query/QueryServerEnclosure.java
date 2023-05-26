@@ -131,6 +131,12 @@ public class QueryServerEnclosure {
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _executor.submit(() -> _queryRunner.processQuery(distributedStagePlan, requestMetadataMap));
+    _executor.submit(() -> {
+      try {
+        _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+      } catch (Exception e) {
+        throw new RuntimeException("Error executing query!", e);
+      }
+    });
   }
 }

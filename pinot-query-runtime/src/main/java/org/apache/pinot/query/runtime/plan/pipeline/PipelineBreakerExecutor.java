@@ -27,50 +27,50 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Utility class to run pipeline breaker execution and collects the results.
  */
-public class PipelineBreakerExecutionUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerExecutionUtils.class);
-
-  private PipelineBreakerExecutionUtils() {
+public class PipelineBreakerExecutor {
+  private PipelineBreakerExecutor() {
     // do not instantiate.
   }
 
+  /**
+   * Execute a pipeline breaker and collect the results (synchronously)
+   *
+   * Currently, pipeline breaker executor can only execute mailbox receive pipeline breaker.
+   */
   public static Map<Integer, List<TransferableBlock>> execute(OpChainSchedulerService scheduler,
-      PipelineBreakerContext context, PlanRequestContext planRequestContext) {
+      PipelineBreakerContext context, PhysicalPlanContext physicalPlanContext)
+      throws Exception {
     Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap = new HashMap<>();
     for (Map.Entry<Integer, PlanNode> e : context.getPipelineBreakerMap().entrySet()) {
       int key = e.getKey();
       PlanNode planNode = e.getValue();
+      // TODO: supprot other pipeline breaker node type as well.
       if (!(planNode instanceof MailboxReceiveNode)) {
         throw new UnsupportedOperationException("Only MailboxReceiveNode is supported to run as pipeline breaker now");
       }
-      OpChain tempOpChain = PhysicalPlanVisitor.walkPlanNode(planNode, planRequestContext);
+      OpChain tempOpChain = PhysicalPlanVisitor.walkPlanNode(planNode, physicalPlanContext);
       pipelineWorkerMap.put(key, tempOpChain.getRoot());
     }
-    return runMailboxReceivePipelineBreaker(scheduler, pipelineWorkerMap, planRequestContext);
+    return runMailboxReceivePipelineBreaker(scheduler, pipelineWorkerMap, physicalPlanContext);
   }
 
   private static Map<Integer, List<TransferableBlock>> runMailboxReceivePipelineBreaker(
       OpChainSchedulerService scheduler, Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap,
-      PlanRequestContext planRequestContext) {
-    PipelineBreakOperator pipelineBreakOperator = new PipelineBreakOperator(
-        planRequestContext.getOpChainExecutionContext(), pipelineWorkerMap);
-    OpChain pipelineBreakerOpChain = new OpChain(planRequestContext.getOpChainExecutionContext(), pipelineBreakOperator,
-        planRequestContext.getReceivingMailboxIds());
+      PhysicalPlanContext physicalPlanContext)
+      throws Exception {
+    PipelineBreakerOperator pipelineBreakerOperator = new PipelineBreakerOperator(
+        physicalPlanContext.getOpChainExecutionContext(), pipelineWorkerMap);
+    OpChain pipelineBreakerOpChain = new OpChain(physicalPlanContext.getOpChainExecutionContext(),
+        pipelineBreakerOperator,
+        physicalPlanContext.getReceivingMailboxIds());
     scheduler.register(pipelineBreakerOpChain);
-    try {
-      return pipelineBreakOperator.getResult();
-    } catch (Exception e) {
-      LOGGER.error("Error executing pipeline breaker.", e);
-      throw new RuntimeException("Error executing pipeline breaker.", e);
-    }
+    return pipelineBreakerOperator.getResult();
   }
 }

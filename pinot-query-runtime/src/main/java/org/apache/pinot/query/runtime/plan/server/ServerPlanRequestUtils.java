@@ -40,7 +40,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerContext;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -71,7 +71,7 @@ public class ServerPlanRequestUtils {
   }
 
   public static ServerPlanRequestContext build(MailboxService mailboxService, DistributedStagePlan stagePlan,
-      Map<String, String> requestMetadataMap, PipelineBreakerContext pipelineBreakerContext,
+      Map<String, String> requestMetadataMap, PipelineBreakerResult pipelineBreakerResult,
       TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
       List<String> segmentList, long deadlineMs) {
     // Before-visit: construct the ServerPlanRequestContext baseline
@@ -91,11 +91,11 @@ public class ServerPlanRequestUtils {
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
-            stagePlan.getServer(), stagePlan.getStageMetadata(), pipelineBreakerContext, pinotQuery, tableType,
+            stagePlan.getServer(), stagePlan.getStageMetadata(), pipelineBreakerResult, pinotQuery, tableType,
             timeBoundaryInfo, traceEnabled);
 
     // visit the plan and create query physical plan.
-    ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);
+    ServerPlanRequestVisitor.walkStageNode(stagePlan.getStageRoot(), context);
 
     // Post-visit: finalize context.
     // 1. global rewrite/optimize
