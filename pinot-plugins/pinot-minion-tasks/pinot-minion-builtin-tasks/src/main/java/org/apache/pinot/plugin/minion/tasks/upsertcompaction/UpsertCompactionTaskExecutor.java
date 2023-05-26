@@ -23,13 +23,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
@@ -39,14 +37,16 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.roaringbitmap.PeekableIntIterator;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,8 +54,86 @@ import org.slf4j.LoggerFactory;
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
-  public static final String RECORD_PURGER_KEY = "recordPurger";
-  public static final String NUM_RECORDS_PURGED_KEY = "numRecordsPurged";
+  private int _numRecordsCompacted;
+
+  private class CompactedRecordReader implements RecordReader {
+    private final PinotSegmentRecordReader _pinotSegmentRecordReader;
+    private final ImmutableRoaringBitmap _validDocIds;
+    private int _docId = 0;
+    // Reusable generic row to store the next row to return
+    GenericRow _nextRow = new GenericRow();
+    // Flag to mark whether we need to fetch another row
+    boolean _nextRowReturned = true;
+    // Flag to mark whether all records have been iterated
+    boolean _finished = false;
+
+    CompactedRecordReader(File indexDir, ImmutableRoaringBitmap validDocIds) {
+      _pinotSegmentRecordReader = new PinotSegmentRecordReader();
+      _pinotSegmentRecordReader.init(indexDir, null, null);
+      _validDocIds = validDocIds;
+    }
+
+    @Override
+    public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (_finished) {
+        return false;
+      }
+
+      // If next row has not been returned, return true
+      if (!_nextRowReturned) {
+        return true;
+      }
+
+      // Try to get the next row to return
+      while (_pinotSegmentRecordReader.hasNext()) {
+        _nextRow.clear();
+        _nextRow = _pinotSegmentRecordReader.next(_nextRow);
+        _docId++;
+        if (_validDocIds.contains(_docId-1)) {
+          _nextRowReturned = false;
+          return true;
+        } else {
+          _numRecordsCompacted++;
+        }
+      }
+
+      // Cannot find next row to return, return false
+      _finished = true;
+      return false;
+    }
+
+    @Override
+    public GenericRow next() {
+      return next(new GenericRow());
+    }
+
+    @Override
+    public GenericRow next(GenericRow reuse) {
+      Preconditions.checkState(!_nextRowReturned);
+      reuse.init(_nextRow);
+      _nextRowReturned = true;
+      return reuse;
+    }
+
+    @Override
+    public void rewind() {
+      _pinotSegmentRecordReader.rewind();
+      _nextRowReturned = true;
+      _finished = false;
+      _docId = 0;
+      _numRecordsCompacted = 0;
+    }
+
+    @Override
+    public void close()
+      throws IOException {
+      _pinotSegmentRecordReader.close();
+    }
+  }
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
@@ -67,44 +145,53 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    List<String> columns = getSchema(rawTableName).getPrimaryKeyColumns();
     TableConfig tableConfig = getTableConfig(tableNameWithType);
-    columns.add(tableConfig.getValidationConfig().getTimeColumnName());
     ImmutableRoaringBitmap validDocIds = getValidDocIds(tableNameWithType, configs);
-    Set<Integer> validIds = getValidIds(validDocIds, indexDir, columns);
 
-    MINION_CONTEXT.setRecordPurgerFactory(x -> row -> {
-      if (validIds.isEmpty()) {
-        return true;
-      }
-
-      List<String> values = new ArrayList<>();
-      for (String column : columns) {
-        values.add(row.getValue(column).toString());
-      }
-      return !validIds.contains(values.hashCode());
-    });
-    SegmentPurger.RecordPurger recordPurger = MINION_CONTEXT.getRecordPurgerFactory().getRecordPurger(rawTableName);
-
-    _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segment");
-    SegmentPurger segmentPurger = new SegmentPurger(indexDir, workingDir, tableConfig, recordPurger, null);
-    File compactedSegmentFile = segmentPurger.purgeSegment();
-    if (compactedSegmentFile == null) {
-      compactedSegmentFile = indexDir;
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    String segmentName = segmentMetadata.getName();
+    try (CompactedRecordReader compactedRecordReader = new CompactedRecordReader(indexDir, validDocIds)) {
+      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, compactedRecordReader);
+      driver.build();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Number of records compacted: " + String.valueOf(_numRecordsCompacted));
     }
+
+    File compactedSegmentFile = new File(workingDir, segmentName);
 
     SegmentConversionResult result = new SegmentConversionResult.Builder()
         .setFile(compactedSegmentFile)
         .setTableNameWithType(tableNameWithType)
         .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
-        .setCustomProperty(RECORD_PURGER_KEY, segmentPurger.getRecordPurger())
-        .setCustomProperty(NUM_RECORDS_PURGED_KEY, segmentPurger.getNumRecordsPurged()).build();
+        .build();
 
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
 
     return result;
+  }
+
+  private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
+      SegmentMetadataImpl segmentMetadata, String segmentName) {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, segmentMetadata.getSchema());
+    config.setOutDir(workingDir.getPath());
+    config.setSegmentName(segmentName);
+    // Keep index creation time the same as original segment because both segments use the same raw data.
+    // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
+    // identify if the new pushed segment has newer data than the existing one.
+    config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
+
+    // The time column type info is not stored in the segment metadata.
+    // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
+    if (segmentMetadata.getTimeInterval() != null) {
+      config.setTimeColumnName(tableConfig.getValidationConfig().getTimeColumnName());
+      config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
+      config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
+      config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
+    }
+    return config;
   }
 
   private static ImmutableRoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs) {
@@ -125,33 +212,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     byte[] snapshot = response.readEntity(byte[].class);
     ImmutableRoaringBitmap validDocIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(snapshot));
     return validDocIds;
-  }
-
-  @VisibleForTesting
-  public static Set<Integer> getValidIds(ImmutableRoaringBitmap validDocIds,
-      File indexDir, List<String> columns) throws IOException {
-    Set<Integer> validIds = new HashSet<>();
-
-    if (validDocIds.isEmpty()) {
-      return validIds;
-    }
-
-    PeekableIntIterator iterator = validDocIds.getIntIterator();
-    PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
-    recordReader.init(indexDir, new HashSet<>(columns), null);
-    GenericRow genericRow = new GenericRow();
-
-    while (iterator.hasNext()) {
-      int validDocId = iterator.next();
-      recordReader.getRecord(validDocId, genericRow);
-      List<String> values = new ArrayList<>();
-      for (String column : columns) {
-        values.add(genericRow.getValue(column).toString());
-      }
-      validIds.add(values.hashCode());
-    }
-    recordReader.close();
-    return validIds;
   }
 
   @VisibleForTesting
