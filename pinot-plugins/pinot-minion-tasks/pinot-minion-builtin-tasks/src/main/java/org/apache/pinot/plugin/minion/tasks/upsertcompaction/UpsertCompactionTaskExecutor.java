@@ -93,7 +93,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
         _nextRow.clear();
         _nextRow = _pinotSegmentRecordReader.next(_nextRow);
         _docId++;
-        if (_validDocIds.contains(_docId-1)) {
+        if (_validDocIds.contains(_docId - 1)) {
           _nextRowReturned = false;
           return true;
         } else {
