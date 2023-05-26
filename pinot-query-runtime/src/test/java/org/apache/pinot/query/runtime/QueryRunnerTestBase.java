@@ -52,6 +52,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -134,11 +135,20 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
       QueryServerInstance server = entry.getKey();
       for (int workerId : entry.getValue()) {
-        DistributedStagePlan distributedStagePlan = QueryDispatcher.constructDistributedStagePlan(
+        DistributedStagePlan distributedStagePlan = constructDistributedStagePlan(
             dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
         _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
       }
     }
+  }
+
+  protected static DistributedStagePlan constructDistributedStagePlan(DispatchableSubPlan dispatchableSubPlan,
+      int stageId, VirtualServerAddress serverAddress) {
+    return new DistributedStagePlan(stageId, serverAddress,
+        dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment().getFragmentRoot(),
+        new StageMetadata.Builder().setWorkerMetadataList(
+                dispatchableSubPlan.getQueryStageList().get(stageId).getWorkerMetadataList())
+            .addCustomProperties(dispatchableSubPlan.getQueryStageList().get(stageId).getCustomProperties()).build());
   }
 
   protected List<Object[]> queryH2(String sql)

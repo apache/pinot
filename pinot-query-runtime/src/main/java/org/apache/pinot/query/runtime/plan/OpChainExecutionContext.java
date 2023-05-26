@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
