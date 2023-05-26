@@ -41,12 +41,51 @@ import org.apache.pinot.query.runtime.plan.StageMetadata;
  * This utility class serialize/deserialize between {@link Worker.StagePlan} elements to Planner elements.
  */
 public class QueryPlanSerDeUtils {
+  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
+      "(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)");
 
   private QueryPlanSerDeUtils() {
     // do not instantiate.
   }
 
-  public static List<DistributedStagePlan> deserialize(Worker.StagePlan stagePlan) {
+  public static List<DistributedStagePlan> deserializeStagePlan(Worker.QueryRequest request) {
+    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
+    for (Worker.StagePlan stagePlan : request.getStagePlanList()) {
+      distributedStagePlans.addAll(deserializeStagePlan(stagePlan));
+    }
+    return distributedStagePlans;
+  }
+
+  public static Worker.StagePlan serialize(DispatchableSubPlan dispatchableSubPlan, int stageId,
+      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
+    return Worker.StagePlan.newBuilder()
+        .setStageId(stageId)
+        .setStageRoot(StageNodeSerDeUtils.serializeStageNode(
+            (AbstractPlanNode) dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
+                .getFragmentRoot()))
+        .setStageMetadata(
+            toProtoStageMetadata(dispatchableSubPlan.getQueryStageList().get(stageId), queryServerInstance, workerIds))
+        .build();
+  }
+
+  public static VirtualServerAddress protoToAddress(String virtualAddressStr) {
+    Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(virtualAddressStr);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("Unexpected virtualAddressStr '" + virtualAddressStr + "'. This might "
+          + "happen if you are upgrading from an old version of the multistage engine to the current one in a rolling "
+          + "fashion.");
+    }
+
+    // Skipped netty and grpc port as they are not used in worker instance.
+    return new VirtualServerAddress(matcher.group("host"),
+        Integer.parseInt(matcher.group("port")), Integer.parseInt(matcher.group("virtualid")));
+  }
+
+  public static String addressToProto(VirtualServerAddress serverAddress) {
+    return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
+  }
+
+  private static List<DistributedStagePlan> deserializeStagePlan(Worker.StagePlan stagePlan) {
     List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
     QueryServerInstance queryServerInstance =
         fromProtoQueryServerInstance(stagePlan.getStageMetadata().getQueryServerInstance());
@@ -67,46 +106,6 @@ public class QueryPlanSerDeUtils {
     return new QueryServerInstance(protoQueryServerInstance.getHostname(),
         protoQueryServerInstance.getQueryServicePort(),
         protoQueryServerInstance.getQueryMailboxPort());
-  }
-
-  public static List<DistributedStagePlan> deserialize(Worker.QueryRequest request) {
-    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
-    for (Worker.StagePlan stagePlan : request.getStagePlanList()) {
-      distributedStagePlans.addAll(deserialize(stagePlan));
-    }
-    return distributedStagePlans;
-  }
-
-  public static Worker.StagePlan serialize(DispatchableSubPlan dispatchableSubPlan, int stageId,
-      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
-    return Worker.StagePlan.newBuilder()
-        .setStageId(stageId)
-        .setStageRoot(StageNodeSerDeUtils.serializeStageNode(
-            (AbstractPlanNode) dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
-                .getFragmentRoot()))
-        .setStageMetadata(
-            toProtoStageMetadata(dispatchableSubPlan.getQueryStageList().get(stageId), queryServerInstance, workerIds))
-        .build();
-  }
-
-  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
-      "(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)");
-
-  public static VirtualServerAddress protoToAddress(String virtualAddressStr) {
-    Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(virtualAddressStr);
-    if (!matcher.matches()) {
-      throw new IllegalArgumentException("Unexpected virtualAddressStr '" + virtualAddressStr + "'. This might "
-          + "happen if you are upgrading from an old version of the multistage engine to the current one in a rolling "
-          + "fashion.");
-    }
-
-    // Skipped netty and grpc port as they are not used in worker instance.
-    return new VirtualServerAddress(matcher.group("host"),
-        Integer.parseInt(matcher.group("port")), Integer.parseInt(matcher.group("virtualid")));
-  }
-
-  public static String addressToProto(VirtualServerAddress serverAddress) {
-    return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
   }
 
   private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
@@ -147,15 +146,6 @@ public class QueryPlanSerDeUtils {
     MailboxMetadata mailboxMetadata =
         new MailboxMetadata(mailboxIds, virtualAddresses, protoMailboxMetadata.getCustomPropertyMap());
     return mailboxMetadata;
-  }
-
-  private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {
-    Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
-    for (WorkerMetadata workerMetadata : stageMetadata.getWorkerMetadataList()) {
-      builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
-    }
-    builder.putAllCustomProperty(stageMetadata.getCustomProperties());
-    return builder.build();
   }
 
   private static Worker.StageMetadata toProtoStageMetadata(DispatchablePlanFragment planFragment,

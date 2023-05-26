@@ -72,11 +72,6 @@ public class StageMetadata {
       return this;
     }
 
-    public Builder addCustomProperty(String key, String value) {
-      _customProperties.put(key, value);
-      return this;
-    }
-
     public Builder addCustomProperties(Map<String, String> customPropertyMap) {
       _customProperties.putAll(customPropertyMap);
       return this;

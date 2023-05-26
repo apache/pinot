@@ -36,6 +36,7 @@ public class WorkerQueryServer {
   private static final int DEFAULT_EXECUTOR_THREAD_NUM = 5;
 
   private final ExecutorService _executor;
+  private final int _queryServicePort;
   private final PinotConfiguration _configuration;
   private final HelixManager _helixManager;
 
@@ -50,11 +51,13 @@ public class WorkerQueryServer {
     _helixManager = helixManager;
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
+    _queryServicePort =
+        _configuration.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT);
     _queryRunner = new QueryRunner();
     _queryRunner.init(_configuration, _instanceDataManager, _helixManager, _serverMetrics);
-    _queryWorkerService = new QueryServer(_configuration, _queryRunner);
+    _queryWorkerService = new QueryServer(_queryServicePort, _queryRunner);
     _executor = Executors.newFixedThreadPool(DEFAULT_EXECUTOR_THREAD_NUM,
-        new NamedThreadFactory("worker_query_server_enclosure_on_" + _queryWorkerService.getPort() + "_port"));
+        new NamedThreadFactory("worker_query_server_enclosure_on_" + _queryServicePort + "_port"));
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {
@@ -84,7 +87,7 @@ public class WorkerQueryServer {
   }
 
   public int getPort() {
-    return _queryWorkerService.getPort();
+    return _queryServicePort;
   }
 
   public void start() {

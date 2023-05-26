@@ -26,16 +26,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,18 +48,19 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
   private final int _port;
-  private Server _server = null;
   private final QueryRunner _queryRunner;
-
+  // query submission service is only used for plan submission for now.
+  // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
+  //   directly return from submission response observer.
   private final ExecutorService _querySubmissionExecutorService;
 
-  public QueryServer(PinotConfiguration configuration, QueryRunner queryRunner) {
-    _port = configuration.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT);
+  private Server _server = null;
+
+  public QueryServer(int port, QueryRunner queryRunner) {
+    _port = port;
     _queryRunner = queryRunner;
-    int queryServerExecutorServiceNumThreads =
-        configuration.getProperty(QueryConfig.KEY_OF_QUERY_SUBMISSION_EXECUTOR_SERVICE_NUM_THREADS, 0);
-    _querySubmissionExecutorService = queryServerExecutorServiceNumThreads <= 0
-        ? Executors.newCachedThreadPool() : Executors.newFixedThreadPool(queryServerExecutorServiceNumThreads);
+    _querySubmissionExecutorService = Executors.newCachedThreadPool(
+        new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
   }
 
   public void start() {
@@ -96,35 +95,27 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // Deserialize the request
     List<DistributedStagePlan> distributedStagePlans;
     Map<String, String> requestMetadataMap;
-    long requestId = -1;
+    requestMetadataMap = request.getMetadataMap();
+    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     try {
-      distributedStagePlans = QueryPlanSerDeUtils.deserialize(request);
-      requestMetadataMap = request.getMetadataMap();
-      requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+      distributedStagePlans = QueryPlanSerDeUtils.deserializeStagePlan(request);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing the request: {}, payload: {}", requestId, request, e);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
-    // This throwable exception only carries one exception, meanwhile it could have multiple in submission phase.
-    AtomicReference<Throwable> throwableException = new AtomicReference<>();
+    // TODO: allow thrown exception to return back to broker in asynchronous manner.
     distributedStagePlans.forEach(distributedStagePlan -> _querySubmissionExecutorService.submit(() -> {
           try {
             _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
           } catch (Throwable t) {
-            throwableException.set(t);
+            LOGGER.error("Caught exception while compiling opChain for request: {}, stage: {}", requestId,
+                distributedStagePlan.getStageId(), t);
           }
         })
     );
-    if (throwableException.get() == null) {
-      responseObserver.onNext(Worker.QueryResponse.newBuilder()
-          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
-    } else {
-      responseObserver.onNext(Worker.QueryResponse.newBuilder()
-          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR,
-              QueryException.getTruncatedStackTrace(throwableException.get()))
-          .build());
-    }
+    responseObserver.onNext(Worker.QueryResponse.newBuilder()
+        .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
     responseObserver.onCompleted();
   }
 
@@ -137,9 +128,5 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
-  }
-
-  public int getPort() {
-    return _port;
   }
 }

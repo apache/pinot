@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
-import com.google.common.collect.ImmutableMap;
 import io.grpc.stub.StreamObserver;
 import java.util.HashMap;
 import java.util.List;
@@ -37,10 +36,8 @@ import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -77,9 +74,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       Mockito.when(queryRunner.getQueryWorkerLeafExecutorService()).thenReturn(LEAF_WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryWorkerIntermExecutorService()).thenReturn(INTERM_WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryRunnerExecutorService()).thenReturn(RUNNER_EXECUTOR_SERVICE);
-      PinotConfiguration pinotConfiguration =
-          new PinotConfiguration(ImmutableMap.of(QueryConfig.KEY_OF_QUERY_SERVER_PORT, availablePort));
-      QueryServer queryServer = new QueryServer(pinotConfiguration, queryRunner);
+      QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer = Mockito.spy(queryServer);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
