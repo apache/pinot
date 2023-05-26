@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.reader;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -45,12 +46,40 @@ public class H3IndexResolutionTest {
   }
 
   @Test
-  public void deserialization()
+  public void deserializationList()
       throws JsonProcessingException {
     H3IndexResolution resolution =
         JsonUtils.stringToObject("[5,6,13]", H3IndexResolution.class);
     Assert.assertEquals(resolution.size(), 3);
     Assert.assertEquals(resolution.getLowestResolution(), 5);
     Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
+  }
+
+  @Test
+  public void deserializationShort()
+      throws JsonProcessingException {
+    H3IndexResolution resolution =
+        JsonUtils.stringToObject("8288", H3IndexResolution.class);
+    Assert.assertEquals(resolution.size(), 3);
+    Assert.assertEquals(resolution.getLowestResolution(), 5);
+    Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
+  }
+
+  @Test
+  public void deserializationLargeInt() {
+    Assert.assertThrows(JsonParseException.class,
+        () -> JsonUtils.stringToObject(Integer.toString(Integer.MAX_VALUE), H3IndexResolution.class));
+  }
+
+  @Test
+  public void deserializationSmallInt() {
+    Assert.assertThrows(JsonParseException.class,
+        () -> JsonUtils.stringToObject(Integer.toString(Integer.MIN_VALUE), H3IndexResolution.class));
+  }
+
+  @Test
+  public void deserializationObject() {
+    Assert.assertThrows(JsonParseException.class,
+        () -> JsonUtils.stringToObject("{}", H3IndexResolution.class));
   }
 }
