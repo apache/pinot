@@ -457,19 +457,12 @@ public class TableConfigUtils {
 
     // check getInstanceAssignmentConfigMap is null or empty,
     if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
-      for (Map.Entry<String, InstanceAssignmentConfig> entry: tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
-        InstanceAssignmentConfig instanceAssignmentConfig = entry.getValue();
+      for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
         //check InstanceAssignmentConfig has the InstanceReplicaGroupPartitionConfig with non-empty partitionColumn
         if (StringUtils.isNotEmpty(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn())) {
-          // if true, set the partitionColumn value.
-          partitionColumn = instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
+          return instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
         }
       }
-    }
-
-    // check, if partitionColumn is not empty, return the value.
-    if (!StringUtils.isEmpty(partitionColumn)) {
-      return partitionColumn;
     }
 
     // for backward-compatibility, If partitionColumn value isn't there in InstanceReplicaGroupPartitionConfig
