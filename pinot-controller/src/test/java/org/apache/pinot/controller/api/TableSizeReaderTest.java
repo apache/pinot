@@ -318,7 +318,7 @@ public class TableSizeReaderTest {
     assertNull(tableSizeDetails._realtimeSegments);
     assertEquals(tableSizeDetails._reportedSizeInBytes, offlineSizes._reportedSizeInBytes);
     assertEquals(tableSizeDetails._estimatedSizeInBytes, offlineSizes._estimatedSizeInBytes);
-    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes,offlineSizes._reportedSizePerReplicaInBytes);
+    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes, offlineSizes._reportedSizePerReplicaInBytes);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 0);
@@ -345,7 +345,7 @@ public class TableSizeReaderTest {
     assertEquals(offlineSizes._segments.size(), 3);
     assertEquals(offlineSizes._reportedSizeInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
     assertEquals(tableSizeDetails._estimatedSizeInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
-    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes,TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
+    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes, TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
@@ -374,7 +374,7 @@ public class TableSizeReaderTest {
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
     assertEquals(tableSizeDetails._reportedSizeInBytes, offlineSizes._reportedSizeInBytes);
     assertEquals(tableSizeDetails._estimatedSizeInBytes, offlineSizes._estimatedSizeInBytes);
-    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes,offlineSizes._reportedSizePerReplicaInBytes);
+    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes, offlineSizes._reportedSizePerReplicaInBytes);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 20);
     assertEquals(MetricValueUtils
@@ -401,7 +401,7 @@ public class TableSizeReaderTest {
     validateTableSubTypeSize(servers, realtimeSegments);
     assertEquals(tableSizeDetails._reportedSizeInBytes, realtimeSegments._reportedSizeInBytes);
     assertEquals(tableSizeDetails._estimatedSizeInBytes, realtimeSegments._estimatedSizeInBytes);
-    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes,realtimeSegments._reportedSizePerReplicaInBytes);
+    assertEquals(tableSizeDetails._reportedSizePerReplicaInBytes, realtimeSegments._reportedSizePerReplicaInBytes);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(table);
     assertEquals(MetricValueUtils
             .getTableGaugeValue(_controllerMetrics, tableNameWithType,
