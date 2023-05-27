@@ -453,9 +453,7 @@ public class TableConfigUtils {
    * @return partition column
    */
   public static String getPartitionColumn(TableConfig tableConfig) {
-    String partitionColumn = null;
-
-    // check getInstanceAssignmentConfigMap is null or empty,
+    // check InstanceAssignmentConfigMap is null or empty,
     if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
       for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
         //check InstanceAssignmentConfig has the InstanceReplicaGroupPartitionConfig with non-empty partitionColumn
