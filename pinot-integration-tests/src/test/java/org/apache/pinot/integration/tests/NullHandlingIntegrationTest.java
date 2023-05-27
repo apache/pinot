@@ -299,4 +299,24 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asText(), "null");
   }
+
+  @Test
+  public void testOrderByNullsFirst()
+      throws Exception {
+    String h2Query =
+        "SELECT 1 AS column1 FROM " + getTableName() + " ORDER BY column1 NULLS FIRST";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+
+    testQuery(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testOrderByNullsLast()
+      throws Exception {
+    String h2Query =
+        "SELECT 1 AS column1 FROM " + getTableName() + " ORDER BY column1 DESC NULLS LAST";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+
+    testQuery(pinotQuery, h2Query);
+  }
 }
