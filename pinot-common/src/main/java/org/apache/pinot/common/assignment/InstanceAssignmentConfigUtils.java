@@ -114,12 +114,12 @@ public class InstanceAssignmentConfigUtils {
       Preconditions.checkState(numPartitions > 0, "Number of partitions for column: %s is not properly configured",
           partitionColumn);
       replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions,
-          replicaGroupStrategyConfig.getNumInstancesPerPartition(), minimizeDataMovement);
+          replicaGroupStrategyConfig.getNumInstancesPerPartition(), minimizeDataMovement, partitionColumn);
     } else {
       // If partition column is not configured, use replicaGroupStrategyConfig.getNumInstancesPerPartition() as
       // number of instances per replica-group for backward-compatibility
       replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups,
-          replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0, minimizeDataMovement);
+          replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0, minimizeDataMovement, null);
     }
 
     return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);

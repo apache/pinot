@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
@@ -38,6 +39,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -443,5 +445,28 @@ public class TableConfigUtils {
       InstancePartitionsType instancePartitionsType) {
     return hasPreConfiguredInstancePartitions(tableConfig)
         && tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType);
+  }
+
+  /**
+   * Get the partition column from tableConfig instance assignment config map.
+   * @param tableConfig table config
+   * @return partition column
+   */
+  public static String getPartitionColumn(TableConfig tableConfig) {
+    // check InstanceAssignmentConfigMap is null or empty,
+    if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
+        //check InstanceAssignmentConfig has the InstanceReplicaGroupPartitionConfig with non-empty partitionColumn
+        if (StringUtils.isNotEmpty(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn())) {
+          return instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
+        }
+      }
+    }
+
+    // for backward-compatibility, If partitionColumn value isn't there in InstanceReplicaGroupPartitionConfig
+    // check ReplicaGroupStrategyConfig for partitionColumn
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    return replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
   }
 }

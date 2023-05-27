@@ -27,8 +27,8 @@ import java.util.Random;
 import java.util.TreeMap;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -54,9 +54,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
     Preconditions.checkState(validationAndRetentionConfig != null, "Validation Config is null");
     _replication = tableConfig.getReplication();
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-        validationAndRetentionConfig.getReplicaGroupStrategyConfig();
-    _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    _partitionColumn = TableConfigUtils.getPartitionColumn(_tableConfig);
     if (_partitionColumn == null) {
       LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
           + "with replication: {} without partition column for table: {} ", _replication, _tableName);

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -48,6 +49,7 @@ import org.testng.annotations.Test;
 public class TableConfigUtilsTest {
 
   private static final String TABLE_NAME = "testTable";
+  private static final String PARTITION_COLUMN = "partitionColumn";
 
   /**
    * Test the {@link TableConfigUtils#convertFromLegacyTableConfig(TableConfig)} utility.
@@ -138,6 +140,29 @@ public class TableConfigUtilsTest {
         .setTierOverwrites(JsonUtils.stringToJsonNode("{\"coldTier\": {\"starTreeIndexConfigs\": {}}}")).build();
     TableConfig tierTblCfg = TableConfigUtils.overwriteTableConfigForTier(tableConfig, "coldTier");
     Assert.assertEquals(tierTblCfg, tableConfig);
+  }
+
+  @Test
+  public void testGetPartitionColumnWithoutAnyConfig() {
+    // without instanceAssignmentConfigMap
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    Assert.assertNull(TableConfigUtils.getPartitionColumn(tableConfig));
+  }
+
+  @Test
+  public void testGetPartitionColumnWithReplicaGroupConfig() {
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+
+    // setting up ReplicaGroupStrategyConfig for backward compatibility test.
+    SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
+    validationConfig.setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+    tableConfig.setValidationConfig(validationConfig);
+
+    Assert.assertEquals(PARTITION_COLUMN, TableConfigUtils.getPartitionColumn(tableConfig));
   }
 
   /**
