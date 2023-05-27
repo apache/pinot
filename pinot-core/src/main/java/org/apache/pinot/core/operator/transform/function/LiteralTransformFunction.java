@@ -82,6 +82,10 @@ public class LiteralTransformFunction implements TransformFunction {
     return _longLiteral;
   }
 
+  public float getFloatLiteral() {
+    return _floatLiteral;
+  }
+
   public double getDoubleLiteral() {
     return _doubleLiteral;
   }
