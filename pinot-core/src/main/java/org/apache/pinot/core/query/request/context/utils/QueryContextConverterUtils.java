@@ -142,8 +142,7 @@ public class QueryContextConverterUtils {
         if (seen.add(orderByFunctionsRemoved)) {
           ExpressionContext expressionContext = RequestContextUtils.getExpression(orderByFunctionsRemoved);
           if (isNullsLast != null) {
-            orderByExpressions.add(
-                new OrderByExpressionContext(expressionContext, isAsc, isNullsLast));
+            orderByExpressions.add(new OrderByExpressionContext(expressionContext, isAsc, isNullsLast));
           } else {
             orderByExpressions.add(new OrderByExpressionContext(expressionContext, isAsc));
           }
