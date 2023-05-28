@@ -136,17 +136,16 @@ public class QueryContextConverterUtils {
       Set<Expression> seen = new HashSet<>();
       for (Expression orderBy : orderByList) {
         boolean isAsc = isAsc(orderBy);
-        Boolean isNullLast = isNullsLast(orderBy);
-        Expression expressionWithOrderByFunctionsRemoved = removeOrderByFunctions(orderBy);
+        Boolean isNullsLast = isNullsLast(orderBy);
+        Expression orderByFunctionsRemoved = removeOrderByFunctions(orderBy);
         // Deduplicate the order-by expressions
-        if (seen.add(expressionWithOrderByFunctionsRemoved)) {
-          ExpressionContext expressionContextWithOrderByFunctionsRemoved =
-              RequestContextUtils.getExpression(expressionWithOrderByFunctionsRemoved);
-          if (isNullLast != null) {
+        if (seen.add(orderByFunctionsRemoved)) {
+          ExpressionContext expressionContext = RequestContextUtils.getExpression(orderByFunctionsRemoved);
+          if (isNullsLast != null) {
             orderByExpressions.add(
-                new OrderByExpressionContext(expressionContextWithOrderByFunctionsRemoved, isAsc, isNullLast));
+                new OrderByExpressionContext(expressionContext, isAsc, isNullsLast));
           } else {
-            orderByExpressions.add(new OrderByExpressionContext(expressionContextWithOrderByFunctionsRemoved, isAsc));
+            orderByExpressions.add(new OrderByExpressionContext(expressionContext, isAsc));
           }
         }
       }
