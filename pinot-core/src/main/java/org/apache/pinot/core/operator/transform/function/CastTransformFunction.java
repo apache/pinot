@@ -104,6 +104,14 @@ public class CastTransformFunction extends BaseTransformFunction {
     return _resultMetadata;
   }
 
+  public TransformFunction getTransformFunction() {
+    return _transformFunction;
+  }
+
+  public DataType getSourceDataType() {
+    return _sourceDataType;
+  }
+
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     switch (_resultMetadata.getDataType()) {
