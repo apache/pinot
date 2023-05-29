@@ -68,9 +68,9 @@ PASS=0
 for i in $(seq 1 2)
 do
   if [ "$JAVA_VER" -gt 11 ] ; then
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
+    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
   else
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
+    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
   fi
   if [ $? -eq 0 ]; then
     PASS=1
