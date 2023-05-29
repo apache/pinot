@@ -344,7 +344,12 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
       { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
-      { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" }
+      { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
+      { "sql": "SELECT i1 = i1, i2 = i2, i1 != i1, i2 != i2, i1 <> i1, i2 <> i2 FROM {tbl}" },
+      { "sql": "SELECT * FROM (SELECT i1 = i2, i2 = i1, i1 != i2, i2 != i1 FROM {tbl})" },
+      { "sql": "SELECT CASE WHEN i1 = i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 = i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT CASE WHEN i1 != i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 != i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT CASE WHEN i1 <> i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 <> i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"}
     ]
   },
   "float_x_numeric_comp": {
