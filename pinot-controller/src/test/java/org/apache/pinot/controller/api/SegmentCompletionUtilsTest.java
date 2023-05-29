@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.api;
 
-import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
