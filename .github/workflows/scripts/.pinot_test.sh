@@ -84,7 +84,7 @@ else
         -pl '!:pinot-json' \
         -pl '!:pinot-segment-uploader-default' \
         -P github-actions,no-integration-tests \
-        -Dcheckstyle.skip -Dspotless.apply.skip -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true \
+        -Dspotless.apply.skip -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true \
          && exit 0 || exit 1
   fi
 fi
