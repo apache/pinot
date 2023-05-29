@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api;
+package org.apache.pinot.core.data.manager.realtime;
 
-import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
