@@ -78,8 +78,10 @@ public class OrderByComparatorFactory {
         for (int i = from; i < to; i++) {
           Comparable v1 = (Comparable) o1[i];
           Comparable v2 = (Comparable) o2[i];
-          if (v1 == null) {
-            return v2 == null ? 0 : nullsMultipliers[i];
+          if (v1 == null && v2 == null) {
+            continue;
+          } else if (v1 == null) {
+            return nullsMultipliers[i];
           } else if (v2 == null) {
             return -nullsMultipliers[i];
           }
