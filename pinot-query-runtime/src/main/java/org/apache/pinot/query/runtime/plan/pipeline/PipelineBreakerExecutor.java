@@ -22,11 +22,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 
@@ -44,7 +46,30 @@ public class PipelineBreakerExecutor {
    *
    * Currently, pipeline breaker executor can only execute mailbox receive pipeline breaker.
    */
-  public static Map<Integer, List<TransferableBlock>> execute(OpChainSchedulerService scheduler,
+  public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
+      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, long timeoutMs, long deadlineMs,
+      long requestId, boolean isTraceEnabled)
+      throws Exception {
+    PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext(
+        DistributedStagePlan.isLeafStage(distributedStagePlan));
+    PipelineBreakerVisitor.visitPlanRoot(distributedStagePlan.getStageRoot(), pipelineBreakerContext);
+    if (pipelineBreakerContext.getPipelineBreakerMap().size() > 0) {
+      PlanNode stageRoot = distributedStagePlan.getStageRoot();
+      // TODO: This PlanRequestContext needs to indicate it is a pre-stage opChain and only listens to pre-stage OpChain
+      //     receive-mail callbacks.
+      // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
+      PhysicalPlanContext physicalPlanContext =
+          new PhysicalPlanContext(mailboxService, requestId, stageRoot.getPlanFragmentId(), timeoutMs, deadlineMs,
+              distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
+      Map<Integer, List<TransferableBlock>> resultMap =
+          PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
+      return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), resultMap);
+    } else {
+      return null;
+    }
+  }
+
+  private static Map<Integer, List<TransferableBlock>> execute(OpChainSchedulerService scheduler,
       PipelineBreakerContext context, PhysicalPlanContext physicalPlanContext)
       throws Exception {
     Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap = new HashMap<>();

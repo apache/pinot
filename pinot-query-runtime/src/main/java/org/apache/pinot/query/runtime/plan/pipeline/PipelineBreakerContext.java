@@ -31,7 +31,12 @@ public class PipelineBreakerContext {
   private final Map<Integer, PlanNode> _pipelineBreakerMap = new HashMap<>();
   private final Map<PlanNode, Integer> _planNodeObjectToIdMap = new HashMap<>();
 
+  private final boolean _isLeafStage;
   private int _currentNodeId = 0;
+
+  public PipelineBreakerContext(boolean isLeafStage) {
+    _isLeafStage = isLeafStage;
+  }
 
   public void addPipelineBreaker(MailboxReceiveNode mailboxReceiveNode) {
     int nodeId = _planNodeObjectToIdMap.get(mailboxReceiveNode);
@@ -49,5 +54,9 @@ public class PipelineBreakerContext {
 
   public Map<Integer, PlanNode> getPipelineBreakerMap() {
     return _pipelineBreakerMap;
+  }
+
+  public boolean isLeafStage() {
+    return _isLeafStage;
   }
 }

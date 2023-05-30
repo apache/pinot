@@ -42,9 +42,7 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
@@ -56,10 +54,8 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
-import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerVisitor;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.query.service.QueryConfig;
@@ -88,14 +84,11 @@ public class QueryRunner {
   private MailboxService _mailboxService;
   private String _hostname;
   private int _port;
-  private VirtualServerAddress _rootServer;
 
   private ExecutorService _queryWorkerIntermExecutorService;
   private ExecutorService _queryWorkerLeafExecutorService;
-  private ExecutorService _queryRunnerExecutorService;
 
-  private OpChainSchedulerService _intermScheduler;
-  private OpChainSchedulerService _leafScheduler;
+  private OpChainSchedulerService _scheduler;
 
   /**
    * Initializes the query executor.
@@ -107,8 +100,6 @@ public class QueryRunner {
     _hostname = instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceName.substring(
         CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
-    // always use 0 for root server ID as all data is processed by one node at the global root
-    _rootServer = new VirtualServerAddress(_hostname, _port, 0);
     _helixManager = helixManager;
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
@@ -117,12 +108,9 @@ public class QueryRunner {
           new NamedThreadFactory("query_intermediate_worker_on_" + _port + "_port"));
       _queryWorkerLeafExecutorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("query_leaf_worker_on_" + _port + "_port"));
-      _queryRunnerExecutorService = Executors.newCachedThreadPool(
-          new NamedThreadFactory("query_runner_on_" + _port + "_port"));
-      _intermScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
+      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
           getQueryWorkerIntermExecutorService());
-      _leafScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), getQueryRunnerExecutorService());
-      _mailboxService = new MailboxService(_hostname, _port, config, _intermScheduler::onDataAvailable);
+      _mailboxService = new MailboxService(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
@@ -135,16 +123,14 @@ public class QueryRunner {
     _helixPropertyStore = _helixManager.getHelixPropertyStore();
     _mailboxService.start();
     _serverExecutor.start();
-    _leafScheduler.startAsync().awaitRunning(30, TimeUnit.SECONDS);
-    _intermScheduler.startAsync().awaitRunning(30, TimeUnit.SECONDS);
+    _scheduler.startAsync().awaitRunning(30, TimeUnit.SECONDS);
   }
 
   public void shutDown()
       throws TimeoutException {
     _serverExecutor.shutDown();
     _mailboxService.shutdown();
-    _leafScheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
-    _intermScheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
+    _scheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
   }
 
   /**
@@ -160,19 +146,28 @@ public class QueryRunner {
     boolean isTraceEnabled =
         Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
+
+    // run pre-stage execution for all pipeline breakers
+    PipelineBreakerResult pipelineBreakerResult;
+    try {
+      pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService,
+          distributedStagePlan, timeoutMs, deadlineMs, requestId, isTraceEnabled);
+    } catch (Exception e) {
+      LOGGER.error("Error executing pre-stage pipeline breaker for: {}:{}", requestId,
+          distributedStagePlan.getStageId(), e);
+      _scheduler.cancel(requestId);
+      throw e;
+    }
+
     // run OpChain
-    if (isLeafStage(distributedStagePlan)) {
+    if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
       try {
-        // pre-stage execution for all pipeline breakers
-        // TODO: pipeline breaker is now only supported by leaf stage, next to be supported by all OpChain
-        PipelineBreakerResult pipelineBreakerResult = executePipelineBreakers(_leafScheduler, distributedStagePlan,
-            timeoutMs, deadlineMs, requestId, isTraceEnabled);
         OpChain rootOperator = compileLeafStage(distributedStagePlan, requestMetadataMap, pipelineBreakerResult,
             timeoutMs, deadlineMs, requestId);
-        _leafScheduler.register(rootOperator);
+        _scheduler.register(rootOperator);
       } catch (Exception e) {
         LOGGER.error("Error executing leaf stage for: {}:{}", requestId, distributedStagePlan.getStageId(), e);
-        _leafScheduler.cancel(requestId);
+        _scheduler.cancel(requestId);
         throw e;
       }
     } else {
@@ -181,39 +176,17 @@ public class QueryRunner {
         OpChain rootOperator = PhysicalPlanVisitor.walkPlanNode(stageRoot,
             new PhysicalPlanContext(_mailboxService, requestId, stageRoot.getPlanFragmentId(), timeoutMs, deadlineMs,
                 distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled));
-        _intermScheduler.register(rootOperator);
+        _scheduler.register(rootOperator);
       } catch (Exception e) {
         LOGGER.error("Error executing intermediate stage for: {}:{}", requestId, distributedStagePlan.getStageId(), e);
-        _leafScheduler.cancel(requestId);
+        _scheduler.cancel(requestId);
         throw e;
       }
     }
   }
 
-  private PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
-      DistributedStagePlan distributedStagePlan, long timeoutMs, long deadlineMs, long requestId,
-      boolean isTraceEnabled)
-      throws Exception {
-    PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
-    PipelineBreakerVisitor.visitPlanRoot(distributedStagePlan.getStageRoot(), pipelineBreakerContext);
-    if (pipelineBreakerContext.getPipelineBreakerMap().size() > 0) {
-      PlanNode stageRoot = distributedStagePlan.getStageRoot();
-      // TODO: This PlanRequestContext needs to indicate it is a pre-stage opChain and only listens to pre-stage OpChain
-      //     receive-mail callbacks.
-      // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
-      PhysicalPlanContext physicalPlanContext =
-          new PhysicalPlanContext(_mailboxService, requestId, stageRoot.getPlanFragmentId(), timeoutMs, deadlineMs,
-              distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
-      Map<Integer, List<TransferableBlock>> resultMap =
-          PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
-      return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), resultMap);
-    } else {
-      return null;
-    }
-  }
-
   public void cancel(long requestId) {
-    _intermScheduler.cancel(requestId);
+    _scheduler.cancel(requestId);
   }
 
   @VisibleForTesting
@@ -224,10 +197,6 @@ public class QueryRunner {
   @VisibleForTesting
   public ExecutorService getQueryWorkerIntermExecutorService() {
     return _queryWorkerIntermExecutorService;
-  }
-
-  public ExecutorService getQueryRunnerExecutorService() {
-    return _queryRunnerExecutorService;
   }
 
   private OpChain compileLeafStage(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap,
@@ -304,11 +273,5 @@ public class QueryRunner {
       result = errorResponse;
     }
     return result;
-  }
-
-  private boolean isLeafStage(DistributedStagePlan distributedStagePlan) {
-    WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
-    Map<String, List<String>> segments = WorkerMetadata.getTableSegmentsMap(workerMetadata);
-    return segments != null && segments.size() > 0;
   }
 }

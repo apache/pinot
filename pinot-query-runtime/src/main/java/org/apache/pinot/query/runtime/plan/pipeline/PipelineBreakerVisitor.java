@@ -42,7 +42,9 @@ public class PipelineBreakerVisitor extends DefaultPostOrderTraversalVisitor<Voi
     process(node, context);
     // TODO: actually implement pipeline breaker attribute in PlanNode
     // currently all mailbox receive node from leaf stage is considered as pipeline breaker node.
-    context.addPipelineBreaker(node);
+    if (context.isLeafStage()) {
+      context.addPipelineBreaker(node);
+    }
     return null;
   }
 }
