@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,8 @@ public class SegmentCompletionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionUtils.class);
   // Used to create temporary segment file names
   private static final String TMP = ".tmp.";
+  private static final Pattern TMP_FILE = Pattern.compile(
+      "\\.tmp\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 
   /**
    * Takes in a segment name, and returns a file name prefix that is used to store all attempted uploads of this
@@ -43,5 +46,9 @@ public class SegmentCompletionUtils {
 
   public static String generateSegmentFileName(String segmentNameStr) {
     return getSegmentNamePrefix(segmentNameStr) + UUID.randomUUID().toString();
+  }
+
+  public static boolean isTmpFile(String uri) {
+    return TMP_FILE.matcher(uri).find();
   }
 }
