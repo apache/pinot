@@ -236,9 +236,6 @@ jobs:
       matrix:
         java: [ 11, 17, 20 ]
         distribution: [ "temurin" ]
-        include:
-          - java: 8
-            distribution: "adopt"
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v3
@@ -266,29 +263,6 @@ jobs:
     name: Build Presto Pinot Driver
     steps:
       - uses: actions/checkout@v3
-# Removed temporally given that sun.misc.Unsafe cannot be used from Java 11 with --release 8
-#      - name: Set up JDK 11
-#        uses: actions/setup-java@v3
-#        with:
-#          java-version: 11
-#          distribution: 'adopt'
-#          cache: 'maven'
-#      - name: Build presto pinot driver with JDK 11
-#        env:
-#          MAVEN_OPTS: >
-#            -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-#            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-#            -XX:+IgnoreUnrecognizedVMOptions
-#            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
-#            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-#            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
-#            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
-#            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-#            --add-exports=java.base/java.nio=ALL-UNNAMED
-#            --add-exports=java.base/java.misc=ALL-UNNAMED
-#            --add-exports=java.base/sun.nio.ch=ALL-UNNAMED
-#        run: |
-#          mvn clean install -DskipTests -Ppresto-driver -am -B -pl ':presto-pinot-driver' -T 16 || exit 1
       - name: Set up JDK 8
         uses: actions/setup-java@v3
         with:
