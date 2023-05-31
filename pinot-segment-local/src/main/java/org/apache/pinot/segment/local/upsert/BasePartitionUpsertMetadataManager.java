@@ -306,9 +306,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // Allow persisting valid doc ids snapshot after metadata manager is stopped
     MutableRoaringBitmap validDocIds =
         segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap() : null;
-    if (_enableSnapshot && segment instanceof ImmutableSegmentImpl) {
-      ((ImmutableSegmentImpl) segment).persistValidDocIdsSnapshot(validDocIds);
-    }
     if (validDocIds == null || validDocIds.isEmpty()) {
       _logger.info("Skip removing segment without valid docs: {}", segmentName);
       return;

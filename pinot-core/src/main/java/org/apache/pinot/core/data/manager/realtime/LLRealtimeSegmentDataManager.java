@@ -47,7 +47,9 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
@@ -56,6 +58,7 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -97,6 +100,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMod
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -232,7 +236,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // consuming.
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
-  private final BooleanSupplier _isReadyToConsumeData;
+  private BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
@@ -1071,6 +1075,21 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
       _partitionGroupConsumerSemaphore.release();
     }
+    if (_tableConfig.getUpsertConfig().isEnableSnapshot()) {
+      // block ingestion for new consuming segments
+      _isReadyToConsumeData = () -> false;
+      // persist snapshot for all sealed segments
+      List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
+      for (SegmentDataManager segmentDataManager: allSegments) {
+        if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
+          MutableRoaringBitmap validDocIds = new MutableRoaringBitmap();
+          if (segmentDataManager.getSegment().getValidDocIds() != null) {
+            validDocIds = segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
+          }
+          ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+        }
+      }
+    }
   }
 
   private void closePartitionGroupConsumer() {
@@ -1272,7 +1291,47 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected void startConsumerThread() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
+    if (_tableConfig.getUpsertConfig().isEnableSnapshot()) {
+      _isReadyToConsumeData = new BooleanSupplier() {
+        volatile boolean _allSnapshotPersisted;
+        long _lastCheckTimeMs;
+
+        @Override
+        public boolean getAsBoolean() {
+          if (_allSnapshotPersisted) {
+            return true;
+          } else {
+            synchronized (this) {
+              if (_allSnapshotPersisted) {
+                return true;
+              }
+              long currentTimeMs = System.currentTimeMillis();
+              if (currentTimeMs - _lastCheckTimeMs
+                  <= RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
+                return false;
+              }
+              _lastCheckTimeMs = currentTimeMs;
+              _allSnapshotPersisted = checkAllSnapshotPersisted();
+              return _allSnapshotPersisted;
+            }
+          }
+        }
+      };
+    }
     _consumerThread.start();
+  }
+
+  private boolean checkAllSnapshotPersisted() {
+    List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
+    for (SegmentDataManager segmentDataManager : allSegments) {
+      if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
+        File file = ((ImmutableSegmentImpl) segmentDataManager.getSegment()).getValidDocIdsSnapshotFile();
+        if (!file.exists()) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   /**
