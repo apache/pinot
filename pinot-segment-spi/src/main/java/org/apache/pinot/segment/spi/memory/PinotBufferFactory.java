@@ -29,7 +29,6 @@ public interface PinotBufferFactory {
 
   default PinotDataBuffer readFile(File file, long offset, long size, ByteOrder byteOrder)
       throws IOException {
-    // TODO: Shouldn't we allocate size - offset instead of size?
     PinotDataBuffer buffer = allocateDirect(size, byteOrder);
     buffer.readFrom(0, file, offset, size);
     return buffer;
