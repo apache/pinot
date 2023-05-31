@@ -215,6 +215,13 @@ public class NormalizedDateSegmentNameGeneratorTest {
         "myTable_1970-01-02_1970-01-04");
     assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, "1970-01-02", "1970-01-04"),
         "myTable_1970-01-02_1970-01-04_1");
+
+    // The following date time format will work with Joda time library and not java.text
+    segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, false, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
+            DateTimeFormatSpec.forSimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSSZ"), null);
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, "2023-01-01T12:00:00.111111111Z",
+        "2023-01-02T12:00:00.111111111Z"), "myTable_2023-01-01_2023-01-02_1");
   }
 
   @Test
