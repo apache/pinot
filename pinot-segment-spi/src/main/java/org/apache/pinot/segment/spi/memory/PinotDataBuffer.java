@@ -194,8 +194,9 @@ public abstract class PinotDataBuffer implements Closeable {
     if (factoryClassName != null) {
       _defaultFactory = createFactory(factoryClassName, prioritizeByteBuffer);
     } else {
-      LOGGER.info("No custom Pinot buffer factory class found in configuration. Using default factory");
-      _defaultFactory = createDefaultFactory();
+      LOGGER.info("No custom Pinot buffer factory class found in configuration. Using default factory with "
+          + "prioritize bytebuffer = {}", prioritizeByteBuffer);
+      _defaultFactory = createDefaultFactory(prioritizeByteBuffer);
     }
   }
 
