@@ -212,11 +212,10 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case LONG:
         fillLongResultArray(valueBlock, leftFloatValues, length);
         break;
+      //handling Float & double comparisons, avoiding CAST transformation.
       case FLOAT:
-        fillFloatResultArray(valueBlock, leftFloatValues, length);
-        break;
       case DOUBLE:
-        fillDoubleResultArray(valueBlock, leftFloatValues, length);
+        fillFloatDoubleResultArray(valueBlock, leftFloatValues, length);
         break;
       case BIG_DECIMAL:
         fillBigDecimalResultArray(valueBlock, leftFloatValues, length);
@@ -421,19 +420,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  private void fillFloatResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
-    // handling float double comparison, skipping the right CAST function and evaluate the result.
-    if (handleFloatDoubleComparison(valueBlock, leftValues, length)) {
-      return;
-    }
-
-    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(valueBlock);
-    for (int i = 0; i < length; i++) {
-      _intValuesSV[i] = getIntResult(Float.compare(leftValues[i], rightFloatValues[i]));
-    }
-  }
-
-  private void fillDoubleResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+  private void fillFloatDoubleResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
     double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
@@ -585,21 +572,5 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       default:
         throw new IllegalStateException();
     }
-  }
-
-  private boolean handleFloatDoubleComparison(ValueBlock valueBlock, float[] leftValues, int length) {
-    // checking if the rightTransformationFunction is 'Cast'
-    // and rightStoredType DataType is 'FLOAT'
-    // and sourceDataType for rightTransformationFunction is 'Double'
-    if (_rightTransformFunction instanceof CastTransformFunction
-        && ((CastTransformFunction) _rightTransformFunction).getSourceDataType().equals(DataType.DOUBLE)) {
-      double[] rightDoubleValues = ((CastTransformFunction) _rightTransformFunction).getTransformFunction()
-          .transformToDoubleValuesSV(valueBlock);
-      for (int i = 0; i < length; i++) {
-        _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
-      }
-      return true;
-    }
-    return false;
   }
 }

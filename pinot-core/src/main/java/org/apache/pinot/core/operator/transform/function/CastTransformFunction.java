@@ -104,14 +104,6 @@ public class CastTransformFunction extends BaseTransformFunction {
     return _resultMetadata;
   }
 
-  public TransformFunction getTransformFunction() {
-    return _transformFunction;
-  }
-
-  public DataType getSourceDataType() {
-    return _sourceDataType;
-  }
-
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     switch (_resultMetadata.getDataType()) {
@@ -195,7 +187,9 @@ public class CastTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() == DataType.DOUBLE) {
+    DataType storedDataType = _resultMetadata.getDataType().getStoredType();
+    // Allowing FLOAT for handling float-double comparison, avoiding CAST.
+    if (storedDataType == DataType.DOUBLE || storedDataType == DataType.FLOAT) {
       return _transformFunction.transformToDoubleValuesSV(valueBlock);
     } else {
       return super.transformToDoubleValuesSV(valueBlock);
