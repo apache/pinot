@@ -120,6 +120,9 @@ public enum AggregationFunctionType {
   SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch"),
   AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch"),
 
+  FREQUENTSTRINGSSKETCH("frequentStringsSketch"),
+  FREQUENTLONGSSKETCH("frequentLongsSketch"),
+
   // Geo aggregation functions
   STUNION("STUnion"),
 

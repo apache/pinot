@@ -353,6 +353,10 @@ public class AggregationFunctionFactory {
                 "Aggregation function: " + function + " is only supported in selection without alias.");
           case FUNNELCOUNT:
             return new FunnelCountAggregationFunction(arguments);
+          case FREQUENTSTRINGSSKETCH:
+            return new FrequentStringsSketchAggregationFunction(arguments);
+          case FREQUENTLONGSSKETCH:
+            return new FrequentLongsSketchAggregationFunction(arguments);
 
           default:
             throw new IllegalArgumentException();
