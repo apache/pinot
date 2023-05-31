@@ -72,8 +72,8 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
     if (node.isSortOnReceiver()) {
       SortedMailboxReceiveOperator sortedMailboxReceiveOperator =
           new SortedMailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
-              node.getDataSchema(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
-              node.getSenderStageId());
+              node.getDataSchema(), node.getCollationKeys(), node.getCollationDirections(),
+              node.getCollationNullDirections(), node.isSortOnSender(), node.getSenderStageId());
       context.addReceivingMailboxIds(sortedMailboxReceiveOperator.getMailboxIds());
       return sortedMailboxReceiveOperator;
     } else {
@@ -167,7 +167,8 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     boolean isInputSorted = nextOperator instanceof SortedMailboxReceiveOperator;
     return new SortOperator(context.getOpChainExecutionContext(), nextOperator, node.getCollationKeys(),
-        node.getCollationDirections(), node.getFetch(), node.getOffset(), node.getDataSchema(), isInputSorted);
+        node.getCollationDirections(), node.getCollationNullDirections(), node.getFetch(), node.getOffset(),
+        node.getDataSchema(), isInputSorted);
   }
 
   @Override

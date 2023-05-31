@@ -108,8 +108,7 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
-            stagePlan.getServer(), stagePlan.getStageMetadata(), pinotQuery, tableType, timeBoundaryInfo,
-            traceEnabled);
+            stagePlan.getServer(), stagePlan.getStageMetadata(), pinotQuery, tableType, timeBoundaryInfo, traceEnabled);
 
     // visit the plan and create query physical plan.
     ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);
@@ -232,16 +231,15 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
+    PinotQuery pinotQuery = context.getPinotQuery();
     if (node.getCollationKeys().size() > 0) {
-      context.getPinotQuery().setOrderByList(
-          CalciteRexExpressionParser.convertOrderByList(node.getCollationKeys(), node.getCollationDirections(),
-              context.getPinotQuery()));
+      pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(node, pinotQuery));
     }
     if (node.getFetch() > 0) {
-      context.getPinotQuery().setLimit(node.getFetch());
+      pinotQuery.setLimit(node.getFetch());
     }
     if (node.getOffset() > 0) {
-      context.getPinotQuery().setOffset(node.getOffset());
+      pinotQuery.setOffset(node.getOffset());
     }
     return null;
   }
