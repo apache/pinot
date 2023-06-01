@@ -782,6 +782,38 @@ public class SegmentPreProcessorTest {
   }
 
   /**
+   * Test to check if text index creation skipped if SKIP_EXISTING_SEGMENTS set to true
+   * @throws Exception
+   */
+  @Test
+  public void testSkipTextIndexCreationOnExistingSegmentForRawColumn()
+      throws Exception {
+    Set<String> textIndexColumns = new HashSet<>();
+    textIndexColumns.add(EXISTING_STRING_COL_RAW);
+    _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
+    Map<String, Map<String, String>> columnProperties = _indexLoadingConfig.getColumnProperties();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("skipExistingSegments", "true");
+    columnProperties.put(EXISTING_STRING_COL_RAW, properties);
+
+    // Create a segment in V3, enable text index on existing column
+    constructV3Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
+    assertNotNull(columnMetadata);
+
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(),
+            new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, _schema)) {
+      processor.process();
+      try (SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+        assertFalse(reader.hasIndexFor(EXISTING_STRING_COL_RAW, ColumnIndexType.TEXT_INDEX));
+      }
+    }
+  }
+
+  /**
    * Test to check text index creation during segment load after text index
    * creation is enabled on an existing dictionary encoded column.
    * This will exercise the SegmentPreprocessor code path during segment load
