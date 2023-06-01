@@ -123,7 +123,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
             fileFormat);
       }
       return RecordReaderFactory.getRecordReaderByClass(recordReaderClassName, dataFile, sourceFields,
-          segmentGeneratorConfig.getReaderConfig());
+          segmentGeneratorConfig.getReaderConfig(), false);
     }
 
     // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)

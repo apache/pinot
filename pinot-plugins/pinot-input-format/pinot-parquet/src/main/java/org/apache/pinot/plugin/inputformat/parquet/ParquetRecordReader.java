@@ -62,7 +62,8 @@ public class ParquetRecordReader implements RecordReader {
   }
 
   @Override
-  public boolean hasNext() {
+  public boolean hasNext()
+      throws IOException {
     return _internalParquetRecordReader.hasNext();
   }
 

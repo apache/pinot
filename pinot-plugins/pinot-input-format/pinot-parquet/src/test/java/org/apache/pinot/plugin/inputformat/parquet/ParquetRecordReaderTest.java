@@ -33,6 +33,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.LazyRecordReader;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -41,8 +42,6 @@ import org.testng.annotations.Test;
 public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   private final File _testParquetFileWithInt96AndDecimal =
       new File(getClass().getClassLoader().getResource("test-file-with-int96-and-decimal.snappy.parquet").getFile());
-
-  private static final int NUM_RECORDS_TEST_PARQUET_WITH_INT96 = 1965;
 
   @Override
   protected RecordReader createRecordReader(File file)
@@ -83,6 +82,11 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     ParquetAvroRecordReader avroRecordReader = new ParquetAvroRecordReader();
     avroRecordReader.init(_dataFile, null, new ParquetRecordReaderConfig());
     testReadParquetFile(avroRecordReader, SAMPLE_RECORDS_SIZE);
+
+    // Test the lazy reader. It should be exactly the same as regular reader
+    RecordReader lazyReader = new LazyRecordReader(avroRecordReader, _dataFile, null,
+        new ParquetRecordReaderConfig());
+    testReadParquetFile(lazyReader, SAMPLE_RECORDS_SIZE);
   }
 
   private void testReadParquetFile(RecordReader reader, int totalRecords)

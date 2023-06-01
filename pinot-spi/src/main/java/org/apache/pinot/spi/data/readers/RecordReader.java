@@ -47,7 +47,8 @@ public interface RecordReader extends Closeable, Serializable {
   /**
    * Return <code>true</code> if more records remain to be read.
    */
-  boolean hasNext();
+  boolean hasNext()
+      throws IOException;
 
   /**
    * Get the next record.

@@ -136,6 +136,7 @@ public class SegmentMapper {
 
         reuse.clear();
       }
+      recordReader.close();
     }
 
     for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {

@@ -142,11 +142,21 @@ public class RecordReaderFactory {
    * Constructs and initializes a RecordReader based on the given RecordReader class name and config.
    */
   public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile,
-      Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+      Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig, boolean lazy)
       throws Exception {
     RecordReader recordReader = PluginManager.get().createInstance(recordReaderClassName);
-    recordReader.init(dataFile, fieldsToRead, recordReaderConfig);
-    return recordReader;
+    if (lazy) {
+      return new LazyRecordReader(recordReader, dataFile, fieldsToRead, recordReaderConfig);
+    } else {
+      recordReader.init(dataFile, fieldsToRead, recordReaderConfig);
+      return recordReader;
+    }
+  }
+
+  public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile,
+      Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+      throws Exception {
+    return getRecordReaderByClass(recordReaderClassName, dataFile, fieldsToRead, recordReaderConfig, false);
   }
 
   /**
@@ -155,20 +165,20 @@ public class RecordReaderFactory {
   public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
       @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
-    return getRecordReader(fileFormat.name(), dataFile, fieldsToRead, recordReaderConfig);
+    return getRecordReader(fileFormat.name(), dataFile, fieldsToRead, recordReaderConfig, false);
   }
 
   /**
    * Constructs and initializes a RecordReader based on the given file format and RecordReader config.
    */
   public static RecordReader getRecordReader(String fileFormat, File dataFile, Set<String> fieldsToRead,
-      @Nullable RecordReaderConfig recordReaderConfig)
+      @Nullable RecordReaderConfig recordReaderConfig, boolean lazy)
       throws Exception {
     String recordReaderClassName = DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormat.toUpperCase());
     if (recordReaderClassName == null) {
       throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
     }
-    return getRecordReaderByClass(recordReaderClassName, dataFile, fieldsToRead, recordReaderConfig);
+    return getRecordReaderByClass(recordReaderClassName, dataFile, fieldsToRead, recordReaderConfig, lazy);
   }
 
   /**
