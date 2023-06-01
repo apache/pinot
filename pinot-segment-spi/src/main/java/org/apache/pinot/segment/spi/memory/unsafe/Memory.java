@@ -19,10 +19,34 @@
 package org.apache.pinot.segment.spi.memory.unsafe;
 
 import java.io.Closeable;
+import java.io.IOException;
 
 
+/**
+ * A representation of some offheap memory previously allocated. This is mainly an address, a size and a way to
+ * release it.
+ */
 public interface Memory extends Closeable {
+   /**
+    * The virtual address where the memory starts.
+    */
    long getAddress();
+
+   /**
+    * The number of bytes that can be accessed starting from {@link #getAddress()}.
+    */
    long getSize();
+
+   /**
+    * If the memory is backed by a file (like in a memory map file) it syncs the content between the memory and the
+    * disk. Otherwise it does nothing.
+    */
    void flush();
+
+   /**
+    * Close this object, releasing the reserved memory.
+    */
+   @Override
+   void close()
+       throws IOException;
 }

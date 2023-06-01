@@ -23,6 +23,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A {@link Memory} that is anonymous and therefore there it is not backed by any file.
+ */
 public class DirectMemory implements Memory {
   private static final Logger LOGGER = LoggerFactory.getLogger(DirectMemory.class);
 

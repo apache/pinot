@@ -24,6 +24,14 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 
+/**
+ * A utility class used to allocate a ByteBuffer pointing to an already used address in memory.
+ *
+ * This feature is used internally by the JVM but there is no way to directly call these internal methods from user Java
+ * code. By using reflection, this class let us call these methods. Given that these methods are private, they may
+ * change from JVM to JVM and in fact they do. Therefore this class tries several methods that we know that exists in
+ * different JVM versions.
+ */
 public class ByteBufferUtil {
 
   private static final ByteBufferCreator CREATOR;

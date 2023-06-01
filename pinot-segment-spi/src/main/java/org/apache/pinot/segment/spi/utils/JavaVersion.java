@@ -23,6 +23,9 @@ import net.openhft.chronicle.core.Jvm;
 
 public class JavaVersion {
 
+  /**
+   * Returns the major Java version (ie 6, 8, 11, 15, 21, etc)
+   */
   public static final int VERSION;
 
   static {

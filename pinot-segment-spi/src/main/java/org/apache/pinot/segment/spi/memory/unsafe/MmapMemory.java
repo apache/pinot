@@ -37,15 +37,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A {@link Memory} that whose bytes are mapped on a file.
+ */
 public class MmapMemory implements Memory {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapMemory.class);
 
   private static final MapFun MAP_FUN;
 
   /**
-   * The address actually mapped. It has to be page aligned.
+   * The address that correspond to the offset given at creation time.
    *
-   * {@code _address = _offset - offset % pageSize}
+   * The actual mapping address may be smaller than this value, as usually memory map must start on an address that is
+   * page aligned.
    */
   private final long _address;
   /**
@@ -147,6 +151,11 @@ public class MmapMemory implements Memory {
     }
   }
 
+  /**
+   * This is a factory method that can be used to create {@link MapSection}s.
+   *
+   * Each JVM may provide different method to map files in memory.
+   */
   interface MapFun {
 
     /**
@@ -225,17 +234,20 @@ public class MmapMemory implements Memory {
   }
 
   /**
-   * A {@link MapFun} that actually delegates into a map0 native method included in pre 19 Java releases.
-   *
-   * Unlike normal map methods, map0 actually has some low level requirements. For example, the offset must be page
-   * aligned.
+   * As defined by POSIX, the map0 method requires that the offset is page aligned. Failing to do that may produce
+   * segfault errors. This interface is a {@link MapFun} that does some sanitation before calling the map method.
+   * They include:
+   * <ul>
+   *   <li>Grow the file if the last mapped byte is larger than the file length.</li>
+   *   <li>Align the offset with the previous page. This means that we need to correct the actual mapped address.</li>
+   * </ul>
    */
   interface Map0Fun extends MapFun {
 
     /**
-     * @param offset It has to be a positive value that is page aligned.
+     * @param pageAlignedOffset It has to be a positive value that is page aligned.
      */
-    MapSection map0(FileChannel fc, boolean readOnly, long offset, long size)
+    MapSection map0(FileChannel fc, boolean readOnly, long pageAlignedOffset, long size)
         throws InvocationTargetException, IllegalAccessException, IOException;
 
     default MapSection map(File file, boolean readOnly, long offset, long size) throws IOException {
@@ -258,11 +270,9 @@ public class MmapMemory implements Memory {
           // If file size is smaller than the specified size, extend the file size
           raf.seek(offset + size - 1);
           raf.write(0);
-          //logger.trace(s"extend file size to ${fc.size}")
         }
         long mapPosition = offset - pagePosition;
         long mapSize = size + pagePosition;
-        // A workaround for the error when calling fc.map(MapMode.READ_WRITE, offset, size) with size more than 2GB
 
         MapSection map0Section = map0(fc, readOnly, mapPosition, mapSize);
         return new MapSection(map0Section.getAddress() + pagePosition, map0Section.getUnmapFun());
@@ -285,17 +295,22 @@ public class MmapMemory implements Memory {
       };
     }
 
+    /**
+     * Instead of looking for the correct map method by our self, this finder delegates on
+     * {@link OS#map(FileChannel, FileChannel.MapMode, long, long)} and {@link OS#unmap(long, long)}, which internally
+     * does the same thing.
+     */
     class ChronicleCore implements Finder<Map0Fun> {
       @Override
       public Map0Fun tryFind() {
         OS.mapAlignment();
-        return (fc, readOnly, offset, size) -> {
+        return (fc, readOnly, pageAlignedOffset, size) -> {
           if (size == 0) {
             return MapSection.EMPTY;
           }
           FileChannel.MapMode mapMode = readOnly ? FileChannel.MapMode.READ_ONLY : FileChannel.MapMode.READ_WRITE;
           long alignedSize = OS.pageAlign(size);
-          long address = OS.map(fc, mapMode, offset, alignedSize);
+          long address = OS.map(fc, mapMode, pageAlignedOffset, alignedSize);
           return new MapSection(address, () -> {
             try {
               OS.unmap(address, alignedSize);
@@ -319,11 +334,11 @@ public class MmapMemory implements Memory {
 
         BiConsumer<Long, Long> unmap0 = tryFindUnmapper();
 
-        return (fc, readOnly, offset, size) -> {
+        return (fc, readOnly, pageAlignedOffset, size) -> {
           // see FileChannelImpl.MAP_RO and MAP_RW
           int iMode = readOnly ? 0 : 1;
 
-          long address = (long) mapMethod.invoke(fc, iMode, offset, size);
+          long address = (long) mapMethod.invoke(fc, iMode, pageAlignedOffset, size);
 
           UnmapFun unmapFun = () -> unmap0.accept(address, size);
 
@@ -345,10 +360,10 @@ public class MmapMemory implements Memory {
 
         BiConsumer<Long, Long> unmap0 = tryFindUnmapper();
 
-        return (fc, readOnly, offset, size) -> {
+        return (fc, readOnly, pageAlignedOffset, size) -> {
           // see FileChannelImpl.MAP_RO and MAP_RW
           int iMode = readOnly ? 0 : 1;
-          long address = (long) mapMethod.invoke(fc, iMode, offset, size, false);
+          long address = (long) mapMethod.invoke(fc, iMode, pageAlignedOffset, size, false);
 
           UnmapFun unmapFun = () -> unmap0.accept(address, size);
 
