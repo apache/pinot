@@ -371,16 +371,6 @@ public abstract class PinotDataBuffer implements Closeable {
     }
   }
 
-  @Override
-  protected void finalize()
-      throws Throwable {
-    if (_closeable) {
-      LOGGER.warn("Buffer of class " + getClass() + " with size " + size() + " wasn't explicitly closed");
-      close();
-    }
-    super.finalize();
-  }
-
   public byte getByte(int offset) {
     return getByte((long) offset);
   }
