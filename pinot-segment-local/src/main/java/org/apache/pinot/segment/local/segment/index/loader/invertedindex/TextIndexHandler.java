@@ -38,6 +38,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -146,7 +147,10 @@ public class TextIndexHandler extends BaseIndexHandler {
     if (columnMetadata != null) {
       // Fail fast upon unsupported operations.
       checkUnsupportedOperationsForTextIndex(columnMetadata);
-      return true;
+
+      // Create text index only for those segments that are created within recent time-window
+      return _segmentMetadata == null
+          || _segmentMetadata.getIndexCreationTime() >= Instant.now().minusSeconds(3600).toEpochMilli();
     }
     return false;
   }
