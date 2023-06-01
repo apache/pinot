@@ -1276,47 +1276,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected void startConsumerThread() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
-    if (_tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig().isEnableSnapshot()) {
-      _isReadyToConsumeData = new BooleanSupplier() {
-        volatile boolean _allSnapshotPersisted;
-        long _lastCheckTimeMs;
-
-        @Override
-        public boolean getAsBoolean() {
-          if (_allSnapshotPersisted) {
-            return true;
-          } else {
-            synchronized (this) {
-              if (_allSnapshotPersisted) {
-                return true;
-              }
-              long currentTimeMs = System.currentTimeMillis();
-              if (currentTimeMs - _lastCheckTimeMs
-                  <= RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
-                return false;
-              }
-              _lastCheckTimeMs = currentTimeMs;
-              _allSnapshotPersisted = checkAllSnapshotPersisted();
-              return _allSnapshotPersisted;
-            }
-          }
-        }
-      };
-    }
     _consumerThread.start();
-  }
-
-  private boolean checkAllSnapshotPersisted() {
-    List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
-    for (SegmentDataManager segmentDataManager : allSegments) {
-      if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
-        File file = ((ImmutableSegmentImpl) segmentDataManager.getSegment()).getValidDocIdsSnapshotFile();
-        if (!file.exists()) {
-          return false;
-        }
-      }
-    }
-    return true;
   }
 
   /**
@@ -1473,10 +1433,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _partitionGroupConsumerSemaphore.acquire();
       _acquiredConsumerSemaphore.set(true);
       if (_tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig().isEnableSnapshot()) {
-        // block ingestion for new consuming segments
-        _isReadyToConsumeData = () -> false;
         // persist snapshot for all sealed segments
-        // TODO: Use a semaphore to guarantee all the segments are sealed before peristing snapshot.
+        // TODO: Use a semaphore to guarantee all the segments are sealed before persisting snapshot.
         List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
         for (SegmentDataManager segmentDataManager: allSegments) {
           if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
