@@ -33,9 +33,12 @@ import net.openhft.chronicle.core.OS;
 import net.openhft.posix.MSyncFlag;
 import net.openhft.posix.PosixAPI;
 import org.apache.pinot.segment.spi.utils.JavaVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MmapMemory implements Memory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MmapMemory.class);
 
   private static final MapFun MAP_FUN;
 
@@ -58,6 +61,7 @@ public class MmapMemory implements Memory {
    */
   private final long _size;
   private final MapSection _section;
+  private boolean _closed = false;
 
   static {
     try {
@@ -100,10 +104,27 @@ public class MmapMemory implements Memory {
   public void close()
       throws IOException {
     try {
-      _section._unmapFun.unmap();
+      if (!_closed) {
+        synchronized (this) {
+          if (!_closed) {
+            _section._unmapFun.unmap();
+            _closed = true;
+          }
+        }
+      }
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new RuntimeException("Error while calling unmap", e);
     }
+  }
+
+  @Override
+  protected void finalize()
+      throws Throwable {
+    if (!_closed) {
+      LOGGER.warn("Mmap section of " + _size + " wasn't explicitly closed");
+      close();
+    }
+    super.finalize();
   }
 
   private static class MapSection {

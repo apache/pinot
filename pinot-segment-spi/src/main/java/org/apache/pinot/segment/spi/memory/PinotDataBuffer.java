@@ -342,7 +342,7 @@ public abstract class PinotDataBuffer implements Closeable {
             DIRECT_BUFFER_USAGE.get(), MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
   }
 
-  private boolean _closeable;
+  private volatile boolean _closeable;
 
   protected PinotDataBuffer(boolean closeable) {
     _closeable = closeable;
@@ -369,6 +369,16 @@ public abstract class PinotDataBuffer implements Closeable {
       }
       _closeable = false;
     }
+  }
+
+  @Override
+  protected void finalize()
+      throws Throwable {
+    if (_closeable) {
+      LOGGER.warn("Buffer of class " + getClass() + " with size " + size() + " wasn't explicitly closed");
+      close();
+    }
+    super.finalize();
   }
 
   public byte getByte(int offset) {
