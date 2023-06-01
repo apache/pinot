@@ -776,7 +776,7 @@ public class BrokerRequestToQueryContextConverterTest {
 
   @Test
   void testDistinctOrderByNullsLast() {
-    String query = "SELECT A FROM testTable ORDER BY A NULLS LAST";
+    String query = "SELECT DISTINCT A FROM testTable ORDER BY A NULLS LAST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
