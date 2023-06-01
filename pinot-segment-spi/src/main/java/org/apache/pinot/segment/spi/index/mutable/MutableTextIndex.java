@@ -18,10 +18,22 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
-public interface MutableTextIndex extends TextIndexReader {
+public interface MutableTextIndex extends TextIndexReader, MutableIndex {
+  @Override
+  default void add(@Nonnull Object value, int dictId, int docId) {
+    add((String) value);
+  }
+
+  @Override
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+    throw new UnsupportedOperationException("Mutable text indexes are not supported for multi-valued columns");
+  }
+
   /**
    * Index the document
    * @param document the document as a string

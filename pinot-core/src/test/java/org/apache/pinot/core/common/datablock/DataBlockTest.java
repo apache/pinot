@@ -135,10 +135,7 @@ public class DataBlockTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT_ARRAY});
 
     DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    try {
-      DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataBlock.toBytes())).getIntArray(0, 0);
-    } catch (Exception e) {
-      Assert.assertTrue(e.toString().contains("java.lang.NullPointerException"));
-    }
+    int[] intArray = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataBlock.toBytes())).getIntArray(0, 0);
+    Assert.assertEquals(intArray.length, 0);
   }
 }

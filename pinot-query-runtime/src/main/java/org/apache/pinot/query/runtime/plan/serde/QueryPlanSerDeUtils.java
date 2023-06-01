@@ -24,43 +24,50 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 
 
 /**
  * This utility class serialize/deserialize between {@link Worker.StagePlan} elements to Planner elements.
  */
 public class QueryPlanSerDeUtils {
+  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
+      "(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)");
 
   private QueryPlanSerDeUtils() {
     // do not instantiate.
   }
 
-  public static DistributedStagePlan deserialize(Worker.StagePlan stagePlan) {
-    DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
-    distributedStagePlan.setServer(protoToAddress(stagePlan.getVirtualAddress()));
-    distributedStagePlan.setStageRoot(StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot()));
-    distributedStagePlan.setStageMetadata(fromProtoStageMetadata(stagePlan.getStageMetadata()));
-    return distributedStagePlan;
+  public static List<DistributedStagePlan> deserializeStagePlan(Worker.QueryRequest request) {
+    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
+    for (Worker.StagePlan stagePlan : request.getStagePlanList()) {
+      distributedStagePlans.addAll(deserializeStagePlan(stagePlan));
+    }
+    return distributedStagePlans;
   }
 
-  public static Worker.StagePlan serialize(DistributedStagePlan distributedStagePlan) {
+  public static Worker.StagePlan serialize(DispatchableSubPlan dispatchableSubPlan, int stageId,
+      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
     return Worker.StagePlan.newBuilder()
-        .setStageId(distributedStagePlan.getStageId())
-        .setVirtualAddress(addressToProto(distributedStagePlan.getServer()))
-        .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) distributedStagePlan.getStageRoot()))
-        .setStageMetadata(toProtoStageMetadata(distributedStagePlan.getStageMetadata())).build();
+        .setStageId(stageId)
+        .setStageRoot(StageNodeSerDeUtils.serializeStageNode(
+            (AbstractPlanNode) dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
+                .getFragmentRoot()))
+        .setStageMetadata(
+            toProtoStageMetadata(dispatchableSubPlan.getQueryStageList().get(stageId), queryServerInstance, workerIds))
+        .build();
   }
-
-  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
-      "(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)");
 
   public static VirtualServerAddress protoToAddress(String virtualAddressStr) {
     Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(virtualAddressStr);
@@ -77,6 +84,25 @@ public class QueryPlanSerDeUtils {
 
   public static String addressToProto(VirtualServerAddress serverAddress) {
     return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
+  }
+
+  private static List<DistributedStagePlan> deserializeStagePlan(Worker.StagePlan stagePlan) {
+    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
+    String serverAddress = stagePlan.getStageMetadata().getServerAddress();
+    String[] hostPort = StringUtils.split(serverAddress, ':');
+    String hostname = hostPort[0];
+    int port = Integer.parseInt(hostPort[1]);
+    AbstractPlanNode stageRoot = StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot());
+    StageMetadata stageMetadata = fromProtoStageMetadata(stagePlan.getStageMetadata());
+    for (int workerId : stagePlan.getStageMetadata().getWorkerIdsList()) {
+      DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
+      VirtualServerAddress virtualServerAddress = new VirtualServerAddress(hostname, port, workerId);
+      distributedStagePlan.setServer(virtualServerAddress);
+      distributedStagePlan.setStageRoot(stageRoot);
+      distributedStagePlan.setStageMetadata(stageMetadata);
+      distributedStagePlans.add(distributedStagePlan);
+    }
+    return distributedStagePlans;
   }
 
   private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
@@ -119,12 +145,16 @@ public class QueryPlanSerDeUtils {
     return mailboxMetadata;
   }
 
-  private static Worker.StageMetadata toProtoStageMetadata(StageMetadata stageMetadata) {
+  private static Worker.StageMetadata toProtoStageMetadata(DispatchablePlanFragment planFragment,
+      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
     Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
-    for (WorkerMetadata workerMetadata : stageMetadata.getWorkerMetadataList()) {
+    for (WorkerMetadata workerMetadata : planFragment.getWorkerMetadataList()) {
       builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
     }
-    builder.putAllCustomProperty(stageMetadata.getCustomProperties());
+    builder.putAllCustomProperty(planFragment.getCustomProperties());
+    builder.setServerAddress(String.format("%s:%d", queryServerInstance.getHostname(),
+        queryServerInstance.getQueryMailboxPort()));
+    builder.addAllWorkerIds(workerIds);
     return builder.build();
   }
 

@@ -82,19 +82,23 @@ public interface RexExpression {
         operands);
   }
 
-  static Object toRexValue(FieldSpec.DataType dataType, Comparable value) {
+  @Nullable
+  static Object toRexValue(FieldSpec.DataType dataType, @Nullable Comparable<?> value) {
+    if (value == null) {
+      return null;
+    }
     switch (dataType) {
       case INT:
-        return value == null ? 0 : ((BigDecimal) value).intValue();
+        return ((BigDecimal) value).intValue();
       case LONG:
-        return value == null ? 0L : ((BigDecimal) value).longValue();
+        return ((BigDecimal) value).longValue();
       case FLOAT:
-        return value == null ? 0f : ((BigDecimal) value).floatValue();
-      case BIG_DECIMAL:
+        return ((BigDecimal) value).floatValue();
       case DOUBLE:
-        return value == null ? 0d : ((BigDecimal) value).doubleValue();
+      case BIG_DECIMAL:
+        return ((BigDecimal) value).doubleValue();
       case STRING:
-        return value == null ? "" : ((NlsString) value).getValue();
+        return ((NlsString) value).getValue();
       default:
         return value;
     }

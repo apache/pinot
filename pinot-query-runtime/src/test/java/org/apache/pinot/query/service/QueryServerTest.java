@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -40,12 +41,10 @@ import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.StageMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -68,9 +67,6 @@ public class QueryServerTest extends QueryTestSet {
   private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE =
       Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
-  private static final ExecutorService RUNNER_EXECUTOR_SERVICE =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
-          new NamedThreadFactory("QueryServerTest_Runner"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -86,7 +82,6 @@ public class QueryServerTest extends QueryTestSet {
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
       Mockito.when(queryRunner.getQueryWorkerLeafExecutorService()).thenReturn(LEAF_WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryWorkerIntermExecutorService()).thenReturn(INTERM_WORKER_EXECUTOR_SERVICE);
-      Mockito.when(queryRunner.getQueryRunnerExecutorService()).thenReturn(RUNNER_EXECUTOR_SERVICE);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
@@ -124,7 +119,9 @@ public class QueryServerTest extends QueryTestSet {
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
 
-        StageMetadata stageMetadata = dispatchablePlanFragment.toStageMetadata();
+        StageMetadata stageMetadata = new StageMetadata.Builder()
+            .setWorkerMetadataList(dispatchablePlanFragment.getWorkerMetadataList())
+            .addCustomProperties(dispatchablePlanFragment.getCustomProperties()).build();
 
         // ensure mock query runner received correctly deserialized payload.
         QueryRunner mockRunner =
@@ -230,9 +227,8 @@ public class QueryServerTest extends QueryTestSet {
     QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
     int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
 
-    return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(
-            QueryDispatcher.constructDistributedStagePlan(dispatchableSubPlan, stageId,
-                new VirtualServerAddress(serverInstance, workerId))))
+    return Worker.QueryRequest.newBuilder().addStagePlan(
+            QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, serverInstance, ImmutableList.of(workerId)))
         // the default configurations that must exist.
         .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))
         .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,

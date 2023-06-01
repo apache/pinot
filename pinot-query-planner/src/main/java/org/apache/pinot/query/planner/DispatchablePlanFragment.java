@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
 
@@ -106,10 +105,6 @@ public class DispatchablePlanFragment {
   public void setWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
     _workerMetadataList.clear();
     _workerMetadataList.addAll(workerMetadataList);
-  }
-
-  public StageMetadata toStageMetadata() {
-    return new StageMetadata(_workerMetadataList, _customProperties);
   }
 
   public void setServerInstanceToWorkerIdMap(Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap) {

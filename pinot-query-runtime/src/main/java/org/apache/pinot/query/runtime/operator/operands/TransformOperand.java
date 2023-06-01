@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
-
 import com.google.common.base.Preconditions;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 
@@ -43,7 +42,6 @@ public abstract class TransformOperand {
     }
   }
 
-  @SuppressWarnings({"ConstantConditions", "rawtypes", "unchecked"})
   private static TransformOperand toTransformOperand(RexExpression.FunctionCall functionCall,
       DataSchema inputDataSchema) {
     final List<RexExpression> functionOperands = functionCall.getFunctionOperands();
@@ -65,77 +63,17 @@ public abstract class TransformOperand {
             "BOOL / IS_TRUE takes one argument, passed in argument size:" + operandSize);
         return new FilterOperand.True(functionOperands.get(0), inputDataSchema);
       case "equals":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
-          @Override
-          public Boolean apply(Object[] row) {
-            if (_requireCasting) {
-              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
-                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) == 0;
-            } else {
-              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) == 0;
-            }
-          }
-        };
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v == 0);
       case "notEquals":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
-          @Override
-          public Boolean apply(Object[] row) {
-            if (_requireCasting) {
-              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
-                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) != 0;
-            } else {
-              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) != 0;
-            }
-          }
-        };
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v != 0);
       case "greaterThan":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
-          @Override
-          public Boolean apply(Object[] row) {
-            if (_requireCasting) {
-              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
-                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) > 0;
-            } else {
-              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) > 0;
-            }
-          }
-        };
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v > 0);
       case "greaterThanOrEqual":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
-          @Override
-          public Boolean apply(Object[] row) {
-            if (_requireCasting) {
-              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
-                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) >= 0;
-            } else {
-              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) >= 0;
-            }
-          }
-        };
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v >= 0);
       case "lessThan":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
-          @Override
-          public Boolean apply(Object[] row) {
-            if (_requireCasting) {
-              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
-                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) < 0;
-            } else {
-              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) < 0;
-            }
-          }
-        };
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v < 0);
       case "lessThanOrEqual":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
-          @Override
-          public Boolean apply(Object[] row) {
-            if (_requireCasting) {
-              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
-                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) <= 0;
-            } else {
-              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) <= 0;
-            }
-          }
-        };
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v <= 0);
       default:
         return new FunctionOperand(functionCall, inputDataSchema);
     }
@@ -149,5 +87,6 @@ public abstract class TransformOperand {
     return _resultType;
   }
 
+  @Nullable
   public abstract Object apply(Object[] row);
 }

@@ -74,7 +74,12 @@ public class PartialUpsertHandler {
             // comparison column values from the previous record, and the sole non-null comparison column value from
             // the new record.
             newRecord.putValue(column, previousRecord.getValue(column));
-            newRecord.removeNullValueField(column);
+            if (!_comparisonColumns.contains(column)) {
+              // Despite wanting to overwrite the values to comparison columns from prior records, we want to
+              // preserve for _this_ record which comparison column was non-null. Doing so will allow us to
+              // re-evaluate the same comparisons when reading a segment and during steady-state stream ingestion
+              newRecord.removeNullValueField(column);
+            }
           } else if (!_comparisonColumns.contains(column)) {
             PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
             newRecord.putValue(column,

@@ -16,9 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.mutable.provider;
+package org.apache.pinot.query.runtime.plan.pipeline;
 
-public interface MutableIndexProvider
-    extends MutableForwardIndexProvider, MutableInvertedIndexProvider, MutableTextIndexReaderProvider,
-            MutableJsonIndexProvider, MutableDictionaryProvider {
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+
+
+public class PipelineBreakerResult {
+  private final Map<PlanNode, Integer> _nodeIdMap;
+  private final Map<Integer, List<TransferableBlock>> _resultMap;
+
+  public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<TransferableBlock>> resultMap) {
+    _nodeIdMap = nodeIdMap;
+    _resultMap = resultMap;
+  }
+
+  public Map<PlanNode, Integer> getNodeIdMap() {
+    return _nodeIdMap;
+  }
+
+  public Map<Integer, List<TransferableBlock>> getResultMap() {
+    return _resultMap;
+  }
 }

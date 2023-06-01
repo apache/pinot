@@ -72,6 +72,15 @@ public enum AggregationFunctionType {
   KURTOSIS("kurtosis"),
   FOURTHMOMENT("fourthmoment"),
 
+  // DataSketches Tuple Sketch support
+  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch"),
+
+  // DataSketches Tuple Sketch support for Integer based Tuple Sketches
+  DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch"),
+
+  SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch"),
+  AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch"),
+
   // Geo aggregation functions
   STUNION("STUnion"),
 

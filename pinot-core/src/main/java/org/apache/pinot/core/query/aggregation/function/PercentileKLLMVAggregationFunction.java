@@ -30,9 +30,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class PercentileKLLMVAggregationFunction extends PercentileKLLAggregationFunction {
-  public PercentileKLLMVAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression, percentile);
-  }
 
   public PercentileKLLMVAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments);
@@ -120,7 +117,7 @@ public class PercentileKLLMVAggregationFunction extends PercentileKLLAggregation
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILEKLLMV.getName().toLowerCase()
-        + "(" + _expression + ", " + _percentile + ")";
+    return AggregationFunctionType.PERCENTILEKLLMV.getName().toLowerCase() + "(" + _expression + ", " + _percentile
+        + ")";
   }
 }

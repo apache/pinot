@@ -20,12 +20,16 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
@@ -65,6 +69,9 @@ public class QueryServerEnclosure {
   private final HelixManager _helixManager;
 
   private final QueryRunner _queryRunner;
+  private final ExecutorService _executor = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
+      new NamedThreadFactory("QueryServerTest_Server"));
+
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
     try {
@@ -124,6 +131,12 @@ public class QueryServerEnclosure {
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+    _executor.submit(() -> {
+      try {
+        _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+      } catch (Exception e) {
+        throw new RuntimeException("Error executing query!", e);
+      }
+    });
   }
 }

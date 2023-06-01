@@ -572,7 +572,7 @@
         "description": "Single empty OVER() with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER() as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {
@@ -580,7 +580,7 @@
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col) as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "keepOutputRowOrder": true,
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {
@@ -1335,7 +1335,7 @@
         "description": "Multiple empty OVER()s with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER() as count, MIN(double_col) OVER() as min FROM {tbl} WHERE string_col = 'a' AND bool_col != false AND int_col > 200)",
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {
@@ -1343,7 +1343,7 @@
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col) as count, MIN(double_col) OVER(ORDER BY string_col) as min FROM {tbl} WHERE string_col = 'a' AND bool_col != false AND int_col > 200)",
         "keepOutputRowOrder": true,
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {
@@ -2477,7 +2477,7 @@
         "description": "Single OVER(PARTITION BY) with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col) as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {
@@ -2486,7 +2486,7 @@
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {
@@ -3445,7 +3445,7 @@
         "description": "Multiple OVER(PARTITION BY)s with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col) as count, AVG(int_col) OVER(PARTITION BY string_col) as avg FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {
@@ -3454,7 +3454,7 @@
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
-          [0]
+          [null]
         ]
       },
       {

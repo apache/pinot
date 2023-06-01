@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -78,5 +79,11 @@ public class DistributedStagePlan {
 
   public WorkerMetadata getCurrentWorkerMetadata() {
     return _stageMetadata.getWorkerMetadataList().get(_server.workerId());
+  }
+
+  public static boolean isLeafStage(DistributedStagePlan distributedStagePlan) {
+    WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
+    Map<String, List<String>> segments = WorkerMetadata.getTableSegmentsMap(workerMetadata);
+    return segments != null && segments.size() > 0;
   }
 }

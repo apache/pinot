@@ -102,9 +102,17 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getBooleanLiteral(), PinotDataType.BOOLEAN);
             break;
+          case INT:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getIntLiteral(), PinotDataType.INTEGER);
+            break;
           case LONG:
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.LONG);
+            break;
+          case FLOAT:
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getFloatLiteral(), PinotDataType.FLOAT);
             break;
           case DOUBLE:
             _scalarArguments[i] =

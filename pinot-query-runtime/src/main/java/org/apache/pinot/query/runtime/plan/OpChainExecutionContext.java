@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
@@ -58,10 +57,10 @@ public class OpChainExecutionContext {
     _traceEnabled = traceEnabled;
   }
 
-  public OpChainExecutionContext(PlanRequestContext planRequestContext) {
-    this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
-        planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
-        planRequestContext.getStageMetadata(), planRequestContext.isTraceEnabled());
+  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext) {
+    this(physicalPlanContext.getMailboxService(), physicalPlanContext.getRequestId(), physicalPlanContext.getStageId(),
+        physicalPlanContext.getServer(), physicalPlanContext.getTimeoutMs(), physicalPlanContext.getDeadlineMs(),
+        physicalPlanContext.getStageMetadata(), physicalPlanContext.isTraceEnabled());
   }
 
   public MailboxService getMailboxService() {

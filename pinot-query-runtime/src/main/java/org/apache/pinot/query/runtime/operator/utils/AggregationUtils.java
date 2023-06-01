@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -38,7 +39,6 @@ import org.apache.pinot.spi.data.FieldSpec;
  * <p>Accumulation is used by {@code WindowAggregateOperator} and {@code AggregateOperator}.
  */
 public class AggregationUtils {
-
   private AggregationUtils() {
   }
 
@@ -54,54 +54,92 @@ public class AggregationUtils {
     return new Key(new Object[0]);
   }
 
-  private static Object mergeSum(Object left, Object right) {
-    return ((Number) left).doubleValue() + ((Number) right).doubleValue();
+  // TODO: Use the correct type for SUM/MIN/MAX instead of always using double
+
+  @Nullable
+  private static Object mergeSum(@Nullable Object agg, @Nullable Object value) {
+    if (agg == null) {
+      return value;
+    }
+    if (value == null) {
+      return agg;
+    }
+    return ((Number) agg).doubleValue() + ((Number) value).doubleValue();
   }
 
-  private static Object mergeMin(Object left, Object right) {
-    return Math.min(((Number) left).doubleValue(), ((Number) right).doubleValue());
+  @Nullable
+  private static Object mergeMin(@Nullable Object agg, @Nullable Object value) {
+    if (agg == null) {
+      return value;
+    }
+    if (value == null) {
+      return agg;
+    }
+    return Math.min(((Number) agg).doubleValue(), ((Number) value).doubleValue());
   }
 
-  private static Object mergeMax(Object left, Object right) {
-    return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
+  @Nullable
+  private static Object mergeMax(@Nullable Object agg, @Nullable Object value) {
+    if (agg == null) {
+      return value;
+    }
+    if (value == null) {
+      return agg;
+    }
+    return Math.max(((Number) agg).doubleValue(), ((Number) value).doubleValue());
   }
 
-  private static Boolean mergeBoolAnd(Object left, Object right) {
-    return ((Boolean) left) && ((Boolean) right);
+  @Nullable
+  private static Boolean mergeBoolAnd(@Nullable Object agg, @Nullable Object value) {
+    if (agg == null) {
+      return (Boolean) value;
+    }
+    if (value == null) {
+      return (Boolean) agg;
+    }
+    return ((Boolean) agg) & ((Boolean) value);
   }
 
-  private static Boolean mergeBoolOr(Object left, Object right) {
-    return ((Boolean) left) || ((Boolean) right);
+  @Nullable
+  private static Boolean mergeBoolOr(@Nullable Object agg, @Nullable Object value) {
+    if (agg == null) {
+      return (Boolean) value;
+    }
+    if (value == null) {
+      return (Boolean) agg;
+    }
+    return ((Boolean) agg) | ((Boolean) value);
   }
 
   private static class MergeCounts implements AggregationUtils.Merger {
 
     @Override
-    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
-      return other == null ? 0 : 1;
+    public Long init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
+      return value == null ? 0L : 1L;
     }
 
     @Override
-    public Object merge(Object left, Object right) {
-      return ((Number) left).doubleValue() + (right == null ? 0 : 1);
+    public Long merge(Object agg, @Nullable Object value) {
+      return value == null ? (long) agg : (long) agg + 1;
     }
   }
 
   public interface Merger {
+
     /**
-     * Initializes the merger based on the first input
+     * Initializes the merger based on the column data type and first value.
      */
-    default Object initialize(Object other, DataSchema.ColumnDataType dataType) {
-      // TODO: Initialize as a double so that if only one row is returned it matches the type when many rows are
-      //       returned
-      return other == null ? dataType.getNullPlaceholder() : other;
+    @Nullable
+    default Object init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
+      return value;
     }
 
     /**
-     * Merges the existing aggregate (the result of {@link #initialize(Object, DataSchema.ColumnDataType)}) with
+     * Merges the existing aggregate (the result of {@link #init(Object, DataSchema.ColumnDataType)}) with
      * the new value coming in (which may be an aggregate in and of itself).
      */
-    Object merge(Object agg, Object value);
+    @Nullable
+    Object merge(@Nullable Object agg, @Nullable Object value);
   }
 
   /**
@@ -169,7 +207,7 @@ public class AggregationUtils {
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
 
       if (currentRes == null) {
-        _results.put(key, _merger.initialize(value, _dataType));
+        _results.put(key, _merger.init(value, _dataType));
       } else {
         Object mergedResult = _merger.merge(currentRes, value);
         _results.put(key, mergedResult);

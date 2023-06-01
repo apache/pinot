@@ -49,8 +49,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -59,7 +57,6 @@ import org.testng.annotations.Test;
  * Integration test for heap size based server query killing, this works only for xmx4G
  */
 public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterIntegrationTestSet {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterServerCPUTimeQueryKillingTest.class);
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
   public static final String INT_DIM_SV1 = "intDimSV1";
@@ -94,13 +91,8 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
   @BeforeClass
   public void setUp()
       throws Exception {
-    // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterServerCPUTimeQueryKillingTest.class).setLevel(Level.INFO);
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
-    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
+        .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
 
@@ -135,6 +127,13 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
 
     //Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
+
+    // Setup logging and resource accounting
+    LogManager.getLogger(OfflineClusterServerCPUTimeQueryKillingTest.class).setLevel(Level.INFO);
+    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
+        .setLevel(Level.INFO);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
+    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
   }
 
   protected void startBrokers()
@@ -252,7 +251,6 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
         }
     );
     countDownLatch.await();
-    LOGGER.info("testDigestOOMMultipleQueries: {}", queryResponse1);
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed on SERVER"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("CPU time exceeding limit of"));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));

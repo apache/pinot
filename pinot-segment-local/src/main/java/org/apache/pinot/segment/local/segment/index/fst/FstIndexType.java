@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.segment.index.fst;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -77,13 +78,43 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
     Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
     for (String column : indexLoadingConfig.getAllKnownColumns()) {
       if (fstIndexColumns.contains(column)) {
-        FstIndexConfig conf = new FstIndexConfig(indexLoadingConfig.getFSTIndexType());
+        FSTType fstType = getFstTypeFromIndexLoadingConfig(indexLoadingConfig, column);
+        FstIndexConfig conf = new FstIndexConfig(fstType);
         result.put(column, conf);
       } else {
         result.put(column, FstIndexConfig.DISABLED);
       }
     }
     return result;
+  }
+
+  private FSTType getFstTypeFromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig, String column) {
+
+    FSTType fstType = indexLoadingConfig.getFSTIndexType();
+
+    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+    if (tableConfig != null) {
+      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+      if (fieldConfigList != null) {
+        FieldConfig fieldConfig = fieldConfigList.stream()
+            .filter(fc -> fc.getName().equals(column))
+            .findAny()
+            .orElse(null);
+        if (fieldConfig != null) {
+          Map<String, String> textProperties = fieldConfig.getProperties();
+          if (textProperties != null) {
+            for (Map.Entry<String, String> entry : textProperties.entrySet()) {
+              if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
+                fstType = FSTType.NATIVE;
+              } else {
+                fstType = FSTType.LUCENE;
+              }
+            }
+          }
+        }
+      }
+    }
+    return fstType;
   }
 
   @Override

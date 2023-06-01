@@ -402,13 +402,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private static class MergeRowNumber implements AggregationUtils.Merger {
 
     @Override
-    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
+    public Long init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
       return 1L;
     }
 
     @Override
-    public Object merge(Object left, Object right) {
-      return ((Number) left).longValue() + 1L;
+    public Long merge(Object agg, @Nullable Object value) {
+      return (long) agg + 1;
     }
   }
 
@@ -440,7 +440,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         Object previousRowOutputValue) {
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
       if (previousPartitionKey == null || !currentPartitionKey.equals(previousPartitionKey)) {
-        return _merger.initialize(currentPartitionKey, _dataType);
+        return _merger.init(currentPartitionKey, _dataType);
       } else {
         return _merger.merge(previousRowOutputValue, value);
       }
@@ -466,7 +466,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
       _orderByResults.putIfAbsent(key, new OrderKeyResult());
       if (currentRes == null) {
-        _orderByResults.get(key).addOrderByResult(orderKey, _merger.initialize(value, _dataType));
+        _orderByResults.get(key).addOrderByResult(orderKey, _merger.init(value, _dataType));
       } else {
         Object mergedResult;
         if (orderKey.equals(previousOrderKeyIfPresent)) {

@@ -671,13 +671,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
     boolean noIncomingQueries = false;
     long currentTimeMs;
     while ((currentTimeMs = System.currentTimeMillis()) < endTimeMs) {
-      long noQueryTimeMs = currentTimeMs - _serverInstance.getLatestQueryTime();
+      // Ensure we wait the full noQueryTimeMs since the start of shutdown
+      long noQueryTimeMs = currentTimeMs - Math.max(startTimeMs, _serverInstance.getLatestQueryTime());
       if (noQueryTimeMs >= noQueryThresholdMs) {
         LOGGER.info("No query received within {}ms (larger than the threshold: {}ms), mark it as no incoming queries",
             noQueryTimeMs, noQueryThresholdMs);
         noIncomingQueries = true;
         break;
       }
+      // Otherwise sleep the difference, or use shutdown execution timeout if it's smaller
       long sleepTimeMs = Math.min(noQueryThresholdMs - noQueryTimeMs, endTimeMs - currentTimeMs);
       LOGGER.info(
           "Sleep for {}ms as there are still incoming queries (no query time: {}ms is smaller than the threshold: "

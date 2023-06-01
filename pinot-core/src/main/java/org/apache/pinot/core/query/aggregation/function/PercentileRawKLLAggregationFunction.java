@@ -27,9 +27,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class PercentileRawKLLAggregationFunction extends PercentileKLLAggregationFunction {
-  public PercentileRawKLLAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression, percentile);
-  }
 
   public PercentileRawKLLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments);
@@ -47,8 +44,8 @@ public class PercentileRawKLLAggregationFunction extends PercentileKLLAggregatio
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILERAWKLL.getName().toLowerCase()
-        + "(" + _expression + ", " + _percentile + ")";
+    return AggregationFunctionType.PERCENTILERAWKLL.getName().toLowerCase() + "(" + _expression + ", " + _percentile
+        + ")";
   }
 
   @Override

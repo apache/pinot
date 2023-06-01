@@ -161,17 +161,11 @@ public class PercentileKLLQueriesTest extends BaseQueriesTest {
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(aggregationResult.size(), 6);
+    assertEquals(aggregationResult.size(), 3);
     DoubleList doubleList0 = (DoubleList) aggregationResult.get(0);
     Collections.sort(doubleList0);
     assertSketch((KllDoublesSketch) aggregationResult.get(1), doubleList0);
     assertSketch((KllDoublesSketch) aggregationResult.get(2), doubleList0);
-
-    DoubleList doubleList3 = (DoubleList) aggregationResult.get(3);
-    Collections.sort(doubleList3);
-    assertEquals(doubleList3, doubleList0);
-    assertSketch((KllDoublesSketch) aggregationResult.get(4), doubleList0);
-    assertSketch((KllDoublesSketch) aggregationResult.get(5), doubleList0);
   }
 
   @Test
@@ -179,9 +173,9 @@ public class PercentileKLLQueriesTest extends BaseQueriesTest {
     for (int percentile = 0; percentile <= 100; percentile++) {
       BrokerResponseNative brokerResponse = getBrokerResponse(getAggregationQuery(percentile));
       Object[] results = brokerResponse.getResultTable().getRows().get(0);
-      assertEquals(results.length, 6);
+      assertEquals(results.length, 3);
       double expectedResult = (Double) results[0];
-      for (int i = 1; i < 6; i++) {
+      for (int i = 1; i < 3; i++) {
         assertEquals((Double) results[i], expectedResult, DELTA, ERROR_MESSAGE);
       }
     }
@@ -201,12 +195,6 @@ public class PercentileKLLQueriesTest extends BaseQueriesTest {
       Collections.sort(doubleList0);
       assertSketch((KllDoublesSketch) groupByResult.getResultForGroupId(1, groupId), doubleList0);
       assertSketch((KllDoublesSketch) groupByResult.getResultForGroupId(2, groupId), doubleList0);
-
-      DoubleList doubleList3 = (DoubleList) groupByResult.getResultForGroupId(3, groupId);
-      Collections.sort(doubleList3);
-      assertEquals(doubleList3, doubleList0);
-      assertSketch((KllDoublesSketch) groupByResult.getResultForGroupId(4, groupId), doubleList0);
-      assertSketch((KllDoublesSketch) groupByResult.getResultForGroupId(5, groupId), doubleList0);
     }
   }
 
@@ -217,9 +205,9 @@ public class PercentileKLLQueriesTest extends BaseQueriesTest {
       List<Object[]> rows = brokerResponse.getResultTable().getRows();
       assertEquals(rows.size(), 3);
       for (Object[] row : rows) {
-        assertEquals(row.length, 6);
+        assertEquals(row.length, 3);
         double expectedResult = (Double) row[0];
-        for (int i = 1; i < 6; i++) {
+        for (int i = 1; i < 3; i++) {
           assertEquals((Double) row[i], expectedResult, DELTA, ERROR_MESSAGE);
         }
       }
@@ -227,9 +215,9 @@ public class PercentileKLLQueriesTest extends BaseQueriesTest {
   }
 
   protected String getAggregationQuery(int percentile) {
-    return String.format("SELECT PERCENTILE%1$d(%2$s), PERCENTILEKLL%1$d(%2$s), PERCENTILEKLL%1$d(%3$s), "
-            + "PERCENTILE(%2$s, %1$d), PERCENTILEKLL(%2$s, %1$d), PERCENTILEKLL(%3$s, %1$d) FROM %4$s",
-        percentile, DOUBLE_COLUMN, KLL_COLUMN, TABLE_NAME);
+    return String.format(
+        "SELECT PERCENTILE(%2$s, %1$d), PERCENTILEKLL(%2$s, %1$d), PERCENTILEKLL(%3$s, %1$d) FROM %4$s", percentile,
+        DOUBLE_COLUMN, KLL_COLUMN, TABLE_NAME);
   }
 
   private String getGroupByQuery(int percentile) {

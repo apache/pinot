@@ -21,11 +21,12 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -55,20 +56,22 @@ public class AggregationFunctionFactory {
         if (remainingFunctionName.equals("SMARTTDIGEST")) {
           return new PercentileSmartTDigestAggregationFunction(arguments);
         }
-        if (remainingFunctionName.contains("KLL")) {
-          if (remainingFunctionName.equals("KLL")) {
-            return new PercentileKLLAggregationFunction(arguments);
-          } else if (remainingFunctionName.equals("KLLMV")) {
-            return new PercentileKLLMVAggregationFunction(arguments);
-          } else if (remainingFunctionName.equals("RAWKLL")) {
-            return new PercentileRawKLLAggregationFunction(arguments);
-          } else if (remainingFunctionName.equals("RAWKLLMV")) {
-            return new PercentileRawKLLMVAggregationFunction(arguments);
-          }
+        if (remainingFunctionName.equals("KLL")) {
+          return new PercentileKLLAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("KLLMV")) {
+          return new PercentileKLLMVAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("RAWKLL")) {
+          return new PercentileRawKLLAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("RAWKLLMV")) {
+          return new PercentileRawKLLMVAggregationFunction(arguments);
         }
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
+          // NOTE: This convention is deprecated. DO NOT add new functions here
           if (remainingFunctionName.matches("\\d+")) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, parsePercentileToInt(remainingFunctionName));
@@ -88,14 +91,6 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigest
             String percentileString = remainingFunctionName.substring(10);
             return new PercentileRawTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
-          } else if (remainingFunctionName.matches("KLL\\d+")) {
-            // PercentileKLL
-            String percentileString = remainingFunctionName.substring(3);
-            return new PercentileKLLAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
-          } else if (remainingFunctionName.matches("RAWKLL\\d+")) {
-            // PercentileRawKLL
-            String percentileString = remainingFunctionName.substring(6);
-            return new PercentileRawKLLAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("\\d+MV")) {
             // PercentileMV
             String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
@@ -116,14 +111,6 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigestMV
             String percentileString = remainingFunctionName.substring(10, remainingFunctionName.length() - 2);
             return new PercentileRawTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
-          } else if (remainingFunctionName.matches("KLL\\d+MV")) {
-            // PercentileKLLMV
-            String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
-            return new PercentileKLLMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
-          } else if (remainingFunctionName.matches("RAWKLL\\d+MV")) {
-            // PercentileRawKLLMV
-            String percentileString = remainingFunctionName.substring(6, remainingFunctionName.length() - 2);
-            return new PercentileRawKLLMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           }
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
@@ -150,14 +137,6 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigest
             return new PercentileRawTDigestAggregationFunction(firstArgument, percentile);
           }
-          if (remainingFunctionName.equals("KLL")) {
-            // PercentileKLL
-            return new PercentileKLLAggregationFunction(firstArgument, percentile);
-          }
-          if (remainingFunctionName.equals("RAWKLL")) {
-            // PercentileRawKLL
-            return new PercentileRawKLLAggregationFunction(firstArgument, percentile);
-          }
           if (remainingFunctionName.equals("MV")) {
             // PercentileMV
             return new PercentileMVAggregationFunction(firstArgument, percentile);
@@ -177,14 +156,6 @@ public class AggregationFunctionFactory {
           if (remainingFunctionName.equals("RAWTDIGESTMV")) {
             // PercentileRawTDigestMV
             return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile);
-          }
-          if (remainingFunctionName.equals("KLLMV")) {
-            // PercentileKLLMV
-            return new PercentileKLLMVAggregationFunction(firstArgument, percentile);
-          }
-          if (remainingFunctionName.equals("RAWKLLMV")) {
-            // PercentileRawKLLMV
-            return new PercentileRawKLLMVAggregationFunction(firstArgument, percentile);
           }
         } else if (numArguments == 3) {
           // Triple arguments percentile (e.g. percentileTDigest(bar, 95, 1000), etc.) where the
@@ -237,13 +208,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
+              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
-                  return new FirstIntValueWithTimeAggregationFunction(
-                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                  return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol,
+                      fieldDataType == DataType.BOOLEAN);
                 case LONG:
                   return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -267,13 +237,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType =
-                  FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
+              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
                   return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol,
-                      fieldDataType == FieldSpec.DataType.BOOLEAN);
+                      fieldDataType == DataType.BOOLEAN);
                 case LONG:
                   return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -368,6 +337,15 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
+          case DISTINCTCOUNTTUPLESKETCH:
+            // mode actually doesn't matter here because we only care about keys, not values
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case SUMVALUESINTEGERSUMTUPLESKETCH:
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case AVGVALUEINTEGERSUMTUPLESKETCH:
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case PARENTARGMAX:
             return new ParentArgMinMaxAggregationFunction(arguments, true);
           case PARENTARGMIN:
@@ -378,15 +356,14 @@ public class AggregationFunctionFactory {
             return new ChildArgMinMaxAggregationFunction(arguments, false);
           case ARGMAX:
           case ARGMIN:
-            throw new IllegalArgumentException("Aggregation function: " + function
-                + " is only supported in selection without alias.");
+            throw new IllegalArgumentException(
+                "Aggregation function: " + function + " is only supported in selection without alias.");
           default:
             throw new IllegalArgumentException();
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException(
-          "Invalid aggregation function: " + function + "; Reason: " + e.getMessage());
+      throw new BadQueryRequestException("Invalid aggregation function: " + function + "; Reason: " + e.getMessage());
     }
   }
 

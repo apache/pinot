@@ -45,8 +45,12 @@ public class MailboxIdUtils {
     return new OpChainId(Long.parseLong(parts[0]), Integer.parseInt(parts[4]), Integer.parseInt(parts[3]));
   }
 
-  public static List<String> toMailboxIds(long requestId, MailboxMetadata senderMailBoxMetadatas) {
-    return senderMailBoxMetadatas.getMailBoxIdList().stream()
+  public static List<String> toMailboxIds(long requestId, MailboxMetadata senderMailBoxMetadata) {
+    return toMailboxIds(requestId, senderMailBoxMetadata.getMailBoxIdList());
+  }
+
+  public static List<String> toMailboxIds(long requestId, List<String> mailboxMetadataIdList) {
+    return mailboxMetadataIdList.stream()
         .map(mailboxIdFromBroker -> Long.toString(requestId) + SEPARATOR + mailboxIdFromBroker)
         .collect(Collectors.toList());
   }
