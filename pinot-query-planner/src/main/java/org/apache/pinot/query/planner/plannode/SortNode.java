@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
@@ -30,7 +33,9 @@ public class SortNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _collationKeys;
   @ProtoProperties
-  private List<RelFieldCollation.Direction> _collationDirections;
+  private List<Direction> _collationDirections;
+  @ProtoProperties
+  private List<NullDirection> _collationNullDirections;
   @ProtoProperties
   private int _fetch;
   @ProtoProperties
@@ -43,22 +48,36 @@ public class SortNode extends AbstractPlanNode {
   public SortNode(int planFragmentId, List<RelFieldCollation> fieldCollations, int fetch, int offset,
       DataSchema dataSchema) {
     super(planFragmentId, dataSchema);
-    _collationDirections = new ArrayList<>(fieldCollations.size());
-    _collationKeys = new ArrayList<>(fieldCollations.size());
+    int numCollations = fieldCollations.size();
+    _collationKeys = new ArrayList<>(numCollations);
+    _collationDirections = new ArrayList<>(numCollations);
+    _collationNullDirections = new ArrayList<>(numCollations);
+    for (RelFieldCollation fieldCollation : fieldCollations) {
+      _collationKeys.add(new RexExpression.InputRef(fieldCollation.getFieldIndex()));
+      Direction direction = fieldCollation.getDirection();
+      Preconditions.checkArgument(direction == Direction.ASCENDING || direction == Direction.DESCENDING,
+          "Unsupported ORDER-BY direction: %s", direction);
+      _collationDirections.add(direction);
+      NullDirection nullDirection = fieldCollation.nullDirection;
+      if (nullDirection == NullDirection.UNSPECIFIED) {
+        nullDirection = direction == Direction.ASCENDING ? NullDirection.LAST : NullDirection.FIRST;
+      }
+      _collationNullDirections.add(nullDirection);
+    }
     _fetch = fetch;
     _offset = offset;
-    for (RelFieldCollation fieldCollation : fieldCollations) {
-      _collationDirections.add(fieldCollation.getDirection());
-      _collationKeys.add(new RexExpression.InputRef(fieldCollation.getFieldIndex()));
-    }
   }
 
   public List<RexExpression> getCollationKeys() {
     return _collationKeys;
   }
 
-  public List<RelFieldCollation.Direction> getCollationDirections() {
+  public List<Direction> getCollationDirections() {
     return _collationDirections;
+  }
+
+  public List<NullDirection> getCollationNullDirections() {
+    return _collationNullDirections;
   }
 
   public int getFetch() {
@@ -71,9 +90,7 @@ public class SortNode extends AbstractPlanNode {
 
   @Override
   public String explain() {
-    return String.format("SORT%s%s",
-        (_fetch > 0) ? " LIMIT " + _fetch : "",
-        (_offset > 0) ? " OFFSET " + _offset : "");
+    return String.format("SORT%s%s", (_fetch > 0) ? " LIMIT " + _fetch : "", (_offset > 0) ? " OFFSET " + _offset : "");
   }
 
   @Override

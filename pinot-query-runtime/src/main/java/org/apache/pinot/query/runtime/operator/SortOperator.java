@@ -56,16 +56,18 @@ public class SortOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
-      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections, int fetch, int offset,
-      DataSchema dataSchema, boolean isInputSorted) {
-    this(context, upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema, isInputSorted,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
+      List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
+      boolean isInputSorted) {
+    this(context, upstreamOperator, collationKeys, collationDirections, collationNullDirections, fetch, offset,
+        dataSchema, isInputSorted, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
         CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
   }
 
   @VisibleForTesting
   SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
+      List<RelFieldCollation.Direction> collationDirections,
+      List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
     super(context);
     _upstreamOperator = upstreamOperator;
@@ -87,7 +89,7 @@ public class SortOperator extends MultiStageOperator {
       // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
       // which elements to keep and which to remove based on the limits.
       _priorityQueue = new PriorityQueue<>(Math.min(defaultHolderCapacity, _numRowsToKeep),
-          new SortUtils.SortComparator(collationKeys, collationDirections, dataSchema, false, true));
+          new SortUtils.SortComparator(collationKeys, collationDirections, collationNullDirections, dataSchema, true));
       _rows = null;
     }
   }
