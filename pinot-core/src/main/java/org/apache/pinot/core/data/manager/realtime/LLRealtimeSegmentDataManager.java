@@ -1476,6 +1476,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         // block ingestion for new consuming segments
         _isReadyToConsumeData = () -> false;
         // persist snapshot for all sealed segments
+        // TODO: Use a semaphore to guarantee all the segments are sealed before peristing snapshot.
         List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
         for (SegmentDataManager segmentDataManager: allSegments) {
           if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
