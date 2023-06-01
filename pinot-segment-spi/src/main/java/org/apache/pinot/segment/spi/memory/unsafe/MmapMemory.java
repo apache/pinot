@@ -53,12 +53,6 @@ public class MmapMemory implements Memory {
    */
   private final long _address;
   /**
-   * The offset requested to map.
-   *
-   * {@code _address = _offset - offset % pageSize}
-   */
-  private final long _offset;
-  /**
    * How many bytes have been requested to be mapped.
    * The actual mapped size may be larger (up to the next page), but the actual mapped size
    * is stored by {@link #_section}.
@@ -78,7 +72,6 @@ public class MmapMemory implements Memory {
 
   public MmapMemory(File file, boolean readOnly, long offset, long size) {
     _size = size;
-    _offset = offset;
 
     try {
       _section = MAP_FUN.map(file, readOnly, offset, size);
@@ -101,7 +94,7 @@ public class MmapMemory implements Memory {
   @Override
   public void flush() {
     MSyncFlag mode = MSyncFlag.MS_SYNC;
-    PosixAPI.posix().msync(_offset, _size, mode);
+    PosixAPI.posix().msync(_address, _size, mode);
   }
 
   @Override
@@ -174,7 +167,7 @@ public class MmapMemory implements Memory {
           new Map0Fun.ChronicleCore(),
           new Map0Fun.Java11(),
           new Map0Fun.Java17(),
-          new Java20()
+          new Map0Fun.Java20()
       );
 
       for (Finder<? extends MapFun> candidate : candidates) {
@@ -185,51 +178,6 @@ public class MmapMemory implements Memory {
         }
       }
       throw new NoSuchMethodException("Cannot find how to create memory map files in Java " + JavaVersion.VERSION);
-    }
-
-    class Java20 implements Finder<MapFun> {
-      @Override
-      public MapFun tryFind()
-          throws NoSuchMethodException, ClassNotFoundException {
-        Class<?> fileChannelImpl = MmapMemory.class.getClassLoader().loadClass("sun.nio.ch.FileChannelImpl");
-
-        Method mapMethod = fileChannelImpl.getDeclaredMethod("mapInternal", FileChannel.MapMode.class, long.class,
-            long.class, int.class, boolean.class);
-        mapMethod.setAccessible(true);
-
-        Class<?> unmapperClass = MmapMemory.class.getClassLoader().loadClass("sun.nio.ch.FileChannelImpl$Unmapper");
-        Method unmapMethod = unmapperClass.getDeclaredMethod("unmap");
-        unmapMethod.setAccessible(true);
-        Method addressMethod = unmapperClass.getDeclaredMethod("address");
-        addressMethod.setAccessible(true);
-
-        return (file, readOnly, offset, size) -> {
-          FileChannel.MapMode mapMode = readOnly ? FileChannel.MapMode.READ_ONLY : FileChannel.MapMode.READ_WRITE;
-          // see https://github.com/openjdk/jdk/blob/cc9f7ad9ce33dc44d335fb7fb5483795c62ba936/src/java.base/share/
-          // classes/sun/nio/ch/FileChannelImpl.java#L1223
-          int prot = readOnly ? 0 : 1;
-
-          String mode = readOnly ? "r" : "rw";
-          try (RandomAccessFile raf = new RandomAccessFile(file, mode); FileChannel fc = raf.getChannel()) {
-            Object unmapper = mapMethod.invoke(fc, mapMode, offset, size, prot, false);
-            long address;
-            UnmapFun unmapFun;
-            if (unmapper == null) {
-              // unmapper may be null if the size is 0 or if the file descriptor is closed while mapInternal was called
-              address = 0;
-              unmapFun = () -> {
-              };
-            } else {
-              address = (long) addressMethod.invoke(unmapper);;
-              unmapFun = () -> unmapMethod.invoke(unmapper);
-            }
-
-            return new MapSection(address, unmapFun);
-          } catch (InvocationTargetException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-          }
-        };
-      }
     }
   }
 
@@ -366,6 +314,51 @@ public class MmapMemory implements Memory {
           long address = (long) mapMethod.invoke(fc, iMode, pageAlignedOffset, size, false);
 
           UnmapFun unmapFun = () -> unmap0.accept(address, size);
+
+          return new MapSection(address, unmapFun);
+        };
+      }
+    }
+
+    /**
+     * In Java 20 the method used to map already does the alignment corrections, so we could call it with a non-aligned
+     * offset. But we need to know the position in the page in order to correct the address, so it is useful to return a
+     * Map0Fun instead of a MapFun.
+     */
+    class Java20 implements Finder<Map0Fun> {
+      @Override
+      public Map0Fun tryFind()
+          throws NoSuchMethodException, ClassNotFoundException {
+        Class<?> fileChannelImpl = MmapMemory.class.getClassLoader().loadClass("sun.nio.ch.FileChannelImpl");
+
+        Method mapMethod = fileChannelImpl.getDeclaredMethod("mapInternal", FileChannel.MapMode.class, long.class,
+            long.class, int.class, boolean.class);
+        mapMethod.setAccessible(true);
+
+        Class<?> unmapperClass = MmapMemory.class.getClassLoader().loadClass("sun.nio.ch.FileChannelImpl$Unmapper");
+        Method unmapMethod = unmapperClass.getDeclaredMethod("unmap");
+        unmapMethod.setAccessible(true);
+        Method addressMethod = unmapperClass.getDeclaredMethod("address");
+        addressMethod.setAccessible(true);
+
+        return (fc, readOnly, pageAlignedOffset, size) -> {
+          FileChannel.MapMode mapMode = readOnly ? FileChannel.MapMode.READ_ONLY : FileChannel.MapMode.READ_WRITE;
+          // see https://github.com/openjdk/jdk/blob/cc9f7ad9ce33dc44d335fb7fb5483795c62ba936/src/java.base/share/
+          // classes/sun/nio/ch/FileChannelImpl.java#L1223
+          int prot = readOnly ? 0 : 1;
+
+          Object unmapper = mapMethod.invoke(fc, mapMode, pageAlignedOffset, size, prot, false);
+          long address;
+          UnmapFun unmapFun;
+          if (unmapper == null) {
+            // unmapper may be null if the size is 0 or if the file descriptor is closed while mapInternal was called
+            address = 0;
+            unmapFun = () -> {
+            };
+          } else {
+            address = (long) addressMethod.invoke(unmapper);
+            unmapFun = () -> unmapMethod.invoke(unmapper);
+          }
 
           return new MapSection(address, unmapFun);
         };
