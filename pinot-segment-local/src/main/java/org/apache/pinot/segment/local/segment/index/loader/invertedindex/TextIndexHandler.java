@@ -87,6 +87,8 @@ import org.slf4j.LoggerFactory;
 public class TextIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
+  private static final String SKIP_EXISTING_SEGMENTS = "skipExistingSegments";
+
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
   private final Map<String, Map<String, String>> _columnProperties;
@@ -148,9 +150,8 @@ public class TextIndexHandler extends BaseIndexHandler {
       // Fail fast upon unsupported operations.
       checkUnsupportedOperationsForTextIndex(columnMetadata);
 
-      // Create text index only for those segments that are created within recent time-window
-      return _segmentMetadata == null
-          || _segmentMetadata.getIndexCreationTime() >= Instant.now().minusSeconds(3600).toEpochMilli();
+      // skip creating text index if SKIP_EXISTING_SEGMENTS is set to true.
+      return processExistingSegments(columnMetadata);
     }
     return false;
   }
@@ -166,6 +167,30 @@ public class TextIndexHandler extends BaseIndexHandler {
       throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
   }
+
+  /**
+   * Helper method to skip processing segments if the property SKIP_EXISTING_SEGMENTS is
+   * set to true in fieldConfigList.
+   *
+   * e.g
+   * "fieldConfigList":[
+   *   {
+   *      "name":"text_col_1",
+   *      "encodingType":"RAW",
+   *      "indexTypes": ["TEXT"],
+   *      "properties":{"fstType":"native", "skipExistingSegments":"true"}
+   *   }
+   *  ]
+   * */
+  private boolean processExistingSegments(ColumnMetadata columnMetadata) {
+    String columnName = columnMetadata.getColumnName();
+    if (!_columnProperties.containsKey(columnName)
+        || !_columnProperties.get(columnName).containsKey(SKIP_EXISTING_SEGMENTS)) {
+      return true;
+    }
+    return !Boolean.parseBoolean(_columnProperties.get(columnName).get(SKIP_EXISTING_SEGMENTS));
+  }
+
 
   private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
       TextIndexCreatorProvider textIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
