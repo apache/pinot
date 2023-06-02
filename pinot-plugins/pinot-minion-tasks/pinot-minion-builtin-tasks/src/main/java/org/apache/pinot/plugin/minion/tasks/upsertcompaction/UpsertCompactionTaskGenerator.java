@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
-  private static final String DEFAULT_INVALID_RECORDS_THRESHOLD = "100000";
+  private static final long DEFAULT_INVALID_RECORDS_THRESHOLD = 100000;
   @Override
   public String getTaskType() {
     return MinionConstants.UpsertCompactionTask.TASK_TYPE;
@@ -97,11 +97,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
                 new ArrayList<>(urlToSegment.keySet()), tableNameWithType, true, 3000);
 
       // only compact segments that exceed the invalidRecordThreshold
-      int invalidRecordsThreshold = Integer.parseInt(compactionConfigs.getOrDefault(
-          UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, DEFAULT_INVALID_RECORDS_THRESHOLD));
+      long invalidRecordsThreshold = Long.parseLong(compactionConfigs.getOrDefault(
+          UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD)));
       List<SegmentZKMetadata> selectedSegments = new ArrayList<>();
       for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-        int invalidRecordCount = Integer.parseInt(streamResponse.getValue());
+        long invalidRecordCount = Long.parseLong(streamResponse.getValue());
         if (invalidRecordCount > invalidRecordsThreshold) {
           SegmentZKMetadata segment = urlToSegment.get(streamResponse.getKey());
           selectedSegments.add(segment);
