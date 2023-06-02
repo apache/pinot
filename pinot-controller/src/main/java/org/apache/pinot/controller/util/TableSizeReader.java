@@ -151,8 +151,8 @@ public class TableSizeReader {
 
     // Set the top level sizes to  DEFAULT_SIZE_WHEN_MISSING_OR_ERROR when all segments are error
     if ((hasRealtimeTableConfig && hasOfflineTableConfig && isMissingAllRealtimeSegments && isMissingAllOfflineSegments)
-        || (hasOfflineTableConfig && isMissingAllOfflineSegments) || (hasRealtimeTableConfig
-        && isMissingAllRealtimeSegments)) {
+        || (hasOfflineTableConfig && !hasRealtimeTableConfig && isMissingAllOfflineSegments) || (hasRealtimeTableConfig
+        && !hasOfflineTableConfig && isMissingAllRealtimeSegments)) {
       tableSizeDetails._reportedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       tableSizeDetails._estimatedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       tableSizeDetails._reportedSizePerReplicaInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
