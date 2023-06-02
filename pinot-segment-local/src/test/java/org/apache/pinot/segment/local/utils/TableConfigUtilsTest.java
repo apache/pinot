@@ -1758,16 +1758,13 @@ public class TableConfigUtilsTest {
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     Map<String, String> upsertCompactionTaskConfig =
-        ImmutableMap.of("schedule", "0 */10 * ? * * *",
-            "bucketTimePeriod", "6h",
+        ImmutableMap.of(
             "bufferTimePeriod", "5d",
-            "maxNumRecordsPerSegment", "5000000");
+            "maxNumRecordsPerSegment", "5000000"
+        );
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("myCol", new ColumnPartitionConfig(
-                "murmur", 1))))
         .setTaskConfig(new TableTaskConfig(
             ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
         .build();
