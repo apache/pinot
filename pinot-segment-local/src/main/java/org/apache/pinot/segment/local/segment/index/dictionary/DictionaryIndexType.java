@@ -24,7 +24,6 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -423,7 +422,7 @@ public class DictionaryIndexType
         ? Lists.newArrayList()
         : tableConfig.getFieldConfigList();
 
-    List<FieldConfig> configsToUpdate = new ArrayList<>();
+    Set<FieldConfig> configsToUpdate = new HashSet<>();
     for (FieldConfig fieldConfig : fieldConfigList) {
       // skip further computation of field configs which already has RAW encodingType
       if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
