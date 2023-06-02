@@ -65,7 +65,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
@@ -207,7 +206,8 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
       @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping) {
     boolean shouldExcludeReplacedSegments = Boolean.parseBoolean(excludeReplacedSegments);
-    return selectSegments(tableName, tableTypeStr, shouldExcludeReplacedSegments, startTimestampStr, endTimestampStr, excludeOverlapping)
+    return selectSegments(tableName, tableTypeStr, shouldExcludeReplacedSegments,
+        startTimestampStr, endTimestampStr, excludeOverlapping)
         .stream()
         .map(pair -> Collections.singletonMap(pair.getKey(), pair.getValue()))
         .collect(Collectors.toList());
@@ -892,10 +892,11 @@ public class PinotSegmentRestletResource {
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod) {
     int numSegments = 0;
-    for(Pair<TableType, List<String>> tableTypeSegments : selectSegments(tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr, excludeOverlapping)) {
+    for (Pair<TableType, List<String>> tableTypeSegments : selectSegments(
+        tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr, excludeOverlapping)) {
       List<String> segments = tableTypeSegments.getValue();
       numSegments += segments.size();
-      if(segments.isEmpty()) {
+      if (segments.isEmpty()) {
         continue;
       }
       String tableNameWithType = getExistingTable(tableName, segments.get(0));
@@ -1151,8 +1152,13 @@ public class PinotSegmentRestletResource {
       return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableNameWithType);
   }
 
-  public List<Pair<TableType, List<String>>> selectSegments(String tableName,
-      String tableTypeStr, boolean excludeReplacedSegments, String startTimestampStr, String endTimestampStr, boolean excludeOverlapping) {
+  public List<Pair<TableType, List<String>>> selectSegments(
+      String tableName,
+      String tableTypeStr,
+      boolean excludeReplacedSegments,
+      String startTimestampStr,
+      String endTimestampStr,
+      boolean excludeOverlapping) {
     long startTimestamp;
     long endTimestamp;
     try {
