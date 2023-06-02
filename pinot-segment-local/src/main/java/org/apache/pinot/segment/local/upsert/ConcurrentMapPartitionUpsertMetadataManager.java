@@ -36,7 +36,7 @@ import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.PeekableIntIterator;
@@ -57,10 +57,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   private final GenericRow _reuse = new GenericRow();
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
-      List<String> primaryKeyColumns, List<String> comparisonColumns, HashFunction hashFunction,
-      @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, ServerMetrics serverMetrics) {
-    super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, hashFunction, partialUpsertHandler,
-        enableSnapshot, serverMetrics);
+      List<String> primaryKeyColumns, UpsertConfig upsertConfig, @Nullable PartialUpsertHandler partialUpsertHandler,
+      ServerMetrics serverMetrics) {
+    super(tableNameWithType, partitionId, primaryKeyColumns, upsertConfig, partialUpsertHandler, serverMetrics);
   }
 
   @Override

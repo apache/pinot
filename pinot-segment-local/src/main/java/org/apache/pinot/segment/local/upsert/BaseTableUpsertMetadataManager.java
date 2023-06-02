@@ -26,7 +26,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -36,10 +35,8 @@ import org.apache.pinot.spi.data.Schema;
 public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetadataManager {
   protected String _tableNameWithType;
   protected List<String> _primaryKeyColumns;
-  protected List<String> _comparisonColumns;
-  protected HashFunction _hashFunction;
+  protected UpsertConfig _upsertConfig;
   protected PartialUpsertHandler _partialUpsertHandler;
-  protected boolean _enableSnapshot;
   protected ServerMetrics _serverMetrics;
 
   @Override
@@ -55,12 +52,11 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     Preconditions.checkArgument(!CollectionUtils.isEmpty(_primaryKeyColumns),
         "Primary key columns must be configured for upsert enabled table: %s", _tableNameWithType);
 
-    _comparisonColumns = upsertConfig.getComparisonColumns();
-    if (_comparisonColumns == null) {
-      _comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
+    _upsertConfig = upsertConfig;
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (comparisonColumns == null) {
+      comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
     }
-
-    _hashFunction = upsertConfig.getHashFunction();
 
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
       Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
@@ -68,10 +64,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
           "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
       _partialUpsertHandler =
           new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
-              _comparisonColumns);
+              comparisonColumns);
     }
-
-    _enableSnapshot = upsertConfig.isEnableSnapshot();
 
     _serverMetrics = serverMetrics;
   }

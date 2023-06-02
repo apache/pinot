@@ -97,6 +97,7 @@ public class ImmutableSegmentImplUpsertSnapshotTest {
 
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setComparisonColumns(Collections.singletonList("daysSinceEpoch"));
 
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
@@ -119,7 +120,7 @@ public class ImmutableSegmentImplUpsertSnapshotTest {
     ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
     _partitionUpsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager("testTable_REALTIME", 0, Collections.singletonList("column6"),
-            Collections.singletonList("daysSinceEpoch"), HashFunction.NONE, null, true, serverMetrics);
+            upsertConfig, null, serverMetrics);
 
     _immutableSegmentImpl.enableUpsert(_partitionUpsertMetadataManager, new ThreadSafeMutableRoaringBitmap());
   }
