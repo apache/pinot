@@ -1774,7 +1774,8 @@ public class TableConfigUtilsTest {
 
     TableConfigUtils.validateTaskConfigs(tableConfig, schema);
   }
-  
+
+  @Test
   public void testValidatePartitionedReplicaGroupInstance() {
     String partitionColumn = "testPartitionCol";
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
