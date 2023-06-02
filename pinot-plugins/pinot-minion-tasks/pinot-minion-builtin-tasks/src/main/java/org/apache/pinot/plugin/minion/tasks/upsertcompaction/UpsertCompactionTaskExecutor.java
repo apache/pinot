@@ -32,7 +32,7 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.model.IdealState;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -212,12 +212,11 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   @VisibleForTesting
   public static String getServer(String segmentName, String tableNameWithType) {
     String server = null;
-    IdealState idealState =
-        _clusterManagementTool.getResourceIdealState(_clusterName, tableNameWithType);
-    if (idealState == null) {
-      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    ExternalView externalView = _clusterManagementTool.getResourceExternalView(_clusterName, tableNameWithType);
+    if (externalView == null) {
+      throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
     }
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+    for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
       if (Objects.equals(segment, segmentName)) {
         server = entry.getValue().keySet().toArray()[0].toString();

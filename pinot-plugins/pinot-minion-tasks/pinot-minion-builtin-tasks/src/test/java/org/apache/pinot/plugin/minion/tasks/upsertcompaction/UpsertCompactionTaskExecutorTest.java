@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 import java.util.Map;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.minion.MinionContext;
 import org.mockito.Mockito;
@@ -35,13 +36,13 @@ public class UpsertCompactionTaskExecutorTest {
 
   @Test
   public void testGetServer() {
-    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
-    Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
-    idealStateSegmentAssignment.put(SEGMENT_NAME, Map.of("server1", "server1"));
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
+    externalViewSegmentAssignment.put(SEGMENT_NAME, Map.of("server1", "server1"));
     HelixAdmin clusterManagementTool = Mockito.mock(HelixAdmin.class);
     MinionContext minionContext = MinionContext.getInstance();
-    Mockito.when(clusterManagementTool.getResourceIdealState(CLUSTER_NAME, REALTIME_TABLE_NAME))
-        .thenReturn(idealState);
+    Mockito.when(clusterManagementTool.getResourceExternalView(CLUSTER_NAME, REALTIME_TABLE_NAME))
+        .thenReturn(externalView);
     HelixManager helixManager = Mockito.mock(HelixManager.class);
     Mockito.when(helixManager.getClusterName()).thenReturn(CLUSTER_NAME);
     Mockito.when(helixManager.getClusterManagmentTool()).thenReturn(clusterManagementTool);
