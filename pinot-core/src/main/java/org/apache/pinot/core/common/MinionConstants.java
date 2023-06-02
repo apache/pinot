@@ -137,8 +137,13 @@ public class MinionConstants {
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
 
-  public static class UpsertCompactionTask extends MergeTask {
+  public static class UpsertCompactionTask {
     public static final String TASK_TYPE = "UpsertCompactionTask";
+    /**
+     * The time period to wait before picking segments for this task
+     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
+     */
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
     /**
      * The maximum amount of old records allowed for an existing segment.
      * e.g. if the current amount surpasses 2500000, then the segment will be compacted
