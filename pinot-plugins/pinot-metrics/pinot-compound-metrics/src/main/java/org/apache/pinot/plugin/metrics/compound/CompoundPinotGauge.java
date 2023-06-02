@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.metrics.compound;
 
 import java.util.List;
+import java.util.function.Supplier;
 import org.apache.pinot.spi.metrics.PinotGauge;
 
 
@@ -35,5 +36,15 @@ public class CompoundPinotGauge<T> extends AbstractCompoundPinotMetric<PinotGaug
   @Override
   public T value() {
     return getSomeMeter().value();
+  }
+
+  @Override
+  public void setValue(T value) {
+    _metrics.forEach(m -> m.setValue(value));
+  }
+
+  @Override
+  public void setValueSupplier(Supplier<T> valueSupplier) {
+    _metrics.forEach(m -> m.setValueSupplier(valueSupplier));
   }
 }

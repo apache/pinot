@@ -43,7 +43,9 @@ public class CommonConstants {
   public static final String UNKNOWN = "unknown";
   public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "factory.className";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
-      "org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory";
+      //"org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory";
+      "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
+      //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
