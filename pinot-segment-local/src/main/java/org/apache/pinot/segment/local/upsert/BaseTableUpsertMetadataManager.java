@@ -56,6 +56,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     List<String> comparisonColumns = upsertConfig.getComparisonColumns();
     if (comparisonColumns == null) {
       comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
+      _upsertConfig.setComparisonColumns(comparisonColumns);
     }
 
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
