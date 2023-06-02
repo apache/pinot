@@ -894,12 +894,13 @@ public class PinotSegmentRestletResource {
     int numSegments = 0;
     for (Pair<TableType, List<String>> tableTypeSegments : selectSegments(
         tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr, excludeOverlapping)) {
-      List<String> segments = tableTypeSegments.getValue();
+      TableType tableType = tableTypeSegments.getLeft();
+      List<String> segments = tableTypeSegments.getRight();
       numSegments += segments.size();
       if (segments.isEmpty()) {
         continue;
       }
-      String tableNameWithType = getExistingTable(tableName, segments.get(0));
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
       deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
     }
     return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableName);
