@@ -212,10 +212,11 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case LONG:
         fillLongResultArray(valueBlock, leftFloatValues, length);
         break;
-      //handling Float & double comparisons, avoiding CAST transformation.
       case FLOAT:
+        fillFloatResultArray(valueBlock, leftFloatValues, length);
+        break;
       case DOUBLE:
-        fillFloatDoubleResultArray(valueBlock, leftFloatValues, length);
+        fillDoubleResultArray(valueBlock, leftFloatValues, length);
         break;
       case BIG_DECIMAL:
         fillBigDecimalResultArray(valueBlock, leftFloatValues, length);
@@ -420,7 +421,14 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  private void fillFloatDoubleResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+  private void fillFloatResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
+    float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(valueBlock);
+    for (int i = 0; i < length; i++) {
+      _intValuesSV[i] = getIntResult(Float.compare(leftValues[i], rightFloatValues[i]));
+    }
+  }
+
+  private void fillDoubleResultArray(ValueBlock valueBlock, float[] leftValues, int length) {
     double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));

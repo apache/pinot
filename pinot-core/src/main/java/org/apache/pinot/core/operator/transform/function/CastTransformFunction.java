@@ -187,9 +187,7 @@ public class CastTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
-    DataType storedDataType = _resultMetadata.getDataType().getStoredType();
-    // Allowing FLOAT for handling float-double comparison, avoiding CAST.
-    if (storedDataType == DataType.DOUBLE || storedDataType == DataType.FLOAT) {
+    if (_resultMetadata.getDataType().getStoredType() == DataType.DOUBLE) {
       return _transformFunction.transformToDoubleValuesSV(valueBlock);
     } else {
       return super.transformToDoubleValuesSV(valueBlock);
