@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -55,6 +56,9 @@ import org.slf4j.LoggerFactory;
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
+  private static HelixManager _helixManager = MINION_CONTEXT.getHelixManager();
+  private static HelixAdmin _clusterManagementTool = _helixManager.getClusterManagmentTool();
+  private static String _clusterName = _helixManager.getClusterName();
 
   private class CompactedRecordReader implements RecordReader {
     private final PinotSegmentRecordReader _pinotSegmentRecordReader;
@@ -191,7 +195,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     // get the url for the validDocIds for the server
     InstanceConfig instanceConfig =
-        MINION_CONTEXT.getClusterManagementTool().getInstanceConfig(MINION_CONTEXT.getClusterName(), server);
+        _clusterManagementTool.getInstanceConfig(_clusterName, server);
     String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
     String url = String.format("%s/segments/%s/%s/validDocIds",
         endpoint, tableNameWithType, segmentName);
@@ -208,9 +212,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   @VisibleForTesting
   public static String getServer(String segmentName, String tableNameWithType) {
     String server = null;
-    HelixAdmin clusterManagementTool = MINION_CONTEXT.getClusterManagementTool();
     IdealState idealState =
-        clusterManagementTool.getResourceIdealState(MINION_CONTEXT.getClusterName(), tableNameWithType);
+        _clusterManagementTool.getResourceIdealState(_clusterName, tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }

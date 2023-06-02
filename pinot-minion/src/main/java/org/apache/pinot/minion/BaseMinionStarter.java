@@ -254,10 +254,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager.connect();
     updateInstanceConfigIfNeeded();
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
-
-    minionContext.setClusterManagementTool(_helixManager.getClusterManagmentTool());
-    minionContext.setClusterName(_helixManager.getClusterName());
-
+    minionContext.setHelixManager(_helixManager);
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = new MinionAdminApiApplication(_instanceId, _config);
     _minionAdminApplication.start(_listenerConfigs);

@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import java.util.Map;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.minion.MinionContext;
 import org.mockito.Mockito;
@@ -30,6 +31,7 @@ import org.testng.annotations.Test;
 public class UpsertCompactionTaskExecutorTest {
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String SEGMENT_NAME = "testSegment";
+  private static final String CLUSTER_NAME = "testCluster";
 
   @Test
   public void testGetServer() {
@@ -38,9 +40,12 @@ public class UpsertCompactionTaskExecutorTest {
     idealStateSegmentAssignment.put(SEGMENT_NAME, Map.of("server1", "server1"));
     HelixAdmin clusterManagementTool = Mockito.mock(HelixAdmin.class);
     MinionContext minionContext = MinionContext.getInstance();
-    Mockito.when(clusterManagementTool.getResourceIdealState(minionContext.getClusterName(), REALTIME_TABLE_NAME))
+    Mockito.when(clusterManagementTool.getResourceIdealState(CLUSTER_NAME, REALTIME_TABLE_NAME))
         .thenReturn(idealState);
-    minionContext.setClusterManagementTool(clusterManagementTool);
+    HelixManager helixManager = Mockito.mock(HelixManager.class);
+    Mockito.when(helixManager.getClusterName()).thenReturn(CLUSTER_NAME);
+    Mockito.when(helixManager.getClusterManagmentTool()).thenReturn(clusterManagementTool);
+    minionContext.setHelixManager(helixManager);
 
     String server = UpsertCompactionTaskExecutor.getServer(SEGMENT_NAME, REALTIME_TABLE_NAME);
 
