@@ -19,11 +19,11 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Lists;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.testng.Assert.*;
 
@@ -83,5 +83,28 @@ public class H3IndexConfigTest {
     Assert.assertEquals(resolution.size(), 3);
     Assert.assertEquals(resolution.getLowestResolution(), 5);
     Assert.assertEquals(resolution.getResolutions(), Lists.newArrayList(5, 6, 13));
+  }
+
+  @Test
+  public void serde()
+      throws JsonProcessingException {
+    H3IndexConfig initialConf = new H3IndexConfig(new H3IndexResolution(Lists.newArrayList(5, 6, 13)));
+
+    String confAsJson = JsonUtils.objectToString(initialConf);
+    Assert.assertEquals(confAsJson, "{\"disabled\":false,\"resolution\":[5,6,13]}");
+
+    H3IndexConfig readConf = JsonUtils.stringToObject(confAsJson, H3IndexConfig.class);
+    Assert.assertEquals(readConf, initialConf, "Unexpected configuration after serialization and deserialization");
+  }
+
+  @Test
+  public void deserializeShort()
+      throws JsonProcessingException {
+    H3IndexConfig initialConf = new H3IndexConfig(new H3IndexResolution(Lists.newArrayList(5, 6, 13)));
+
+    String serialized = "{\"resolution\":8288}";
+    H3IndexConfig h3IndexConfig = JsonUtils.stringToObject(serialized, H3IndexConfig.class);
+
+    Assert.assertEquals(h3IndexConfig, initialConf, "Unexpected configuration after reading " + serialized);
   }
 }
