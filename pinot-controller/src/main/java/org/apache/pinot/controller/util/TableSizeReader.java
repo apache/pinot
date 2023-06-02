@@ -279,12 +279,13 @@ public class TableSizeReader {
       String segment = entry.getKey();
       SegmentSizeDetails sizeDetails = entry.getValue();
       // Iterate over all segment size info, update reported size, track max segment size and number of errored servers
-      long segmentLevelMax = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
+      sizeDetails._maxReportedSizePerReplicaInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       int errors = 0;
       for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
         if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
           sizeDetails._reportedSizeInBytes += sizeInfo.getDiskSizeInBytes();
-          segmentLevelMax = Math.max(segmentLevelMax, sizeInfo.getDiskSizeInBytes());
+          sizeDetails._maxReportedSizePerReplicaInBytes =
+              Math.max(sizeDetails._maxReportedSizePerReplicaInBytes, sizeInfo.getDiskSizeInBytes());
         } else {
           errors++;
         }
@@ -292,8 +293,8 @@ public class TableSizeReader {
       // Update estimated size, track segments that are missing from all servers
       if (errors != sizeDetails._serverInfo.size()) {
         // Use max segment size from other servers to estimate the segment size not reported
-        sizeDetails._estimatedSizeInBytes = sizeDetails._reportedSizeInBytes + errors * segmentLevelMax;
-        sizeDetails._maxReportedSizePerReplicaInBytes = segmentLevelMax;
+        sizeDetails._estimatedSizeInBytes =
+            sizeDetails._reportedSizeInBytes + (errors * sizeDetails._maxReportedSizePerReplicaInBytes);
         subTypeSizeDetails._reportedSizeInBytes += sizeDetails._reportedSizeInBytes;
         subTypeSizeDetails._estimatedSizeInBytes += sizeDetails._estimatedSizeInBytes;
         subTypeSizeDetails._reportedSizePerReplicaInBytes += sizeDetails._maxReportedSizePerReplicaInBytes;
