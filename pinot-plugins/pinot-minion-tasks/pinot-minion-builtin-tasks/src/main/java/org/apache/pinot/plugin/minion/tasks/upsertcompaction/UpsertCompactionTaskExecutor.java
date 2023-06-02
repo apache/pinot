@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,12 +55,10 @@ import org.slf4j.LoggerFactory;
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
-  private int _numRecordsCompacted;
 
   private class CompactedRecordReader implements RecordReader {
     private final PinotSegmentRecordReader _pinotSegmentRecordReader;
-    private final ImmutableRoaringBitmap _validDocIds;
-    private int _docId = 0;
+    private final PeekableIntIterator _validDocIdsIterator;
     // Reusable generic row to store the next row to return
     GenericRow _nextRow = new GenericRow();
     // Flag to mark whether we need to fetch another row
@@ -70,7 +69,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     CompactedRecordReader(File indexDir, ImmutableRoaringBitmap validDocIds) {
       _pinotSegmentRecordReader = new PinotSegmentRecordReader();
       _pinotSegmentRecordReader.init(indexDir, null, null);
-      _validDocIds = validDocIds;
+      _validDocIdsIterator = validDocIds.getIntIterator();
     }
 
     @Override
@@ -89,16 +88,12 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       }
 
       // Try to get the next row to return
-      while (_pinotSegmentRecordReader.hasNext()) {
+      if (_validDocIdsIterator.hasNext()) {
+        int docId = _validDocIdsIterator.next();
         _nextRow.clear();
-        _nextRow = _pinotSegmentRecordReader.next(_nextRow);
-        _docId++;
-        if (_validDocIds.contains(_docId - 1)) {
-          _nextRowReturned = false;
-          return true;
-        } else {
-          _numRecordsCompacted++;
-        }
+        _pinotSegmentRecordReader.getRecord(docId, _nextRow);
+        _nextRowReturned = false;
+        return true;
       }
 
       // Cannot find next row to return, return false
@@ -124,8 +119,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       _pinotSegmentRecordReader.rewind();
       _nextRowReturned = true;
       _finished = false;
-      _docId = 0;
-      _numRecordsCompacted = 0;
     }
 
     @Override
@@ -155,8 +148,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();
-      _eventObserver.notifyProgress(pinotTaskConfig,
-          "Number of records compacted: " + String.valueOf(_numRecordsCompacted));
     }
 
     File compactedSegmentFile = new File(workingDir, segmentName);
