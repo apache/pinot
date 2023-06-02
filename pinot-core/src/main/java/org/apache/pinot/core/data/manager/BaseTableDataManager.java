@@ -691,9 +691,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       File tierTableDataDir = new File(tierDataDir, _tableNameWithType);
       return new File(tierTableDataDir, segmentName);
     } catch (Exception e) {
-      LOGGER.warn("Failed to get dataDir for segment: {} of table: {} on tier: {} due to error: {}", segmentName,
-          _tableNameWithType, segmentTier, e.getMessage());
-      return getSegmentDataDir(segmentName);
+      File defaultDir = getSegmentDataDir(segmentName);
+      LOGGER.debug("Failed to get dataDir for segment: {} of table: {} on tier: {} due to error: {}. Use default: {}",
+          segmentName, _tableNameWithType, segmentTier, e.getMessage(), defaultDir);
+      return defaultDir;
     }
   }
 
