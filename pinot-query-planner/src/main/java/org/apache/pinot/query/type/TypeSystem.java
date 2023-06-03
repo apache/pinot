@@ -71,61 +71,15 @@ public class TypeSystem extends RelDataTypeSystemImpl {
     }
   }
 
-  // overriding the function for handling comparison bet ween different data types.
+  // overriding the function for handling comparison between different data types.
   // based on the precision value calcite adds the CAST function to make operands of same type for comparison.
   @Override public int getDefaultPrecision(SqlTypeName typeName) {
-    // Following BasicSqlType precision as the default
     switch (typeName) {
-      case CHAR:
-      case BINARY:
-        return 1;
-      case VARCHAR:
-      case VARBINARY:
-        return RelDataType.PRECISION_NOT_SPECIFIED;
-      case DECIMAL:
-        return getMaxNumericPrecision();
-      case INTERVAL_YEAR:
-      case INTERVAL_YEAR_MONTH:
-      case INTERVAL_MONTH:
-      case INTERVAL_DAY:
-      case INTERVAL_DAY_HOUR:
-      case INTERVAL_DAY_MINUTE:
-      case INTERVAL_DAY_SECOND:
-      case INTERVAL_HOUR:
-      case INTERVAL_HOUR_MINUTE:
-      case INTERVAL_HOUR_SECOND:
-      case INTERVAL_MINUTE:
-      case INTERVAL_MINUTE_SECOND:
-      case INTERVAL_SECOND:
-        return SqlTypeName.DEFAULT_INTERVAL_START_PRECISION;
-      case BOOLEAN:
-        return 1;
-      case TINYINT:
-        return 3;
-      case SMALLINT:
-        return 5;
-      case INTEGER:
-        return 10;
-      case BIGINT:
-        return 19;
-      case REAL:
-        return 7;
-      case FLOAT:
-        return 15;
       case DOUBLE:
         return 16;
-      case TIME:
-      case TIME_WITH_LOCAL_TIME_ZONE:
-      case DATE:
-        return 0; // SQL99 part 2 section 6.1 syntax rule 30
-      case TIMESTAMP:
-      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-        // farrago supports only 0 (see
-        // SqlTypeName.getDefaultPrecision), but it should be 6
-        // (microseconds) per SQL99 part 2 section 6.1 syntax rule 30.
-        return 0;
       default:
-        return -1;
+        // Following BasicSqlType precision as the default
+        return super.getDefaultPrecision(typeName);
     }
   }
 }
