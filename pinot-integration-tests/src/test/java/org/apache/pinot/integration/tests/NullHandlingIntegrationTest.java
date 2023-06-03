@@ -303,8 +303,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testOrderByNullsFirst()
       throws Exception {
-    String h2Query =
-        "SELECT 1 AS column1 FROM " + getTableName() + " ORDER BY column1 NULLS FIRST";
+    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary NULLS FIRST";
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
@@ -313,8 +312,16 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testOrderByNullsLast()
       throws Exception {
-    String h2Query =
-        "SELECT 1 AS column1 FROM " + getTableName() + " ORDER BY column1 DESC NULLS LAST";
+    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+
+    testQuery(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testDistinctOrderByNullsLast()
+      throws Exception {
+    String h2Query = "SELECT distinct salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
