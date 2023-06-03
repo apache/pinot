@@ -236,7 +236,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // consuming.
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
-  private BooleanSupplier _isReadyToConsumeData;
+  private final BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
@@ -403,13 +403,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
     removeSegmentFile();
-
-    if (!_isReadyToConsumeData.getAsBoolean()) {
-      do {
-        //noinspection BusyWait
-        Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-      } while (!_shouldStop && !endCriteriaReached() && !_isReadyToConsumeData.getAsBoolean());
-    }
 
     _numRowsErrored = 0;
     final long idlePipeSleepTimeMillis = 100;
@@ -666,6 +659,46 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
+        if (!_isReadyToConsumeData.getAsBoolean()) {
+          do {
+            //noinspection BusyWait
+            Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+          } while (!_shouldStop && !endCriteriaReached() && !_isReadyToConsumeData.getAsBoolean());
+        }
+
+        if (_tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig().isEnableSnapshot()) {
+          // Persist snapshot for sealed segments. We need to guarantee the previous segment is already replaced with
+          // the immutable segment, so the snapshot might not be persisted for the previous consuming segment.
+          List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
+          List<SegmentDataManager> allSegmentsForPartition = _realtimeTableDataManager.acquireAllSegments();
+          for (SegmentDataManager segmentDataManager: allSegments) {
+            // release segments not this partition
+            if (_partitionGroupId == new LLCSegmentName(segmentDataManager.getSegmentName()).getPartitionGroupId()) {
+              allSegmentsForPartition.add(segmentDataManager);
+            } else {
+              _realtimeTableDataManager.releaseSegment(segmentDataManager);
+            }
+          }
+          // wait if all segments for this partition not sealed completely
+          if (allSegmentsForPartition.stream().anyMatch(
+              segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment())) {
+            do {
+              //noinspection BusyWait
+              Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+            } while (allSegmentsForPartition.stream().anyMatch(
+                segmentDataManager -> !segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()));
+          }
+          // Persist snapshot and release all the segments for this partition, they should be immutableSegments.
+          for (SegmentDataManager segmentDataManager: allSegmentsForPartition) {
+            assert segmentDataManager.getSegment() instanceof ImmutableSegment;
+            if (segmentDataManager.getSegment().getValidDocIds() != null) {
+              MutableRoaringBitmap validDocIds =
+                  segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
+              ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+            }
+            _realtimeTableDataManager.releaseSegment(segmentDataManager);
+          }
+        }
         while (!_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
@@ -1432,20 +1465,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       _partitionGroupConsumerSemaphore.acquire();
       _acquiredConsumerSemaphore.set(true);
-      if (_tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig().isEnableSnapshot()) {
-        // persist snapshot for all sealed segments
-        // TODO: Use a semaphore to guarantee all the segments are sealed before persisting snapshot.
-        List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
-        for (SegmentDataManager segmentDataManager: allSegments) {
-          if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
-            MutableRoaringBitmap validDocIds = new MutableRoaringBitmap();
-            if (segmentDataManager.getSegment().getValidDocIds() != null) {
-              validDocIds = segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
-            }
-            ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
-          }
-        }
-      }
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
       _segmentLogger.error(errorMsg);

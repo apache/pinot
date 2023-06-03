@@ -208,39 +208,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
     }
 
-    if (tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().isEnableSnapshot()
-        && isPartialUpsertEnabled()) {
-      // For partial-upsert, need to wait for all segments loaded before starting consuming data
-      // For snapshot enabled, we need to make sure the snapshots are persisted for all sealed segments
-      _isTableReadyToConsumeData = new BooleanSupplier() {
-        volatile boolean _allSnapshotPersisted;
-        volatile boolean _allSegmentsLoaded;
-        long _lastCheckTimeMs;
-
-        @Override
-        public boolean getAsBoolean() {
-          if (_allSnapshotPersisted && _allSegmentsLoaded) {
-            return true;
-          } else {
-            synchronized (this) {
-              if (_allSnapshotPersisted && _allSegmentsLoaded) {
-                return true;
-              }
-              long currentTimeMs = System.currentTimeMillis();
-              if (currentTimeMs - _lastCheckTimeMs
-                  <= RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
-                return false;
-              }
-              _lastCheckTimeMs = currentTimeMs;
-              _allSnapshotPersisted = checkAllSnapshotPersisted();
-              _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
-              return _allSnapshotPersisted && _allSegmentsLoaded;
-            }
-          }
-        }
-      };
-    } else if (isDedupEnabled() || isPartialUpsertEnabled()) {
-      // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
+    // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
+    if (isDedupEnabled() || isPartialUpsertEnabled()) {
       _isTableReadyToConsumeData = new BooleanSupplier() {
         volatile boolean _allSegmentsLoaded;
         long _lastCheckTimeMs;
@@ -265,49 +234,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           }
         }
       };
-    } else if (tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().isEnableSnapshot()) {
-      // For snapshot enabled, we need to make sure the snapshots are persisted for all sealed segments
-      _isTableReadyToConsumeData = new BooleanSupplier() {
-        volatile boolean _allSnapshotPersisted;
-        long _lastCheckTimeMs;
-
-        @Override
-        public boolean getAsBoolean() {
-          if (_allSnapshotPersisted) {
-            return true;
-          } else {
-            synchronized (this) {
-              if (_allSnapshotPersisted) {
-                return true;
-              }
-              long currentTimeMs = System.currentTimeMillis();
-              if (currentTimeMs - _lastCheckTimeMs
-                  <= RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
-                return false;
-              }
-              _lastCheckTimeMs = currentTimeMs;
-              _allSnapshotPersisted = checkAllSnapshotPersisted();
-              return _allSnapshotPersisted;
-            }
-          }
-        }
-      };
     } else {
       _isTableReadyToConsumeData = () -> true;
     }
-  }
-
-  private boolean checkAllSnapshotPersisted() {
-    List<SegmentDataManager> allSegments = acquireAllSegments();
-    for (SegmentDataManager segmentDataManager : allSegments) {
-      if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
-        File file = ((ImmutableSegmentImpl) segmentDataManager.getSegment()).getValidDocIdsSnapshotFile();
-        if (!file.exists()) {
-          return false;
-        }
-      }
-    }
-    return true;
   }
 
   @Override
