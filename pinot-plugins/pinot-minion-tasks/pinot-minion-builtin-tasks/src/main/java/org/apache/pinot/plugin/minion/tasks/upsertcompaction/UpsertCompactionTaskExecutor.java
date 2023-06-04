@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
@@ -34,6 +35,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -189,7 +191,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     return config;
   }
 
-  private static ImmutableRoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs) {
+  private static ImmutableRoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs)
+      throws URISyntaxException {
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String server = getServer(segmentName, tableNameWithType);
 
@@ -197,8 +200,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     InstanceConfig instanceConfig =
         _clusterManagementTool.getInstanceConfig(_clusterName, server);
     String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
-    String url = String.format("%s/segments/%s/%s/validDocIds",
-        endpoint, tableNameWithType, segmentName);
+    String url = new URIBuilder(endpoint)
+        .setPath(String.format("/segments/%s/%s/validDocIds", tableNameWithType, segmentName))
+        .toString();
 
     // get the validDocIds from that server
     Response response = ClientBuilder.newClient().target(url).request().get(Response.class);

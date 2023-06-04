@@ -425,7 +425,7 @@ public class TablesResource {
   public Response downloadValidDocIds(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
       @Context HttpHeaders httpHeaders) {
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
     // Validate data access

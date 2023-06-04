@@ -20,12 +20,14 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -86,8 +88,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         throw new RuntimeException(e);
       }
 
-      Map<String, SegmentZKMetadata> urlToSegment =
-          getUrlToSegmentMappings(tableNameWithType, completedSegments, segmentToServer, serverToEndpoints);
+      Map<String, SegmentZKMetadata> urlToSegment;
+      try {
+        urlToSegment =
+            getUrlToSegmentMappings(tableNameWithType, completedSegments, segmentToServer, serverToEndpoints);
+      } catch (URISyntaxException e) {
+        throw new RuntimeException(e);
+      }
 
       // request the urls from the servers
       CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(
@@ -139,8 +146,12 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     for (SegmentZKMetadata segment : allSegments) {
       CommonConstants.Segment.Realtime.Status status = segment.getStatus();
       // initial segments selection based on status and age
-      if (status.isCompleted() && segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs)) {
-        completedSegments.add(segment);
+      if (status.isCompleted()) {
+        boolean endedWithinBufferPeriod = segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs);
+        boolean endsInTheFuture = segment.getEndTimeMs() > System.currentTimeMillis();
+        if (endedWithinBufferPeriod || endsInTheFuture) {
+          completedSegments.add(segment);
+        }
       }
     }
     return completedSegments;
@@ -149,15 +160,17 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   @VisibleForTesting
   public static Map<String, SegmentZKMetadata> getUrlToSegmentMappings(String tableNameWithType,
       List<SegmentZKMetadata> completedSegments, Map<String, String> segmentToServer,
-      BiMap<String, String> serverToEndpoints) {
+      BiMap<String, String> serverToEndpoints)
+      throws URISyntaxException {
     // get url to segment mappings
     Map<String, SegmentZKMetadata> urlToSegment = new HashMap<>();
     for (SegmentZKMetadata completedSegment : completedSegments) {
       String segmentName = completedSegment.getSegmentName();
       String server = segmentToServer.get(segmentName);
       String endpoint = serverToEndpoints.get(server);
-      String url = String.format("%s/tables/%s/segments/%s/invalidRecordCount",
-        endpoint, tableNameWithType, segmentName);
+      String url = new URIBuilder(endpoint)
+          .setPath(String.format("/tables/%s/segments/%s/invalidRecordCount", tableNameWithType, segmentName))
+          .toString();
       urlToSegment.put(url, completedSegment);
     }
     return urlToSegment;

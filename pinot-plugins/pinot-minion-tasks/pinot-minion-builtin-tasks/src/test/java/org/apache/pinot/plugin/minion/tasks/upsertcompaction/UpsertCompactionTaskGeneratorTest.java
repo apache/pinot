@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -150,7 +151,8 @@ public class UpsertCompactionTaskGeneratorTest {
   }
 
   @Test
-  public void testGetUrlToSegmentMappings() {
+  public void testGetUrlToSegmentMappings()
+      throws URISyntaxException {
     List<SegmentZKMetadata> completedSegments = Lists.newArrayList(_completedSegment);
     Map<String, String> segmentToServer = new HashMap<>();
     segmentToServer.put(_completedSegment.getSegmentName(), "server1");
