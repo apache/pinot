@@ -538,9 +538,9 @@ public final class TableConfigUtils {
           // check no malformed period
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
           // check maxNumRecordsPerSegment
-          Preconditions.checkState(Integer.parseInt(
-                  taskTypeConfig.getOrDefault("maxNumRecordsPerSegment", "5000000")) > 0,
-              "maxNumRecordsPerSegment must be > 0");
+          Preconditions.checkState(Double.parseDouble(
+                  taskTypeConfig.getOrDefault("invalidRecordsThresholdPercent", "10.0")) >= 0,
+              "invalidRecordsThresholdPercent must be >= 0");
         }
       }
     }

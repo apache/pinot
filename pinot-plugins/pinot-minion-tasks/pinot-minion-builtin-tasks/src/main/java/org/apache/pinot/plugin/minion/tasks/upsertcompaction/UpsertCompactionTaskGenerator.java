@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
-  private static final long DEFAULT_INVALID_RECORDS_THRESHOLD = 100000;
+  private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 10.0;
   @Override
   public String getTaskType() {
     return MinionConstants.UpsertCompactionTask.TASK_TYPE;
@@ -103,14 +103,16 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
             completionServiceHelper.doMultiGetRequest(
                 new ArrayList<>(urlToSegment.keySet()), tableNameWithType, true, 3000);
 
-      // only compact segments that exceed the invalidRecordThreshold
-      long invalidRecordsThreshold = Long.parseLong(compactionConfigs.getOrDefault(
-          UpsertCompactionTask.INVALID_RECORDS_THRESHOLD, String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD)));
+      // only compact segments that exceed the threshold
+      double invalidRecordsThresholdPercent =
+          Double.parseDouble(compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
+              String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
       List<SegmentZKMetadata> selectedSegments = new ArrayList<>();
       for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-        long invalidRecordCount = Long.parseLong(streamResponse.getValue());
-        if (invalidRecordCount > invalidRecordsThreshold) {
-          SegmentZKMetadata segment = urlToSegment.get(streamResponse.getKey());
+        double invalidRecordCount = Double.parseDouble(streamResponse.getValue());
+        SegmentZKMetadata segment = urlToSegment.get(streamResponse.getKey());
+        double invalidRecordPercent = (invalidRecordCount / segment.getTotalDocs()) * 100;
+        if (invalidRecordPercent > invalidRecordsThresholdPercent) {
           selectedSegments.add(segment);
         }
       }
@@ -206,7 +208,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
   private static final String[] VALID_CONFIG_KEYS = {
       UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY,
-      UpsertCompactionTask.INVALID_RECORDS_THRESHOLD,
+      UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
   };
 
   private Map<String, String> getCompactionConfigs(Map<String, String> taskConfig) {

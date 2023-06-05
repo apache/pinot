@@ -1760,7 +1760,7 @@ public class TableConfigUtilsTest {
     Map<String, String> upsertCompactionTaskConfig =
         ImmutableMap.of(
             "bufferTimePeriod", "5d",
-            "maxNumRecordsPerSegment", "5000000"
+            "invalidRecordsThresholdPercent", "0"
         );
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)

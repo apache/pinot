@@ -148,6 +148,6 @@ public class MinionConstants {
      * The maximum amount of old records allowed for an existing segment.
      * e.g. if the current amount surpasses 2500000, then the segment will be compacted
      */
-    public static final String INVALID_RECORDS_THRESHOLD = "invalidRecordsThreshold";
+    public static final String INVALID_RECORDS_THRESHOLD_PERCENT = "invalidRecordsThresholdPercent";
   }
 }
