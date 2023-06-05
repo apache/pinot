@@ -118,5 +118,6 @@ public class NativeTextIndexReader implements TextIndexReader {
   @Override
   public void close()
       throws IOException {
+    _buffer.close();
   }
 }
