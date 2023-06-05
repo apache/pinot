@@ -106,7 +106,7 @@ public class TextIndexHandler extends BaseIndexHandler {
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
-      if (!columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column) && shouldRemoveTextIndex(_segmentMetadata.getColumnMetadataFor(column))) {
         LOGGER.info("Need to remove existing text index from segment: {}, column: {}", segmentName, column);
         return true;
       }
@@ -130,7 +130,7 @@ public class TextIndexHandler extends BaseIndexHandler {
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
     for (String column : existingColumns) {
-      if (!columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column) && shouldRemoveTextIndex(_segmentMetadata.getColumnMetadataFor(column))) {
         LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, ColumnIndexType.TEXT_INDEX);
         LOGGER.info("Removed existing text index from segment: {}, column: {}", segmentName, column);
@@ -142,6 +142,14 @@ public class TextIndexHandler extends BaseIndexHandler {
         createTextIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldRemoveTextIndex(ColumnMetadata columnMetadata) {
+    if (columnMetadata != null) {
+      // skip deleting text index if SKIP_EXISTING_SEGMENTS is set to true.
+      return processExistingSegments(columnMetadata);
+    }
+    return true;
   }
 
   private boolean shouldCreateTextIndex(ColumnMetadata columnMetadata) {
