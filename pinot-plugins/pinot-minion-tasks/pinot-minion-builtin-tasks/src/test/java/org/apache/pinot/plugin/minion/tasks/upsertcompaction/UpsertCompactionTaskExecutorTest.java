@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -37,7 +38,9 @@ public class UpsertCompactionTaskExecutorTest {
   public void testGetServer() {
     ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
     Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
-    externalViewSegmentAssignment.put(SEGMENT_NAME, Map.of("server1", "server1"));
+    Map<String, String> map = new HashMap<>();
+    map.put("server1", "server1");
+    externalViewSegmentAssignment.put(SEGMENT_NAME, map);
     HelixAdmin clusterManagementTool = Mockito.mock(HelixAdmin.class);
     MinionContext minionContext = MinionContext.getInstance();
     Mockito.when(clusterManagementTool.getResourceExternalView(CLUSTER_NAME, REALTIME_TABLE_NAME))

@@ -157,14 +157,14 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, String> segmentToServer = new HashMap<>();
     segmentToServer.put(_completedSegment.getSegmentName(), "server1");
     BiMap<String, String> serverToEndpoints = HashBiMap.create(1);
-    serverToEndpoints.put("server1", "endpoint1");
+    serverToEndpoints.put("server1", "http://endpoint1");
 
     Map<String, SegmentZKMetadata> urlToSegment =
         UpsertCompactionTaskGenerator.getUrlToSegmentMappings(
             REALTIME_TABLE_NAME, completedSegments, segmentToServer, serverToEndpoints);
 
     String expectedUrl = String.format("%s/tables/%s/segments/%s/invalidRecordCount",
-        "endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName());
+        "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName());
     SegmentZKMetadata seg = urlToSegment.get(expectedUrl);
     assertEquals(seg.getSegmentName(), _completedSegment.getSegmentName());
   }
