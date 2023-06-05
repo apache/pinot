@@ -22,7 +22,6 @@ import java.util.Map;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
 import org.apache.pinot.minion.MinionContext;
 import org.mockito.Mockito;
 import org.testng.Assert;
