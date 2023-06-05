@@ -54,6 +54,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
+import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
@@ -489,14 +490,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
-    if (isUpsertEnabled()) {
-      handleUpsert(immutableSegment);
-      return;
-    }
+    if (immutableSegment instanceof ImmutableSegmentImpl) {
+      if (isUpsertEnabled()) {
+        handleUpsert(immutableSegment);
+        return;
+      }
 
-    // TODO: Change dedup handling to handle segment replacement
-    if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
-      buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
+      // TODO: Change dedup handling to handle segment replacement
+      if (isDedupEnabled()) {
+        buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
+      }
     }
     super.addSegment(immutableSegment);
   }

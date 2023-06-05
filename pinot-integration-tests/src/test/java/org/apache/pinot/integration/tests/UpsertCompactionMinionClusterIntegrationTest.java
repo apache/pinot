@@ -123,8 +123,11 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
 
   @Override
   protected long getCountStarResult() {
-    // Three distinct records are expected with pk values of 100000, 100001, 100002
     return 3;
+  }
+
+  private long getCountStarResultAfterCompaction() {
+    return 300;
   }
 
   @AfterClass
@@ -159,10 +162,10 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
 
   @Test
   public void testCompaction() {
-    assertNotEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResult());
+    assertNotEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResultAfterCompaction());
     assertNotNull(_taskManager.scheduleTasks(REALTIME_TABLE_NAME).get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
-    assertEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResult());
+    assertEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResultAfterCompaction());
   }
 
   protected void waitForTaskToComplete() {
