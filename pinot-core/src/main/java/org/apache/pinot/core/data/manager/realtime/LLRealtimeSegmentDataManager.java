@@ -670,7 +670,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // Persist snapshot for sealed segments. We need to guarantee the previous segment is already replaced with
           // the immutable segment, so the snapshot might not be persisted for the previous consuming segment.
           List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
-          List<SegmentDataManager> allSegmentsForPartition = _realtimeTableDataManager.acquireAllSegments();
+          List<SegmentDataManager> allSegmentsForPartition = new ArrayList<>();
           for (SegmentDataManager segmentDataManager: allSegments) {
             // release segments not this partition
             if (_partitionGroupId == new LLCSegmentName(segmentDataManager.getSegmentName()).getPartitionGroupId()) {
