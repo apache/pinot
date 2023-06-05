@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class ServerPlanRequestUtils {
-  private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
+  private static final int DEFAULT_LEAF_NODE_LIMIT = Integer.MAX_VALUE;
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerPlanRequestUtils.class);
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
       ImmutableList.of(PredicateComparisonRewriter.class.getName(),
