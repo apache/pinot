@@ -219,6 +219,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    String[] outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 10);
@@ -255,6 +257,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getName(), "myTable_segment_0001");
@@ -269,6 +273,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 5);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
@@ -286,6 +292,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 5);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
@@ -303,6 +311,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertTrue(outputSegments.isEmpty());
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_singleSegment);
 
@@ -313,6 +323,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
@@ -329,6 +341,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 3);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     outputSegments.sort(null);
     // segment 0
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
@@ -366,6 +380,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 2);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     outputSegments.sort(null);
     // segment 0
     segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
@@ -429,6 +445,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 8);
     assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597881600000_0");
@@ -442,6 +460,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 3);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     outputSegments.sort(null);
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
@@ -462,6 +482,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 3);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     outputSegments.sort(null);
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
@@ -488,6 +510,8 @@ public class SegmentProcessorFrameworkTest {
     SegmentProcessorFramework framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
     List<File> outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    String[] outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
@@ -501,6 +525,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 3);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     outputSegments.sort(null);
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 2);
@@ -528,6 +554,8 @@ public class SegmentProcessorFrameworkTest {
     SegmentProcessorFramework framework = new SegmentProcessorFramework(_multiValueSegments, config, workingDir);
     List<File> outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    String[] outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 2);
@@ -562,6 +590,8 @@ public class SegmentProcessorFrameworkTest {
     framework = new SegmentProcessorFramework(_multiValueSegments, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
     segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 2);
