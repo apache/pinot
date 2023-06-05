@@ -107,6 +107,27 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
   /**
+   * Merges two intermediate results and also updates the aggregation result holder. This is needed when aggregation
+   * is processed in multiple stages to store the intermediate results.
+   */
+  default void mergeAndUpdateResultHolder(IntermediateResult intermediateResult,
+      AggregationResultHolder aggregationResultHolder) {
+    // TODO: Remove when support for all aggregation functions is added to the Multistage engine.
+    throw new UnsupportedOperationException("Aggregation operation is not supported.");
+  }
+
+  /**
+   * Merges two intermediate results and also updates the group by result holder. This is needed when aggregation is
+   * processed in multiple stages to store the intermediate results.
+   */
+  default void mergeAndUpdateResultHolder(IntermediateResult intermediateResult,
+      GroupByResultHolder groupByResultHolder,
+      int groupKey) {
+    // TODO: Remove when support for all aggregation functions is added to the Multistage engine.
+    throw new UnsupportedOperationException("Aggregation operation is not supported.");
+  }
+
+  /**
    * Returns the {@link ColumnDataType} of the intermediate result.
    * <p>This column data type is used for transferring data in data table.
    */

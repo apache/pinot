@@ -60,7 +60,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
   @Override
   public ColumnContext getResultColumnContext(ExpressionContext expression) {
     assert expression.getType() == ExpressionContext.Type.IDENTIFIER;
-    return _columnContextMap.get(expression.getIdentifier());
+    return _columnContextMap.get(expression.getIdentifierName());
   }
 
   @Override

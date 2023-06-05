@@ -197,7 +197,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
         "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier"
             + " if needed.", lhs, lhs.getType());
-    String key = lhs.getIdentifier();
+    String key = lhs.getIdentifierName();
 
     // Support 2 formats:
     // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')

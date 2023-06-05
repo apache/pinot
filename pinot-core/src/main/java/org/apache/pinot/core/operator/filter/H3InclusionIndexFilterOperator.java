@@ -70,10 +70,10 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     _isPositiveCheck = BooleanUtils.toBoolean(eqPredicate.getValue());
 
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
-      _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
+      _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifierName()).getH3Index();
       _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral().getStringValue()));
     } else {
-      _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
+      _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifierName()).getH3Index();
       _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral().getStringValue()));
     }
     // must be some h3 index

@@ -117,6 +117,22 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   }
 
   @Override
+  public void mergeAndUpdateResultHolder(Set intermediateResult,
+      AggregationResultHolder aggregationResultHolder) {
+    Set existingVal = extractAggregationResult(aggregationResultHolder);
+    Set result = merge(existingVal, intermediateResult);
+    aggregationResultHolder.setValue(result);
+  }
+
+  @Override
+  public void mergeAndUpdateResultHolder(Set intermediateResult,
+      GroupByResultHolder groupByResultHolder, int groupKey) {
+    Set existingVal = extractGroupByResult(groupByResultHolder, groupKey);
+    Set result = merge(existingVal, intermediateResult);
+    groupByResultHolder.setValueForKey(groupKey, result);
+  }
+
+  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

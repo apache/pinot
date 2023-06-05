@@ -71,7 +71,7 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
     }
 
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
-      return new ColumnValueExtractor(_indexes.get(expression.getIdentifier()), _dataSchema);
+      return new ColumnValueExtractor(_indexes.get(expression.getIdentifierName()), _dataSchema);
     } else {
       // TODO: This does not handle transform properly (e.g. colA - colB where the gapfill selects colA and colB).
       // TODO: This is handled within the PostAggregationValueExtractor, and we may also extract that out to be shared.

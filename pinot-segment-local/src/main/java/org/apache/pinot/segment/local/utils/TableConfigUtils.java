@@ -385,7 +385,7 @@ public final class TableConfigUtils {
           Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
               "aggregator function argument must be a identifier: %s", aggregationConfig);
 
-          aggregationSourceColumns.add(argument.getIdentifier());
+          aggregationSourceColumns.add(argument.getIdentifierName());
         }
         if (schema != null) {
           Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),

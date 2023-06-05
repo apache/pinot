@@ -110,7 +110,7 @@ public class AggregationPlanNode implements PlanNode {
         for (int i = 0; i < aggregationFunctions.length; i++) {
           List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
           if (!inputExpressions.isEmpty()) {
-            String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
+            String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifierName();
             dataSources[i] = _indexSegment.getDataSource(column);
           }
         }
@@ -163,7 +163,7 @@ public class AggregationPlanNode implements PlanNode {
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
       }
-      DataSource dataSource = indexSegment.getDataSource(argument.getIdentifier());
+      DataSource dataSource = indexSegment.getDataSource(argument.getIdentifierName());
       if (DICTIONARY_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
         if (dataSource.getDictionary() != null) {
           continue;

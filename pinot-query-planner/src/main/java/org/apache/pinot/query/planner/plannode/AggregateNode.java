@@ -44,9 +44,11 @@ public class AggregateNode extends AbstractPlanNode {
       List<RexExpression> groupSet,
       List<RelHint> relHints) {
     super(planFragmentId, dataSchema);
-    _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+
+
     _groupSet = groupSet;
     _relHints = relHints;
+    _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     Preconditions.checkState(!(isFinalStage(this) && isIntermediateStage(this)),
         "Unable to compile aggregation with both hints for final and intermediate agg type.");
   }
@@ -59,6 +61,11 @@ public class AggregateNode extends AbstractPlanNode {
   public static boolean isIntermediateStage(AggregateNode aggNode) {
     return PinotHintStrategyTable.containsHint(aggNode.getRelHints(),
         PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE);
+  }
+
+  public static boolean isSingleStageAggregation(AggregateNode aggNode) {
+    return PinotHintStrategyTable.containsHint(aggNode.getRelHints(),
+        PinotHintStrategyTable.INTERNAL_IS_SINGLE_STAGE_AGG);
   }
 
   public List<RexExpression> getAggCalls() {

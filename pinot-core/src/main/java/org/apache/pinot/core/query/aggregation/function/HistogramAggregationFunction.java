@@ -98,7 +98,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     for (int i = 0; i < len; i++) {
       // TODO: Represent infinity as literal instead of identifier
       if (arrayStr.get(i).getType() == ExpressionContext.Type.IDENTIFIER) {
-        ret[i] = Double.parseDouble(arrayStr.get(i).getIdentifier());
+        ret[i] = Double.parseDouble(arrayStr.get(i).getIdentifierName());
       } else {
         ret[i] = arrayStr.get(i).getLiteral().getDoubleValue();
       }

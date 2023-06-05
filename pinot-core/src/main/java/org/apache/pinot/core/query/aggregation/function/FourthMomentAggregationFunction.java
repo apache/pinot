@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunct
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-
+// TODO: Add null handling.
 public class FourthMomentAggregationFunction extends BaseSingleInputAggregationFunction<PinotFourthMoment, Double> {
 
   private final Type _type;
@@ -138,6 +138,30 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
   public PinotFourthMoment merge(PinotFourthMoment intermediateResult1, PinotFourthMoment intermediateResult2) {
     intermediateResult1.combine(intermediateResult2);
     return intermediateResult1;
+  }
+
+  @Override
+  public void mergeAndUpdateResultHolder(PinotFourthMoment intermediateResult,
+      AggregationResultHolder aggregationResultHolder) {
+    PinotFourthMoment existingVal = aggregationResultHolder.getResult();
+    if (existingVal == null || intermediateResult == null) {
+      // TODO: This can be removed when native nullHandling is added to FourthMoment aggregation function.
+      return;
+    }
+    PinotFourthMoment result = merge(existingVal, intermediateResult);
+    aggregationResultHolder.setValue(result);
+  }
+
+  @Override
+  public void mergeAndUpdateResultHolder(PinotFourthMoment intermediateResult,
+      GroupByResultHolder groupByResultHolder, int groupKey) {
+    PinotFourthMoment existingVal = groupByResultHolder.getResult(groupKey);
+    if (existingVal == null || intermediateResult == null) {
+      // TODO: This can be removed when native nullHandling is added to FourthMoment aggregation function.
+      return;
+    }
+    PinotFourthMoment result = merge(existingVal, intermediateResult);
+    groupByResultHolder.setValueForKey(groupKey, result);
   }
 
   @Override

@@ -71,7 +71,7 @@ public class AggregationFunctionUtils {
     if (inputExpressions.size() == 1) {
       ExpressionContext inputExpression = inputExpressions.get(0);
       if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
-        return new AggregationFunctionColumnPair(aggregationFunctionType, inputExpression.getIdentifier());
+        return new AggregationFunctionColumnPair(aggregationFunctionType, inputExpression.getIdentifierName());
       }
     }
     return null;

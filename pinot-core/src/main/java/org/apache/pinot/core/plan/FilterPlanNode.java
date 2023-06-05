@@ -146,7 +146,7 @@ public class FilterPlanNode implements PlanNode {
     boolean findLiteral = false;
     for (ExpressionContext argument : arguments) {
       if (argument.getType() == ExpressionContext.Type.IDENTIFIER) {
-        columnName = argument.getIdentifier();
+        columnName = argument.getIdentifierName();
       } else if (argument.getType() == ExpressionContext.Type.LITERAL) {
         findLiteral = true;
       }
@@ -180,14 +180,14 @@ public class FilterPlanNode implements PlanNode {
     if (functionName.equals("stwithin")) {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
-        String columnName = arguments.get(0).getIdentifier();
+        String columnName = arguments.get(0).getIdentifierName();
         return _indexSegment.getDataSource(columnName).getH3Index() != null;
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
-        String columnName = arguments.get(1).getIdentifier();
+        String columnName = arguments.get(1).getIdentifierName();
         return _indexSegment.getDataSource(columnName).getH3Index() != null;
       }
       return false;
@@ -246,7 +246,7 @@ public class FilterPlanNode implements PlanNode {
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           }
         } else {
-          String column = lhs.getIdentifier();
+          String column = lhs.getIdentifierName();
           DataSource dataSource = _indexSegment.getDataSource(column);
           PredicateEvaluator predicateEvaluator;
           switch (predicate.getType()) {

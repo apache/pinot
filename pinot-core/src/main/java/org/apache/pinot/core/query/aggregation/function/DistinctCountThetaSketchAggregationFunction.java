@@ -1055,7 +1055,7 @@ public class DistinctCountThetaSketchAggregationFunction
     Preconditions.checkArgument(expression.getType() != ExpressionContext.Type.LITERAL,
         "Post-aggregation expression should not contain literal expression: %s", expression.toString());
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
-      int sketchId = extractSketchId(expression.getIdentifier());
+      int sketchId = extractSketchId(expression.getIdentifierName());
       Preconditions.checkArgument(sketchId <= numFilters, "Sketch id: %s exceeds number of filters: %s", sketchId,
           numFilters);
       return sketchId == 0;
@@ -1266,7 +1266,7 @@ public class DistinctCountThetaSketchAggregationFunction
    */
   private Sketch evaluatePostAggregationExpression(ExpressionContext expression, List<Sketch> sketches) {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
-      return sketches.get(extractSketchId(expression.getIdentifier()));
+      return sketches.get(extractSketchId(expression.getIdentifierName()));
     }
 
     // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.

@@ -342,8 +342,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       return expression;
     }
     ExpressionContext overrideExpression = expressionOverrideHints.get(expression);
-    if (overrideExpression != null && overrideExpression.getIdentifier() != null && indexSegment.getColumnNames()
-        .contains(overrideExpression.getIdentifier())) {
+    if (overrideExpression != null && overrideExpression.getIdentifierName() != null && indexSegment.getColumnNames()
+        .contains(overrideExpression.getIdentifierName())) {
       return overrideExpression;
     }
     expression.getFunction().getArguments()

@@ -101,7 +101,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
       }
       InvocationRecording recording = Tracing.activeRecording();
       if (recording.isEnabled()) {
-        recording.setColumnName(_predicateEvaluator.getPredicate().getLhs().getIdentifier());
+        recording.setColumnName(_predicateEvaluator.getPredicate().getLhs().getIdentifierName());
         recording.setNumDocsMatchingAfterFilter(docIds.getCardinality());
         recording.setFilter(FilterType.INDEX, String.valueOf(_predicateEvaluator.getPredicateType()));
       }

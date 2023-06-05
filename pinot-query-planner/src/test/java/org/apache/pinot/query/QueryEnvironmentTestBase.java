@@ -136,8 +136,14 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) "
             + "FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 "
             + "AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col3 FROM a JOIN b ON a.col1 = b"
-            + ".col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1  "
+            + "WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
+        new Object[]{"SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), aggOptions"
+            + "(is_partitioned_by_group_by_keys='true') */ a.col3, a.col1, SUM(b.col3) FROM a JOIN b ON a.col3 = b"
+            + ".col3 GROUP BY a.col3, a.col1"},
+        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) FROM a"
+            + " WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND "
+            + "MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
     };
   }
 

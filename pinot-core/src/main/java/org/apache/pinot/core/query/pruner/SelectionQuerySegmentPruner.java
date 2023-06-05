@@ -118,7 +118,7 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     if (firstOrderByExpression.getExpression().getType() != ExpressionContext.Type.IDENTIFIER) {
       return segments;
     }
-    String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
+    String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifierName();
 
     // Extract the column min/max value from each segment
     int numSegments = segments.size();

@@ -74,7 +74,7 @@ public class DefaultFetchPlanner implements FetchPlanner {
           // Only prune columns
           break;
         }
-        String column = lhs.getIdentifier();
+        String column = lhs.getIdentifierName();
         Predicate.Type predicateType = predicate.getType();
         if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.IN) {
           eqInColumns.add(column);
@@ -95,7 +95,7 @@ public class DefaultFetchPlanner implements FetchPlanner {
 
   private Set<String> getColumns(IndexSegment indexSegment, QueryContext queryContext) {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    if (selectExpressions.size() == 1 && "*".equals(selectExpressions.get(0).getIdentifier())) {
+    if (selectExpressions.size() == 1 && "*".equals(selectExpressions.get(0).getIdentifierName())) {
       return indexSegment.getPhysicalColumnNames();
     } else {
       return queryContext.getColumns();

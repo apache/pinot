@@ -43,7 +43,9 @@ public class AggregationFunctionFactory {
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
-      String upperCaseFunctionName = StringUtils.remove(function.getFunctionName(), '_').toUpperCase();
+      // TODO(Sonam): Replace $ removal with a util function
+      String upperCaseFunctionName =
+          StringUtils.remove(StringUtils.remove(function.getFunctionName(), '_').toUpperCase(), "$");
       List<ExpressionContext> arguments = function.getArguments();
       ExpressionContext firstArgument = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {

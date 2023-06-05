@@ -238,6 +238,9 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
     }
 
     double[] valueArray = blockValSet.getDoubleValuesSV();
+    if (valueArray == null) {
+      return;
+    }
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       int groupKey = groupKeyArray[i];
@@ -292,6 +295,22 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
       return intermediateMinResult1;
     }
     return intermediateMinResult2;
+  }
+
+  @Override
+  public void mergeAndUpdateResultHolder(Double intermediateResult,
+      AggregationResultHolder aggregationResultHolder) {
+    Double existingVal = extractAggregationResult(aggregationResultHolder);
+    Double result = merge(existingVal, intermediateResult);
+    aggregationResultHolder.setValue(result);
+  }
+
+  @Override
+  public void mergeAndUpdateResultHolder(Double intermediateResult,
+      GroupByResultHolder groupByResultHolder, int groupKey) {
+    Double existingVal = extractGroupByResult(groupByResultHolder, groupKey);
+    Double result = merge(existingVal, intermediateResult);
+    groupByResultHolder.setValueForKey(groupKey, result);
   }
 
   @Override

@@ -91,7 +91,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   private void record(ImmutableRoaringBitmap bitmap) {
     InvocationRecording recording = Tracing.activeRecording();
     if (recording.isEnabled()) {
-      recording.setColumnName(_predicate.getLhs().getIdentifier());
+      recording.setColumnName(_predicate.getLhs().getIdentifierName());
       recording.setFilter(FilterType.INDEX, _predicate.getType().name());
       recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
     }

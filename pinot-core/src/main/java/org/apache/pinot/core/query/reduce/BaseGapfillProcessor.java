@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggFunctionQueryContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
@@ -163,7 +164,7 @@ abstract class BaseGapfillProcessor {
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
-      int index = indexes.get(entityColum.getIdentifier());
+      int index = indexes.get(entityColum.getIdentifierName());
       _isGroupBySelections[index] = true;
     }
 
@@ -196,7 +197,7 @@ abstract class BaseGapfillProcessor {
         expressionContext = expressionContext.getFunction().getArguments().get(0);
       }
       if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
-        columnNames[i] = expressionContext.getIdentifier();
+        columnNames[i] = expressionContext.getIdentifierName();
         columnDataTypes[i] = dataSchema.getColumnDataType(_timeBucketColumnIndex);
       } else {
         FunctionContext functionContext = expressionContext.getFunction();

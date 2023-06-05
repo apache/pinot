@@ -232,8 +232,26 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
   }
 
   @Override
+  public void mergeAndUpdateResultHolder(Integer intermediateResult,
+      AggregationResultHolder aggregationResultHolder) {
+    Integer existingVal = extractAggregationResult(aggregationResultHolder);
+    Integer result = merge(existingVal, intermediateResult);
+    aggregationResultHolder.setValue(result);
+  }
+
+  @Override
+  public void mergeAndUpdateResultHolder(Integer intermediateResult,
+      GroupByResultHolder groupByResultHolder, int groupKey) {
+    Integer existingVal = extractGroupByResult(groupByResultHolder, groupKey);
+    Integer result = merge(existingVal, intermediateResult);
+    groupByResultHolder.setValueForKey(groupKey, result);
+  }
+
+  @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.BOOLEAN;
+    // bool_and and bool_or work on integers in the intermediate stages. However, the final result is converted to a
+    // boolean.
+    return DataSchema.ColumnDataType.INT;
   }
 
   @Override
