@@ -24,20 +24,14 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 public class SegmentPartitionInfo {
   private final String _partitionColumn;
-  private final int _numPartitions;
   private final PartitionFunction _partitionFunction;
   private final Set<Integer> _partitions;
 
-  public SegmentPartitionInfo(String partitionColumn, int numPartitions, PartitionFunction partitionFunction,
+  public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction,
       Set<Integer> partitions) {
     _partitionColumn = partitionColumn;
-    _numPartitions = numPartitions;
     _partitionFunction = partitionFunction;
     _partitions = partitions;
-  }
-
-  public int getNumPartitions() {
-    return _numPartitions;
   }
 
   public String getPartitionColumn() {

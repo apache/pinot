@@ -33,21 +33,67 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentPartitionUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionUtils.class);
-  public static final SegmentPartitionInfo INVALID_PARTITION_INFO = new SegmentPartitionInfo(null, 0, null, null);
+  private SegmentPartitionUtils() {
+  }
+
+  public static final SegmentPartitionInfo INVALID_PARTITION_INFO = new SegmentPartitionInfo(null, null, null);
   public static final Map<String, SegmentPartitionInfo> INVALID_COLUMN_PARTITION_INFO_MAP = Collections.emptyMap();
 
-  private SegmentPartitionUtils() {
-    // do not instantiate.
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionUtils.class);
+
+  /**
+   * Returns the partition info for a given segment with single partition column.
+   *
+   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
+   *       {@link #INVALID_PARTITION_INFO} when the segment does not have valid partition metadata in its ZK metadata,
+   *       in which case we won't retry later.
+   */
+  @Nullable
+  public static SegmentPartitionInfo extractPartitionInfo(String tableNameWithType, String partitionColumn,
+      String segment, @Nullable ZNRecord znRecord) {
+    if (znRecord == null) {
+      LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, tableNameWithType);
+      return null;
+    }
+
+    String partitionMetadataJson = znRecord.getSimpleField(CommonConstants.Segment.PARTITION_METADATA);
+    if (partitionMetadataJson == null) {
+      LOGGER.warn("Failed to find segment partition metadata for segment: {}, table: {}", segment, tableNameWithType);
+      return INVALID_PARTITION_INFO;
+    }
+
+    SegmentPartitionMetadata segmentPartitionMetadata;
+    try {
+      segmentPartitionMetadata = SegmentPartitionMetadata.fromJsonString(partitionMetadataJson);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while extracting segment partition metadata for segment: {}, table: {}", segment,
+          tableNameWithType, e);
+      return INVALID_PARTITION_INFO;
+    }
+
+    ColumnPartitionMetadata columnPartitionMetadata =
+        segmentPartitionMetadata.getColumnPartitionMap().get(partitionColumn);
+    if (columnPartitionMetadata == null) {
+      LOGGER.warn("Failed to find column partition metadata for column: {}, segment: {}, table: {}", partitionColumn,
+          segment, tableNameWithType);
+      return INVALID_PARTITION_INFO;
+    }
+
+    return new SegmentPartitionInfo(partitionColumn,
+        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
+            columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
+        columnPartitionMetadata.getPartitions());
   }
 
   /**
+   * Returns a map from partition column name to partition info for a given segment with multiple partition columns.
+   *
    * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
    *       {@link #INVALID_COLUMN_PARTITION_INFO_MAP} when the segment does not have valid partition metadata in its ZK
    *       metadata, in which case we won't retry later.
    */
   @Nullable
-  public static Map<String, SegmentPartitionInfo> extractPartitionInfoMapFromSegmentZKMetadata(String tableNameWithType,
+  public static Map<String, SegmentPartitionInfo> extractPartitionInfoMap(String tableNameWithType,
       Set<String> partitionColumns, String segment, @Nullable ZNRecord znRecord) {
     if (znRecord == null) {
       LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, tableNameWithType);
@@ -78,11 +124,10 @@ public class SegmentPartitionUtils {
             segment, tableNameWithType);
         continue;
       }
-      SegmentPartitionInfo segmentPartitionInfo =
-          new SegmentPartitionInfo(partitionColumn, columnPartitionMetadata.getNumPartitions(),
-              PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
-                  columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
-              columnPartitionMetadata.getPartitions());
+      SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
+          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
+              columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
+          columnPartitionMetadata.getPartitions());
       columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {
@@ -90,47 +135,5 @@ public class SegmentPartitionUtils {
       return Collections.singletonMap(partitionColumn, columnSegmentPartitionInfoMap.get(partitionColumn));
     }
     return columnSegmentPartitionInfoMap.isEmpty() ? INVALID_COLUMN_PARTITION_INFO_MAP : columnSegmentPartitionInfoMap;
-  }
-
-  /**
-   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
-   *       {@link #INVALID_PARTITION_INFO} when the segment does not have valid partition metadata in its ZK metadata,
-   *       in which case we won't retry later.
-   */
-  @Nullable
-  public static SegmentPartitionInfo extractPartitionInfoFromSegmentZKMetadata(String tableNameWithType,
-      String partitionColumn, String segment, @Nullable ZNRecord znRecord) {
-    if (znRecord == null) {
-      LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, tableNameWithType);
-      return null;
-    }
-
-    String partitionMetadataJson = znRecord.getSimpleField(CommonConstants.Segment.PARTITION_METADATA);
-    if (partitionMetadataJson == null) {
-      LOGGER.warn("Failed to find segment partition metadata for segment: {}, table: {}", segment, tableNameWithType);
-      return INVALID_PARTITION_INFO;
-    }
-
-    SegmentPartitionMetadata segmentPartitionMetadata;
-    try {
-      segmentPartitionMetadata = SegmentPartitionMetadata.fromJsonString(partitionMetadataJson);
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while extracting segment partition metadata for segment: {}, table: {}", segment,
-          tableNameWithType, e);
-      return INVALID_PARTITION_INFO;
-    }
-
-    ColumnPartitionMetadata columnPartitionMetadata =
-        segmentPartitionMetadata.getColumnPartitionMap().get(partitionColumn);
-    if (columnPartitionMetadata == null) {
-      LOGGER.warn("Failed to find column partition metadata for column: {}, segment: {}, table: {}", partitionColumn,
-          segment, tableNameWithType);
-      return INVALID_PARTITION_INFO;
-    }
-
-    return new SegmentPartitionInfo(partitionColumn, columnPartitionMetadata.getNumPartitions(),
-        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
-            columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
-        columnPartitionMetadata.getPartitions());
   }
 }

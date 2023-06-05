@@ -46,6 +46,7 @@ import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager;
+import org.apache.pinot.broker.routing.segmentpartition.TablePartitionInfo;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
@@ -70,6 +71,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -505,15 +507,23 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     }
 
-    SegmentPartitionMetadataManager partitionDataManager = null;
-    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
-    if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap() != null
-        && segmentPartitionConfig.getColumnPartitionMap().size() == 1) {
-      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-      Map.Entry<String, ColumnPartitionConfig> partitionConfig = columnPartitionMap.entrySet().iterator().next();
-      LOGGER.info("Enabling PartitionDataManager for table: {} on {}", tableNameWithType, partitionConfig.getKey());
-      partitionDataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
-          partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+    SegmentPartitionMetadataManager partitionMetadataManager = null;
+    // TODO: Support multiple partition columns
+    // TODO: Make partition pruner on top of the partition metadata manager to avoid keeping 2 copies of the metadata
+    if (_pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
+        CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER)) {
+      SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+      if (segmentPartitionConfig == null || segmentPartitionConfig.getColumnPartitionMap().size() != 1) {
+        LOGGER.warn("Cannot enable SegmentPartitionMetadataManager. "
+            + "Expecting SegmentPartitionConfig with exact 1 partition column");
+      } else {
+        Map.Entry<String, ColumnPartitionConfig> partitionConfig =
+            segmentPartitionConfig.getColumnPartitionMap().entrySet().iterator().next();
+        LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}", tableNameWithType,
+            partitionConfig.getKey());
+        partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
+            partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+      }
     }
 
     QueryConfig queryConfig = tableConfig.getQueryConfig();
@@ -523,15 +533,15 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (SegmentZkMetadataFetchListener listener : segmentPruners) {
       segmentZkMetadataFetcher.register(listener);
     }
-    if (partitionDataManager != null) {
-      segmentZkMetadataFetcher.register(partitionDataManager);
+    if (partitionMetadataManager != null) {
+      segmentZkMetadataFetcher.register(partitionMetadataManager);
     }
     segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
 
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
             segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
-            timeBoundaryManager, partitionDataManager, queryTimeoutMs);
+            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -670,23 +680,13 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   @Nullable
-  public Map<Integer, Set<String>> getPartitionToFullyReplicatedServersMap(String tableNameWithType) {
+  public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {
       return null;
     }
     SegmentPartitionMetadataManager partitionMetadataManager = routingEntry.getPartitionMetadataManager();
-    return partitionMetadataManager != null ? partitionMetadataManager.getPartitionToFullyReplicatedServersMap() : null;
-  }
-
-  @Nullable
-  public Map<Integer, List<String>> getPartitionToSegmentsMap(String tableNameWithType) {
-    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    if (routingEntry == null) {
-      return null;
-    }
-    SegmentPartitionMetadataManager partitionMetadataManager = routingEntry.getPartitionMetadataManager();
-    return partitionMetadataManager != null ? partitionMetadataManager.getPartitionToSegmentsMap() : null;
+    return partitionMetadataManager != null ? partitionMetadataManager.getTablePartitionInfo() : null;
   }
 
   /**
@@ -804,8 +804,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
       int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
-        InstanceSelector.SelectionResult selectionResult = _instanceSelector.select(brokerRequest,
-            new ArrayList<>(selectedSegments), requestId);
+        InstanceSelector.SelectionResult selectionResult =
+            _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments), requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
@@ -855,7 +855,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
     return serverTag;
   }
-
 
   private void deleteServerFromTableTenantServerMap(String server) {
     for (Map.Entry<String, Map<String, ServerInstance>> entry : _tableTenantServersMap.entrySet()) {

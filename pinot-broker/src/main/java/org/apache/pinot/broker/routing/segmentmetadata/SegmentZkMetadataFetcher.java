@@ -52,6 +52,19 @@ public class SegmentZkMetadataFetcher {
     _initialized = false;
   }
 
+  public void register(SegmentZkMetadataFetchListener listener) {
+    if (!_initialized) {
+      _listeners.add(listener);
+    } else {
+      throw new RuntimeException(
+          "Segment ZK metadata fetcher has already been initialized! Unable to register more listeners.");
+    }
+  }
+
+  public List<SegmentZkMetadataFetchListener> getListeners() {
+    return _listeners;
+  }
+
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     if (!_initialized) {
       _initialized = true;
@@ -64,47 +77,41 @@ public class SegmentZkMetadataFetcher {
           segments.add(segment);
           segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
         }
-        _onlineSegmentsCached.addAll(onlineSegments);
         List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
         for (SegmentZkMetadataFetchListener listener : _listeners) {
           listener.init(idealState, externalView, segments, znRecords);
         }
+        for (int i = 0; i < numSegments; i++) {
+          if (znRecords.get(i) != null) {
+            _onlineSegmentsCached.add(segments.get(i));
+          }
+        }
       }
     } else {
-      throw new RuntimeException("Segment zk metadata fetcher has already been initialized!");
+      throw new RuntimeException("Segment ZK metadata fetcher has already been initialized!");
     }
-  }
-
-  public void register(SegmentZkMetadataFetchListener listener) {
-    if (!_initialized) {
-      _listeners.add(listener);
-    } else {
-      throw new RuntimeException("Segment zk metadata fetcher has already been initialized! "
-          + "Unable to register more listeners.");
-    }
-  }
-
-  public List<SegmentZkMetadataFetchListener> getListeners() {
-    return _listeners;
   }
 
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     if (!_listeners.isEmpty()) {
-      int numSegments = onlineSegments.size();
-      List<String> segments = new ArrayList<>(numSegments);
-      List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-
+      List<String> segments = new ArrayList<>();
+      List<String> segmentZKMetadataPaths = new ArrayList<>();
       for (String segment : onlineSegments) {
-        if (_onlineSegmentsCached.add(segment)) {
+        if (!_onlineSegmentsCached.contains(segment)) {
           segments.add(segment);
           segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
         }
       }
-      _onlineSegmentsCached.addAll(onlineSegments);
       List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
       for (SegmentZkMetadataFetchListener listener : _listeners) {
         listener.onAssignmentChange(idealState, externalView, onlineSegments, segments, znRecords);
+      }
+      int numSegments = segments.size();
+      for (int i = 0; i < numSegments; i++) {
+        if (znRecords.get(i) != null) {
+          _onlineSegmentsCached.add(segments.get(i));
+        }
       }
       _onlineSegmentsCached.retainAll(onlineSegments);
     }
@@ -116,7 +123,11 @@ public class SegmentZkMetadataFetcher {
       for (SegmentZkMetadataFetchListener listener : _listeners) {
         listener.refreshSegment(segment, znRecord);
       }
-      _onlineSegmentsCached.add(segment);
+      if (znRecord != null) {
+        _onlineSegmentsCached.add(segment);
+      } else {
+        _onlineSegmentsCached.remove(segment);
+      }
     }
   }
 }

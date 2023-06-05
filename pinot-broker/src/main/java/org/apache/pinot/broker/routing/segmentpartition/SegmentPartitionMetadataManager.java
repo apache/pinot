@@ -25,13 +25,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,6 +45,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *   2. For each server, what are all the partition IDs and list of segments of those partition IDs on this server.
  */
 public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionMetadataManager.class);
+  private static final int INVALID_PARTITION_ID = -1;
+
   private final String _tableNameWithType;
 
   // static content, if anything changes for the following. a rebuild of routing table is needed.
@@ -51,12 +56,10 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final int _numPartitions;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
-  private final Map<String, List<String>> _segmentToOnlineServersMap = new HashMap<>();
-  private final Map<String, Integer> _segmentToPartitionMap = new HashMap<>();
+  private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
 
   // computed value based on status change.
-  private Map<Integer, Set<String>> _partitionToFullyReplicatedServersMap;
-  private Map<Integer, List<String>> _partitionToSegmentsMap;
+  private transient TablePartitionInfo _tablePartitionInfo;
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
       int numPartitions) {
@@ -69,121 +72,144 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   @Override
   public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
       List<ZNRecord> znRecords) {
-    for (int idx = 0; idx < onlineSegments.size(); idx++) {
-      String segment = onlineSegments.get(idx);
-      ZNRecord znRecord = znRecords.get(idx);
-      // extract single partition info
-      SegmentPartitionInfo segmentPartitionInfo = SegmentPartitionUtils.extractPartitionInfoFromSegmentZKMetadata(
-          _tableNameWithType, _partitionColumn, segment, znRecord);
-      if (validate(segmentPartitionInfo)) {
-        // update segment to partition map
-        Integer partitionId = segmentPartitionInfo.getPartitions().iterator().next();
-        _segmentToPartitionMap.put(segment, partitionId);
-      }
-      // update segment to server list.
-      updateSegmentServerOnlineMap(externalView, segment);
+    int numSegments = onlineSegments.size();
+    for (int i = 0; i < numSegments; i++) {
+      String segment = onlineSegments.get(i);
+      SegmentPartitionInfo partitionInfo =
+          SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecords.get(i));
+      SegmentInfo segmentInfo = new SegmentInfo(getPartitionId(partitionInfo), getOnlineServers(externalView, segment));
+      _segmentInfoMap.put(segment, segmentInfo);
     }
-    computePartitionMaps();
+    computeTablePartitionInfo();
   }
 
-  private void updateSegmentServerOnlineMap(ExternalView externalView, String segment) {
+  private int getPartitionId(@Nullable SegmentPartitionInfo segmentPartitionInfo) {
+    if (segmentPartitionInfo == null || segmentPartitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
+      return INVALID_PARTITION_ID;
+    }
+    if (!_partitionColumn.equals(segmentPartitionInfo.getPartitionColumn())) {
+      return INVALID_PARTITION_ID;
+    }
+    PartitionFunction partitionFunction = segmentPartitionInfo.getPartitionFunction();
+    if (!_partitionFunctionName.equalsIgnoreCase(partitionFunction.getName())) {
+      return INVALID_PARTITION_ID;
+    }
+    if (_numPartitions != partitionFunction.getNumPartitions()) {
+      return INVALID_PARTITION_ID;
+    }
+    Set<Integer> partitions = segmentPartitionInfo.getPartitions();
+    if (partitions.size() != 1) {
+      return INVALID_PARTITION_ID;
+    }
+    return partitions.iterator().next();
+  }
+
+  private List<String> getOnlineServers(ExternalView externalView, String segment) {
     Map<String, String> instanceStateMap = externalView.getStateMap(segment);
-    List<String> serverList = instanceStateMap == null ? Collections.emptyList()
-        : instanceStateMap.entrySet().stream()
-            .filter(entry -> CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(entry.getValue()))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
-    _segmentToOnlineServersMap.put(segment, serverList);
+    if (instanceStateMap == null) {
+      return Collections.emptyList();
+    }
+    List<String> onlineServers = new ArrayList<>(instanceStateMap.size());
+    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+      String instanceState = entry.getValue();
+      if (instanceState.equals(SegmentStateModel.ONLINE) || instanceState.equals(SegmentStateModel.CONSUMING)) {
+        onlineServers.add(entry.getKey());
+      }
+    }
+    return onlineServers;
   }
 
-  private boolean validate(SegmentPartitionInfo segmentPartitionInfo) {
-    if (segmentPartitionInfo == null || segmentPartitionInfo.getPartitionFunction() == null
-        || segmentPartitionInfo.getPartitions() == null) {
-      return false;
+  private void computeTablePartitionInfo() {
+    TablePartitionInfo.PartitionInfo[] partitionInfoMap = new TablePartitionInfo.PartitionInfo[_numPartitions];
+    Set<String> segmentsWithInvalidPartition = new HashSet<>();
+    for (Map.Entry<String, SegmentInfo> entry : _segmentInfoMap.entrySet()) {
+      String segment = entry.getKey();
+      SegmentInfo segmentInfo = entry.getValue();
+      int partitionId = segmentInfo._partitionId;
+      List<String> onlineServers = segmentInfo._onlineServers;
+      if (partitionId == INVALID_PARTITION_ID) {
+        segmentsWithInvalidPartition.add(segment);
+        continue;
+      }
+      TablePartitionInfo.PartitionInfo partitionInfo = partitionInfoMap[partitionId];
+      if (partitionInfo == null) {
+        partitionInfo = new TablePartitionInfo.PartitionInfo();
+        partitionInfo._segments = new ArrayList<>();
+        partitionInfo._segments.add(segment);
+        partitionInfo._fullyReplicatedServers = new HashSet<>(onlineServers);
+        partitionInfoMap[partitionId] = partitionInfo;
+      } else {
+        partitionInfo._segments.add(segment);
+        partitionInfo._fullyReplicatedServers.retainAll(onlineServers);
+      }
     }
-    // TODO: check more than just function name here but also function config.
-    return _partitionFunctionName.equals(segmentPartitionInfo.getPartitionFunction().getName())
-        && _partitionColumn.equals(segmentPartitionInfo.getPartitionColumn())
-        && _numPartitions == segmentPartitionInfo.getNumPartitions()
-        && segmentPartitionInfo.getPartitions().size() == 1;
+    if (!segmentsWithInvalidPartition.isEmpty()) {
+      int numSegmentsWithInvalidPartition = segmentsWithInvalidPartition.size();
+      if (numSegmentsWithInvalidPartition <= 10) {
+        LOGGER.warn("Found {} segments: {} with invalid partition from table: {}", numSegmentsWithInvalidPartition,
+            segmentsWithInvalidPartition, _tableNameWithType);
+      } else {
+        LOGGER.warn("Found {} segments: {} with invalid partition from table: {}", numSegmentsWithInvalidPartition,
+            segmentsWithInvalidPartition, _tableNameWithType);
+      }
+    }
+    _tablePartitionInfo =
+        new TablePartitionInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName, _numPartitions,
+            partitionInfoMap, segmentsWithInvalidPartition);
   }
 
   @Override
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
-    // update segment zk metadata for the pulled segments
-    for (int idx = 0; idx < pulledSegments.size(); idx++) {
-      String segment = pulledSegments.get(idx);
-      ZNRecord znRecord = znRecords.get(idx);
-      SegmentPartitionInfo segmentPartitionInfo = SegmentPartitionUtils.extractPartitionInfoFromSegmentZKMetadata(
-          _tableNameWithType, _partitionColumn, segment, znRecord);
-      if (validate(segmentPartitionInfo)) {
-        // update segment to partition map
-        Integer partitionId = segmentPartitionInfo.getPartitions().iterator().next();
-        _segmentToPartitionMap.put(segment, partitionId);
+    // Update segment partition id for the pulled segments
+    int numSegments = pulledSegments.size();
+    for (int i = 0; i < numSegments; i++) {
+      String segment = pulledSegments.get(i);
+      SegmentPartitionInfo partitionInfo =
+          SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecords.get(i));
+      SegmentInfo segmentInfo = new SegmentInfo(getPartitionId(partitionInfo), getOnlineServers(externalView, segment));
+      _segmentInfoMap.put(segment, segmentInfo);
+    }
+    // Update online servers for all online segments
+    for (String segment : onlineSegments) {
+      SegmentInfo segmentInfo = _segmentInfoMap.get(segment);
+      if (segmentInfo == null) {
+        segmentInfo = new SegmentInfo(INVALID_PARTITION_ID, getOnlineServers(externalView, segment));
+        _segmentInfoMap.put(segment, segmentInfo);
       } else {
-        // remove the segment from the partition map
-        _segmentToPartitionMap.remove(segment);
+        segmentInfo._onlineServers = getOnlineServers(externalView, segment);
       }
     }
-    // update the server online information based on external view.
-    for (String onlineSegment : onlineSegments) {
-      // update segment to server list.
-      updateSegmentServerOnlineMap(externalView, onlineSegment);
-    }
-    _segmentToPartitionMap.keySet().retainAll(onlineSegments);
-    _segmentToOnlineServersMap.keySet().retainAll(onlineSegments);
-    computePartitionMaps();
+    _segmentInfoMap.keySet().retainAll(onlineSegments);
+    computeTablePartitionInfo();
   }
 
   @Override
   public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
-    SegmentPartitionInfo segmentPartitionInfo = SegmentPartitionUtils.extractPartitionInfoFromSegmentZKMetadata(
-        _tableNameWithType, _partitionColumn, segment, znRecord);
-    if (validate(segmentPartitionInfo)) {
-      // update segment to partition map
-      Integer partitionId = segmentPartitionInfo.getPartitions().iterator().next();
-      _segmentToPartitionMap.put(segment, partitionId);
+    SegmentPartitionInfo partitionInfo =
+        SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecord);
+    int partitionId = getPartitionId(partitionInfo);
+    SegmentInfo segmentInfo = _segmentInfoMap.get(segment);
+    if (segmentInfo == null) {
+      segmentInfo = new SegmentInfo(partitionId, Collections.emptyList());
+      _segmentInfoMap.put(segment, segmentInfo);
     } else {
-      // remove the segment from the partition map
-      _segmentToPartitionMap.remove(segment);
+      segmentInfo._partitionId = partitionId;
     }
-    computePartitionMaps();
+    computeTablePartitionInfo();
   }
 
-  public Map<Integer, Set<String>> getPartitionToFullyReplicatedServersMap() {
-    return _partitionToFullyReplicatedServersMap;
+  public TablePartitionInfo getTablePartitionInfo() {
+    return _tablePartitionInfo;
   }
 
-  public Map<Integer, List<String>> getPartitionToSegmentsMap() {
-    return _partitionToSegmentsMap;
-  }
+  private static class SegmentInfo {
+    int _partitionId;
+    List<String> _onlineServers;
 
-  private void computePartitionMaps() {
-    Map<Integer, Set<String>> partitionToFullyReplicatedServersMap = new HashMap<>();
-    Map<Integer, List<String>> partitionToSegmentsMap = new HashMap<>();
-    for (Map.Entry<String, List<String>> segmentServerEntry : _segmentToOnlineServersMap.entrySet()) {
-      String segment = segmentServerEntry.getKey();
-      int partitionId = _segmentToPartitionMap.getOrDefault(segment, -1);
-      if (partitionId >= 0) {
-        // update the partition to full replicate server set map.
-        Set<String> existingServerSet = partitionToFullyReplicatedServersMap.get(partitionId);
-        if (existingServerSet == null) {
-          existingServerSet = new HashSet<>(segmentServerEntry.getValue());
-        } else {
-          existingServerSet.retainAll(segmentServerEntry.getValue());
-        }
-        partitionToFullyReplicatedServersMap.put(partitionId, existingServerSet);
-        // update the partition to list of segments map
-        List<String> segmentList = partitionToSegmentsMap.get(partitionId);
-        if (segmentList == null) {
-          segmentList = new ArrayList<>();
-        }
-        segmentList.add(segment);
-        partitionToSegmentsMap.put(partitionId, segmentList);
-      }
+    SegmentInfo(int partitionId, List<String> onlineServers) {
+      _partitionId = partitionId;
+      _onlineServers = onlineServers;
     }
-    _partitionToFullyReplicatedServersMap = partitionToFullyReplicatedServersMap;
-    _partitionToSegmentsMap = partitionToSegmentsMap;
   }
 }

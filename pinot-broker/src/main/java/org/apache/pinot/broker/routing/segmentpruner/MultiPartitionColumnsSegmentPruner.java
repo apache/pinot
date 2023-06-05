@@ -42,7 +42,6 @@ import org.apache.pinot.sql.FilterKind;
  * pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
  */
 public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
-
   private final String _tableNameWithType;
   private final Set<String> _partitionColumns;
   private final Map<String, Map<String, SegmentPartitionInfo>> _segmentColumnPartitionInfoMap =
@@ -60,8 +59,8 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
     for (int idx = 0; idx < onlineSegments.size(); idx++) {
       String segment = onlineSegments.get(idx);
       Map<String, SegmentPartitionInfo> columnPartitionInfoMap =
-          SegmentPartitionUtils.extractPartitionInfoMapFromSegmentZKMetadata(_tableNameWithType, _partitionColumns,
-              segment, znRecords.get(idx));
+          SegmentPartitionUtils.extractPartitionInfoMap(_tableNameWithType, _partitionColumns, segment,
+              znRecords.get(idx));
       if (columnPartitionInfoMap != null) {
         _segmentColumnPartitionInfoMap.put(segment, columnPartitionInfoMap);
       }
@@ -77,8 +76,7 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
       String segment = pulledSegments.get(idx);
       ZNRecord znRecord = znRecords.get(idx);
       _segmentColumnPartitionInfoMap.computeIfAbsent(segment,
-          k -> SegmentPartitionUtils.extractPartitionInfoMapFromSegmentZKMetadata(_tableNameWithType, _partitionColumns,
-              k, znRecord));
+          k -> SegmentPartitionUtils.extractPartitionInfoMap(_tableNameWithType, _partitionColumns, k, znRecord));
     }
     _segmentColumnPartitionInfoMap.keySet().retainAll(onlineSegments);
   }
@@ -86,8 +84,7 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
   @Override
   public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
     Map<String, SegmentPartitionInfo> columnPartitionInfo =
-        SegmentPartitionUtils.extractPartitionInfoMapFromSegmentZKMetadata(_tableNameWithType, _partitionColumns,
-            segment, znRecord);
+        SegmentPartitionUtils.extractPartitionInfoMap(_tableNameWithType, _partitionColumns, segment, znRecord);
     if (columnPartitionInfo != null) {
       _segmentColumnPartitionInfoMap.put(segment, columnPartitionInfo);
     } else {
