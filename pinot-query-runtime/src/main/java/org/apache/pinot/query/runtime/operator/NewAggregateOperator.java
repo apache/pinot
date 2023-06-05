@@ -34,17 +34,15 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggFunctionQueryContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-
-import static org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
-import static org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
-import static org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory.getAggregationFunction;
 
 
 /**
@@ -118,12 +116,12 @@ public class NewAggregateOperator extends MultiStageOperator {
     _aggregationResultHolders = new AggregationResultHolder[functionContexts.size()];
     _groupByResultHolders = new GroupByResultHolder[functionContexts.size()];
     for (int i = 0; i < _aggregationFunctions.length; i++) {
-      _aggregationFunctions[i] = getAggregationFunction(functionContexts.get(i),
+      _aggregationFunctions[i] = AggregationFunctionFactory.getAggregationFunction(functionContexts.get(i),
           new AggFunctionQueryContext(true));
       _aggregationResultHolders[i] = _aggregationFunctions[i].createAggregationResultHolder();
-      _groupByResultHolders[i] =
-          _aggregationFunctions[i].createGroupByResultHolder(DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-              DEFAULT_NUM_GROUPS_LIMIT);
+      _groupByResultHolders[i] = _aggregationFunctions[i].createGroupByResultHolder(
+          InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     }
 
     _upstreamErrorBlock = null;
@@ -268,7 +266,7 @@ public class NewAggregateOperator extends MultiStageOperator {
 
   private void performMergeGroupBy(List<Object[]> container) {
     // Create group by keys for each row.
-    int[] intKeys = GenerateGroupByKeys(container);
+    int[] intKeys = generateGroupByKeys(container);
 
     for (int i = 0; i < _aggregationFunctions.length; i++) {
       GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
@@ -292,8 +290,8 @@ public class NewAggregateOperator extends MultiStageOperator {
     Preconditions.checkState(!expressions.isEmpty());
     ExpressionContext expr = expressions.get(0);
 
-    Object result = expr.getType().equals(ExpressionContext.Type.IDENTIFIER) ? row[expr.getIdentifierIndex()] :
-        expr.getLiteral().getValue();
+    Object result = expr.getType().equals(ExpressionContext.Type.IDENTIFIER) ? row[expr.getIdentifierIndex()]
+        : expr.getLiteral().getValue();
     return result;
   }
 
@@ -311,14 +309,14 @@ public class NewAggregateOperator extends MultiStageOperator {
     }
 
     if (_groupSet.isEmpty()) {
-      PerformSimpleAggregation(container.size(), columnValuesMap);
+      performSimpleAggregation(container.size(), columnValuesMap);
     } else {
-      int[] intKeys = GenerateGroupByKeys(container);
-      PerformGroupByAggregation(container.size(), columnValuesMap, intKeys);
+      int[] intKeys = generateGroupByKeys(container);
+      performGroupByAggregation(container.size(), columnValuesMap, intKeys);
     }
   }
 
-  private void PerformSimpleAggregation(int length, Map<Integer, List<Object>> columnValuesMap) {
+  private void performSimpleAggregation(int length, Map<Integer, List<Object>> columnValuesMap) {
     for (int i = 0; i < _aggregationFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       aggregationFunction.aggregate(length, _aggregationResultHolders[i],
@@ -326,7 +324,7 @@ public class NewAggregateOperator extends MultiStageOperator {
     }
   }
 
-  private void PerformGroupByAggregation(int length, Map<Integer, List<Object>> columnValuesMap, int[] intKeys) {
+  private void performGroupByAggregation(int length, Map<Integer, List<Object>> columnValuesMap, int[] intKeys) {
     for (int i = 0; i < _aggregationFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       Map<ExpressionContext, BlockValSet> blockValSetMap = getBlockValSetMap(aggregationFunction, columnValuesMap);
@@ -338,7 +336,7 @@ public class NewAggregateOperator extends MultiStageOperator {
     }
   }
 
-  private int[] GenerateGroupByKeys(List<Object[]> rows) {
+  private int[] generateGroupByKeys(List<Object[]> rows) {
     int[] rowKeys = new int[rows.size()];
 
     for (int i = 0; i < rows.size(); i++) {

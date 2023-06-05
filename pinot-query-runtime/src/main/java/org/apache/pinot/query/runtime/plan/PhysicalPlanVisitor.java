@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,6 +39,7 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.IntersectOperator;
@@ -48,8 +48,6 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MinusOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.apache.pinot.query.runtime.operator.NewAggregateOperator;
-import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
@@ -129,7 +127,8 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
 
 //    TODO(Sonam): Rename to AggregateOperator when the planner changes are merged.
 //    return new NewAggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema,
-//        functionContexts, groupByExprContext, AggregateNode.isFinalStage(node), AggregateNode.isSingleStageAggregation(node));
+//        functionContexts, groupByExprContext, AggregateNode.isFinalStage(node), AggregateNode
+//        .isSingleStageAggregation(node));
     return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
         node.getAggCalls(), node.getGroupSet(), node.getInputs().get(0).getDataSchema());
   }
