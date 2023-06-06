@@ -152,18 +152,18 @@ public abstract class PinotDataBuffer implements Closeable {
   }
 
   public static PinotBufferFactory createDefaultFactory() {
-    return createDefaultFactory(true);
+    return createDefaultFactory(false);
   }
 
   public static PinotBufferFactory createDefaultFactory(boolean prioritizeByteBuffer) {
     String factoryClassName;
-    if (JavaVersion.VERSION < 16) {
-      LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
-      factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
-    } else {
+//    if (JavaVersion.VERSION < 16) {
+//      LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
+//      factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
+//    } else {
       LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
       factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
-    }
+//    }
     return createFactory(factoryClassName, prioritizeByteBuffer);
   }
 
@@ -190,7 +190,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * Therefore it is recommended to call this method during Pinot startup.
    */
   public static void loadDefaultFactory(PinotConfiguration configuration) {
-    boolean prioritizeByteBuffer = configuration.getProperty(OFFHEAP_BUFFER_PRIORITIZE_BYTE_BUFFER_CONFIG, true);
+    boolean prioritizeByteBuffer = configuration.getProperty(OFFHEAP_BUFFER_PRIORITIZE_BYTE_BUFFER_CONFIG, false);
     String factoryClassName = configuration.getProperty(OFFHEAP_BUFFER_FACTORY_CONFIG);
     if (factoryClassName != null) {
       _defaultFactory = createFactory(factoryClassName, prioritizeByteBuffer);
