@@ -128,6 +128,7 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to String
    */
+  @Nullable
   @ScalarFunction
   public static String jsonPathString(Object object, String jsonPath)
       throws JsonProcessingException {
