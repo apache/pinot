@@ -686,7 +686,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               //noinspection BusyWait
               Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
             } while (allSegmentsForPartition.stream().anyMatch(
-                segmentDataManager -> !segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()));
+                segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()));
           }
           // Persist snapshot and release all the segments for this partition, they should be immutableSegments.
           for (SegmentDataManager segmentDataManager: allSegmentsForPartition) {
