@@ -135,7 +135,7 @@ public class JsonFunctions {
     if (jsonValue instanceof String) {
       return (String) jsonValue;
     }
-    return JsonUtils.objectToString(jsonValue);
+    return jsonValue == null ? null : JsonUtils.objectToString(jsonValue);
   }
 
   /**
