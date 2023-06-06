@@ -33,6 +33,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 @MetricsFactory
 public class DropwizardMetricsFactory implements PinotMetricsFactory {
   public static final String DOMAIN_PROP = "pinot.metrics.dropwizard.domain";
+  // this is the default in Dropwizard, which was used in Pinot before 2023
   public static final String DEFAULT_DOMAIN_VALUE = "org.apache.pinot.common.metrics";
   private PinotMetricsRegistry _pinotMetricsRegistry = null;
   private String _domainName;
