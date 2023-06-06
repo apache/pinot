@@ -69,5 +69,9 @@
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-jmx</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.auto.service</groupId>
+      <artifactId>auto-service</artifactId>
+    </dependency>
   </dependencies>
 </project>

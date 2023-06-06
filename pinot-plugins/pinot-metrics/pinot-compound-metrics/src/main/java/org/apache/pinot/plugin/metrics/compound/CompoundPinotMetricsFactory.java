@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.compound;
 
+import com.google.auto.service.AutoService;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +68,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
     Algorithm algorithm = Algorithm.valueOf(algorithmName.toUpperCase(Locale.US));
     _factories = algorithm.streamInstances(metricsConfiguration)
         .filter(factory -> allIgnored.stream().noneMatch(ignored -> ignored.isAssignableFrom(factory.getClass())))
+        .filter(factory -> CompoundPinotMetricsFactory.class.isAssignableFrom(factory.getClass()))
         .collect(Collectors.toList());
 
     if (_factories.isEmpty()) {
@@ -88,7 +91,8 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
 
   @Override
   public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
-    List<PinotMetricName> names = _factories.stream().map(factory -> factory.makePinotMetricName(klass, name))
+    List<PinotMetricName> names = _factories.stream()
+        .map(factory -> factory.makePinotMetricName(klass, name))
         .collect(Collectors.toList());
     return new CompoundPinotMetricName(name, names);
   }
@@ -136,7 +140,6 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
       @Override
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
         return PinotMetricUtils.getPinotMetricsFactoryClasses().stream()
-            .filter(clazz -> !CompoundPinotMetricsFactory.class.isAssignableFrom(clazz))
             .map(clazz -> {
                   try {
                     return (PinotMetricsFactory) clazz.getDeclaredConstructor().newInstance();
@@ -153,10 +156,9 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
         return metricsConfiguration.getProperty(LIST_KEY, Collections.emptyList()).stream()
             .map(className -> {
                   try {
-                    Class<?> c = Class.forName(className);
-                    return (PinotMetricsFactory) c.getDeclaredConstructor().newInstance();
+                    return PluginManager.get().createInstance(className);
                   } catch (ClassNotFoundException ex) {
-                    throw new IllegalArgumentException("Cannot find metric factory named " + className);
+                    throw new IllegalArgumentException("Cannot find metric factory named " + className, ex);
                   } catch (Exception ex) {
                     throw new IllegalArgumentException("Cannot instantiate class " + className, ex);
                   }
