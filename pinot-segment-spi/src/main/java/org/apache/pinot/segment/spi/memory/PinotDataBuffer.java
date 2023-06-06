@@ -36,6 +36,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.apache.pinot.segment.spi.utils.JavaVersion;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,7 +170,7 @@ public abstract class PinotDataBuffer implements Closeable {
   private static PinotBufferFactory createFactory(String factoryClassName, boolean prioritizeByteBuffer) {
     try {
       LOGGER.info("Instantiating Pinot buffer factory class {}", factoryClassName);
-      PinotBufferFactory factory = (PinotBufferFactory) Class.forName(factoryClassName).getConstructor().newInstance();
+      PinotBufferFactory factory = PluginManager.get().createInstance(factoryClassName);
 
       if (prioritizeByteBuffer) {
         factory = new SmallWithFallbackPinotBufferFactory(new ByteBufferPinotBufferFactory(), factory);
