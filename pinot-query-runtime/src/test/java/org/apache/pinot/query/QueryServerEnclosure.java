@@ -29,7 +29,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
@@ -69,7 +68,7 @@ public class QueryServerEnclosure {
   private final HelixManager _helixManager;
 
   private final QueryRunner _queryRunner;
-  private final ExecutorService _executor = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
+  private final ExecutorService _executor = Executors.newCachedThreadPool(
       new NamedThreadFactory("QueryServerTest_Server"));
 
 
