@@ -1200,27 +1200,17 @@ public class DateTimeFunctions {
     return DateTimeUtils.getTimestampField(chronology, unit).getDifferenceAsLong(timestamp2, timestamp1);
   }
 
-  @ScalarFunction(names = {"timestampDiffMVMV", "dateDiffMVMV"})
-  public static long[] timestampDiffMVMV(String unit, long[] timestamp1, long[] timestamp2) {
-    assert timestamp1.length == timestamp2.length;
-
-    long[] results = new long[timestamp1.length];
-    for (int i = 0; i < timestamp1.length; i++) {
-      results[i] = timestampDiff(unit, timestamp1[i], timestamp2[i]);
-    }
-    return results;
-  }
-
-  @ScalarFunction(names = {"timestampDiffMVFixed", "dateDiffMVFixed"})
-  public static long[] timestampDiffMVFixed(String unit, long[] timestamp1, long timestamp2) {
+  @ScalarFunction(names = {"timestampDiffMV", "dateDiffMV"})
+  public static long[] timestampDiffMV(String unit, long[] timestamp1, long timestamp2) {
     long[] results = new long[timestamp1.length];
     for (int i = 0; i < timestamp1.length; i++) {
       results[i] = timestampDiff(unit, timestamp1[i], timestamp2);
     }
     return results;
   }
-  @ScalarFunction(names = {"timestampDiffMVFixedReverse", "dateDiffMVFixedReverse"})
-  public static long[] timestampDiffMVFixedReverse(String unit, long timestamp1, long[] timestamp2) {
+
+  @ScalarFunction(names = {"timestampDiffMVReverse", "dateDiffMVReverse"})
+  public static long[] timestampDiffMVReverse(String unit, long timestamp1, long[] timestamp2) {
     long[] results = new long[timestamp2.length];
     for (int i = 0; i < timestamp2.length; i++) {
       results[i] = timestampDiff(unit, timestamp1, timestamp2[i]);
