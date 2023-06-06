@@ -30,6 +30,15 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   private String _fileFormat;
   private String _header;
+
+  // When true, record reader would fill the default header (e.g. "col_0", "col_1" ...) when the source is detected not
+  // to include the header. If the header is explicitly set (setHeader()), this configuration is ignored.
+  //
+  // WARNING: CSV header detection is based on a heuristic (the logic is motivated by Python's csv library -
+  // https://github.com/python/cpython/blob/main/Lib/csv.py) and it doesn't guarantee the 100% accuracy.
+  // In some edge cases, we may have a false negative and override the header to the default one. In this case, the
+  // user should either turn off the configuration or explicitly pass the header config using setHeader().
+  private boolean _fillDefaultHeaderWhenMissing;
   private char _delimiter = DEFAULT_DELIMITER;
   private char _multiValueDelimiter = DEFAULT_MULTI_VALUE_DELIMITER;
   private boolean _multiValueDelimiterEnabled = true; // when false, skip parsing for multiple values
@@ -42,7 +51,6 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
   private Character _quoteCharacter = '"';
   private String _quoteMode;
   private String _recordSeparator;
-
 
   public String getFileFormat() {
     return _fileFormat;
@@ -58,6 +66,14 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   public void setHeader(String header) {
     _header = header;
+  }
+
+  public boolean fillDefaultHeaderWhenMissing() {
+    return _fillDefaultHeaderWhenMissing;
+  }
+
+  public void setFillDefaultHeaderWhenMissing(boolean fillDefaultHeaderWhenMissing) {
+    _fillDefaultHeaderWhenMissing = fillDefaultHeaderWhenMissing;
   }
 
   public char getDelimiter() {
