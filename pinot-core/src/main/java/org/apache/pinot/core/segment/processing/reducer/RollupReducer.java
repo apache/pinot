@@ -68,7 +68,7 @@ public class RollupReducer implements Reducer {
       if (_rollupFileManager != null) {
         _rollupFileManager.cleanUp();
       }
-      throw new RuntimeException("Failed to complete rollup reduce", e);
+      throw e;
     }
   }
 

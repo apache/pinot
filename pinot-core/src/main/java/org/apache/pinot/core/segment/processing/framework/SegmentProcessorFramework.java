@@ -95,12 +95,16 @@ public class SegmentProcessorFramework {
     try {
       return doProcess();
     } catch (Exception e) {
+      // Cleaning up file managers no matter they are from map phase or reduce phase. For those from reduce phase, the
+      // reducers should have cleaned up the corresponding file managers from map phase already.
       if (_partitionToFileManagerMap != null) {
         for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
           fileManager.cleanUp();
         }
       }
-      throw new RuntimeException("Failed to complete process", e);
+      // Cleaning up output dir as processing has failed.
+      FileUtils.deleteQuietly(_segmentsOutputDir);
+      throw e;
     } finally {
       FileUtils.deleteDirectory(_mapperOutputDir);
       FileUtils.deleteDirectory(_reducerOutputDir);

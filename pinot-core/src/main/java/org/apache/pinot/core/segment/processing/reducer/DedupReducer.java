@@ -56,7 +56,7 @@ public class DedupReducer implements Reducer {
       if (_dedupFileManager != null) {
         _dedupFileManager.cleanUp();
       }
-      throw new RuntimeException("Failed to complete dedup reduce", e);
+      throw e;
     }
   }
 

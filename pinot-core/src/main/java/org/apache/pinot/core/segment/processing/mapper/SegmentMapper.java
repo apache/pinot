@@ -115,7 +115,7 @@ public class SegmentMapper {
       for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
         fileManager.cleanUp();
       }
-      throw new RuntimeException("Failed to complete map phase", e);
+      throw e;
     }
   }
 
