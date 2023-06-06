@@ -206,16 +206,14 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     TableConfig tableConfig = loaderContext.getTableConfig();
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = loaderContext.getSegmentName();
-    try {
-      String tierDataDir =
-          TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, loaderContext.getInstanceTierConfigs());
-      File tierTableDataDir = new File(tierDataDir, tableNameWithType);
-      return new File(tierTableDataDir, segmentName);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to get dataDir for segment: {} of table: {} on tier: {} due to error: {}", segmentName,
-          tableNameWithType, segmentTier, e.getMessage());
+    String tierDataDir =
+        TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, loaderContext.getInstanceTierConfigs());
+    if (StringUtils.isEmpty(tierDataDir)) {
+      LOGGER.warn("No dataDir for segment: {} of table: {} on tier: {}", segmentName, tableNameWithType, segmentTier);
       return null;
     }
+    File tierTableDataDir = new File(tierDataDir, tableNameWithType);
+    return new File(tierTableDataDir, segmentName);
   }
 
   @Override
