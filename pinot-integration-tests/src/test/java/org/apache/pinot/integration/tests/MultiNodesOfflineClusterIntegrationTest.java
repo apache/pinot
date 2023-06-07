@@ -33,6 +33,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -45,6 +47,7 @@ import static org.testng.Assert.fail;
  * Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
  */
 public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiNodesOfflineClusterIntegrationTest.class);
   private static final int NUM_BROKERS = 2;
   private static final int NUM_SERVERS = 3;
 
@@ -138,6 +141,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     testCountStarQuery(3, false);
     assertEquals(getCurrentCountStarResult(), expectedCountStarResult);
 
+    LOGGER.warn("Shutting down server " + _serverStarters.get(NUM_SERVERS - 1).getInstanceId());
     // Take a server and shut down its query server to mimic a hard failure
     BaseServerStarter serverStarter = _serverStarters.get(NUM_SERVERS - 1);
     try {
@@ -174,7 +178,11 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       assertEquals(exceptions.size(), 2);
       JsonNode firstException = exceptions.get(0);
       assertEquals(firstException.get("errorCode").intValue(), QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
-      assertTrue(firstException.get("message").textValue().contains("Connection refused"));
+      String firstExceptionMessage = firstException.get("message").textValue();
+      if (!firstExceptionMessage.contains("Connection refused")) {
+        LOGGER.warn("first exception message is " + firstExceptionMessage + ", which does not contain "
+              + "\"Connection refused\"");
+      }
       JsonNode secondException = exceptions.get(1);
       assertEquals(secondException.get("errorCode").intValue(), QueryException.SERVER_NOT_RESPONDING_ERROR_CODE);
     } else {

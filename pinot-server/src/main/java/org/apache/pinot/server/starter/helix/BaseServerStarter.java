@@ -186,6 +186,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Initialize Pinot Environment Provider
     _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
 
+    // Initialize the data buffer factory
+    PinotDataBuffer.loadDefaultFactory(serverConf);
+
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
