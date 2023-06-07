@@ -1169,6 +1169,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // Nothing to do. we already built local segment and swapped it with in-memory data.
           _segmentLogger.info("State {}. Nothing to do", _state.toString());
           break;
+        case RETAINING:
+          // Nothing to do. Let PartitionConsumer complete the process of building the segment.
+          _segmentLogger.info("State {}. PartitionConsumer is building segment. Nothing to do", _state.toString());
+          break;
         case DISCARDED:
         case ERROR:
           _segmentLogger.info("State {}. Downloading to replace", _state.toString());
