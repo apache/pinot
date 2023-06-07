@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -31,12 +34,15 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Utility class to run pipeline breaker execution and collects the results.
  */
 public class PipelineBreakerExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerExecutor.class);
   private PipelineBreakerExecutor() {
     // do not instantiate.
   }
@@ -92,10 +98,15 @@ public class PipelineBreakerExecutor {
       throws Exception {
     PipelineBreakerOperator pipelineBreakerOperator = new PipelineBreakerOperator(
         physicalPlanContext.getOpChainExecutionContext(), pipelineWorkerMap);
+    CountDownLatch latch = new CountDownLatch(1);
     OpChain pipelineBreakerOpChain = new OpChain(physicalPlanContext.getOpChainExecutionContext(),
-        pipelineBreakerOperator,
-        physicalPlanContext.getReceivingMailboxIds());
+        pipelineBreakerOperator, physicalPlanContext.getReceivingMailboxIds(), (id) -> latch.countDown());
     scheduler.register(pipelineBreakerOpChain);
-    return pipelineBreakerOperator.getResult();
+    long timeoutMs = physicalPlanContext.getDeadlineMs() - System.currentTimeMillis();
+    if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+      return pipelineBreakerOperator.getResultMap();
+    } else {
+      throw new IOException("Exception occur when awaiting breaker results!");
+    }
   }
 }
