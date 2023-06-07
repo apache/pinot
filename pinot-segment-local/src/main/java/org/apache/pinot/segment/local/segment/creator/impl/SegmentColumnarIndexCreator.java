@@ -128,13 +128,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       if (fieldSpec == null) {
-        // Schema and table configs are normally in sync, and that's enforced by validation put in place in table config
-        // rest endpoint. There's valid scenario in which schema might be different from table config, and that's where
-        // the segment is being regenerated from an old segment, and the schema is taken from the segment file. In this
-        // case, we just ignore the new indices in the latest table config, and build the segment with columns available
-        // in the old schema.
-        LOGGER.warn("Ignoring index creation for column {} because it is not in schema", columnName);
-        continue;
+        Preconditions.checkState(schema.hasColumn(columnName),
+            "Cannot create index for column: %s because it is not in schema", columnName);
       }
       if (fieldSpec.isVirtualColumn()) {
         LOGGER.warn("Ignoring index creation for virtual column " + columnName);

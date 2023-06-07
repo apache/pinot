@@ -186,62 +186,6 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   }
 
   /**
-   * Test purge on segments which were built by older schema and table config.
-   * Two new columns are added after segments are built and indices are defined for the new columns in the table config.
-   */
-  @Test
-  public void testPurgeOnOldSegmentsWithIndicesOnNewColumns()
-      throws Exception {
-
-    // add new columns to schema
-    Schema schema = createSchema();
-    schema.addField(new DimensionFieldSpec("ColumnABC", FieldSpec.DataType.INT, true));
-    schema.addField(new DimensionFieldSpec("ColumnXYZ", FieldSpec.DataType.INT, true));
-    updateSchema(schema);
-
-    // add indices to the new columns
-    setTableName(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
-    TableConfig tableConfig = createOfflineTableConfig();
-    tableConfig.setTaskConfig(getPurgeTaskConfig());
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    List<String> invertedIndices = new ArrayList<>(indexingConfig.getInvertedIndexColumns());
-    invertedIndices.add("ColumnABC");
-    List<String> rangeIndices = new ArrayList<>(indexingConfig.getRangeIndexColumns());
-    rangeIndices.add("ColumnXYZ");
-    indexingConfig.setInvertedIndexColumns(invertedIndices);
-    indexingConfig.setRangeIndexColumns(rangeIndices);
-    updateTableConfig(tableConfig);
-
-    // schedule purge tasks
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
-    assertNotNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
-    assertTrue(_helixTaskResourceManager.getTaskQueues()
-        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
-    assertNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
-    waitForTaskToComplete();
-
-    // Check that metadata contains expected values
-    for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
-      // Check purge time
-      assertTrue(
-          metadata.getCustomMap().containsKey(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
-    }
-
-    // 52 rows with ArrTime = 1
-    // 115545 totals rows
-    // Expecting 115545 - 52 = 115493 rows after purging
-    // It might take some time for server to load the purged segments
-    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE) == 115493,
-        60_000L, "Failed to get expected purged records");
-
-    // Drop the table
-    dropOfflineTable(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
-
-    // Check if the task metadata is cleaned up on table deletion
-    verifyTableDelete(offlineTableName);
-  }
-
-  /**
    * Test purge with no metadata on the segments (checking null safe implementation)
    */
   @Test
@@ -363,6 +307,62 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // Drop the table
     dropOfflineTable(PURGE_DELTA_NOT_PASSED_TABLE);
+
+    // Check if the task metadata is cleaned up on table deletion
+    verifyTableDelete(offlineTableName);
+  }
+
+  /**
+   * Test purge on segments which were built by older schema and table config.
+   * Two new columns are added after segments are built and indices are defined for the new columns in the table config.
+   */
+  @Test
+  public void testPurgeOnOldSegmentsWithIndicesOnNewColumns()
+      throws Exception {
+
+    // add new columns to schema
+    Schema schema = createSchema();
+    schema.addField(new DimensionFieldSpec("ColumnABC", FieldSpec.DataType.INT, true));
+    schema.addField(new DimensionFieldSpec("ColumnXYZ", FieldSpec.DataType.INT, true));
+    updateSchema(schema);
+
+    // add indices to the new columns
+    setTableName(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+    TableConfig tableConfig = createOfflineTableConfig();
+    tableConfig.setTaskConfig(getPurgeTaskConfig());
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    List<String> invertedIndices = new ArrayList<>(indexingConfig.getInvertedIndexColumns());
+    invertedIndices.add("ColumnABC");
+    List<String> rangeIndices = new ArrayList<>(indexingConfig.getRangeIndexColumns());
+    rangeIndices.add("ColumnXYZ");
+    indexingConfig.setInvertedIndexColumns(invertedIndices);
+    indexingConfig.setRangeIndexColumns(rangeIndices);
+    updateTableConfig(tableConfig);
+
+    // schedule purge tasks
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+    assertNotNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
+    assertTrue(_helixTaskResourceManager.getTaskQueues()
+        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
+    assertNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
+    waitForTaskToComplete();
+
+    // Check that metadata contains expected values
+    for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
+      // Check purge time
+      assertTrue(
+          metadata.getCustomMap().containsKey(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
+    }
+
+    // 52 rows with ArrTime = 1
+    // 115545 totals rows
+    // Expecting 115545 - 52 = 115493 rows after purging
+    // It might take some time for server to load the purged segments
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE) == 115493,
+        60_000L, "Failed to get expected purged records");
+
+    // Drop the table
+    dropOfflineTable(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
 
     // Check if the task metadata is cleaned up on table deletion
     verifyTableDelete(offlineTableName);
