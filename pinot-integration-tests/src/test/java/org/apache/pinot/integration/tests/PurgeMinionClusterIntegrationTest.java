@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -82,43 +83,38 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     startBrokers(1);
     startServers(1);
 
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
+    List<String> allTables = ImmutableList.of(
+        PURGE_FIRST_RUN_TABLE,
+        PURGE_DELTA_PASSED_TABLE,
+        PURGE_DELTA_NOT_PASSED_TABLE,
+        PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE
+    );
+    Schema schema = null;
+    TableConfig tableConfig = null;
+    for (String tableName : allTables) {
+      // create and upload schema
+      schema = createSchema();
+      schema.setSchemaName(tableName);
+      addSchema(schema);
 
-    setTableName(PURGE_DELTA_NOT_PASSED_TABLE);
-    TableConfig purgeDeltaNotPassedTableConfig = createOfflineTableConfig();
-    purgeDeltaNotPassedTableConfig.setTaskConfig(getPurgeTaskConfig());
-
-    setTableName(PURGE_FIRST_RUN_TABLE);
-    TableConfig purgeTableConfig = createOfflineTableConfig();
-    purgeTableConfig.setTaskConfig(getPurgeTaskConfig());
-
-    setTableName(PURGE_DELTA_PASSED_TABLE);
-    TableConfig purgeDeltaPassedTableConfig = createOfflineTableConfig();
-    purgeDeltaPassedTableConfig.setTaskConfig(getPurgeTaskConfig());
-
-    setTableName(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
-    TableConfig purgeOldSegmentsWithNewIndicesTableConfig = createOfflineTableConfig();
-    purgeOldSegmentsWithNewIndicesTableConfig.setTaskConfig(getPurgeTaskConfig());
-
-    addTableConfig(purgeTableConfig);
-    addTableConfig(purgeDeltaPassedTableConfig);
-    addTableConfig(purgeDeltaNotPassedTableConfig);
-    addTableConfig(purgeOldSegmentsWithNewIndicesTableConfig);
+      // create and upload table config
+      setTableName(tableName);
+      tableConfig = createOfflineTableConfig();
+      tableConfig.setTaskConfig(getPurgeTaskConfig());
+      addTableConfig(tableConfig);
+    }
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, purgeTableConfig, schema, 0, _segmentDataDir,
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDataDir,
         _segmentTarDir);
 
-    // Upload segments
-    uploadSegments(PURGE_FIRST_RUN_TABLE, _segmentTarDir);
-    uploadSegments(PURGE_DELTA_PASSED_TABLE, _segmentTarDir);
-    uploadSegments(PURGE_DELTA_NOT_PASSED_TABLE, _segmentTarDir);
-    uploadSegments(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE, _segmentTarDir);
+    // Upload segments for all tables
+    for (String tableName : allTables) {
+      uploadSegments(tableName, _segmentTarDir);
+    }
 
     startMinion();
     setRecordPurger();
@@ -324,6 +320,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     Schema schema = createSchema();
     schema.addField(new DimensionFieldSpec("ColumnABC", FieldSpec.DataType.INT, true));
     schema.addField(new DimensionFieldSpec("ColumnXYZ", FieldSpec.DataType.INT, true));
+    schema.setSchemaName(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
     updateSchema(schema);
 
     // add indices to the new columns
