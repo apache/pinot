@@ -41,6 +41,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationConverter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -685,16 +686,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentTier == null) {
       return getSegmentDataDir(segmentName);
     }
-    try {
-      String tierDataDir =
-          TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, _tableDataManagerConfig.getInstanceTierConfigs());
-      File tierTableDataDir = new File(tierDataDir, _tableNameWithType);
-      return new File(tierTableDataDir, segmentName);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to get dataDir for segment: {} of table: {} on tier: {} due to error: {}", segmentName,
-          _tableNameWithType, segmentTier, e.getMessage());
+    String tierDataDir =
+        TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, _tableDataManagerConfig.getInstanceTierConfigs());
+    if (StringUtils.isEmpty(tierDataDir)) {
       return getSegmentDataDir(segmentName);
     }
+    File tierTableDataDir = new File(tierDataDir, _tableNameWithType);
+    return new File(tierTableDataDir, segmentName);
   }
 
   @Nullable

@@ -48,6 +48,7 @@ public class RollupReducer implements Reducer {
   private final GenericRowFileManager _fileManager;
   private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final File _reducerOutputDir;
+  private GenericRowFileManager _rollupFileManager;
 
   public RollupReducer(String partitionId, GenericRowFileManager fileManager,
       Map<String, AggregationFunctionType> aggregationTypes, File reducerOutputDir) {
@@ -59,6 +60,19 @@ public class RollupReducer implements Reducer {
 
   @Override
   public GenericRowFileManager reduce()
+      throws Exception {
+    try {
+      return doReduce();
+    } catch (Exception e) {
+      // Cleaning up resources created by the reducer, leaving others to the caller like the input _fileManager.
+      if (_rollupFileManager != null) {
+        _rollupFileManager.cleanUp();
+      }
+      throw e;
+    }
+  }
+
+  private GenericRowFileManager doReduce()
       throws Exception {
     LOGGER.info("Start reducing on partition: {}", _partitionId);
     long reduceStartTimeMs = System.currentTimeMillis();
@@ -85,9 +99,8 @@ public class RollupReducer implements Reducer {
     FileUtils.forceMkdir(partitionOutputDir);
     LOGGER.info("Start creating rollup file under dir: {}", partitionOutputDir);
     long rollupFileCreationStartTimeMs = System.currentTimeMillis();
-    GenericRowFileManager rollupFileManager =
-        new GenericRowFileManager(partitionOutputDir, fieldSpecs, includeNullFields, 0);
-    GenericRowFileWriter rollupFileWriter = rollupFileManager.getFileWriter();
+    _rollupFileManager = new GenericRowFileManager(partitionOutputDir, fieldSpecs, includeNullFields, 0);
+    GenericRowFileWriter rollupFileWriter = _rollupFileManager.getFileWriter();
     GenericRow previousRow = new GenericRow();
     recordReader.read(0, previousRow);
     int previousRowId = 0;
@@ -122,12 +135,12 @@ public class RollupReducer implements Reducer {
       }
     }
     rollupFileWriter.write(previousRow);
-    rollupFileManager.closeFileWriter();
+    _rollupFileManager.closeFileWriter();
     LOGGER.info("Finish creating rollup file in {}ms", System.currentTimeMillis() - rollupFileCreationStartTimeMs);
 
     _fileManager.cleanUp();
     LOGGER.info("Finish reducing in {}ms", System.currentTimeMillis() - reduceStartTimeMs);
-    return rollupFileManager;
+    return _rollupFileManager;
   }
 
   private static void aggregateWithNullFields(GenericRow aggregatedRow, GenericRow rowToAggregate,
