@@ -53,7 +53,7 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
 
     TableConfig tableConfig = getTableConfig(tableNameWithType);
-    Schema schema = getSchema(rawTableName);
+    Schema schema = getSchema(tableNameWithType);
     _eventObserver.notifyProgress(pinotTaskConfig, "Purging segment: " + indexDir);
     SegmentPurger segmentPurger =
         new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier);
