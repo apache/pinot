@@ -108,6 +108,19 @@ public class SegmentMapper {
    */
   public Map<String, GenericRowFileManager> map()
       throws Exception {
+    try {
+      return doMap();
+    } catch (Exception e) {
+      // Cleaning up resources created by the mapper, leaving others to the caller like the input _recordReaders.
+      for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
+        fileManager.cleanUp();
+      }
+      throw e;
+    }
+  }
+
+  private Map<String, GenericRowFileManager> doMap()
+      throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
     int totalCount = _recordReaders.size();
     int count = 1;

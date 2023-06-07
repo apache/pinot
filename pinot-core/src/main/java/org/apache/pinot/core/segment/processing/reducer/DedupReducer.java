@@ -38,6 +38,7 @@ public class DedupReducer implements Reducer {
   private final String _partitionId;
   private final GenericRowFileManager _fileManager;
   private final File _reducerOutputDir;
+  private GenericRowFileManager _dedupFileManager;
 
   public DedupReducer(String partitionId, GenericRowFileManager fileManager, File reducerOutputDir) {
     _partitionId = partitionId;
@@ -47,6 +48,19 @@ public class DedupReducer implements Reducer {
 
   @Override
   public GenericRowFileManager reduce()
+      throws Exception {
+    try {
+      return doReduce();
+    } catch (Exception e) {
+      // Cleaning up resources created by the reducer, leaving others to the caller like the input _fileManager.
+      if (_dedupFileManager != null) {
+        _dedupFileManager.cleanUp();
+      }
+      throw e;
+    }
+  }
+
+  private GenericRowFileManager doReduce()
       throws Exception {
     LOGGER.info("Start reducing on partition: {}", _partitionId);
     long reduceStartTimeMs = System.currentTimeMillis();
@@ -63,10 +77,10 @@ public class DedupReducer implements Reducer {
     FileUtils.forceMkdir(partitionOutputDir);
     LOGGER.info("Start creating dedup file under dir: {}", partitionOutputDir);
     long dedupFileCreationStartTimeMs = System.currentTimeMillis();
-    GenericRowFileManager dedupFileManager =
+    _dedupFileManager =
         new GenericRowFileManager(partitionOutputDir, _fileManager.getFieldSpecs(), _fileManager.isIncludeNullFields(),
             0);
-    GenericRowFileWriter dedupFileWriter = dedupFileManager.getFileWriter();
+    GenericRowFileWriter dedupFileWriter = _dedupFileManager.getFileWriter();
     GenericRow previousRow = new GenericRow();
     recordReader.read(0, previousRow);
     int previousRowId = 0;
@@ -79,11 +93,11 @@ public class DedupReducer implements Reducer {
         dedupFileWriter.write(previousRow);
       }
     }
-    dedupFileManager.closeFileWriter();
+    _dedupFileManager.closeFileWriter();
     LOGGER.info("Finish creating dedup file in {}ms", System.currentTimeMillis() - dedupFileCreationStartTimeMs);
 
     _fileManager.cleanUp();
     LOGGER.info("Finish reducing in {}ms", System.currentTimeMillis() - reduceStartTimeMs);
-    return dedupFileManager;
+    return _dedupFileManager;
   }
 }
