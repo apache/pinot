@@ -489,8 +489,8 @@ public class FunnelCountAggregationFunction implements AggregationFunction<List<
         for (int n = 0; n < _numSteps; n++) {
           _correlatedSteps[n] = steps[n][i] > 0;
         }
+        _lastCorrelationId = correlationId;
       }
-      _lastCorrelationId = correlationId;
     }
 
     void incrStepCounters() {

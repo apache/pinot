@@ -21,14 +21,10 @@ package org.apache.pinot.queries;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
 /**
