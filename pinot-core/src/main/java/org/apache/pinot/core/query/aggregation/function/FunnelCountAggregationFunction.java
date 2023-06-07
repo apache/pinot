@@ -50,10 +50,11 @@ import org.roaringbitmap.RoaringBitmap;
  *   SELECT
  *    dateTrunc('day', timestamp) AS ts,
  *    FUNNEL_COUNT(
- *      STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation')
+ *      STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation'),
  *      CORRELATED_BY(user)
  *    ) as step_counts
  *    FROM user_log
+ *    WHERE url in ('/addToCart', '/checkout', '/orderConfirmation')
  *    GROUP BY 1
  */
 public class FunnelCountAggregationFunction implements AggregationFunction<List<Long>, LongArrayList> {

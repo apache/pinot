@@ -18,6 +18,19 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.File;
+import java.util.Comparator;
+import java.util.List;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
+
+
 /**
  * Queries test for FUNNEL_COUNT queries using sorted strategy.
  */
@@ -25,7 +38,28 @@ package org.apache.pinot.queries;
 public class FunnelCountQueriesSortedTest extends BaseFunnelCountQueriesTest {
 
   @Override
-  protected boolean isSorted() {
-    return true;
+  protected int getExpectedNumEntriesScannedInFilter() {
+    return 0;
+  }
+
+  @Override
+  protected TableConfig getTableConfig() {
+    return TABLE_CONFIG_BUILDER.setSortedColumn(ID_COLUMN).build();
+  }
+
+  @Override
+  protected IndexSegment buildSegment(List<GenericRow> records)
+      throws Exception {
+    // Simulate PinotSegmentSorter
+    records.sort(Comparator.comparingInt(rec -> (Integer) rec.getValue(ID_COLUMN)));
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(getTableConfig(), SCHEMA);
+    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
+    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
+    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.build();
+    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
   }
 }

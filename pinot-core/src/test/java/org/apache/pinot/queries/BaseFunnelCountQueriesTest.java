@@ -73,30 +73,34 @@ import static org.testng.Assert.assertTrue;
  */
 @SuppressWarnings("rawtypes")
 abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR =
+  protected static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "FunnelCountQueriesTest");
-  private static final String RAW_TABLE_NAME = "testTable";
-  private static final String SEGMENT_NAME = "testSegment";
-  private static final Random RANDOM = new Random();
+  protected static final String RAW_TABLE_NAME = "testTable";
+  protected static final String SEGMENT_NAME = "testSegment";
+  protected static final Random RANDOM = new Random();
 
-  private static final int NUM_RECORDS = 2000;
-  private static final int MAX_VALUE = 1000;
-  private static final int NUM_GROUPS = 100;
-  private static final int FILTER_LIMIT = 50;
-  private static final String ID_COLUMN = "idColumn";
-  private static final String STEP_COLUMN = "stepColumn";
-  private static final String[] STEPS = {"A", "B"};
-  private static final Schema SCHEMA = new Schema.SchemaBuilder()
+  protected static final int NUM_RECORDS = 2000;
+  protected static final int MAX_VALUE = 1000;
+  protected static final int NUM_GROUPS = 100;
+  protected static final int FILTER_LIMIT = 50;
+  protected static final String ID_COLUMN = "idColumn";
+  protected static final String STEP_COLUMN = "stepColumn";
+  protected static final String[] STEPS = {"A", "B"};
+  protected static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(ID_COLUMN, DataType.INT)
       .addSingleValueDimension(STEP_COLUMN, DataType.STRING)
       .build();
-  private static final TableConfigBuilder TABLE_CONFIG_BUILDER =
+  protected static final TableConfigBuilder TABLE_CONFIG_BUILDER =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME);
 
   private Set<Integer>[] _values = new Set[2];
   private List<Integer> _all = new ArrayList<>();
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+
+  protected abstract int getExpectedNumEntriesScannedInFilter();
+  protected abstract TableConfig getTableConfig();
+  protected abstract IndexSegment buildSegment(List<GenericRow> records) throws Exception;
 
   @Override
   protected String getFilter() {
@@ -113,20 +117,17 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  protected abstract boolean isSorted();
-  private int getExpectedNumEntriesScannedInFilter() {
-    return isSorted() ? 0 : NUM_RECORDS;
-  }
-
-  private TableConfig getTableConfig() {
-    return isSorted() ? TABLE_CONFIG_BUILDER.setSortedColumn(ID_COLUMN).build() : TABLE_CONFIG_BUILDER.build();
-  }
-
   @BeforeClass
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
+    List<GenericRow> records = genereateRows();
+    _indexSegment = buildSegment(records);
+    _indexSegments = Arrays.asList(_indexSegment, _indexSegment);
+  }
+
+  private List<GenericRow> genereateRows() {
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     int hashMapCapacity = HashUtil.getHashMapCapacity(MAX_VALUE);
     _values[0] = new HashSet<>(hashMapCapacity);
@@ -140,37 +141,7 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
       _all.add(Integer.hashCode(value));
       _values[i % 2].add(Integer.hashCode(value));
     }
-    if (isSorted()) {
-      // Simulate PinotSegmentSorter
-      records.sort(Comparator.comparingInt(rec -> (Integer) rec.getValue(ID_COLUMN)));
-    }
-
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(getTableConfig(), SCHEMA);
-    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
-    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
-
-    if (isSorted()) {
-      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
-      driver.build();
-      ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
-
-      _indexSegment = immutableSegment;
-      _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
-    } else {
-      Schema schema = segmentGeneratorConfig.getSchema();
-      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, SEGMENT_NAME);
-      MutableSegment mutableSegment = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
-      StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
-      for (GenericRow record : records) {
-        mutableSegment.index(record, defaultMetadata);
-      }
-      _indexSegment = mutableSegment;
-      _indexSegments = Arrays.asList(mutableSegment, mutableSegment);
-    }
+    return records;
   }
 
   @Test

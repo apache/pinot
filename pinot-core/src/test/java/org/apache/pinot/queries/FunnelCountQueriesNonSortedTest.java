@@ -18,6 +18,19 @@
  */
 package org.apache.pinot.queries;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
+
+
 /**
  * Queries test for FUNNEL_COUNT queries.
  */
@@ -25,7 +38,24 @@ package org.apache.pinot.queries;
 public class FunnelCountQueriesNonSortedTest extends BaseFunnelCountQueriesTest {
 
   @Override
-  protected boolean isSorted() {
-    return false;
+  protected int getExpectedNumEntriesScannedInFilter() {
+    return NUM_RECORDS;
+  }
+
+  @Override
+  protected TableConfig getTableConfig() {
+    return TABLE_CONFIG_BUILDER.build();
+  }
+
+  @Override
+  protected IndexSegment buildSegment(List<GenericRow> records)
+      throws Exception {
+    MutableSegment mutableSegment = MutableSegmentImplTestUtils
+        .createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
+            false);
+    for (GenericRow record : records) {
+      mutableSegment.index(record, null);
+    }
+    return mutableSegment;
   }
 }
