@@ -279,7 +279,7 @@ public abstract class QueryScheduler {
         _numDroppedLogCounter.incrementAndGet();
       }
 
-      if (minConsumingFreshnessMs > -1) {
+      if (minConsumingFreshnessMs > -1 && minConsumingFreshnessMs != Long.MAX_VALUE) {
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
             (System.currentTimeMillis() - minConsumingFreshnessMs), TimeUnit.MILLISECONDS);
       }

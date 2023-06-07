@@ -22,5 +22,5 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public interface ThreadAccountantFactory {
-  ThreadResourceUsageAccountant init(PinotConfiguration config);
+  ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId);
 }

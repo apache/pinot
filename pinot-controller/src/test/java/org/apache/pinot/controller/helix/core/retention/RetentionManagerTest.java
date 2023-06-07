@@ -233,6 +233,39 @@ public class RetentionManagerTest {
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
   }
 
+  // This test makes sure that we do not clean up last llc completed segments
+  @Test
+  public void testRealtimeLastLLCCleanup()
+      throws Exception {
+    final long now = System.currentTimeMillis();
+    final int replicaCount = 1;
+
+    TableConfig tableConfig = createRealtimeTableConfig1(replicaCount);
+    List<String> removedSegments = new ArrayList<>();
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    PinotHelixResourceManager pinotHelixResourceManager =
+        setupSegmentMetadataForPausedTable(tableConfig, now, removedSegments);
+    setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+
+    ControllerConf conf = new ControllerConf();
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    RetentionManager retentionManager =
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+    retentionManager.start();
+    retentionManager.run();
+
+    SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
+
+    // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+
+    // Verify that the deleteSegments method is actually called.
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
+  }
+
   private PinotHelixResourceManager setupSegmentMetadata(TableConfig tableConfig, final long now, final int nSegments,
       List<String> segmentsToBeDeleted) {
     final int replicaCount = tableConfig.getReplication();
@@ -289,6 +322,50 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(segmentsZKMetadata);
     when(pinotHelixResourceManager.getHelixClusterName()).thenReturn(HELIX_CLUSTER_NAME);
+
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, REALTIME_TABLE_NAME)).thenReturn(idealState);
+    when(pinotHelixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+
+    return pinotHelixResourceManager;
+  }
+
+  private PinotHelixResourceManager setupSegmentMetadataForPausedTable(TableConfig tableConfig, final long now,
+      List<String> segmentsToBeDeleted) {
+    final int replicaCount = tableConfig.getReplication();
+
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
+
+    IdealState idealState =
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
+
+    final int kafkaPartition = 5;
+    final long millisInDays = TimeUnit.DAYS.toMillis(1);
+    final String serverName = "Server_localhost_0";
+    LLCSegmentName llcSegmentName0 = new LLCSegmentName(TEST_TABLE_NAME, kafkaPartition, 0, now);
+    SegmentZKMetadata segmentZKMetadata0 = createSegmentZKMetadata(llcSegmentName0.getSegmentName(), replicaCount, now);
+    segmentZKMetadata0.setTimeUnit(TimeUnit.MILLISECONDS);
+    segmentZKMetadata0.setStartTime(now - 30 * millisInDays);
+    segmentZKMetadata0.setEndTime(now - 20 * millisInDays);
+    segmentZKMetadata0.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentsZKMetadata.add(segmentZKMetadata0);
+    idealState.setPartitionState(llcSegmentName0.getSegmentName(), serverName, "ONLINE");
+    segmentsToBeDeleted.add(llcSegmentName0.getSegmentName());
+
+    LLCSegmentName llcSegmentName1 = new LLCSegmentName(TEST_TABLE_NAME, kafkaPartition, 1, now);
+    SegmentZKMetadata segmentZKMetadata1 = createSegmentZKMetadata(llcSegmentName1.getSegmentName(), replicaCount, now);
+    segmentZKMetadata1.setTimeUnit(TimeUnit.MILLISECONDS);
+    segmentZKMetadata1.setStartTime(now - 20 * millisInDays);
+    segmentZKMetadata1.setEndTime(now - 10 * millisInDays);
+    segmentZKMetadata1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentsZKMetadata.add(segmentZKMetadata1);
+    idealState.setPartitionState(llcSegmentName1.getSegmentName(), serverName, "ONLINE");
+
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    when(pinotHelixResourceManager.getHelixClusterName()).thenReturn(HELIX_CLUSTER_NAME);
+    when(pinotHelixResourceManager.getLastLLCCompletedSegments(REALTIME_TABLE_NAME)).thenCallRealMethod();
 
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, REALTIME_TABLE_NAME)).thenReturn(idealState);

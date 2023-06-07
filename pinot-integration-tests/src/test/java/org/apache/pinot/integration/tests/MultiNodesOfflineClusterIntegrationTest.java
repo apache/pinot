@@ -19,6 +19,8 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.helix.model.ExternalView;
@@ -138,28 +140,28 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Take a server and shut down its query server to mimic a hard failure
     BaseServerStarter serverStarter = _serverStarters.get(NUM_SERVERS - 1);
-    serverStarter.getServerInstance().shutDown();
+    try {
+      serverStarter.getServerInstance().shutDown();
 
-    // First query should hit all servers and get connection refused exception
-    testCountStarQuery(NUM_SERVERS, true);
+      // First query should hit all servers and get connection refused or reset exception
+      // TODO: This is a flaky test. There is a race condition between shutDown and the query being executed.
+      testCountStarQuery(NUM_SERVERS, true);
 
-    // Second query should not hit the failed server, and should return the correct result
-    testCountStarQuery(NUM_SERVERS - 1, false);
-
-    // Restart the failed server, and it should be included in the routing again
-    serverStarter.stop();
-    serverStarter = startOneServer(NUM_SERVERS - 1);
-    _serverStarters.set(NUM_SERVERS - 1, serverStarter);
-    TestUtils.waitForCondition(aVoid -> {
-      try {
+      // Second query should not hit the failed server, and should return the correct result
+      testCountStarQuery(NUM_SERVERS - 1, false);
+    } finally {
+      // Restart the failed server, and it should be included in the routing again
+      serverStarter.stop();
+      serverStarter = startOneServer(NUM_SERVERS - 1);
+      _serverStarters.set(NUM_SERVERS - 1, serverStarter);
+      TestUtils.waitForCondition(() -> {
         JsonNode queryResult = postQuery("SELECT COUNT(*) FROM mytable");
         // Result should always be correct
         assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(), getCountStarResult());
         return queryResult.get("numServersQueried").intValue() == NUM_SERVERS;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 10_000L, "Failed to include the restarted server into the routing");
+      }, 10_000L, 1000L, "Failed to include the restarted server into the routing. Other tests may be affected",
+          true, Duration.of(1, ChronoUnit.SECONDS));
+    }
   }
 
   private void testCountStarQuery(int expectedNumServersQueried, boolean exceptionExpected)

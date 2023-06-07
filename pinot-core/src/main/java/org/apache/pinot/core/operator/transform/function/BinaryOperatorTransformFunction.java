@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -288,12 +287,6 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         break;
       default:
         throw illegalState();
-    }
-  }
-
-  private void fillResultUnknown(int length) {
-    for (int i = 0; i < length; i++) {
-      _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
     }
   }
 

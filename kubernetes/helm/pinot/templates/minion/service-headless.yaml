@@ -30,6 +30,12 @@ spec:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.minion.service.name }}
       port: {{ .Values.minion.service.port }}
+    {{- if .Values.minion.service.extraPorts }}
+    {{- range .Values.minion.service.extraPorts }}
+    - name: {{ .name }}
+      port: {{ .containerPort }} 
+    {{- end }}
+    {{- end }}
   selector:
     {{- include "pinot.minionMatchLabels" . | nindent 4 }}
 {{- end }}

@@ -35,7 +35,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
@@ -43,10 +42,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This is a scheduler that schedules operator chains in round robin fashion,
- * but will only schedule them when there is work to be done. The availability
- * of work is signaled using the {@link #onDataAvailable(MailboxIdentifier)}
- * callback.
+ * This is a scheduler that schedules operator chains in round-robin fashion, but will only schedule them when there is
+ * work to be done. The availability of work is signaled using the {@link #onDataAvailable} callback.
  * <p>
  *   Design: There are 3 states for a OpChain:
  *
@@ -97,7 +94,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
   private final Supplier<Long> _ticker;
 
   private final Map<OpChainId, OpChain> _aliveChains = new ConcurrentHashMap<>();
-  final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
+  private final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
   private final Map<OpChainId, Long> _available = new ConcurrentHashMap<>();
 
   private final BlockingQueue<OpChain> _ready = new LinkedBlockingQueue<>();
@@ -193,14 +190,11 @@ public class RoundRobinScheduler implements OpChainScheduler {
   }
 
   @Override
-  public void onDataAvailable(MailboxIdentifier mailbox) {
-    // TODO: Should we add an API in MailboxIdentifier to get the requestId?
-    OpChainId opChainId = new OpChainId(Long.parseLong(mailbox.getJobId().split("_")[0]),
-        mailbox.getToHost().virtualId(), mailbox.getReceiverStageId());
+  public void onDataAvailable(OpChainId opChainId) {
     // If this chain isn't alive as per the scheduler, don't do anything. If the OpChain is registered after this, it
     // will anyways be scheduled to run since new OpChains are run immediately.
     if (!_aliveChains.containsKey(opChainId)) {
-      trace("got mail, but the OpChain is not registered so ignoring the event " + mailbox);
+      trace("woken up but the OpChain is not registered so ignoring the event: " + opChainId);
       return;
     }
     _lock.lock();
@@ -221,11 +215,12 @@ public class RoundRobinScheduler implements OpChainScheduler {
     } finally {
       _lock.unlock();
     }
-    trace("got mail for " + mailbox);
+    trace("got data for " + opChainId);
   }
 
   @Override
-  public OpChain next(long time, TimeUnit timeUnit) throws InterruptedException {
+  public OpChain next(long time, TimeUnit timeUnit)
+      throws InterruptedException {
     return _ready.poll(time, timeUnit);
   }
 
@@ -261,7 +256,6 @@ public class RoundRobinScheduler implements OpChainScheduler {
   }
 
   private void trace(String operation) {
-    LOGGER.trace("({}) Ready: {}, Available: {}, Mail: {}",
-        operation, _ready, _available, _seenMail);
+    LOGGER.trace("({}) Ready: {}, Available: {}, Mail: {}", operation, _ready, _available, _seenMail);
   }
 }

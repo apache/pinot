@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.base.Function;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -262,7 +262,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  protected QueryConfig getQueryconfig() {
+  protected QueryConfig getQueryConfig() {
     // Enable groovy for tables used in the tests
     return new QueryConfig(null, false, null, null);
   }
@@ -275,11 +275,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected SegmentPartitionConfig getSegmentPartitionConfig() {
     return null;
   }
-
-  /**
-   * The following methods are based on the getters. Override the getters for non-default settings before calling these
-   * methods.
-   */
 
   /**
    * Creates a new schema.
@@ -323,7 +318,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
@@ -394,7 +389,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
@@ -603,26 +598,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true);
-  }
-
-  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
-    waitForDocsLoaded(timeoutMs, raiseError, getTableName());
+    waitForDocsLoaded(timeoutMs, true, getTableName());
   }
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          return getCurrentCountStarResult(tableName) == countStarResult;
-        } catch (Exception e) {
-          return null;
-        }
-      }
-    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", raiseError);
+    TestUtils.waitForCondition(
+        () -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+        "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   /**
@@ -649,22 +632,5 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
         getH2Connection());
-  }
-
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
-  protected void testQueryViaController(String query)
-      throws Exception {
-    testQueryViaController(query, query);
-  }
-
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
-  protected void testQueryViaController(String pinotQuery, String h2Query)
-      throws Exception {
-    ClusterIntegrationTestUtils.testQueryViaController(pinotQuery, _controllerBaseApiUrl, getPinotConnection(), h2Query,
-        getH2Connection(), null, null);
   }
 }

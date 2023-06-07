@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -33,6 +37,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -44,6 +49,7 @@ import org.testng.annotations.Test;
 public class TableConfigUtilsTest {
 
   private static final String TABLE_NAME = "testTable";
+  private static final String PARTITION_COLUMN = "partitionColumn";
 
   /**
    * Test the {@link TableConfigUtils#convertFromLegacyTableConfig(TableConfig)} utility.
@@ -83,6 +89,80 @@ public class TableConfigUtilsTest {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     Assert.assertNull(validationConfig.getSegmentPushFrequency());
     Assert.assertNull(validationConfig.getSegmentPushType());
+  }
+
+  @Test
+  public void testOverwriteTableConfigForTier()
+      throws Exception {
+    String col1CfgStr = "{"
+        + "  \"name\": \"col1\","
+        + "  \"encodingType\": \"DICTIONARY\","
+        + "  \"indexes\": {"
+        + "    \"bloom\": {\"enabled\": \"true\"}"
+        + "  },"
+        + "  \"tierOverwrites\": {"
+        + "    \"coldTier\": {"
+        + "      \"encodingType\": \"RAW\","
+        + "      \"indexes\": {}"
+        + "    }"
+        + "  }"
+        + "}";
+    FieldConfig col2Cfg = JsonUtils.stringToObject(col1CfgStr, FieldConfig.class);
+    String stIdxCfgStr = "{"
+        + "  \"dimensionsSplitOrder\": [\"col1\"],"
+        + "  \"functionColumnPairs\": [\"MAX__col1\"],"
+        + "  \"maxLeafRecords\": 10"
+        + "}";
+    StarTreeIndexConfig stIdxCfg = JsonUtils.stringToObject(stIdxCfgStr, StarTreeIndexConfig.class);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(Collections.singletonList(stIdxCfg))
+        .setTierOverwrites(JsonUtils.stringToJsonNode("{\"coldTier\": {\"starTreeIndexConfigs\": []}}"))
+        .setFieldConfigList(Collections.singletonList(col2Cfg)).build();
+
+    TableConfig tierTblCfg = TableConfigUtils.overwriteTableConfigForTier(tableConfig, "unknownTier");
+    Assert.assertEquals(tierTblCfg, tableConfig);
+    tierTblCfg = TableConfigUtils.overwriteTableConfigForTier(tableConfig, null);
+    Assert.assertEquals(tierTblCfg, tableConfig);
+    // Check original TableConfig and tier specific TableConfig
+    Assert.assertEquals(tierTblCfg.getFieldConfigList().get(0).getEncodingType(), FieldConfig.EncodingType.DICTIONARY);
+    Assert.assertEquals(tierTblCfg.getFieldConfigList().get(0).getIndexes().size(), 1);
+    Assert.assertEquals(tierTblCfg.getIndexingConfig().getStarTreeIndexConfigs().size(), 1);
+    tierTblCfg = TableConfigUtils.overwriteTableConfigForTier(tableConfig, "coldTier");
+    Assert.assertEquals(tierTblCfg.getFieldConfigList().get(0).getEncodingType(), FieldConfig.EncodingType.RAW);
+    Assert.assertEquals(tierTblCfg.getFieldConfigList().get(0).getIndexes().size(), 0);
+    Assert.assertEquals(tierTblCfg.getIndexingConfig().getStarTreeIndexConfigs().size(), 0);
+  }
+
+  @Test
+  public void testOverwriteTableConfigForTierWithError()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTierOverwrites(JsonUtils.stringToJsonNode("{\"coldTier\": {\"starTreeIndexConfigs\": {}}}")).build();
+    TableConfig tierTblCfg = TableConfigUtils.overwriteTableConfigForTier(tableConfig, "coldTier");
+    Assert.assertEquals(tierTblCfg, tableConfig);
+  }
+
+  @Test
+  public void testGetPartitionColumnWithoutAnyConfig() {
+    // without instanceAssignmentConfigMap
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    Assert.assertNull(TableConfigUtils.getPartitionColumn(tableConfig));
+  }
+
+  @Test
+  public void testGetPartitionColumnWithReplicaGroupConfig() {
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+
+    // setting up ReplicaGroupStrategyConfig for backward compatibility test.
+    SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
+    validationConfig.setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+    tableConfig.setValidationConfig(validationConfig);
+
+    Assert.assertEquals(PARTITION_COLUMN, TableConfigUtils.getPartitionColumn(tableConfig));
   }
 
   /**

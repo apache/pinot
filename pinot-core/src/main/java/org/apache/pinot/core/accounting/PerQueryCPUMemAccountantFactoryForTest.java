@@ -30,14 +30,14 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class PerQueryCPUMemAccountantFactoryForTest implements ThreadAccountantFactory {
   @Override
-  public ThreadResourceUsageAccountant init(PinotConfiguration config) {
-    return new PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(config);
+  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId) {
+    return new PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(config, instanceId);
   }
 
   public static class PerQueryCPUMemResourceUsageAccountantBrokerKillingTest
       extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
-    public PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(PinotConfiguration config) {
-      super(config);
+    public PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(PinotConfiguration config, String instanceId) {
+      super(config, instanceId);
     }
 
     public void postAggregation(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {

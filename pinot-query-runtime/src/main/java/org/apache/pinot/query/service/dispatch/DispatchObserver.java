@@ -21,7 +21,7 @@ package org.apache.pinot.query.service.dispatch;
 import io.grpc.stub.StreamObserver;
 import java.util.function.Consumer;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.QueryServerInstance;
 
 
 /**
@@ -29,11 +29,12 @@ import org.apache.pinot.query.routing.VirtualServer;
  */
 class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
   private int _stageId;
-  private VirtualServer _virtualServer;
+  private QueryServerInstance _virtualServer;
   private Consumer<AsyncQueryDispatchResponse> _callback;
   private Worker.QueryResponse _queryResponse;
 
-  public DispatchObserver(int stageId, VirtualServer virtualServer, Consumer<AsyncQueryDispatchResponse> callback) {
+  public DispatchObserver(int stageId, QueryServerInstance virtualServer,
+      Consumer<AsyncQueryDispatchResponse> callback) {
     _stageId = stageId;
     _virtualServer = virtualServer;
     _callback = callback;

@@ -160,7 +160,7 @@ public class PartitionDedupMetadataManagerTest {
     assertSame(indexSegment, segment);
   }
 
-  private static class TestMetadataManager extends PartitionDedupMetadataManager {
+  private static class TestMetadataManager extends ConcurrentMapPartitionDedupMetadataManager {
     Iterator<PrimaryKey> _primaryKeyIterator;
 
     TestMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,

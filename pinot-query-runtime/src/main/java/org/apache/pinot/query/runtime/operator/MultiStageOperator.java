@@ -26,14 +26,15 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public abstract class MultiStageOperator implements Operator<TransferableBlock>, AutoCloseable {
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
-  private final String _operatorId;
-  private final OpChainExecutionContext _context;
+  protected final OpChainExecutionContext _context;
+  protected final String _operatorId;
   protected final OpChainStats _opChainStats;
 
   public MultiStageOperator(OpChainExecutionContext context) {

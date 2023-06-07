@@ -21,11 +21,12 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -55,9 +56,22 @@ public class AggregationFunctionFactory {
         if (remainingFunctionName.equals("SMARTTDIGEST")) {
           return new PercentileSmartTDigestAggregationFunction(arguments);
         }
+        if (remainingFunctionName.equals("KLL")) {
+          return new PercentileKLLAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("KLLMV")) {
+          return new PercentileKLLMVAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("RAWKLL")) {
+          return new PercentileRawKLLAggregationFunction(arguments);
+        }
+        if (remainingFunctionName.equals("RAWKLLMV")) {
+          return new PercentileRawKLLMVAggregationFunction(arguments);
+        }
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
+          // NOTE: This convention is deprecated. DO NOT add new functions here
           if (remainingFunctionName.matches("\\d+")) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, parsePercentileToInt(remainingFunctionName));
@@ -143,6 +157,31 @@ public class AggregationFunctionFactory {
             // PercentileRawTDigestMV
             return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile);
           }
+        } else if (numArguments == 3) {
+          // Triple arguments percentile (e.g. percentileTDigest(bar, 95, 1000), etc.) where the
+          // second argument is a decimal number from 0.0 to 100.0 and third argument is a decimal number indicating
+          // the compression_factor for the TDigest. This can only be used for TDigest type percentile functions to
+          // pass in a custom compression_factor. If the two argument version is used the default compression_factor
+          // of 100.0 is used.
+          // Have to use literal string because we need to cast int to double here.
+          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
+          int compressionFactor = parseCompressionFactorToInt(arguments.get(2).getLiteral().getStringValue());
+          if (remainingFunctionName.equals("TDIGEST")) {
+            // PercentileTDigest
+            return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("RAWTDIGEST")) {
+            // PercentileRawTDigest
+            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("TDIGESTMV")) {
+            // PercentileTDigestMV
+            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
+          if (remainingFunctionName.equals("RAWTDIGESTMV")) {
+            // PercentileRawTDigestMV
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile, compressionFactor);
+          }
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
@@ -169,13 +208,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
+              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
-                  return new FirstIntValueWithTimeAggregationFunction(
-                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                  return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol,
+                      fieldDataType == DataType.BOOLEAN);
                 case LONG:
                   return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -199,13 +237,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType =
-                  FieldSpec.DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
+              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
                   return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol,
-                      fieldDataType == FieldSpec.DataType.BOOLEAN);
+                      fieldDataType == DataType.BOOLEAN);
                 case LONG:
                   return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -300,15 +337,36 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
+          case DISTINCTCOUNTTUPLESKETCH:
+            // mode actually doesn't matter here because we only care about keys, not values
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case SUMVALUESINTEGERSUMTUPLESKETCH:
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case AVGVALUEINTEGERSUMTUPLESKETCH:
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+          case PARENTARGMAX:
+            return new ParentArgMinMaxAggregationFunction(arguments, true);
+          case PARENTARGMIN:
+            return new ParentArgMinMaxAggregationFunction(arguments, false);
+          case CHILDARGMAX:
+            return new ChildArgMinMaxAggregationFunction(arguments, true);
+          case CHILDARGMIN:
+            return new ChildArgMinMaxAggregationFunction(arguments, false);
+          case ARGMAX:
+          case ARGMIN:
+            throw new IllegalArgumentException(
+                "Aggregation function: " + function + " is only supported in selection without alias.");
           case FUNNELCOUNT:
             return new FunnelCountAggregationFunction(arguments);
+            
           default:
             throw new IllegalArgumentException();
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException(
-          "Invalid aggregation function: " + function + "; Reason: " + e.getMessage());
+      throw new BadQueryRequestException("Invalid aggregation function: " + function + "; Reason: " + e.getMessage());
     }
   }
 
@@ -322,5 +380,11 @@ public class AggregationFunctionFactory {
     double percentile = Double.parseDouble(percentileString);
     Preconditions.checkArgument(percentile >= 0d && percentile <= 100d, "Invalid percentile: %s", percentile);
     return percentile;
+  }
+
+  private static int parseCompressionFactorToInt(String compressionFactorString) {
+    int compressionFactor = Integer.parseInt(compressionFactorString);
+    Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
+    return compressionFactor;
   }
 }

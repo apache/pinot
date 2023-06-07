@@ -18,126 +18,120 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.StageNodeVisitor;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
-import org.apache.pinot.query.planner.stage.WindowNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-public class DispatchablePlanVisitor implements StageNodeVisitor<Void, DispatchablePlanContext> {
+public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {
   public static final DispatchablePlanVisitor INSTANCE = new DispatchablePlanVisitor();
 
   private DispatchablePlanVisitor() {
   }
 
-  /**
-   * Entry point
-   * @param globalReceiverNode
-   * @param physicalPlanContext
-   */
-  public void constructDispatchablePlan(StageNode globalReceiverNode, DispatchablePlanContext physicalPlanContext) {
-    globalReceiverNode.visit(DispatchablePlanVisitor.INSTANCE, physicalPlanContext);
-    // special case for the global mailbox receive node
-    physicalPlanContext.getQueryPlan().getQueryStageMap().put(0, globalReceiverNode);
-    computeWorkerAssignment(globalReceiverNode, physicalPlanContext);
-  }
-
-  private StageMetadata getStageMetadata(StageNode node, DispatchablePlanContext context) {
-    return context.getQueryPlan().getStageMetadataMap().computeIfAbsent(
-        node.getStageId(), (id) -> new StageMetadata());
-  }
-
-  private void computeWorkerAssignment(StageNode node, DispatchablePlanContext context) {
-    int stageId = node.getStageId();
-    context.getWorkerManager().assignWorkerToStage(stageId, context.getQueryPlan().getStageMetadataMap().get(stageId),
-        context.getRequestId(), context.getPlannerContext().getOptions());
+  private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
+      DispatchablePlanContext context) {
+    return context.getDispatchablePlanMetadataMap().computeIfAbsent(node.getPlanFragmentId(),
+        (id) -> new DispatchablePlanMetadata());
   }
 
   @Override
   public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    StageMetadata stageMetadata = getStageMetadata(node, context);
-    stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
     return null;
   }
 
   @Override
   public Void visitWindow(WindowNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    StageMetadata stageMetadata = getStageMetadata(node, context);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
     // TODO: Figure out a way to parallelize Empty OVER() and OVER(ORDER BY) so the computation can be done across
     //       multiple nodes.
     // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
     // distributed as no global ordering is required across partitions.
-    stageMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
     return null;
+  }
+
+  @Override
+  public Void visitSetOp(SetOpNode setOpNode, DispatchablePlanContext context) {
+    setOpNode.getInputs().forEach(input -> input.visit(this, context));
+    getOrCreateDispatchablePlanMetadata(setOpNode, context);
+    return null;
+  }
+
+  @Override
+  public Void visitExchange(ExchangeNode exchangeNode, DispatchablePlanContext context) {
+    throw new UnsupportedOperationException("ExchangeNode should not be visited by DispatchablePlanVisitor");
   }
 
   @Override
   public Void visitFilter(FilterNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitJoin(JoinNode node, DispatchablePlanContext context) {
     node.getInputs().forEach(join -> join.visit(this, context));
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, DispatchablePlanContext context) {
     node.getSender().visit(this, context);
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    getStageMetadata(node, context);
-
-    context.getQueryPlan().getQueryStageMap().put(node.getStageId(), node);
-    computeWorkerAssignment(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
+    context.getDispatchablePlanStageRootMap().put(node.getPlanFragmentId(), node);
     return null;
   }
 
   @Override
   public Void visitProject(ProjectNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 
   @Override
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    StageMetadata stageMetadata = getStageMetadata(node, context);
-    stageMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
     return null;
   }
 
   @Override
   public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
-    StageMetadata stageMetadata = getStageMetadata(node, context);
-    stageMetadata.addScannedTable(node.getTableName());
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.addScannedTable(node.getTableName());
     return null;
   }
 
   @Override
   public Void visitValue(ValueNode node, DispatchablePlanContext context) {
-    getStageMetadata(node, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
     return null;
   }
 }

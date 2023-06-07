@@ -21,15 +21,13 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -54,10 +52,8 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -78,9 +74,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final int _reducerPort;
   private final long _defaultBrokerTimeoutMs;
 
-  private final MailboxService<TransferableBlock> _mailboxService;
+  private final MailboxService _mailboxService;
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
+  private final MultiStageRequestIdGenerator _multistageRequestIdGenerator;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -93,7 +90,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // use broker ID as host name, but remove the
       String brokerId = brokerIdFromConfig;
       brokerId = brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) ? brokerId.substring(
-          CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : brokerId;
+          CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH) : brokerId;
       brokerId = StringUtils.split(brokerId, "_").length > 1 ? StringUtils.split(brokerId, "_")[0] : brokerId;
       reducerHostname = brokerId;
     }
@@ -109,18 +106,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // it is OK to ignore the onDataAvailable callback because the broker top-level operators
     // always run in-line (they don't have any scheduler)
-    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> {
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, ignored -> {
     });
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
+
+    _multistageRequestIdGenerator = new MultiStageRequestIdGenerator(brokerIdFromConfig);
   }
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
-    long requestId = _requestIdGenerator.incrementAndGet();
+    long requestId = _multistageRequestIdGenerator.get();
     requestContext.setRequestId(requestId);
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
@@ -143,9 +142,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
-  private BrokerResponse handleRequest(long requestId, String query,
-      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  private BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
@@ -163,27 +161,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         case EXPLAIN:
           queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
           String plan = queryPlanResult.getExplainPlan();
-          RelNode explainRelRoot = queryPlanResult.getRelRoot();
-          if (!hasTableAccess(requesterIdentity, getTableNamesFromRelRoot(explainRelRoot), requestId, requestContext)) {
+          Set<String> tableNames = queryPlanResult.getTableNames();
+          if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
             return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
           }
 
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions,
-              requestId);
+          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e.getMessage()));
     }
 
-    QueryPlan queryPlan = queryPlanResult.getQueryPlan();
-    Set<String> tableNames = getTableNamesFromRelRoot(queryPlanResult.getRelRoot());
+    DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
+    Set<String> tableNames = queryPlanResult.getTableNames();
 
     // Compilation Time. This includes the time taken for parsing, compiling, create stage plans and assigning workers.
     long compilationEndTimeNs = System.nanoTime();
@@ -198,8 +195,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate QPS quota
     if (hasExceededQPSQuota(tableNames, requestId, requestContext)) {
-      String errorMessage =
-          String.format("Request %d: %s exceeds query quota.", requestId, query);
+      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
@@ -209,13 +205,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
-    for (Integer stageId : queryPlan.getStageMetadataMap().keySet()) {
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
     }
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
+      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService, queryTimeoutMs,
           sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
@@ -231,6 +227,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
+    brokerResponse.setRequestId(String.valueOf(requestId));
 
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {
@@ -288,18 +285,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return false;
   }
 
-  private Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    return new HashSet<>(RelOptUtil.findAllTableQualifiedNames(relRoot));
-  }
-
-  private void updatePhaseTimingForTables(Set<String> tableNames,
-      BrokerQueryPhase phase, long time) {
+  private void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
     for (String tableName : tableNames) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
     }
   }
-
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
@@ -330,5 +321,35 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
+  }
+
+  /**
+   * OpChains in Multistage queries are identified by the requestId and the stage-id. v1 Engine uses an incrementing
+   * long to generate requestId, so the requestIds are numbered [0, 1, 2, ...]. When running with multiple brokers,
+   * it could be that two brokers end up generating the same requestId which could lead to weird query errors. This
+   * requestId generator addresses that by:
+   * <ol>
+   *   <li>
+   *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't arrive at the same
+   *     requestId. This mask becomes the most significant 9 digits (in base-10).
+   *   </li>
+   *   <li>
+   *     Using a auto-incrementing counter for the least significant 9 digits (in base-10).
+   *   </li>
+   * </ol>
+   */
+  static class MultiStageRequestIdGenerator {
+    private static final long OFFSET = 1_000_000_000L;
+    private final long _mask;
+    private final AtomicLong _incrementingId = new AtomicLong(0);
+
+    public MultiStageRequestIdGenerator(String brokerId) {
+      _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) * OFFSET;
+    }
+
+    public long get() {
+      long normalized = (_incrementingId.getAndIncrement() & Long.MAX_VALUE) % OFFSET;
+      return _mask + normalized;
+    }
   }
 }

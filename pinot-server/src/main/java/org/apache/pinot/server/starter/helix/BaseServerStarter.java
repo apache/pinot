@@ -87,6 +87,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
@@ -544,6 +545,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+    // initialize the thread accountant for query killing
+    Tracing.ThreadAccountantOps
+        .initializeThreadAccountant(_serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId);
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
@@ -667,13 +671,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
     boolean noIncomingQueries = false;
     long currentTimeMs;
     while ((currentTimeMs = System.currentTimeMillis()) < endTimeMs) {
-      long noQueryTimeMs = currentTimeMs - _serverInstance.getLatestQueryTime();
+      // Ensure we wait the full noQueryTimeMs since the start of shutdown
+      long noQueryTimeMs = currentTimeMs - Math.max(startTimeMs, _serverInstance.getLatestQueryTime());
       if (noQueryTimeMs >= noQueryThresholdMs) {
         LOGGER.info("No query received within {}ms (larger than the threshold: {}ms), mark it as no incoming queries",
             noQueryTimeMs, noQueryThresholdMs);
         noIncomingQueries = true;
         break;
       }
+      // Otherwise sleep the difference, or use shutdown execution timeout if it's smaller
       long sleepTimeMs = Math.min(noQueryThresholdMs - noQueryTimeMs, endTimeMs - currentTimeMs);
       LOGGER.info(
           "Sleep for {}ms as there are still incoming queries (no query time: {}ms is smaller than the threshold: "

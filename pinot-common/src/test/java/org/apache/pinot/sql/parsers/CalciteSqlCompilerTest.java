@@ -3072,6 +3072,36 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tableNames.get(0), "tbl1");
     Assert.assertEquals(tableNames.get(1), "tbl2");
 
+    // query with UNION clause
+    query = "SELECT * FROM tbl1 UNION ALL SELECT * FROM tbl2 UNION ALL SELECT * FROM tbl3";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 3);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+    Assert.assertEquals(tableNames.get(2), "tbl3");
+
+    // query with UNION clause and table alias
+    query = "SELECT * FROM (SELECT * FROM tbl1) AS t1 UNION SELECT * FROM ( SELECT * FROM tbl2) AS t2";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+
+    // query with UNION clause and table alias using WITH clause
+    query = "WITH tmp1 AS (SELECT * FROM tbl1), \n"
+        + "tmp2 AS (SELECT * FROM tbl2) \n"
+        + "SELECT * FROM tmp1 UNION ALL SELECT * FROM tmp2";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl2");
+
     // query with aliases, JOIN, IN/NOT-IN, group-by
     query = "with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1), "
         + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
@@ -3108,6 +3138,14 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tableNames.get(1), "tbl2");
     Assert.assertEquals(tableNames.get(2), "tbl3");
     Assert.assertEquals(tableNames.get(3), "tbl4");
+
+    // test for self join queries
+    query = "SELECT tbl1.a FROM tbl1 JOIN(SELECT a FROM tbl1) as self ON tbl1.a=self.a ";
+    sqlNodeAndOptions = RequestUtils.parseQuery(query);
+    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    Assert.assertEquals(tableNames.size(), 2);
+    Assert.assertEquals(tableNames.get(0), "tbl1");
+    Assert.assertEquals(tableNames.get(1), "tbl1");
   }
 
   @Test
@@ -3193,5 +3231,22 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(rightSubquery,
         CalciteSqlParser.compileToPinotQuery("SELECT key, COUNT(*) AS b FROM T3 JOIN T4 GROUP BY key"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = T2.key"));
+
+    // test for self join queries.
+    query = "SELECT T1.a FROM T1 JOIN(SELECT key FROM T1) as self ON T1.key=self.key";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    dataSource = pinotQuery.getDataSource();
+    Assert.assertNull(dataSource.getTableName());
+    Assert.assertNull(dataSource.getSubquery());
+    Assert.assertNotNull(dataSource.getJoin());
+    join = dataSource.getJoin();
+    Assert.assertEquals(join.getType(), JoinType.INNER);
+    Assert.assertEquals(join.getLeft().getTableName(), "T1");
+    right = join.getRight();
+    Assert.assertEquals(right.getTableName(), "self");
+    rightSubquery = right.getSubquery();
+    Assert.assertEquals(rightSubquery,
+        CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
+    Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
   }
 }

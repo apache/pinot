@@ -80,8 +80,13 @@ public abstract class BaseTransformFunctionTest {
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
   protected static final String BIG_DECIMAL_SV_COLUMN = "bigDecimalSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String STRING_SV_NULL_COLUMN = "stringSVNull";
+
   protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
+
+  protected static final String STRING_ALPHANUM_NULL_SV_COLUMN = "stringAlphaNumSVNull";
+
   protected static final String INT_MV_COLUMN = "intMV";
   protected static final String INT_MV_NULL_COLUMN = "intMVNull";
 
@@ -93,6 +98,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_LONG_MV_COLUMN = "stringLongMV";
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
+  protected static final String TIMESTAMP_COLUMN_NULL = "timestampColumnNull";
+
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   protected final int[] _intSVValues = new int[NUM_ROWS];
@@ -160,17 +167,27 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
       map.put(INT_SV_COLUMN, _intSVValues[i]);
-      if (i % 2 == 0) {
-        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         map.put(INT_SV_NULL_COLUMN, null);
+      } else {
+        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
       }
       map.put(LONG_SV_COLUMN, _longSVValues[i]);
       map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
       map.put(BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
+      if (i % 2 == 0) {
+        map.put(STRING_SV_NULL_COLUMN, _stringSVValues[i]);
+      } else {
+        map.put(STRING_SV_NULL_COLUMN, null);
+      }
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
+      if (i % 2 == 0) {
+        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
+      } else {
+        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, null);
+      }
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       if (i % 2 == 0) {
@@ -185,6 +202,11 @@ public abstract class BaseTransformFunctionTest {
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
       map.put(STRING_LONG_MV_COLUMN, _stringLongFormatMVValues[i]);
       map.put(TIMESTAMP_COLUMN, _timeValues[i]);
+      if (i % 2 == 0) {
+        map.put(TIMESTAMP_COLUMN_NULL, _timeValues[i]);
+      } else {
+        map.put(TIMESTAMP_COLUMN_NULL, null);
+      }
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
       map.put(JSON_COLUMN, _jsonValues[i]);
@@ -200,7 +222,9 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addMetric(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_SV_NULL_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_ALPHANUM_NULL_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
@@ -213,6 +237,7 @@ public abstract class BaseTransformFunctionTest {
         .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_LONG_MV_COLUMN, FieldSpec.DataType.STRING)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addDateTime(TIMESTAMP_COLUMN_NULL, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
@@ -234,6 +259,10 @@ public abstract class BaseTransformFunctionTest {
 
     _projectionBlock = new ProjectionOperator(_dataSourceMap,
         new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+  }
+
+  protected boolean isNullRow(int i) {
+    return i % 2 != 0;
   }
 
   private void testNullBitmap(TransformFunction transformFunction, RoaringBitmap expectedNull) {
@@ -305,6 +334,36 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValues[i], Long.toString(expectedValues[i]));
     }
     testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, long[] expectedValues,
+      RoaringBitmap expectedNull) {
+    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+    Pair<long[], RoaringBitmap> longValues = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
+    Pair<float[], RoaringBitmap> floatValues = transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
+    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    Pair<BigDecimal[], RoaringBitmap> bigDecimalValues =
+        transformFunction.transformToBigDecimalValuesSVWithNull(_projectionBlock);
+    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
+    assertEquals(intValues.getRight(), expectedNull);
+    assertEquals(longValues.getRight(), expectedNull);
+    assertEquals(floatValues.getRight(), expectedNull);
+    assertEquals(doubleValues.getRight(), expectedNull);
+    assertEquals(bigDecimalValues.getRight(), expectedNull);
+    assertEquals(stringValues.getRight(), expectedNull);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (expectedNull.contains(i)) {
+        continue;
+      }
+      // only compare the rows that are not null.
+      assertEquals(intValues.getLeft()[i], (int) expectedValues[i]);
+      assertEquals(longValues.getLeft()[i], expectedValues[i]);
+      assertEquals(floatValues.getLeft()[i], (float) expectedValues[i]);
+      assertEquals(doubleValues.getLeft()[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues.getLeft()[i].longValue(), expectedValues[i]);
+      assertEquals(stringValues.getLeft()[i], Long.toString(expectedValues[i]));
+    }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, float[] expectedValues) {
@@ -481,6 +540,15 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(stringValues[i], expectedValues[i]);
     }
     testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, String[] expectedValues,
+      RoaringBitmap expectedNulls) {
+    Pair<String[], RoaringBitmap> stringValues = transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(stringValues.getLeft()[i], expectedValues[i]);
+    }
+    assertEquals(stringValues.getRight(), expectedNulls);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {

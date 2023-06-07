@@ -36,6 +36,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactoryForTest;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -50,8 +51,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -67,7 +66,6 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
   public static final String LONG_DIM_SV1 = "longDimSV1";
   public static final String DOUBLE_DIM_SV1 = "doubleDimSV1";
   public static final String BOOLEAN_DIM_SV1 = "booleanDimSV1";
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterMemBasedBrokerQueryKillingTest.class);
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 3;
   private static final String OOM_QUERY =
@@ -96,13 +94,8 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
   @BeforeClass
   public void setUp()
       throws Exception {
-    // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterMemBasedBrokerQueryKillingTest.class).setLevel(Level.INFO);
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
-    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
+        .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
 
@@ -136,6 +129,13 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
 
     //Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
+
+    // Setup logging and resource accounting
+    LogManager.getLogger(OfflineClusterMemBasedBrokerQueryKillingTest.class).setLevel(Level.INFO);
+    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
+        .setLevel(Level.INFO);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
+    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
   }
 
   protected void startBrokers()
@@ -152,7 +152,7 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.60f);
+        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.40f);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE, InstanceType.BROKER);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
@@ -200,19 +200,11 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryconfig()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setQueryConfig(getQueryConfig()).setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
 
-//  @Test
-//  public void testDigestOOM()
-//      throws Exception {
-//    JsonNode queryResponse = postQuery(OOM_QUERY);
-//    LOGGER.info("testDigestOOM: {}", queryResponse);
-//    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
-//    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
-//  }
 
   @Test
   public void testDigestOOMMultipleQueries()
@@ -251,9 +243,10 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         }
     );
     countDownLatch.await();
-    LOGGER.info("testDigestOOMMultipleQueries: {}", queryResponse1);
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains(
         "Interrupted in broker reduce phase"));
+    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":"
+        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));

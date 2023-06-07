@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
@@ -50,6 +52,8 @@ import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FSTType;
@@ -64,6 +68,8 @@ import org.slf4j.LoggerFactory;
 public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexReader, TextIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
   protected static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
+
+  public static final String INDEX_DISPLAY_NAME = "text";
 
   protected TextIndexType() {
     super(StandardIndexes.TEXT_ID);
@@ -91,8 +97,13 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<TextIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("text", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative((tableConfig, schema) -> {
           List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
           if (fieldConfigList == null) {
@@ -170,5 +181,24 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       }
       return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
     }
+  }
+
+  @Nullable
+  @Override
+  public MutableIndex createMutableIndex(MutableIndexContext context, TextIndexConfig config) {
+    if (config.isDisabled()) {
+      return null;
+    }
+    if (!context.getFieldSpec().isSingleValueField()) {
+      return null;
+    }
+    if (config.getFstType() == FSTType.NATIVE) {
+      return new NativeMutableTextIndex(context.getFieldSpec().getName());
+    }
+    if (context.getConsumerDir() == null) {
+      throw new IllegalArgumentException("A consumer directory is required");
+    }
+    return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
+        context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude());
   }
 }

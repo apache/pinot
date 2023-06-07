@@ -29,5 +29,11 @@ spec:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.broker.service.name }}
       port: {{ .Values.broker.service.port }}
+    {{- if .Values.broker.service.extraPorts }}
+    {{- range .Values.broker.service.extraPorts }}
+    - name: {{ .name }}
+      port: {{ .containerPort }} 
+    {{- end }}
+    {{- end }}
   selector:
     {{- include "pinot.brokerMatchLabels" . | nindent 4 }}

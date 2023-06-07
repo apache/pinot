@@ -19,10 +19,13 @@
 package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
+import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,7 +34,7 @@ import static org.testng.Assert.*;
 
 public class FstIndexTypeTest {
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(FstIndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimStr", StandardIndexes.fst()), expected);
@@ -150,6 +153,25 @@ public class FstIndexTypeTest {
           + "    }\n"
           + " }");
       assertEquals(new FstIndexConfig(null));
+    }
+
+    @Test
+    public void oldToNewConfConversion()
+        throws IOException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimStr\",\n"
+          + "    \"indexTypes\" : [\"FST\"]\n"
+          + " }");
+      _tableConfig.getIndexingConfig().setFSTIndexType(FSTType.NATIVE);
+      convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
+      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimStr"))
+          .collect(Collectors.toList()).get(0);
+      assertNotNull(fieldConfig.getIndexes().get(FstIndexType.INDEX_DISPLAY_NAME));
+      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      assertNull(_tableConfig.getIndexingConfig().getFSTIndexType());
     }
   }
 

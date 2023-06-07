@@ -18,61 +18,49 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-import org.apache.pinot.query.mailbox.channel.InMemoryTransferStream;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
-  private final Consumer<MailboxIdentifier> _gotMailCallback;
-  private final JsonMailboxIdentifier _mailboxId;
+public class InMemorySendingMailbox implements SendingMailbox {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
 
-  private Supplier<InMemoryTransferStream> _transferStreamProvider;
-  private InMemoryTransferStream _transferStream;
+  private final String _id;
+  private final MailboxService _mailboxService;
+  private final long _deadlineMs;
 
-  public InMemorySendingMailbox(String mailboxId, Supplier<InMemoryTransferStream> transferStreamProvider,
-      Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxId = JsonMailboxIdentifier.parse(mailboxId);
-    _transferStreamProvider = transferStreamProvider;
-    _gotMailCallback = gotMailCallback;
+  private ReceivingMailbox _receivingMailbox;
+
+  public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs) {
+    _id = id;
+    _mailboxService = mailboxService;
+    _deadlineMs = deadlineMs;
   }
 
   @Override
-  public String getMailboxId() {
-    return _mailboxId.toString();
-  }
-
-  @Override
-  public void send(TransferableBlock data)
-      throws Exception {
-    if (!isInitialized()) {
-      initialize();
+  public void send(TransferableBlock block) {
+    if (_receivingMailbox == null) {
+      _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
-    _transferStream.send(data);
-    _gotMailCallback.accept(_mailboxId);
+    long timeoutMs = _deadlineMs - System.currentTimeMillis();
+    if (!_receivingMailbox.offer(block, timeoutMs)) {
+      throw new RuntimeException(String.format("Failed to offer block into mailbox: %s within: %dms", _id, timeoutMs));
+    }
   }
 
   @Override
-  public void complete() throws Exception {
-    _transferStream.complete();
-  }
-
-  @Override
-  public boolean isInitialized() {
-    return _transferStream != null;
+  public void complete() {
   }
 
   @Override
   public void cancel(Throwable t) {
-    if (isInitialized() && !_transferStream.isCancelled()) {
-      _transferStream.cancel();
+    LOGGER.debug("Cancelling mailbox: {}", _id);
+    if (_receivingMailbox == null) {
+      _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
-  }
-
-  private void initialize() {
-    if (_transferStream == null) {
-      _transferStream = _transferStreamProvider.get();
-    }
+    _receivingMailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
+        new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t)));
   }
 }

@@ -69,11 +69,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RELOAD_FAILURES("segments", false),
   REFRESH_FAILURES("segments", false),
   UNTAR_FAILURES("segments", false),
-  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false),
+  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment "
+      + "fetch failures"),
   SEGMENT_DIR_MOVEMENT_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_UPLOAD_FAILURE("segments", false),
+  SEGMENT_UPLOAD_SUCCESS("segments", false),
+  // Emitted only by Server to Deep-store segment uploader.
+  SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
@@ -89,6 +94,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
 
+  // GRPC related metrics
+  GRPC_QUERIES("grpcQueries", true),
+  GRPC_BYTES_RECEIVED("grpcBytesReceived", true),
+  GRPC_BYTES_SENT("grpcBytesSent", true),
+
   NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
   NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),;
@@ -96,11 +106,17 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   private final String _meterName;
   private final String _unit;
   private final boolean _global;
+  private final String _description;
 
   ServerMeter(String unit, boolean global) {
+    this(unit, global, "");
+  }
+
+  ServerMeter(String unit, boolean global, String description) {
     _unit = unit;
     _global = global;
     _meterName = Utils.toCamelCase(name().toLowerCase());
+    _description = description;
   }
 
   @Override
@@ -121,5 +137,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  @Override
+  public String getDescription() {
+    return _description;
   }
 }

@@ -57,9 +57,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -127,7 +131,10 @@ public class ObjectSerDeUtils {
     StringLongPair(31),
     CovarianceTuple(32),
     VarianceTuple(33),
-    PinotFourthMoment(34);
+    PinotFourthMoment(34),
+    ArgMinMaxObject(35),
+    KllDataSketch(36),
+    IntegerTupleSketch(37);
 
     private final int _value;
 
@@ -176,6 +183,8 @@ public class ObjectSerDeUtils {
         return ObjectType.DistinctTable;
       } else if (value instanceof Sketch) {
         return ObjectType.DataSketch;
+      } else if (value instanceof KllDoublesSketch) {
+        return ObjectType.KllDataSketch;
       } else if (value instanceof Geometry) {
         return ObjectType.Geometry;
       } else if (value instanceof RoaringBitmap) {
@@ -213,6 +222,10 @@ public class ObjectSerDeUtils {
         return ObjectType.VarianceTuple;
       } else if (value instanceof PinotFourthMoment) {
         return ObjectType.PinotFourthMoment;
+      } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
+        return ObjectType.IntegerTupleSketch;
+      } else if (value instanceof ArgMinMaxObject) {
+        return ObjectType.ArgMinMaxObject;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -918,6 +931,48 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>> DATA_SKETCH_INT_TUPLE_SER_DE =
+      new ObjectSerDe<org.apache.datasketches.tuple.Sketch<IntegerSummary>>() {
+        @Override
+        public byte[] serialize(org.apache.datasketches.tuple.Sketch<IntegerSummary> value) {
+          return value.compact().toByteArray();
+        }
+
+        @Override
+        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(byte[] bytes) {
+          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+              new IntegerSummaryDeserializer());
+        }
+
+        @Override
+        public org.apache.datasketches.tuple.Sketch<IntegerSummary> deserialize(ByteBuffer byteBuffer) {
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          return org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+              new IntegerSummaryDeserializer());
+        }
+      };
+
+  public static final ObjectSerDe<KllDoublesSketch> KLL_SKETCH_SER_DE = new ObjectSerDe<KllDoublesSketch>() {
+
+    @Override
+    public byte[] serialize(KllDoublesSketch value) {
+      return value.toByteArray();
+    }
+
+    @Override
+    public KllDoublesSketch deserialize(byte[] bytes) {
+      return KllDoublesSketch.wrap(Memory.wrap(bytes));
+    }
+
+    @Override
+    public KllDoublesSketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return KllDoublesSketch.wrap(Memory.wrap(bytes));
+    }
+  };
+
   public static final ObjectSerDe<Geometry> GEOMETRY_SER_DE = new ObjectSerDe<Geometry>() {
 
     @Override
@@ -1199,6 +1254,37 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<ArgMinMaxObject> ARG_MIN_MAX_OBJECT_SER_DE =
+      new ObjectSerDe<ArgMinMaxObject>() {
+
+        @Override
+        public byte[] serialize(ArgMinMaxObject value) {
+          try {
+            return value.toBytes();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+
+        @Override
+        public ArgMinMaxObject deserialize(byte[] bytes) {
+          try {
+            return ArgMinMaxObject.fromBytes(bytes);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+
+        @Override
+        public ArgMinMaxObject deserialize(ByteBuffer byteBuffer) {
+          try {
+            return ArgMinMaxObject.fromByteBuffer(byteBuffer);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1236,7 +1322,10 @@ public class ObjectSerDeUtils {
       STRING_LONG_PAIR_SER_DE,
       COVARIANCE_TUPLE_OBJECT_SER_DE,
       VARIANCE_TUPLE_OBJECT_SER_DE,
-      PINOT_FOURTH_MOMENT_OBJECT_SER_DE
+      PINOT_FOURTH_MOMENT_OBJECT_SER_DE,
+      ARG_MIN_MAX_OBJECT_SER_DE,
+      KLL_SKETCH_SER_DE,
+      DATA_SKETCH_INT_TUPLE_SER_DE,
   };
   //@formatter:on
 

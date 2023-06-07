@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
@@ -33,13 +30,13 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  */
 public class OpChain implements AutoCloseable {
   private final MultiStageOperator _root;
-  private final Set<MailboxIdentifier> _receivingMailbox;
-  private final OpChainStats _stats;
+  private final List<String> _receivingMailboxIds;
   private final OpChainId _id;
+  private final OpChainStats _stats;
 
-  public OpChain(OpChainExecutionContext context, MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes) {
+  public OpChain(OpChainExecutionContext context, MultiStageOperator root, List<String> receivingMailboxIds) {
     _root = root;
-    _receivingMailbox = new HashSet<>(receivingMailboxes);
+    _receivingMailboxIds = receivingMailboxIds;
     _id = context.getId();
     _stats = context.getStats();
   }
@@ -48,8 +45,8 @@ public class OpChain implements AutoCloseable {
     return _root;
   }
 
-  public Set<MailboxIdentifier> getReceivingMailbox() {
-    return _receivingMailbox;
+  public List<String> getReceivingMailboxIds() {
+    return _receivingMailboxIds;
   }
 
   public OpChainId getId() {

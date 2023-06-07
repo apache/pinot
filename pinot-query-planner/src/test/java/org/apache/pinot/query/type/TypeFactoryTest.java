@@ -43,6 +43,7 @@ public class TypeFactoryTest {
         .addSingleValueDimension("DOUBLE_COL", FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension("STRING_COL", FieldSpec.DataType.STRING)
         .addSingleValueDimension("BYTES_COL", FieldSpec.DataType.BYTES)
+        .addSingleValueDimension("JSON_COL", FieldSpec.DataType.JSON)
         .addMultiValueDimension("INT_ARRAY_COL", FieldSpec.DataType.INT)
         .addMultiValueDimension("LONG_ARRAY_COL", FieldSpec.DataType.LONG)
         .addMultiValueDimension("FLOAT_ARRAY_COL", FieldSpec.DataType.FLOAT)
@@ -67,6 +68,7 @@ public class TypeFactoryTest {
           Assert.assertEquals(field.getType(), new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE));
           break;
         case "STRING_COL":
+        case "JSON_COL":
           Assert.assertEquals(field.getType(), new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR));
           break;
         case "BYTES_COL":

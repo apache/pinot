@@ -23,6 +23,7 @@ package org.apache.pinot.segment.local.upsert;
 public class ComparisonColumns implements Comparable<ComparisonColumns> {
   private final Comparable[] _values;
   private final int _comparableIndex;
+  public static final int SEALED_SEGMENT_COMPARISON_INDEX = -1;
 
   public ComparisonColumns(Comparable[] values, int comparableIndex) {
     _values = values;
@@ -37,10 +38,46 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
     return _comparableIndex;
   }
 
+  public int compareToSealed(ComparisonColumns other) {
+      /*
+       - iterate over all columns
+       - if any value in _values is greater than its counterpart in _other._values, keep _values as-is and return 1
+       - if any value in _values is less than its counterpart  in _other._values, keep _values as-is and return -1
+       - if all values between the two sets of Comparables are equal (compareTo == 0), keep _values as-is and return 0
+       */
+    for (int i = 0; i < _values.length; i++) {
+      Comparable comparisonValue = _values[i];
+      Comparable otherComparisonValue = other.getValues()[i];
+      if (comparisonValue == null && otherComparisonValue == null) {
+        continue;
+      }
+
+      // Always keep the record with non-null value, or that with the greater comparisonResult
+      if (comparisonValue == null) {
+        // implies comparisonValue == null && otherComparisonValue != null
+        return -1;
+      } else if (otherComparisonValue == null) {
+        // implies comparisonValue != null && otherComparisonValue == null
+        return 1;
+      } else {
+        int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
+        if (comparisonResult != 0) {
+          return comparisonResult;
+        }
+      }
+    }
+    return 0;
+  }
+
   @Override
   public int compareTo(ComparisonColumns other) {
-    // _comparisonColumns should only at most one non-null comparison value. If not, it is the user's responsibility.
-    // There is no attempt to guarantee behavior in the case where there are multiple non-null values
+    if (_comparableIndex == SEALED_SEGMENT_COMPARISON_INDEX) {
+      return compareToSealed(other);
+    }
+
+    // _comparisonColumns should only at most one non-null comparison value for newly ingested data. If not, it is
+    // the user's responsibility. There is no attempt to guarantee behavior in the case where there are multiple
+    // non-null values
     int comparisonResult;
 
     Comparable comparisonValue = _values[_comparableIndex];

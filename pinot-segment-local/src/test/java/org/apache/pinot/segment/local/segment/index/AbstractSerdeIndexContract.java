@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -123,5 +124,9 @@ public class AbstractSerdeIndexContract {
   protected List<String> parseStringList(String json)
       throws IOException {
     return JsonUtils.stringToObject(json, _stringListTypeRef);
+  }
+
+  protected void convertToUpdatedFormat() {
+    _tableConfig = TableConfigUtils.createTableConfigFromOldFormat(_tableConfig, _schema);
   }
 }

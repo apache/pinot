@@ -34,6 +34,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,16 +56,19 @@ public class SortOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
-      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections, int fetch, int offset,
-      DataSchema dataSchema, boolean isInputSorted) {
-    this(context, upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema, isInputSorted,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
+      List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
+      boolean isInputSorted) {
+    this(context, upstreamOperator, collationKeys, collationDirections, collationNullDirections, fetch, offset,
+        dataSchema, isInputSorted, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
   }
 
   @VisibleForTesting
   SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      boolean isInputSorted, int defaultHolderCapacity) {
+      List<RelFieldCollation.Direction> collationDirections,
+      List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
+      boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
     super(context);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
@@ -72,7 +76,9 @@ public class SortOperator extends MultiStageOperator {
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
-    _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultHolderCapacity;
+    // Setting numRowsToKeep as default maximum on Broker if limit not set.
+    // TODO: make this default behavior configurable.
+    _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultResponseLimit;
     // Under the following circumstances, the SortOperator is a simple selection with row trim on limit & offset:
     // - There are no collationKeys
     // - 'isInputSorted' is set to true indicating that the data was already sorted
@@ -82,8 +88,8 @@ public class SortOperator extends MultiStageOperator {
     } else {
       // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
       // which elements to keep and which to remove based on the limits.
-      _priorityQueue = new PriorityQueue<>(_numRowsToKeep,
-          new SortUtils.SortComparator(collationKeys, collationDirections, dataSchema, false, true));
+      _priorityQueue = new PriorityQueue<>(Math.min(defaultHolderCapacity, _numRowsToKeep),
+          new SortUtils.SortComparator(collationKeys, collationDirections, collationNullDirections, dataSchema, true));
       _rows = null;
     }
   }

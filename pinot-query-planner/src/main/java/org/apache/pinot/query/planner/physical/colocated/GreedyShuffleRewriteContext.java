@@ -24,19 +24,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
 /**
  * Context used for running the {@link GreedyShuffleRewriteVisitor}.
  */
 class GreedyShuffleRewriteContext {
-  private final Map<Integer, StageNode> _rootStageNode;
-  private final Map<Integer, List<StageNode>> _leafNodes;
+  private final Map<Integer, PlanNode> _rootStageNode;
+  private final Map<Integer, List<PlanNode>> _leafNodes;
   private final Set<Integer> _joinStages;
+  private final Set<Integer> _setOpStages;
+
   /**
-   * A map to track the partition keys for the input to the MailboxSendNode of a given stageId. This is needed
+   * A map to track the partition keys for the input to the MailboxSendNode of a given planFragmentId. This is needed
    * because the {@link GreedyShuffleRewriteVisitor} doesn't determine the distribution of the sender if the receiver
    * is a join-stage.
    */
@@ -46,63 +48,80 @@ class GreedyShuffleRewriteContext {
     _rootStageNode = new HashMap<>();
     _leafNodes = new HashMap<>();
     _joinStages = new HashSet<>();
+    _setOpStages = new HashSet<>();
     _senderInputColocationKeys = new HashMap<>();
   }
 
   /**
-   * Returns the root StageNode for a given stageId.
+   * Returns the root StageNode for a given planFragmentId.
    */
-  StageNode getRootStageNode(Integer stageId) {
-    return _rootStageNode.get(stageId);
+  PlanNode getRootStageNode(Integer planFragmentId) {
+    return _rootStageNode.get(planFragmentId);
   }
 
   /**
-   * Sets the root StageNode for a given stageId.
+   * Sets the root StageNode for a given planFragmentId.
    */
-  void setRootStageNode(Integer stageId, StageNode stageNode) {
-    _rootStageNode.put(stageId, stageNode);
+  void setRootStageNode(Integer planFragmentId, PlanNode planNode) {
+    _rootStageNode.put(planFragmentId, planNode);
   }
 
   /**
-   * Returns all the leaf StageNode for a given stageId.
+   * Returns all the leaf StageNode for a given planFragmentId.
    */
-  List<StageNode> getLeafNodes(Integer stageId) {
-    return _leafNodes.get(stageId);
+  List<PlanNode> getLeafNodes(Integer planFragmentId) {
+    return _leafNodes.get(planFragmentId);
   }
 
   /**
-   * Adds a leaf StageNode for a given stageId.
+   * Adds a leaf PlanNode for a given planFragmentId.
    */
-  void addLeafNode(Integer stageId, StageNode stageNode) {
-    _leafNodes.computeIfAbsent(stageId, (x) -> new ArrayList<>()).add(stageNode);
+  void addLeafNode(Integer planFragmentId, PlanNode planNode) {
+    _leafNodes.computeIfAbsent(planFragmentId, (x) -> new ArrayList<>()).add(planNode);
   }
 
   /**
-   * {@link GreedyShuffleRewriteContext} allows checking whether a given stageId has a JoinNode or not. During
-   * pre-computation, this method may be used to mark that the given stageId has a JoinNode.
+   * {@link GreedyShuffleRewriteContext} allows checking whether a given planFragmentId has a JoinNode or not. During
+   * pre-computation, this method may be used to mark that the given planFragmentId has a JoinNode.
    */
-  void markJoinStage(Integer stageId) {
-    _joinStages.add(stageId);
+  void markJoinStage(Integer planFragmentId) {
+    _joinStages.add(planFragmentId);
   }
 
   /**
-   * Returns true if the given stageId has a JoinNode.
+   * Returns true if the given planFragmentId has a JoinNode.
    */
-  boolean isJoinStage(Integer stageId) {
-    return _joinStages.contains(stageId);
+  boolean isJoinStage(Integer planFragmentId) {
+    return _joinStages.contains(planFragmentId);
   }
 
   /**
-   * This returns the {@link Set<ColocationKey>} for the input to the {@link MailboxSendNode} of the given stageId.
+   * {@link GreedyShuffleRewriteContext} allows checking whether a given planFragmentId has a SetOpNode or not. During
+   * pre-computation, this method may be used to mark that the given planFragmentId has a SetOpNode.
    */
-  Set<ColocationKey> getColocationKeys(Integer stageId) {
-    return _senderInputColocationKeys.get(stageId);
+  void markSetOpStage(Integer planFragmentId) {
+    _setOpStages.add(planFragmentId);
   }
 
   /**
-   * This sets the {@link Set<ColocationKey>} for the input to the {@link MailboxSendNode} of the given stageId.
+   * Returns true if the given planFragmentId has a SetOpNode.
    */
-  void setColocationKeys(Integer stageId, Set<ColocationKey> colocationKeys) {
-    _senderInputColocationKeys.put(stageId, colocationKeys);
+  boolean isSetOpStage(Integer planFragmentId) {
+    return _setOpStages.contains(planFragmentId);
+  }
+
+  /**
+   * This returns the {@link Set<ColocationKey>} for the input to the {@link MailboxSendNode} of the given
+   * planFragmentId.
+   */
+  Set<ColocationKey> getColocationKeys(Integer planFragmentId) {
+    return _senderInputColocationKeys.get(planFragmentId);
+  }
+
+  /**
+   * This sets the {@link Set<ColocationKey>} for the input to the {@link MailboxSendNode} of the given planFragmentId.
+   */
+  void setColocationKeys(Integer planFragmentId, Set<ColocationKey> colocationKeys) {
+    _senderInputColocationKeys.put(planFragmentId, colocationKeys);
   }
 }

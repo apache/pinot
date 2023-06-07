@@ -36,12 +36,12 @@ public class PlannerUtils {
     // do not instantiate.
   }
 
-  public static boolean isRootStage(int stageId) {
-    return stageId == 0;
+  public static boolean isRootPlanFragment(int planFragmentId) {
+    return planFragmentId == 0;
   }
 
-  public static boolean isFinalStage(int stageId) {
-    return stageId == 1;
+  public static boolean isFinalPlanFragment(int planFragmentId) {
+    return planFragmentId == 1;
   }
 
   public static String explainPlan(RelNode relRoot, SqlExplainFormat format, SqlExplainLevel explainLevel) {

@@ -26,12 +26,12 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class IsNullTransformFunction extends BaseTransformFunction {
-  private PeekableIntIterator _nullValueVectorIterator;
+  private TransformFunction _transformFunction;
 
   @Override
   public String getName() {
@@ -41,19 +41,7 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NULL");
-    TransformFunction transformFunction = arguments.get(0);
-    Preconditions.checkArgument(transformFunction instanceof IdentifierTransformFunction,
-        "Only column names are supported in IS_NULL. Support for functions is planned for future release");
-    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    ColumnContext columnContext = columnContextMap.get(columnName);
-    Preconditions.checkArgument(columnContext.getDataSource() != null,
-        "Column must be projected from the original table in IS_NULL");
-    NullValueVectorReader nullValueVectorReader = columnContext.getDataSource().getNullValueVector();
-    if (nullValueVectorReader != null) {
-      _nullValueVectorIterator = nullValueVectorReader.getNullBitmap().getIntIterator();
-    } else {
-      _nullValueVectorIterator = null;
-    }
+    _transformFunction = arguments.get(0);
   }
 
   @Override
@@ -63,25 +51,22 @@ public class IsNullTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    RoaringBitmap bitmap = _transformFunction.getNullBitmap(valueBlock);
     int length = valueBlock.getNumDocs();
-    initZeroFillingIntValuesSV(length);
-    int[] docIds = valueBlock.getDocIds();
-    assert docIds != null;
-    if (_nullValueVectorIterator != null) {
-      int currentDocIdIndex = 0;
-      while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
-        _nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);
-        if (_nullValueVectorIterator.hasNext()) {
-          currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, _nullValueVectorIterator.next());
-          if (currentDocIdIndex >= 0) {
-            _intValuesSV[currentDocIdIndex] = 1;
-            currentDocIdIndex++;
-          } else {
-            currentDocIdIndex = -currentDocIdIndex - 1;
-          }
-        }
-      }
+    initIntValuesSV(length);
+    Arrays.fill(_intValuesSV, getIsNullValue() ^ 1);
+    if (bitmap != null) {
+      bitmap.forEach((IntConsumer) i -> _intValuesSV[i] = getIsNullValue());
     }
     return _intValuesSV;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return null;
+  }
+
+  protected int getIsNullValue() {
+    return 1;
   }
 }

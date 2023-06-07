@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -45,6 +46,8 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -57,6 +60,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -138,6 +142,7 @@ public final class TableConfigUtils {
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
       validateInstancePartitionsTypeMapConfig(tableConfig);
+      validatePartitionedReplicaGroupInstance(tableConfig);
       if (!skipTypes.contains(ValidationType.UPSERT)) {
         validateUpsertAndDedupConfig(tableConfig, schema);
         validatePartialUpsertStrategies(tableConfig, schema);
@@ -599,6 +604,24 @@ public final class TableConfigUtils {
           !tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString()),
           String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
               instancePartitionsType));
+    }
+  }
+
+  /**
+   * Detects whether both replicaGroupStrategyConfig and replicaGroupPartitionConfig are set for a given
+   * table. Validation fails because the table would ignore replicaGroupStrategyConfig
+   * when the replicaGroupPartitionConfig is already set.
+   */
+  @VisibleForTesting
+  static void validatePartitionedReplicaGroupInstance(TableConfig tableConfig) {
+    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null
+        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+      return;
+    }
+    for (Map.Entry<String, InstanceAssignmentConfig> entry: tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+      boolean isNullReplicaGroupPartitionConfig = entry.getValue().getReplicaGroupPartitionConfig() == null;
+      Preconditions.checkState(isNullReplicaGroupPartitionConfig,
+          "Both replicaGroupStrategyConfig and replicaGroupPartitionConfig is provided");
     }
   }
 
@@ -1175,5 +1198,31 @@ public final class TableConfigUtils {
   private static boolean isRoutingStrategyAllowedForUpsert(@Nonnull RoutingConfig routingConfig) {
     String instanceSelectorType = routingConfig.getInstanceSelectorType();
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
+  }
+
+  /**
+   * Helper method to extract TableConfig in updated syntax from current TableConfig.
+   * <ul>
+   *   <li>Moves all index configs to FieldConfig.indexes</li>
+   *   <li>Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes</li>
+   * </ul>
+   */
+  public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
+    TableConfig clone = new TableConfig(tableConfig);
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      // get all the index data in new format
+      indexType.convertToNewFormat(clone, schema);
+    }
+    // cleanup the indexTypes field from all FieldConfig items
+    if (clone.getFieldConfigList() != null) {
+      List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
+      for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
+            .withIndexTypes(null)
+            .build());
+      }
+      clone.setFieldConfigList(cleanFieldConfigList);
+    }
+    return clone;
   }
 }

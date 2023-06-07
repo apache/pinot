@@ -21,9 +21,11 @@ package org.apache.pinot.segment.local.segment.index.h3;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
@@ -43,6 +45,8 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -55,6 +59,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<H3IndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "h3";
 
   protected H3IndexType() {
     super(StandardIndexes.H3_ID);
@@ -76,8 +81,13 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<H3IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("h3", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
             FieldConfig.IndexType.H3,
             ((tableConfig, fieldConfig) -> new H3IndexConfig(fieldConfig.getProperties()))));
@@ -128,6 +138,22 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
     protected H3IndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
         H3IndexConfig indexConfig) {
       return new ImmutableH3IndexReader(dataBuffer);
+    }
+  }
+
+  @Nullable
+  @Override
+  public MutableIndex createMutableIndex(MutableIndexContext context, H3IndexConfig config) {
+    if (config.isDisabled()) {
+      return null;
+    }
+    if (!context.getFieldSpec().isSingleValueField()) {
+      return null;
+    }
+    try {
+      return new MutableH3Index(config.getResolution());
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 }

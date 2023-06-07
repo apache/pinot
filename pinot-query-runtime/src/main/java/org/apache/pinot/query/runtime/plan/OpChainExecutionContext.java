@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 
@@ -33,19 +31,19 @@ import org.apache.pinot.query.runtime.operator.OpChainStats;
  *  This information is then used by the OpChain to create the Operators for a query.
  */
 public class OpChainExecutionContext {
-  private final MailboxService<TransferableBlock> _mailboxService;
+  private final MailboxService _mailboxService;
   private final long _requestId;
   private final int _stageId;
   private final VirtualServerAddress _server;
   private final long _timeoutMs;
   private final long _deadlineMs;
-  private final Map<Integer, StageMetadata> _metadataMap;
+  private final StageMetadata _stageMetadata;
   private final OpChainId _id;
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
-  public OpChainExecutionContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long timeoutMs, long deadlineMs, Map<Integer, StageMetadata> metadataMap,
+  public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
+      VirtualServerAddress server, long timeoutMs, long deadlineMs, StageMetadata stageMetadata,
       boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
@@ -53,20 +51,24 @@ public class OpChainExecutionContext {
     _server = server;
     _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
-    _metadataMap = metadataMap;
-    _id = new OpChainId(requestId, server.virtualId(), stageId);
+    _stageMetadata = stageMetadata;
+    _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
     _traceEnabled = traceEnabled;
   }
 
-  public OpChainExecutionContext(PlanRequestContext planRequestContext) {
-    this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
-        planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
-        planRequestContext.getMetadataMap(), planRequestContext.isTraceEnabled());
+  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext) {
+    this(physicalPlanContext.getMailboxService(), physicalPlanContext.getRequestId(), physicalPlanContext.getStageId(),
+        physicalPlanContext.getServer(), physicalPlanContext.getTimeoutMs(), physicalPlanContext.getDeadlineMs(),
+        physicalPlanContext.getStageMetadata(), physicalPlanContext.isTraceEnabled());
   }
 
-  public MailboxService<TransferableBlock> getMailboxService() {
+  public MailboxService getMailboxService() {
     return _mailboxService;
+  }
+
+  public Consumer<OpChainId> getCallback() {
+    return _mailboxService.getCallback();
   }
 
   public long getRequestId() {
@@ -89,8 +91,8 @@ public class OpChainExecutionContext {
     return _deadlineMs;
   }
 
-  public Map<Integer, StageMetadata> getMetadataMap() {
-    return _metadataMap;
+  public StageMetadata getStageMetadata() {
+    return _stageMetadata;
   }
 
   public OpChainId getId() {

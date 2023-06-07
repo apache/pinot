@@ -62,6 +62,22 @@ eksctl create cluster \
 --node-ami auto
 ```
 
+For k8s 1.23+ we need to run the following commands to allow the containers to provision their storage
+```
+eksctl utils associate-iam-oidc-provider --region=us-east-2 --cluster=pinot-quickstart --approve
+
+eksctl create iamserviceaccount \
+  --name ebs-csi-controller-sa \
+  --namespace kube-system \
+  --cluster pinot-quickstart \
+  --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
+  --approve \
+  --role-only \
+  --role-name AmazonEKS_EBS_CSI_DriverRole
+
+eksctl create addon --name aws-ebs-csi-driver --cluster pinot-quickstart --service-account-role-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/AmazonEKS_EBS_CSI_DriverRole --force
+```
+
 You can monitor cluster status by command:
 
 ```bash

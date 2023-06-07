@@ -372,7 +372,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 4000", COLUMN_NAME);
+      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC NULLS LAST LIMIT 4000", COLUMN_NAME);
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
@@ -397,9 +397,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         k++;
       }
-      // Note 1: we inserted 500 nulls in _records, and since we query 4 identical index segments, the number of null
-      //  values is: 500 * 4 = 2000.
-      // Note 2: The default null ordering is 'NULLS LAST', regardless of the ordering direction.
+      // We inserted 500 nulls in _records, and since we query 4 identical index segments, the number of null values is:
+      // 500 * 4 = 2000.
       for (int i = 2000; i < rowsCount; i++) {
         Object[] values = rows.get(i);
         assertEquals(values.length, 2);

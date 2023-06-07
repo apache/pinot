@@ -86,7 +86,7 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
   @CommandLine.Option(names = {"-schemaFile"}, description = "Path to schema file. "
-      + "By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
+      + "By default uses examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_schema.json")
   private String _schemaFile;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")

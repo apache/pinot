@@ -55,6 +55,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -88,7 +89,6 @@ public class ClusterIntegrationTestUtils {
   // Comparison limit
   public static final int MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE = 5;
   public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
-  public static final int H2_MULTI_VALUE_SUFFIX_LENGTH = 5;
 
   private static final Random RANDOM = new Random();
 
@@ -134,7 +134,8 @@ public class ClusterIntegrationTestUtils {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true));
               break;
             }
-            Assert.fail("Unsupported UNION Avro field: " + fieldName + " with underlying types: " + typesInUnion);
+            Assert.fail(
+                String.format("Unsupported UNION Avro field: %s with underlying types: %s", fieldName, typesInUnion));
             break;
           case ARRAY:
             Schema.Type type = field.schema().getElementType().getType();
@@ -146,24 +147,21 @@ public class ClusterIntegrationTestUtils {
             if (isSingleValueAvroFieldType(fieldType)) {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, fieldType, false));
             } else {
-              Assert.fail("Unsupported Avro field: " + fieldName + " with type: " + fieldType);
+              Assert.fail(String.format("Unsupported Avro field: %s with underlying types: %s", fieldName, fieldType));
             }
             break;
         }
       }
 
-      h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
-      h2Connection.prepareCall("CREATE TABLE " + tableName + "(" + StringUtil.join(",",
-          h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
+      h2Connection.prepareCall(String.format("DROP TABLE IF EXISTS %s", tableName)).execute();
+      String columnsStr = StringUtil.join(",", h2FieldNameAndTypes.toArray(new String[0]));
+      h2Connection.prepareCall(String.format("CREATE TABLE %s (%s)", tableName, columnsStr)).execute();
     }
 
     // Insert Avro records into H2 table
-    StringBuilder params = new StringBuilder("?");
-    for (int i = 0; i < h2FieldNameAndTypes.size() - 1; i++) {
-      params.append(",?");
-    }
+    String params = "?" + StringUtils.repeat(",?", h2FieldNameAndTypes.size() - 1);
     PreparedStatement h2Statement =
-        h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
+        h2Connection.prepareStatement(String.format("INSERT INTO %s VALUES (%s)", tableName, params));
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
@@ -248,7 +246,7 @@ public class ClusterIntegrationTestUtils {
     }
     // if column is array data type, add Array with size.
     if (arrayType) {
-      h2FieldType = h2FieldType + " ARRAY[" + MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE + "]";
+      h2FieldType = String.format("%s  ARRAY[%d]", h2FieldType, MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
     }
     if (nullable) {
       return String.format("`%s` %s", fieldName, h2FieldType);
@@ -399,7 +397,6 @@ public class ClusterIntegrationTestUtils {
    * @param avroFiles List of Avro files
    * @param kafkaBroker Kafka broker config
    * @param kafkaTopic Kafka topic
-   * @param maxNumKafkaMessagesPerBatch Maximum number of Kafka messages per batch
    * @param header Optional Kafka message header
    * @param partitionColumn Optional partition column
    * @param commit if the transaction commits or aborts
@@ -591,7 +588,7 @@ public class ClusterIntegrationTestUtils {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
           extraJsonProperties, true, false);
     } catch (Exception e) {
-      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+      failure(pinotQuery, h2Query, e);
     }
   }
 
@@ -602,7 +599,7 @@ public class ClusterIntegrationTestUtils {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
           extraJsonProperties, false, false);
     } catch (Exception e) {
-      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+      failure(pinotQuery, h2Query, e);
     }
   }
 
@@ -613,7 +610,7 @@ public class ClusterIntegrationTestUtils {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
           extraJsonProperties, false, true);
     } catch (Exception e) {
-      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+      failure(pinotQuery, h2Query, e);
     }
   }
 
@@ -670,7 +667,7 @@ public class ClusterIntegrationTestUtils {
         }
       }
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
-          pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
+          pinotQuery, h2NumRows, pinotNumRecordsSelected);
     } else {
       if (queryContext.getGroupByExpressions() == null && !QueryContextUtils.isDistinctQuery(queryContext)) {
         // aggregation only
@@ -757,14 +754,12 @@ public class ClusterIntegrationTestUtils {
       ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns)
       throws SQLException {
     Map<String, String> reusableExpectedValueMap = new HashMap<>();
-    Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
     List<String> reusableColumnOrder = new ArrayList<>();
     int h2NumRows;
     int numColumns = h2MetaData.getColumnCount();
 
     for (h2NumRows = 0; h2ResultSet.next() && h2NumRows < MAX_NUM_ROWS_TO_COMPARE; h2NumRows++) {
       reusableExpectedValueMap.clear();
-      reusableMultiValuesMap.clear();
       reusableColumnOrder.clear();
 
       for (int columnIndex = 1; columnIndex <= numColumns; columnIndex++) { // h2 result set is 1-based
@@ -816,7 +811,7 @@ public class ClusterIntegrationTestUtils {
 
   private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
       List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
-      Set<String> orderByColumns, String pinotQuery, String h2Query, int h2NumRows, long pinotNumRecordsSelected) {
+      Set<String> orderByColumns, String pinotQuery, int h2NumRows, long pinotNumRecordsSelected) {
 
     int pinotNumRows = connectionResultSet.getRowCount();
     // No record selected in H2
@@ -856,7 +851,7 @@ public class ClusterIntegrationTestUtils {
           JsonNode columnValues = null;
           try {
             columnValues = JsonUtils.stringToJsonNode(columnResult);
-          } catch (IOException e) {
+          } catch (IOException ignored) {
           }
 
           if (columnValues != null && columnValues.isArray()) {
@@ -870,16 +865,13 @@ public class ClusterIntegrationTestUtils {
               multiValue.add("null");
             }
             Collections.sort(multiValue);
-            actualValueBuilder.append(multiValue.toString()).append(' ');
-            if (orderByColumns.contains(columnName)) {
-              actualOrderByValueBuilder.append(columnResult).append(' ');
-            }
+            actualValueBuilder.append(multiValue).append(' ');
           } else {
             // Single-value column
             actualValueBuilder.append(columnResult).append(' ');
-            if (orderByColumns.contains(columnName)) {
-              actualOrderByValueBuilder.append(columnResult).append(' ');
-            }
+          }
+          if (orderByColumns.contains(columnName)) {
+            actualOrderByValueBuilder.append(columnResult).append(' ');
           }
         }
 
@@ -887,8 +879,10 @@ public class ClusterIntegrationTestUtils {
         String actualOrderByValue = actualOrderByValueBuilder.toString();
         // Check actual value in expected values set, skip comparison if query response is truncated by limit
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
-          throw new RuntimeException(
-              "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues);
+          throw new RuntimeException(String.format(
+              "Selection result differ in Pinot from H2: Pinot row: [ %s ] not found in H2 result set: [%s].",
+              actualValue, expectedValues)
+          );
         }
         if (!orderByColumns.isEmpty()) {
           // Check actual group value is the same as expected group value in the same order.
@@ -903,25 +897,21 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static String removeTrailingZeroForNumber(String value, String type) {
+    String upperCaseType = StringUtils.upperCase(type);
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT")
-        || type.toUpperCase().equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION") || type.toUpperCase()
-        .equals("BIGINT")) {
+    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT")
+        || upperCaseType.equals("DOUBLE") || upperCaseType.equals("DOUBLE PRECISION")) {
       try {
         String result = (new BigDecimal(value)).stripTrailingZeros().toPlainString();
-        if (type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DECFLOAT") || type.toUpperCase()
-            .equals("DOUBLE") || type.toUpperCase().equals("DOUBLE PRECISION")) {
-          if (!result.contains("\\.")) {
-            return result + ".0";
-          }
-        }
-      } catch (NumberFormatException e) {
+        return result + ".0";
+      } catch (NumberFormatException ignored) {
+        // ignoring the exception
       }
     }
     return value;
   }
 
-  public static boolean isParsable(String input) {
+  public static boolean isParsableDouble(String input) {
     try {
       Double.parseDouble(input);
       return true;
@@ -933,7 +923,7 @@ public class ClusterIntegrationTestUtils {
   public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
     // Fuzzy compare expected value and actual value
     boolean error = false;
-    if (isParsable(h2Value)) {
+    if (isParsableDouble(h2Value)) {
       double expectedValue = Double.parseDouble(h2Value);
       double actualValueBroker = Double.parseDouble(brokerValue);
       double actualValueConnection = Double.parseDouble(connectionValue);
@@ -950,6 +940,10 @@ public class ClusterIntegrationTestUtils {
     return error;
   }
 
+  private static void failure(String pinotQuery, String h2Query, @Nullable Exception e) {
+    String failureMessage = "Caught exception while testing query!";
+    failure(pinotQuery, h2Query, failureMessage, e);
+  }
   /**
    * Helper method to report failures.
    *

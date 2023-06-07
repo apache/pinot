@@ -20,8 +20,10 @@ package org.apache.pinot.segment.local.segment.index.inverted;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -32,7 +34,7 @@ import static org.testng.Assert.*;
 public class InvertedIndexTypeTest {
 
 
-  public class ConfTest extends AbstractSerdeIndexContract {
+  public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(IndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.inverted()), expected);
@@ -109,6 +111,22 @@ public class InvertedIndexTypeTest {
           + "}"
       );
       assertEquals(IndexConfig.ENABLED);
+    }
+
+    @Test
+    public void oldToNewConfConversion()
+        throws IOException {
+      _tableConfig.getIndexingConfig()
+          .setInvertedIndexColumns(parseStringList("[\"dimInt\"]"));
+      convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
+      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .collect(Collectors.toList()).get(0);
+      assertNotNull(fieldConfig.getIndexes().get(InvertedIndexType.INDEX_DISPLAY_NAME));
+      assertNull(_tableConfig.getIndexingConfig().getInvertedIndexColumns());
+      assertTrue(fieldConfig.getIndexTypes().isEmpty());
     }
   }
 

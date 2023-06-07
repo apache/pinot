@@ -20,6 +20,7 @@ package org.apache.pinot.core.common.datablock;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
@@ -94,5 +95,47 @@ public class DataBlockTest {
   @DataProvider(name = "testTypeNullPercentile")
   public Object[][] provideTestTypeNullPercentile() {
     return new Object[][]{new Object[]{0}, new Object[]{10}, new Object[]{100}};
+  }
+
+  /**
+   * TODO: bytes array serialization probably needs fixing.
+   */
+  @Test
+  void bytesArraySerDe() {
+    Object[] row = new Object[1];
+    row[0] = new byte[][]{new byte[]{0xD, 0xA}, new byte[]{0xD, 0xA}};
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(row);
+
+    DataSchema dataSchema = new DataSchema(new String[]{"byteArray"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES_ARRAY});
+
+    try {
+      DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
+      Assert.assertNull(dataBlock);
+      Assert.fail();
+    } catch (Exception e) {
+      Assert.assertTrue(e.toString()
+          .contains("java.lang.IllegalArgumentException: Unsupported type of value: byte[][]"));
+    }
+  }
+
+  /**
+   * TODO: empty int array deserialization is probably needs fixing.
+   */
+  @Test
+  void intArraySerDe()
+      throws IOException {
+    Object[] row = new Object[1];
+    row[0] = new int[0];
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(row);
+
+    DataSchema dataSchema = new DataSchema(new String[]{"intArray"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT_ARRAY});
+
+    DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
+    int[] intArray = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataBlock.toBytes())).getIntArray(0, 0);
+    Assert.assertEquals(intArray.length, 0);
   }
 }

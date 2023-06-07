@@ -186,15 +186,12 @@ public abstract class BaseDataBlock implements DataBlock {
     }
 
     // Read variable size data.
+    _variableSizeDataBytes = new byte[variableSizeDataLength];
     if (variableSizeDataLength != 0) {
-      _variableSizeDataBytes = new byte[variableSizeDataLength];
       byteBuffer.position(variableSizeDataStart);
       byteBuffer.get(_variableSizeDataBytes);
-      _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
-    } else {
-      _variableSizeDataBytes = null;
-      _variableSizeData = null;
     }
+    _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
 
     // Read metadata.
     int metadataLength = byteBuffer.getInt();

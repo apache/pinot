@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvertedIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
@@ -44,6 +45,8 @@ import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
@@ -57,6 +60,7 @@ import org.apache.pinot.spi.data.Schema;
 public class InvertedIndexType
     extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<IndexConfig> {
+  public static final String INDEX_DISPLAY_NAME = "inverted";
 
   protected InvertedIndexType() {
     super(StandardIndexes.INVERTED_ID);
@@ -79,11 +83,16 @@ public class InvertedIndexType
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
     ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
         tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
         (acum, column) -> acum.put(column, IndexConfig.ENABLED));
-    return IndexConfigDeserializer.fromIndexes("inverted", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withExclusiveAlternative(IndexConfigDeserializer.ifIndexingConfig(fromInvertedCols));
   }
 
@@ -181,5 +190,22 @@ public class InvertedIndexType
       PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
       return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
     }
+  }
+
+  @Override
+  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(null);
+  }
+
+  @Nullable
+  @Override
+  public MutableIndex createMutableIndex(MutableIndexContext context, IndexConfig config) {
+    if (config.isDisabled()) {
+      return null;
+    }
+    if (!context.hasDictionary()) {
+      return null;
+    }
+    return new RealtimeInvertedIndex();
   }
 }

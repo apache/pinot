@@ -32,9 +32,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
@@ -111,7 +111,6 @@ public class IndexLoadingConfig {
   @Nullable
   private TableConfig _tableConfig;
   private Schema _schema;
-
   private String _tableDataDir;
   private String _segmentDirectoryLoader;
   private String _segmentTier;
@@ -232,10 +231,6 @@ public class IndexLoadingConfig {
       _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
     }
 
-    _enableDynamicStarTreeCreation = indexingConfig.isEnableDynamicStarTreeCreation();
-    _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
-    _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
-
     String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
     if (tableSegmentVersion != null) {
       _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
@@ -247,11 +242,22 @@ public class IndexLoadingConfig {
           ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
     }
 
-    refreshIndexConfigsByColName();
+    refreshIndexConfigs();
   }
 
-  public void refreshIndexConfigsByColName() {
-    _indexConfigsByColName = calculateIndexConfigsByColName();
+  public void refreshIndexConfigs() {
+    TableConfig tableConfig = getTableConfigWithTierOverwrites();
+    // Accessing the index configs for single-column index is handled by IndexType.getConfig() as defined in index-spi.
+    // As the tableConfig is overwritten with tier specific configs, IndexType.getConfig() can access the tier
+    // specific index configs transparently.
+    _indexConfigsByColName = calculateIndexConfigsByColName(tableConfig, inferSchema());
+    // Accessing the StarTree index configs is not handled by IndexType.getConfig(), so we manually update them.
+    if (tableConfig != null) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      _enableDynamicStarTreeCreation = indexingConfig.isEnableDynamicStarTreeCreation();
+      _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+      _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
+    }
     _dirty = false;
   }
 
@@ -260,7 +266,7 @@ public class IndexLoadingConfig {
    * which is also heavily used by tests) and the one included in the TableConfig (in case the latter is not null).
    *
    * This method does not modify the result of {@link #getFieldIndexConfigByColName()} or
-   * {@link #getFieldIndexConfigByColName()}. To do so, call {@link #refreshIndexConfigsByColName()}.
+   * {@link #getFieldIndexConfigByColName()}. To do so, call {@link #refreshIndexConfigs()}.
    *
    * The main difference between this method and
    * {@link FieldIndexConfigsUtil#createIndexConfigsByColName(TableConfig, Schema)} is that the former relays
@@ -268,16 +274,12 @@ public class IndexLoadingConfig {
    * calling the setter methods.
    */
   public Map<String, FieldIndexConfigs> calculateIndexConfigsByColName() {
-    Schema schema;
-    if (_schema == null) {
-      schema = new Schema();
-      for (String column : getAllKnownColumns()) {
-        schema.addField(new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true));
-      }
-    } else {
-      schema = _schema;
-    }
-    return FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, schema, this::getDeserializer);
+    return calculateIndexConfigsByColName(getTableConfigWithTierOverwrites(), inferSchema());
+  }
+
+  private Map<String, FieldIndexConfigs> calculateIndexConfigsByColName(@Nullable TableConfig tableConfig,
+      Schema schema) {
+    return FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema, this::getDeserializer);
   }
 
   private <C extends IndexConfig> ColumnConfigDeserializer<C> getDeserializer(IndexType<C, ?, ?> indexType) {
@@ -290,15 +292,22 @@ public class IndexLoadingConfig {
           ((ConfigurableFromIndexLoadingConfig<C>) indexType).fromIndexLoadingConfig(this);
 
       if (_schema == null || _tableConfig == null) {
-        LOGGER.warn("Ignoring default deserializers given that there is no schema or table config.");
+        LOGGER.debug("Ignoring default deserializers given that there is no schema [{}] or table config [{}]. Using "
+            + "indexLoadingConfig for indexType: {}", _schema == null, _tableConfig == null, indexType);
         deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig);
-      } else {
+      } else if (_segmentTier == null) {
         deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig)
             .withFallbackAlternative(stdDeserializer);
+      } else {
+        // No need to fall back to fromIndexLoadingConfig which contains index configs for default tier, when looking
+        // for tier specific index configs.
+        deserializer = stdDeserializer;
       }
     } else {
       if (_schema == null || _tableConfig == null) {
-        LOGGER.warn("Ignoring default deserializers given that there is no schema or table config.");
+        LOGGER.debug(
+            "Ignoring default deserializers given that there is no schema [{}] or table config [{}]. Using default "
+                + "configs for indexType: {}", _schema == null, _tableConfig == null, indexType);
         deserializer = (tableConfig, schema) -> getAllKnownColumns().stream()
             .collect(Collectors.toMap(Function.identity(), col -> indexType.getDefaultConfig()));
       } else {
@@ -306,6 +315,22 @@ public class IndexLoadingConfig {
       }
     }
     return deserializer;
+  }
+
+  private TableConfig getTableConfigWithTierOverwrites() {
+    return (_segmentTier == null || _tableConfig == null) ? _tableConfig
+        : TableConfigUtils.overwriteTableConfigForTier(_tableConfig, _segmentTier);
+  }
+
+  private Schema inferSchema() {
+    if (_schema != null) {
+      return _schema;
+    }
+    Schema schema = new Schema();
+    for (String column : getAllKnownColumns()) {
+      schema.addField(new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true));
+    }
+    return schema;
   }
 
   /**
@@ -345,10 +370,6 @@ public class IndexLoadingConfig {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
           _textIndexColumns.add(column);
-          Map<String, String> propertiesMap = fieldConfig.getProperties();
-          if (TextIndexUtils.isFstTypeNative(propertiesMap)) {
-            _fstIndexType = FSTType.NATIVE;
-          }
         }
       }
     }
@@ -754,15 +775,24 @@ public class IndexLoadingConfig {
   }
 
   public boolean isEnableDynamicStarTreeCreation() {
+    if (_dirty) {
+      refreshIndexConfigs();
+    }
     return _enableDynamicStarTreeCreation;
   }
 
   @Nullable
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
+    if (_dirty) {
+      refreshIndexConfigs();
+    }
     return unmodifiable(_starTreeIndexConfigs);
   }
 
   public boolean isEnableDefaultStarTree() {
+    if (_dirty) {
+      refreshIndexConfigs();
+    }
     return _enableDefaultStarTree;
   }
 
@@ -866,14 +896,14 @@ public class IndexLoadingConfig {
   @Nullable
   public FieldIndexConfigs getFieldIndexConfig(String columnName) {
     if (_indexConfigsByColName == null || _dirty) {
-      refreshIndexConfigsByColName();
+      refreshIndexConfigs();
     }
     return _indexConfigsByColName.get(columnName);
   }
 
   public Map<String, FieldIndexConfigs> getFieldIndexConfigByColName() {
     if (_indexConfigsByColName == null || _dirty) {
-      refreshIndexConfigsByColName();
+      refreshIndexConfigs();
     }
     return unmodifiable(_indexConfigsByColName);
   }

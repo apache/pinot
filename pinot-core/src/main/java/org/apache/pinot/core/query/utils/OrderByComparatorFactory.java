@@ -66,8 +66,11 @@ public class OrderByComparatorFactory {
 
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[to];
+    // Use nulls multiplier -1 or 1 to control nulls last/first order
+    int[] nullsMultipliers = new int[to];
     for (int i = from; i < to; i++) {
       multipliers[i] = orderByExpressions.get(i).isAsc() ? 1 : -1;
+      nullsMultipliers[i] = orderByExpressions.get(i).isNullsLast() ? 1 : -1;
     }
 
     if (nullHandlingEnabled) {
@@ -75,11 +78,12 @@ public class OrderByComparatorFactory {
         for (int i = from; i < to; i++) {
           Comparable v1 = (Comparable) o1[i];
           Comparable v2 = (Comparable) o2[i];
-          if (v1 == null) {
-            // The default null ordering is: 'NULLS LAST', regardless of the ordering direction.
-            return v2 == null ? 0 : -multipliers[i];
+          if (v1 == null && v2 == null) {
+            continue;
+          } else if (v1 == null) {
+            return nullsMultipliers[i];
           } else if (v2 == null) {
-            return multipliers[i];
+            return -nullsMultipliers[i];
           }
           int result = v1.compareTo(v2);
           if (result != 0) {

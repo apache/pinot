@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.IndexConfig;
@@ -91,7 +92,7 @@ public class TextIndexConfig extends IndexConfig {
 
   public static abstract class AbstractBuilder {
     @Nullable
-    private final FSTType _fstType;
+    protected FSTType _fstType;
     @Nullable
     protected Object _rawValueForTextIndex;
     protected boolean _enableQueryCache = false;
@@ -132,5 +133,29 @@ public class TextIndexConfig extends IndexConfig {
       _stopWordsExclude = stopWordsExclude;
       return this;
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    TextIndexConfig that = (TextIndexConfig) o;
+    return _enableQueryCache == that._enableQueryCache && _useANDForMultiTermQueries == that._useANDForMultiTermQueries
+        && _fstType == that._fstType && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
+        && Objects.equals(_stopWordsInclude, that._stopWordsInclude) && Objects.equals(_stopWordsExclude,
+        that._stopWordsExclude);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _fstType, _rawValueForTextIndex, _enableQueryCache,
+        _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude);
   }
 }

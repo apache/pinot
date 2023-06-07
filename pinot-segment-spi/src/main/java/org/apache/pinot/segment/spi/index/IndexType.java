@@ -23,6 +23,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -30,7 +32,6 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * TODO: implement mutable indexes.
  * @param <C> the class that represents how this object is configured.
  * @param <IR> the {@link IndexReader} subclass that should be used to read indexes of this type.
  * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
@@ -60,6 +61,10 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   C getDefaultConfig();
 
   Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
+
+  default String getPrettyName() {
+    return getId();
+  }
 
   /**
    * Returns the {@link IndexCreator} that can should be used to create an index of this type with the given context
@@ -93,4 +98,26 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
 
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig);
+
+  /**
+   * This method is used to perform in place conversion of provided {@link TableConfig} to newer format
+   * related to the IndexType that implements it.
+   *
+   * {@link AbstractIndexType#convertToNewFormat(TableConfig, Schema)} ensures all the index information from old format
+   * is made available in the new format while it depends on the individual index types to handle the data cleanup from
+   * old format.
+   */
+  void convertToNewFormat(TableConfig tableConfig, Schema schema);
+
+  /**
+   * Creates a mutable index.
+   *
+   * Implementations return null if the index type doesn't support mutable indexes. Some indexes may support mutable
+   * index only in some conditions. For example, they may only be supported if there is a dictionary or if the column is
+   * single-valued.
+   */
+  @Nullable
+  default MutableIndex createMutableIndex(MutableIndexContext context, C config) {
+    return null;
+  }
 }

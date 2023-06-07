@@ -45,6 +45,8 @@ import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
+import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager;
+import org.apache.pinot.broker.routing.segmentpartition.TablePartitionInfo;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
@@ -57,14 +59,19 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -102,11 +109,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
 
+  // Map that contains the tableNameWithType as key and the enabled serverInstances that are tagged with the table's
+  // tenant.
+  private final Map<String, Map<String, ServerInstance>> _tableTenantServersMap = new ConcurrentHashMap<>();
+
   private BaseDataAccessor<ZNRecord> _zkDataAccessor;
   private String _externalViewPathPrefix;
   private String _idealStatePathPrefix;
   private String _instanceConfigsPath;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private HelixManager _helixManager;
 
   private Set<String> _routableServers;
 
@@ -125,6 +137,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _idealStatePathPrefix = helixDataAccessor.keyBuilder().idealStates().getPath() + "/";
     _instanceConfigsPath = helixDataAccessor.keyBuilder().instanceConfigs().getPath();
     _propertyStore = helixManager.getHelixPropertyStore();
+    _helixManager = helixManager;
   }
 
   @Override
@@ -244,7 +257,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         enabledServers.add(instanceId);
 
         // Always refresh the server instance with the latest instance config in case it changes
-        ServerInstance serverInstance = new ServerInstance(new InstanceConfig(instanceConfigZNRecord));
+        InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
+        ServerInstance serverInstance = new ServerInstance(instanceConfig);
         if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
           newEnabledServers.add(instanceId);
 
@@ -252,6 +266,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           if (_excludedServers.remove(instanceId)) {
             LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
           }
+
+          addNewServerToTableTenantServerMap(instanceId, serverInstance, instanceConfig);
         }
       }
     }
@@ -259,6 +275,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (String instance : _enabledServerInstanceMap.keySet()) {
       if (!enabledServers.contains(instance)) {
         newDisabledServers.add(instance);
+        deleteServerFromTableTenantServerMap(instance);
       }
     }
 
@@ -408,6 +425,9 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
+    // Build a mapping from the table to the list of servers assigned to the table's tenant.
+    buildTableTenantServerMap(tableNameWithType, tableConfig);
+
     String idealStatePath = getIdealStatePath(tableNameWithType);
     IdealState idealState = getIdealState(idealStatePath);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
@@ -487,6 +507,25 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     }
 
+    SegmentPartitionMetadataManager partitionMetadataManager = null;
+    // TODO: Support multiple partition columns
+    // TODO: Make partition pruner on top of the partition metadata manager to avoid keeping 2 copies of the metadata
+    if (_pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
+        CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER)) {
+      SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+      if (segmentPartitionConfig == null || segmentPartitionConfig.getColumnPartitionMap().size() != 1) {
+        LOGGER.warn("Cannot enable SegmentPartitionMetadataManager. "
+            + "Expecting SegmentPartitionConfig with exact 1 partition column");
+      } else {
+        Map.Entry<String, ColumnPartitionConfig> partitionConfig =
+            segmentPartitionConfig.getColumnPartitionMap().entrySet().iterator().next();
+        LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}", tableNameWithType,
+            partitionConfig.getKey());
+        partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
+            partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+      }
+    }
+
     QueryConfig queryConfig = tableConfig.getQueryConfig();
     Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
 
@@ -494,12 +533,15 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (SegmentZkMetadataFetchListener listener : segmentPruners) {
       segmentZkMetadataFetcher.register(listener);
     }
+    if (partitionMetadataManager != null) {
+      segmentZkMetadataFetcher.register(partitionMetadataManager);
+    }
     segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
 
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
             segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
-            timeBoundaryManager, queryTimeoutMs);
+            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -544,6 +586,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     } else {
       LOGGER.warn("Routing does not exist for table: {}, skipping removing routing", tableNameWithType);
+    }
+
+    if (_tableTenantServersMap.remove(tableNameWithType) != null) {
+      LOGGER.info("Removed tenant servers for table: {}", tableNameWithType);
     }
   }
 
@@ -603,6 +649,12 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     return _enabledServerInstanceMap;
   }
 
+  @Override
+  public Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType) {
+    return _tableTenantServersMap.containsKey(tableNameWithType) ? _tableTenantServersMap.get(tableNameWithType)
+        : new HashMap<String, ServerInstance>();
+  }
+
   private String getIdealStatePath(String tableNameWithType) {
     return _idealStatePathPrefix + tableNameWithType;
   }
@@ -627,6 +679,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     return timeBoundaryManager != null ? timeBoundaryManager.getTimeBoundaryInfo() : null;
   }
 
+  @Nullable
+  public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    if (routingEntry == null) {
+      return null;
+    }
+    SegmentPartitionMetadataManager partitionMetadataManager = routingEntry.getPartitionMetadataManager();
+    return partitionMetadataManager != null ? partitionMetadataManager.getTablePartitionInfo() : null;
+  }
+
   /**
    * Returns the table-level query timeout in milliseconds for the given table, or {@code null} if the timeout is not
    * configured in the table config.
@@ -644,6 +706,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     final SegmentPreSelector _segmentPreSelector;
     final SegmentSelector _segmentSelector;
     final List<SegmentPruner> _segmentPruners;
+    final SegmentPartitionMetadataManager _partitionMetadataManager;
     final InstanceSelector _instanceSelector;
     final Long _queryTimeoutMs;
     final SegmentZkMetadataFetcher _segmentZkMetadataFetcher;
@@ -658,7 +721,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         SegmentZkMetadataFetcher segmentZkMetadataFetcher, @Nullable TimeBoundaryManager timeBoundaryManager,
-        @Nullable Long queryTimeoutMs) {
+        @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -669,6 +732,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       _lastUpdateIdealStateVersion = lastUpdateIdealStateVersion;
       _lastUpdateExternalViewVersion = lastUpdateExternalViewVersion;
       _timeBoundaryManager = timeBoundaryManager;
+      _partitionMetadataManager = partitionMetadataManager;
       _queryTimeoutMs = queryTimeoutMs;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
     }
@@ -692,6 +756,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     @Nullable
     TimeBoundaryManager getTimeBoundaryManager() {
       return _timeBoundaryManager;
+    }
+
+    @Nullable
+    SegmentPartitionMetadataManager getPartitionMetadataManager() {
+      return _partitionMetadataManager;
     }
 
     Long getQueryTimeoutMs() {
@@ -735,12 +804,62 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
       int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
-        InstanceSelector.SelectionResult selectionResult = _instanceSelector.select(brokerRequest,
-            new ArrayList<>(selectedSegments), requestId);
+        InstanceSelector.SelectionResult selectionResult =
+            _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments), requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
         return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList(), numPrunedSegments);
+      }
+    }
+  }
+
+  private void buildTableTenantServerMap(String tableNameWithType, TableConfig tableConfig) {
+    String serverTag = getServerTagForTable(tableNameWithType, tableConfig);
+    List<InstanceConfig> allInstanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+    List<InstanceConfig> instanceConfigsWithTag = HelixHelper.getInstancesConfigsWithTag(allInstanceConfigs, serverTag);
+    Map<String, ServerInstance> serverInstances = new HashMap<>();
+    for (InstanceConfig serverInstanceConfig : instanceConfigsWithTag) {
+      serverInstances.put(serverInstanceConfig.getInstanceName(), new ServerInstance(serverInstanceConfig));
+    }
+    _tableTenantServersMap.put(tableNameWithType, serverInstances);
+    LOGGER.info("Built map for table={} with {} server instances.", tableNameWithType, serverInstances.size());
+  }
+
+  private void addNewServerToTableTenantServerMap(String instanceId, ServerInstance serverInstance,
+      InstanceConfig instanceConfig) {
+    List<String> tags = instanceConfig.getTags();
+
+    for (Map.Entry<String, Map<String, ServerInstance>> entry : _tableTenantServersMap.entrySet()) {
+      String tableNameWithType = entry.getKey();
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      String tableServerTag = getServerTagForTable(tableNameWithType, tableConfig);
+
+      Map<String, ServerInstance> tenantServerMap = entry.getValue();
+
+      if (!tenantServerMap.containsKey(instanceId) && tags.contains(tableServerTag)) {
+        tenantServerMap.put(instanceId, serverInstance);
+      }
+    }
+  }
+
+  private String getServerTagForTable(String tableNameWithType, TableConfig tableConfig) {
+    String serverTenantName = tableConfig.getTenantConfig().getServer();
+    String serverTag;
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      serverTag = TagNameUtils.getOfflineTagForTenant(serverTenantName);
+    } else {
+      // Realtime table
+      serverTag = TagNameUtils.getRealtimeTagForTenant(serverTenantName);
+    }
+
+    return serverTag;
+  }
+
+  private void deleteServerFromTableTenantServerMap(String server) {
+    for (Map.Entry<String, Map<String, ServerInstance>> entry : _tableTenantServersMap.entrySet()) {
+      if (entry.getValue().remove(server) != null) {
+        LOGGER.info("Removing entry for server={}, table={}", server, entry.getKey());
       }
     }
   }

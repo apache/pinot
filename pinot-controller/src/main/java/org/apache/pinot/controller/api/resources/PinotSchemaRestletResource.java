@@ -68,6 +68,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -328,6 +329,22 @@ public class PinotSchemaRestletResource {
       return JsonUtils.objectToPrettyString(response);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Gets the metadata on the valid {@link org.apache.pinot.spi.data.FieldSpec.DataType} for each
+   * {@link org.apache.pinot.spi.data.FieldSpec.FieldType} and the default null values for each combination
+   */
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/schemas/fieldSpec")
+  @ApiOperation(value = "Get fieldSpec metadata", notes = "Get fieldSpec metadata")
+  public String getFieldSpecMetadata() {
+    try {
+      return JsonUtils.objectToString(FieldSpec.FIELD_SPEC_METADATA);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

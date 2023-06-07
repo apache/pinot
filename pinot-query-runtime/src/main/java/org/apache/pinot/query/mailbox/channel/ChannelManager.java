@@ -21,9 +21,8 @@ package org.apache.pinot.query.mailbox.channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.query.service.QueryConfig;
-import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -31,40 +30,14 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  *
  * <p>Grpc channels are managed centralized per Pinot component. Channels should be reused across different
  * query/job/stages.
- *
- * <p>the channelId should be in the format of: <code>"senderHost:senderPort:receiverHost:receiverPort"</code>
  */
 public class ChannelManager {
+  private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
 
-  private final GrpcMailboxService _mailboxService;
-  private final GrpcMailboxServer _grpcMailboxServer;
-
-  private final ConcurrentHashMap<String, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
-
-  public ChannelManager(GrpcMailboxService mailboxService, PinotConfiguration extraConfig) {
-    _mailboxService = mailboxService;
-    _grpcMailboxServer = new GrpcMailboxServer(
-        _mailboxService, _mailboxService.getMailboxPort(), extraConfig);
-  }
-
-  public void init() {
-    _grpcMailboxServer.start();
-  }
-
-  public void shutdown() {
-    _grpcMailboxServer.shutdown();
-  }
-
-  public ManagedChannel getChannel(String channelId) {
-    return _channelMap.computeIfAbsent(channelId,
-        (id) -> constructChannel(id.split(":")));
-  }
-
-  private static ManagedChannel constructChannel(String[] channelParts) {
-    ManagedChannelBuilder<?> managedChannelBuilder = ManagedChannelBuilder
-        .forAddress(channelParts[0], Integer.parseInt(channelParts[1]))
-        .maxInboundMessageSize(QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
-        .usePlaintext();
-    return managedChannelBuilder.build();
+  public ManagedChannel getChannel(String hostname, int port) {
+    // TODO: Revisit parameters
+    return _channelMap.computeIfAbsent(Pair.of(hostname, port),
+        (k) -> ManagedChannelBuilder.forAddress(k.getLeft(), k.getRight())
+            .maxInboundMessageSize(QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES).usePlaintext().build());
   }
 }

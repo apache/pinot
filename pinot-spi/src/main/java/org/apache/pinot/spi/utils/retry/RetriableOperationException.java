@@ -23,7 +23,18 @@ package org.apache.pinot.spi.utils.retry;
  */
 public class RetriableOperationException extends AttemptFailureException {
 
+  private int _attempts = 0;
+
+  public int getAttempts() {
+    return _attempts;
+  }
+
   public RetriableOperationException(Throwable cause) {
     super(cause);
+  }
+
+  public RetriableOperationException(Throwable cause, int attempts) {
+    super(cause);
+    _attempts = attempts;
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -80,6 +81,11 @@ public class CalciteSqlParser {
   private CalciteSqlParser() {
   }
 
+  public static final String ASC = "asc";
+  public static final String DESC = "desc";
+  public static final String NULLS_LAST = "nullslast";
+  public static final String NULLS_FIRST = "nullsfirst";
+  public static final ImmutableSet<String> ORDER_BY_FUNCTIONS = ImmutableSet.of(ASC, DESC, NULLS_LAST, NULLS_FIRST);
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
@@ -158,6 +164,9 @@ public class CalciteSqlParser {
         } else {
           tableNames.addAll(extractTableNamesFromNode(right));
         }
+      } else if ((fromNode instanceof SqlBasicCall)
+          && (((SqlBasicCall) fromNode).getOperator() instanceof SqlAsOperator)) {
+        tableNames.addAll(extractTableNamesFromNode(((SqlBasicCall) fromNode).getOperandList().get(0)));
       } else {
         tableNames.addAll(((SqlIdentifier) fromNode).names);
         tableNames.addAll(extractTableNamesFromNode(((SqlSelect) sqlNode).getWhere()));
@@ -169,7 +178,11 @@ public class CalciteSqlParser {
     } else if (sqlNode instanceof SqlBasicCall) {
       if (((SqlBasicCall) sqlNode).getOperator() instanceof SqlAsOperator) {
         SqlNode firstOperand = ((SqlBasicCall) sqlNode).getOperandList().get(0);
-        tableNames.addAll(((SqlIdentifier) firstOperand).names);
+        if (firstOperand instanceof SqlSelect) {
+          tableNames.addAll(extractTableNamesFromNode(firstOperand));
+        } else {
+          tableNames.addAll(((SqlIdentifier) firstOperand).names);
+        }
       } else {
         for (SqlNode node : ((SqlBasicCall) sqlNode).getOperandList()) {
           tableNames.addAll(extractTableNamesFromNode(node));
@@ -178,12 +191,16 @@ public class CalciteSqlParser {
     } else if (sqlNode instanceof SqlWith) {
       List<SqlNode> withList = ((SqlWith) sqlNode).withList;
       Set<String> aliases = new HashSet<>();
-      for (SqlNode withItem: withList) {
+      for (SqlNode withItem : withList) {
         aliases.addAll(((SqlWithItem) withItem).name.names);
         tableNames.addAll(extractTableNamesFromNode(((SqlWithItem) withItem).query));
       }
       tableNames.addAll(extractTableNamesFromNode(((SqlWith) sqlNode).body));
       tableNames.removeAll(aliases);
+    } else if (sqlNode instanceof SqlSetOption) {
+      for (SqlNode node : ((SqlSetOption) sqlNode).getOperandList()) {
+        tableNames.addAll(extractTableNamesFromNode(node));
+      }
     } else if (sqlNode instanceof SqlExplain) {
       SqlExplain explain = (SqlExplain) sqlNode;
       tableNames.addAll(extractTableNamesFromNode(explain.getExplicandum()));
@@ -305,7 +322,7 @@ public class CalciteSqlParser {
           List<Expression> distinctExpressions = getAliasLeftExpressionsFromDistinctExpression(function);
           for (Expression orderByExpression : orderByList) {
             // NOTE: Order-by is always a Function with the ordering of the Expression
-            if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0))) {
+            if (!distinctExpressions.contains(removeOrderByFunctions(orderByExpression))) {
               throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
             }
           }
@@ -617,23 +634,34 @@ public class CalciteSqlParser {
 
   private static List<Expression> convertOrderByList(SqlNodeList orderList) {
     List<Expression> orderByExpr = new ArrayList<>();
-    final Iterator<SqlNode> iterator = orderList.iterator();
-    while (iterator.hasNext()) {
-      final SqlNode next = iterator.next();
-      orderByExpr.add(convertOrderBy(next));
+    for (SqlNode sqlNode : orderList) {
+      orderByExpr.add(convertOrderBy(sqlNode, true));
     }
     return orderByExpr;
   }
 
-  private static Expression convertOrderBy(SqlNode node) {
+  private static Expression convertOrderBy(SqlNode node, boolean createAscExpression) {
+    // If the order is ASC, the SqlNode will not have an ASC operator. In this case we need to create an ASC function in
+    // the expression.
+    // The SqlNode puts the NULLS FIRST/LAST operator in an outer level of the DESC operator.
     Expression expression;
-    if (node.getKind() == SqlKind.DESCENDING) {
+    if (node.getKind() == SqlKind.NULLS_LAST) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression("desc");
-      expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperandList().get(0)));
-    } else {
-      expression = RequestUtils.getFunctionExpression("asc");
+      expression = RequestUtils.getFunctionExpression(NULLS_LAST);
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+    } else if (node.getKind() == SqlKind.NULLS_FIRST) {
+      SqlBasicCall basicCall = (SqlBasicCall) node;
+      expression = RequestUtils.getFunctionExpression(NULLS_FIRST);
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+    } else if (node.getKind() == SqlKind.DESCENDING) {
+      SqlBasicCall basicCall = (SqlBasicCall) node;
+      expression = RequestUtils.getFunctionExpression(DESC);
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), false));
+    } else if (createAscExpression) {
+      expression = RequestUtils.getFunctionExpression(ASC);
       expression.getFunctionCall().addToOperands(toExpression(node));
+    } else {
+      return toExpression(node);
     }
     return expression;
   }
@@ -970,5 +998,12 @@ public class CalciteSqlParser {
       return false;
     }
     return false;
+  }
+
+  public static Expression removeOrderByFunctions(Expression expression) {
+    while (expression.isSetFunctionCall() && ORDER_BY_FUNCTIONS.contains(expression.getFunctionCall().operator)) {
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return expression;
   }
 }

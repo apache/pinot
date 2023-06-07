@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 
 
 public class FunctionInvokeUtils {
-
   private FunctionInvokeUtils() {
-    // do not instantiate.
   }
 
   /**
@@ -35,7 +34,8 @@ public class FunctionInvokeUtils {
    * @param columnDataType desired column data type
    * @return converted entry
    */
-  public static Object convert(Object inputObj, DataSchema.ColumnDataType columnDataType) {
+  @Nullable
+  public static Object convert(@Nullable Object inputObj, DataSchema.ColumnDataType columnDataType) {
     if (columnDataType.isNumber() && columnDataType != DataSchema.ColumnDataType.BIG_DECIMAL) {
       return inputObj == null ? null : columnDataType.convert(inputObj);
     } else {

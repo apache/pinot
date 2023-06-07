@@ -44,6 +44,7 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
+  public static final String INDEX_DISPLAY_NAME = "null";
 
   protected NullValueIndexType() {
     super(StandardIndexes.NULL_VALUE_VECTOR_ID);
@@ -66,8 +67,13 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
+  public String getPrettyName() {
+    return INDEX_DISPLAY_NAME;
+  }
+
+  @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes("null", getIndexConfigClass())
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
         .withFallbackAlternative(
             IndexConfigDeserializer.ifIndexingConfig(
                 IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->
@@ -118,5 +124,9 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
       PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector());
       return new NullValueVectorReaderImpl(buffer);
     }
+  }
+
+  @Override
+  public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
   }
 }
