@@ -622,6 +622,11 @@ public class ControllerTest {
     getControllerRequestClient().addSchema(schema);
   }
 
+  public void updateSchema(Schema schema)
+      throws IOException {
+    getControllerRequestClient().updateSchema(schema);
+  }
+
   public Schema getSchema(String schemaName) {
     Schema schema = _helixResourceManager.getSchema(schemaName);
     assertNotNull(schema);

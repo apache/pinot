@@ -28,6 +28,7 @@ import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -44,7 +45,6 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
     SegmentPurger.RecordPurger recordPurger =
         recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
@@ -52,8 +52,11 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     SegmentPurger.RecordModifier recordModifier =
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
 
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    Schema schema = getSchema(tableNameWithType);
     _eventObserver.notifyProgress(pinotTaskConfig, "Purging segment: " + indexDir);
-    SegmentPurger segmentPurger = new SegmentPurger(indexDir, workingDir, tableConfig, recordPurger, recordModifier);
+    SegmentPurger segmentPurger =
+        new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier);
     File purgedSegmentFile = segmentPurger.purgeSegment();
     if (purgedSegmentFile == null) {
       purgedSegmentFile = indexDir;
