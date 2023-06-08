@@ -46,6 +46,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -61,6 +62,10 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.catalog.PinotCatalog;
+import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -185,8 +190,10 @@ public class PinotQueryResource {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
-    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
+    QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
+        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
+
+    List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
     if (tableNames.size() == 0) {
       return QueryException.getException(QueryException.SQL_PARSING_ERROR,
           new Exception("Unable to find table name from SQL thus cannot dispatch to broker.")).toString();
