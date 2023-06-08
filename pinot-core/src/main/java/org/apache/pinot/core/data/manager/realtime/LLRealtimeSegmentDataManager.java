@@ -679,22 +679,25 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _realtimeTableDataManager.releaseSegment(segmentDataManager);
             }
           }
-          // wait if all segments for this partition not sealed completely
-          if (allSegmentsForPartition.stream().anyMatch(
-              segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment())) {
+          // wait if all segments (except the new consuming segment) for this partition not sealed completely
+          if (allSegmentsForPartition.stream()
+              .filter(segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment())
+              .count() > 1) {
             do {
               //noinspection BusyWait
               Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-            } while (allSegmentsForPartition.stream().anyMatch(
-                segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()));
+            } while (allSegmentsForPartition.stream()
+                .filter(segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment())
+                .count() > 1);
           }
-          // Persist snapshot and release all the segments for this partition, they should be immutableSegments.
+          // Persist snapshot and release all immutable segments for this partition.
           for (SegmentDataManager segmentDataManager: allSegmentsForPartition) {
-            assert segmentDataManager.getSegment() instanceof ImmutableSegment;
-            if (segmentDataManager.getSegment().getValidDocIds() != null) {
-              MutableRoaringBitmap validDocIds =
-                  segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
-              ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+            if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
+              if (segmentDataManager.getSegment().getValidDocIds() != null) {
+                MutableRoaringBitmap validDocIds =
+                    segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
+                ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+              }
             }
             _realtimeTableDataManager.releaseSegment(segmentDataManager);
           }
