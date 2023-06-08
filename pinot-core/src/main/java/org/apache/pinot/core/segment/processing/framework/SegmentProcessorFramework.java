@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.creator.name.SegmentNameGeneratorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +59,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentProcessorFramework {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
 
-  private final List<RecordReader> _recordReaders;
+  private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private final SegmentProcessorConfig _segmentProcessorConfig;
   private final File _mapperOutputDir;
   private final File _reducerOutputDir;
@@ -66,17 +67,26 @@ public class SegmentProcessorFramework {
   private Map<String, GenericRowFileManager> _partitionToFileManagerMap;
 
   /**
-   * Initializes the SegmentProcessorFramework with record readers, config and working directory.
+   * Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
+   * users passing RecordReaderFileConfig, since that also allows us to do lazy initialization of RecordReaders.
+   * Please use the other constructor that uses RecordReaderFileConfig.
    */
+  @Deprecated
   public SegmentProcessorFramework(List<RecordReader> recordReaders, SegmentProcessorConfig segmentProcessorConfig,
       File workingDir)
       throws IOException {
-    Preconditions.checkState(!recordReaders.isEmpty(), "No record reader is provided");
+    this(segmentProcessorConfig, workingDir, convertRecordReadersToRecordReaderFileConfig(recordReaders));
+  }
 
+  public SegmentProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,
+      List<RecordReaderFileConfig> recordReaderFileConfigs)
+      throws IOException {
+
+    Preconditions.checkState(!recordReaderFileConfigs.isEmpty(), "No recordReaderFileConfigs provided");
     LOGGER.info("Initializing SegmentProcessorFramework with {} record readers, config: {}, working dir: {}",
-        recordReaders.size(), segmentProcessorConfig, workingDir.getAbsolutePath());
+        recordReaderFileConfigs.size(), segmentProcessorConfig, workingDir.getAbsolutePath());
+    _recordReaderFileConfigs = recordReaderFileConfigs;
 
-    _recordReaders = recordReaders;
     _segmentProcessorConfig = segmentProcessorConfig;
 
     _mapperOutputDir = new File(workingDir, "mapper_output");
@@ -85,6 +95,16 @@ public class SegmentProcessorFramework {
     FileUtils.forceMkdir(_reducerOutputDir);
     _segmentsOutputDir = new File(workingDir, "segments_output");
     FileUtils.forceMkdir(_segmentsOutputDir);
+  }
+
+  private static List<RecordReaderFileConfig> convertRecordReadersToRecordReaderFileConfig(
+      List<RecordReader> recordReaders) {
+    Preconditions.checkState(!recordReaders.isEmpty(), "No record reader is provided");
+    List<RecordReaderFileConfig> recordReaderFileConfigs = new ArrayList<>();
+    for (RecordReader recordReader : recordReaders) {
+      recordReaderFileConfigs.add(new RecordReaderFileConfig(recordReader));
+    }
+    return recordReaderFileConfigs;
   }
 
   /**
@@ -114,8 +134,8 @@ public class SegmentProcessorFramework {
   private List<File> doProcess()
       throws Exception {
     // Map phase
-    LOGGER.info("Beginning map phase on {} record readers", _recordReaders.size());
-    SegmentMapper mapper = new SegmentMapper(_recordReaders, _segmentProcessorConfig, _mapperOutputDir);
+    LOGGER.info("Beginning map phase on {} record readers", _recordReaderFileConfigs.size());
+    SegmentMapper mapper = new SegmentMapper(_recordReaderFileConfigs, _segmentProcessorConfig, _mapperOutputDir);
     _partitionToFileManagerMap = mapper.map();
 
     // Check for mapper output files

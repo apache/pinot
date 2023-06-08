@@ -48,6 +48,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -141,7 +142,8 @@ public class SegmentMapperTest {
     PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader();
     segmentRecordReader.init(_indexDir, null, null, true);
     SegmentMapper segmentMapper =
-        new SegmentMapper(Collections.singletonList(segmentRecordReader), processorConfig, mapperOutputDir);
+        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(segmentRecordReader)),
+            processorConfig, mapperOutputDir);
     Map<String, GenericRowFileManager> partitionToFileManagerMap = segmentMapper.map();
     segmentRecordReader.close();
 
