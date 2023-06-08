@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -99,7 +100,8 @@ public class UpsertUtils {
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
       Comparable comparisonValue = _comparisonColumnReader.getComparisonValue(docId);
-      boolean deleteRecord = _deleteRecordColumnReader != null && (boolean) _deleteRecordColumnReader.getValue(docId);
+      boolean deleteRecord = _deleteRecordColumnReader != null
+          && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
       return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
     }
 

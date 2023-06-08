@@ -163,7 +163,9 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public void setDeletedRecordColumn(String deletedRecordColumn) {
-    _deletedRecordColumn = deletedRecordColumn;
+    if (deletedRecordColumn != null) {
+      _deletedRecordColumn = deletedRecordColumn;
+    }
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {

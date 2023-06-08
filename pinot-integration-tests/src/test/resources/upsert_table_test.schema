@@ -1,33 +1,34 @@
 {
+  "schemaName": "playerScores",
   "dimensionFieldSpecs": [
     {
-      "dataType": "INT",
-      "singleValueField": true,
-      "name": "clientId"
+      "name": "playerId",
+      "dataType": "INT"
     },
     {
-      "dataType": "STRING",
-      "singleValueField": true,
-      "name": "city"
+      "name": "name",
+      "dataType": "STRING"
     },
     {
-      "dataType": "STRING",
-      "singleValueField": true,
-      "name": "description"
+      "name": "game",
+      "dataType": "STRING"
     },
     {
-      "dataType": "INT",
-      "singleValueField": true,
-      "name": "salary"
+      "name": "deleted",
+      "dataType": "BOOLEAN"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
-      "timeType": "DAYS",
-      "dataType": "INT",
-      "name": "DaysSinceEpoch"
+  "metricFieldSpecs": [
+    {
+      "name": "score",
+      "dataType": "FLOAT"
     }
-  },
-  "primaryKeyColumns": ["clientId"],
-  "schemaName": "upsertSchema"
+  ],
+  "dateTimeFieldSpecs": [{
+    "name": "timestampInEpoch",
+    "dataType": "LONG",
+    "format" : "1:MILLISECONDS:EPOCH",
+    "granularity": "1:MILLISECONDS"
+  }],
+  "primaryKeyColumns": [ "playerId" ]
 }

@@ -37,6 +37,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -396,10 +397,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
+  protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, String deletedColumn,
+      int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeletedRecordColumn(deletedColumn);
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
@@ -409,9 +414,44 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+        .setUpsertConfig(upsertConfig).build();
   }
 
+
+  private Map<String, String> getCSVStreamConfigMap() {
+    Map<String, String> streamConfigsMap = getStreamConfigMap();
+    streamConfigsMap.put(
+        StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
+            StreamConfigProperties.STREAM_DECODER_CLASS),
+        CSVMessageDecoder.class.getName());
+    streamConfigsMap.put(
+        StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
+            "decoder.prop.delimiter"), ",");
+    streamConfigsMap.put(
+        StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
+            "decoder.prop.header"), "playerId,name,game,score,timestampInEpoch,deleted");
+    return streamConfigsMap;
+  }
+  /**
+   * Creates a new Upsert enabled table config.
+   */
+  protected TableConfig createCSVUpsertTableConfig(String primaryKeyColumn, String deletedColumn, int numPartitions) {
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeletedRecordColumn(deletedColumn);
+
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setLLC(useLlc()).setStreamConfigs(getCSVStreamConfigMap()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
+        .setUpsertConfig(upsertConfig).build();
+  }
   /**
    * Creates a new Dedup enabled table config
    */
@@ -507,12 +547,20 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<File> unpackAvroData(File outputDir)
       throws Exception {
+    // TODO: make this use unpackTarData
     InputStream inputStream =
         BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getAvroTarFileName());
     Assert.assertNotNull(inputStream);
     return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
 
+  protected List<File> unpackTarData(String tarFileName, File outputDir)
+      throws Exception {
+    InputStream inputStream =
+        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
+    Assert.assertNotNull(inputStream);
+    return TarGzCompressionUtils.untar(inputStream, outputDir);
+  }
   /**
    * Pushes the data in the given Avro files into a Kafka stream.
    *
@@ -520,9 +568,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
-
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
+  }
+
+  /**
+   * Pushes the data in the given Avro files into a Kafka stream.
+   *
+   * @param csvRecords List of CSV strings
+   */
+  protected void pushCsvIntoKafka(File csvFile, @Nullable Integer partitionColumnIndex)
+      throws Exception {
+    ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, "localhost:" + getKafkaPort(), getKafkaTopic(),
+        partitionColumnIndex, injectTombstones());
   }
 
   protected boolean injectTombstones() {

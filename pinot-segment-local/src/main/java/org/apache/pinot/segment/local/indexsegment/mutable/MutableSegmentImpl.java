@@ -101,6 +101,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -517,7 +518,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Comparable comparisonValue = getComparisonValue(row);
-    boolean deleteRecord = _deletedRecordColumn != null && (boolean) row.getValue(_deletedRecordColumn);
+    boolean deleteRecord = _deletedRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deletedRecordColumn));
     return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
   }
 
