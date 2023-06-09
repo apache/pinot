@@ -69,8 +69,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     GenericRow _nextRow = new GenericRow();
     // Flag to mark whether we need to fetch another row
     boolean _nextRowReturned = true;
-    // Flag to mark whether all records have been iterated
-    boolean _finished = false;
 
     CompactedRecordReader(File indexDir, ImmutableRoaringBitmap validDocIds) {
       _pinotSegmentRecordReader = new PinotSegmentRecordReader();
@@ -84,7 +82,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     @Override
     public boolean hasNext() {
-      if (_finished) {
+      if (!_validDocIdsIterator.hasNext() && _nextRowReturned) {
         return false;
       }
 
@@ -103,7 +101,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       }
 
       // Cannot find next row to return, return false
-      _finished = true;
       return false;
     }
 
@@ -124,7 +121,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     public void rewind() {
       _pinotSegmentRecordReader.rewind();
       _nextRowReturned = true;
-      _finished = false;
     }
 
     @Override
