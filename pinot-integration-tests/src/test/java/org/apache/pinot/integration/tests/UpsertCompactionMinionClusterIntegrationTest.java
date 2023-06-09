@@ -121,7 +121,8 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
+        // 3 Avro files, each with 100 documents, one copy from streaming source, one copy from batch source
+        return getCurrentCountStarResultWithoutUpsert() == 600;
       } catch (Exception e) {
         return null;
       }
@@ -129,23 +130,19 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
-  private long getCountStarResultWithoutUpsert() {
-    // 3 Avro files, each with 100 documents, one copy from streaming source, one copy from batch source
-    return 600;
-  }
-
   private long getCurrentCountStarResultWithoutUpsert() {
     return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
+        .getResultSet(0).getLong(0);
+  }
+
+  private long getSalary() {
+    return getPinotConnection().execute("SELECT salary FROM " + getTableName() + " WHERE clientId=100001")
         .getResultSet(0).getLong(0);
   }
 
   @Override
   protected long getCountStarResult() {
     return 3;
-  }
-
-  private long getCountStarResultAfterCompaction() {
-    return 300;
   }
 
   @AfterClass
@@ -180,10 +177,12 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
 
   @Test
   public void testCompaction() {
-    assertNotEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResultAfterCompaction());
+    assertNotEquals(getCurrentCountStarResultWithoutUpsert(), 300);
+    assertEquals(getSalary(), 2381560);
     assertNotNull(_taskManager.scheduleTasks(REALTIME_TABLE_NAME).get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
-    assertEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResultAfterCompaction());
+    assertEquals(getCurrentCountStarResultWithoutUpsert(), 300);
+    assertEquals(getSalary(), 2381560);
   }
 
   protected void waitForTaskToComplete() {
