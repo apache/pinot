@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
-  private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 10.0;
+  private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 30.0;
   @Override
   public String getTaskType() {
     return MinionConstants.UpsertCompactionTask.TASK_TYPE;
