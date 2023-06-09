@@ -200,12 +200,12 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Validate deleted records
     rs = getPinotConnection()
-        .execute("SELECT playerId FROM " +  tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
+        .execute("SELECT playerId FROM " + tableName
+            + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 2);
     for (int i = 0; i < rs.getRowCount(); i++) {
       String playerId = rs.getString(i, 0);
       Assert.assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
     }
   }
-
 }

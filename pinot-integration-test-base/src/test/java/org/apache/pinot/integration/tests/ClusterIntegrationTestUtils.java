@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Joiner;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
