@@ -20,7 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import org.apache.datasketches.tuple.CompactSketch;
-import org.apache.datasketches.tuple.SketchIterator;
+import org.apache.datasketches.tuple.TupleSketchIterator;
 import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -56,7 +56,7 @@ public class AvgValueIntegerTupleSketchAggregationFunction
     integerSummarySketches.forEach(union::union);
     double retainedTotal = 0L;
     CompactSketch<IntegerSummary> result = union.getResult();
-    SketchIterator<IntegerSummary> summaries = result.iterator();
+    TupleSketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();
     }
