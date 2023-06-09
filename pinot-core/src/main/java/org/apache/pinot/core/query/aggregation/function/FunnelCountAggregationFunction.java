@@ -42,7 +42,7 @@ import org.roaringbitmap.RoaringBitmap;
  * The {@code FunnelCountAggregationFunction} calculates the number of step conversions for a given partition column and
  * a list of boolean expressions.
  * <p>IMPORTANT: This function relies on the partition column being partitioned for each segment, where there are no
- * common values within different segments.
+ * common values across different segments.
  * <p>This function calculates the exact number of step matches per partition key within the segment, then sums up the
  * results from different segments.
  *
