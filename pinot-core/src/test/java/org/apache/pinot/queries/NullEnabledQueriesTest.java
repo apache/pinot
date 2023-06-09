@@ -428,13 +428,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         i++;
         index++;
       }
-      // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
-      if (nullValuesExist) {
-        assertNull(rows.get(rows.size() - 1)[0]);
-      }
     }
     {
-      int limit = 40;
+      int limit = NUM_RECORDS / 2 + 1;
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d", COLUMN_NAME, COLUMN_NAME,
           limit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);

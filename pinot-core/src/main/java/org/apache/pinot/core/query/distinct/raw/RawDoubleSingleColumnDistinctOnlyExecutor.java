@@ -36,6 +36,6 @@ public class RawDoubleSingleColumnDistinctOnlyExecutor extends BaseRawDoubleSing
   @Override
   protected boolean add(double value) {
     _valueSet.add(value);
-    return _valueSet.size() >= _limit - (_hasNull ? 1 : 0);
+    return _valueSet.size() >= _limit;
   }
 }
