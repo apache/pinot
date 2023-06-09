@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -39,7 +38,6 @@ import static org.testng.Assert.assertFalse;
 
 
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static List<String> records = new ArrayList<>();
   private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "playerId";
   private static final String DELETED_COL = "deleted";
@@ -59,12 +57,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     startKafka();
 
     List<File> unpackDataFiles = unpackTarData("gameScores.tar.gz", _tempDir);
-    pushCsvIntoKafka(unpackDataFiles.get(0), 0);  // TODO: Fix
+    pushCsvIntoKafka(unpackDataFiles.get(0), getKafkaTopic(), 0);  // TODO: Fix
 
     // Create and upload schema and table config
     Schema schema = createSchema();
     addSchema(schema);
-    TableConfig tableConfig = createCSVUpsertTableConfig(PRIMARY_KEY_COL, DELETED_COL, getNumKafkaPartitions());
+    TableConfig tableConfig = createCSVUpsertTableConfig("gameScores",
+        PRIMARY_KEY_COL, null, getKafkaTopic(), getNumKafkaPartitions());
     addTableConfig(tableConfig);
 
     // Wait for all documents loaded
@@ -122,13 +121,18 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Override
+  protected String getTableName() {
+    return "gameScores";
+  }
+
+  @Override
   protected long getCountStarResult() {
     // Three distinct records are expected with pk values of 100, 101, 102
     return 3;
   }
 
-  private long queryCountStarWithoutUpsert() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
+  private long queryCountStarWithoutUpsert(String tableName) {
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)")
         .getResultSet(0).getLong(0);
   }
 
@@ -141,7 +145,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return queryCountStarWithoutUpsert() == getCountStarResultWithoutUpsert();
+        return queryCountStarWithoutUpsert("gameScores") == getCountStarResultWithoutUpsert();
       } catch (Exception e) {
         return null;
       }
@@ -152,7 +156,56 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testDeleteWithUpsert()
       throws Exception {
-    // Push some delete records
+    String kafkaTopicName = getKafkaTopic() + "-with-deletes";
+    String tableName = "gameScoresWithDelete";
+
+    // Create table with delete Record column
+    TableConfig tableConfig = createCSVUpsertTableConfig(tableName,
+        PRIMARY_KEY_COL, DELETED_COL, kafkaTopicName, getNumKafkaPartitions());
+    addTableConfig(tableConfig);
+
+    // Push initial 10 upsert records - 3 pks 100, 101 and 102
+    List<File> dataFiles = unpackTarData("gameScores.tar.gz", _tempDir);
+    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
+
+    // Push 2 records with deleted = true - deletes pks 100 and 102
+    dataFiles = unpackTarData("gameScores_with_deleteRecords.tar.gz", _tempDir);
+    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
+
+    // Wait for all docs (12 with skipUpsert=true) to be loaded
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return queryCountStarWithoutUpsert("gameScoresWithDelete") == 12;
+      } catch (Exception e) {
+        return null;
+      }
+    }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithUpsert");
+
+    // Query for number of records in the table - should only return 1
+    ResultSet rs = getPinotConnection().execute("SELECT * FROM " + tableName).getResultSet(0);
+    Assert.assertEquals(rs.getRowCount(), 1);
+
+    // pk 101 - not deleted - only record available
+    int columnCount = rs.getColumnCount();
+    int playerIdColumnIndex = -1;
+    for (int i = 0; i < columnCount; i++) {
+      String columnName = rs.getColumnName(i);
+      if ("playerId".equalsIgnoreCase(columnName)) {
+        playerIdColumnIndex = i;
+        break;
+      }
+    }
+    Assert.assertNotEquals(playerIdColumnIndex, -1);
+    Assert.assertEquals(rs.getString(0, playerIdColumnIndex), "101");
+
+    // Validate deleted records
+    rs = getPinotConnection()
+        .execute("SELECT playerId FROM " +  tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
+    Assert.assertEquals(rs.getRowCount(), 2);
+    for (int i = 0; i < rs.getRowCount(); i++) {
+      String playerId = rs.getString(i, 0);
+      Assert.assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
+    }
   }
 
 }

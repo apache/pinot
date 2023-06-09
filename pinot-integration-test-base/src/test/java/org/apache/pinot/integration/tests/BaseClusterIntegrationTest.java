@@ -418,7 +418,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
 
-  private Map<String, String> getCSVStreamConfigMap() {
+  private Map<String, String> getCSVStreamConfigMap(@Nullable String topicName) {
     Map<String, String> streamConfigsMap = getStreamConfigMap();
     streamConfigsMap.put(
         StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
@@ -430,23 +430,32 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     streamConfigsMap.put(
         StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
             "decoder.prop.header"), "playerId,name,game,score,timestampInEpoch,deleted");
+    if (topicName != null) {
+      streamConfigsMap.put(
+          StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
+              StreamConfigProperties.STREAM_TOPIC_NAME), topicName);
+    }
     return streamConfigsMap;
   }
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createCSVUpsertTableConfig(String primaryKeyColumn, String deletedColumn, int numPartitions) {
+  protected TableConfig createCSVUpsertTableConfig(String tableName, String primaryKeyColumn, String deletedColumn,
+      @Nullable String topicName, int numPartitions) {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeletedRecordColumn(deletedColumn);
 
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+    if (topicName == null) {
+      topicName = getKafkaTopic();
+    }
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setLLC(useLlc()).setStreamConfigs(getCSVStreamConfigMap()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setLLC(useLlc()).setStreamConfigs(getCSVStreamConfigMap(topicName)).setNullHandlingEnabled(getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
@@ -577,9 +586,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    *
    * @param csvRecords List of CSV strings
    */
-  protected void pushCsvIntoKafka(File csvFile, @Nullable Integer partitionColumnIndex)
+  protected void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex)
       throws Exception {
-    ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, "localhost:" + getKafkaPort(), getKafkaTopic(),
+    ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, "localhost:" + getKafkaPort(), kafkaTopic,
         partitionColumnIndex, injectTombstones());
   }
 
