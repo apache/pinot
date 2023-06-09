@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -37,7 +38,7 @@ import org.apache.pinot.spi.data.Schema;
  * <p>Noted that {@link JavaTypeFactoryImpl} is subject to change. Please pay extra attention to this class when
  * upgrading Calcite versions.
  */
-public class TypeFactory extends JavaTypeFactoryImpl {
+public class TypeFactory extends SqlTypeFactoryImpl {
 
   public TypeFactory(RelDataTypeSystem typeSystem) {
     super(typeSystem);
