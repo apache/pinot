@@ -465,16 +465,16 @@ public class TablesResource {
   }
 
   @GET
-  @Path("/tables/{tableNameWithType}/segments/{segmentName}/invalidRecordCount")
+  @Path("/tables/{tableNameWithType}/segments/{segmentName}/validDocIdMetadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Provide segment invalid record count",
-      notes = "Provide invalid record count for the segment on the server")
+  @ApiOperation(value = "Provides segment validDocId metadata",
+      notes = "Provides segment validDocId metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
       @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
-  public Integer getInvalidRecordCount(
+  public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName) {
@@ -501,7 +501,14 @@ public class TablesResource {
             String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
             Response.Status.NOT_FOUND);
       }
-      return indexSegment.getSegmentMetadata().getTotalDocs() - (int) validDocIds.stream().count();
+      Map<String, Integer> validDocIdMetadata = new HashMap<>();
+      int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+      int totalValidDocs = (int) validDocIds.stream().count();
+      int totalInvalidDocs = totalDocs - totalValidDocs;
+      validDocIdMetadata.put("totalDocs", totalDocs);
+      validDocIdMetadata.put("totalValidDocs", totalValidDocs);
+      validDocIdMetadata.put("totalInvalidDocs", totalInvalidDocs);
+      return ResourceUtils.convertToJsonString(validDocIdMetadata);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }

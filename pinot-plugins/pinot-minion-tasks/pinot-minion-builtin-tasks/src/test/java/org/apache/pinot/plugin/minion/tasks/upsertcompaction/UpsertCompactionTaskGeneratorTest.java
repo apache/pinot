@@ -163,7 +163,7 @@ public class UpsertCompactionTaskGeneratorTest {
         UpsertCompactionTaskGenerator.getUrlToSegmentMappings(
             REALTIME_TABLE_NAME, completedSegments, segmentToServer, serverToEndpoints);
 
-    String expectedUrl = String.format("%s/tables/%s/segments/%s/invalidRecordCount",
+    String expectedUrl = String.format("%s/tables/%s/segments/%s/validDocIdMetadata",
         "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName());
     SegmentZKMetadata seg = urlToSegment.get(expectedUrl);
     assertEquals(seg.getSegmentName(), _completedSegment.getSegmentName());

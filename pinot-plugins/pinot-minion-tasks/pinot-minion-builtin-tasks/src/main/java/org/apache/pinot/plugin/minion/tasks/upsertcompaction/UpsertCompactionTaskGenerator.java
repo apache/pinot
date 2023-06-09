@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,6 +42,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,7 +112,15 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
               String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
       List<SegmentZKMetadata> selectedSegments = new ArrayList<>();
       for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-        double invalidRecordCount = Double.parseDouble(streamResponse.getValue());
+        JsonNode validDocIdMetadata;
+        try {
+          validDocIdMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
+        } catch (IOException e) {
+          LOGGER.error("Unable to parse validDocIdMetadata response for: {}", streamResponse.getKey());
+          continue;
+        }
+
+        double invalidRecordCount = validDocIdMetadata.get("totalInvalidDocs").asDouble();
         SegmentZKMetadata segment = urlToSegment.get(streamResponse.getKey());
         double invalidRecordPercent = (invalidRecordCount / segment.getTotalDocs()) * 100;
         if (invalidRecordPercent > invalidRecordsThresholdPercent) {
@@ -171,7 +182,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       String server = segmentToServer.get(segmentName);
       String endpoint = serverToEndpoints.get(server);
       String url = new URIBuilder(endpoint)
-          .setPath(String.format("/tables/%s/segments/%s/invalidRecordCount", tableNameWithType, segmentName))
+          .setPath(String.format("/tables/%s/segments/%s/validDocIdMetadata", tableNameWithType, segmentName))
           .toString();
       urlToSegment.put(url, completedSegment);
     }

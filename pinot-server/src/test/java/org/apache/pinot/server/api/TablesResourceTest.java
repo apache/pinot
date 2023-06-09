@@ -248,13 +248,22 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testGetInvalidRecordCount() {
-    IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
-    String segmentInvalidRecordCountPath =
+  public void testValidDocIdMetadata()
+      throws IOException {
+    IndexSegment segment = _realtimeIndexSegments.get(0);
+    // Verify the content of the downloaded snapshot from a realtime table.
+    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+
+    String validDocIdMetadataPath =
         "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)
-            + "/segments/" + defaultSegment.getSegmentName() + "/invalidRecordCount";
-    Integer count = _webTarget.path(segmentInvalidRecordCountPath).request().get(Integer.class);
-    Assert.assertEquals(count.intValue(), 99992);
+            + "/segments/" + segment.getSegmentName() + "/validDocIdMetadata";
+    String metadataResponse = _webTarget.path(validDocIdMetadataPath).request().get(String.class);
+    JsonNode validDocIdMetadata = JsonUtils.stringToJsonNode(metadataResponse);
+
+    Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 100000);
+    Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
+    Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
   }
 
   // Verify metadata file from segments.
