@@ -19,12 +19,9 @@
 package org.apache.pinot.core.query.distinct.raw;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -38,29 +35,8 @@ public class RawBytesSingleColumnDistinctOnlyExecutor extends BaseRawBytesSingle
   }
 
   @Override
-  public boolean process(ValueBlock valueBlock) {
-    BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
-    byte[][] values = blockValueSet.getBytesValuesSV();
-    int numDocs = valueBlock.getNumDocs();
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      for (int i = 0; i < numDocs; i++) {
-        if (nullBitmap != null && nullBitmap.contains(i)) {
-          values[i] = null;
-        }
-        _valueSet.add(new ByteArray(values[i]));
-        if (_valueSet.size() >= _limit) {
-          return true;
-        }
-      }
-    } else {
-      for (int i = 0; i < numDocs; i++) {
-        _valueSet.add(new ByteArray(values[i]));
-        if (_valueSet.size() >= _limit) {
-          return true;
-        }
-      }
-    }
-    return false;
+  protected boolean add(byte[] value) {
+    _valueSet.add(new ByteArray(value));
+    return _valueSet.size() >= _limit;
   }
 }

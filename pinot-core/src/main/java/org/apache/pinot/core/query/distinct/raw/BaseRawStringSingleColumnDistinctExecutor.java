@@ -25,10 +25,13 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -62,4 +65,42 @@ abstract class BaseRawStringSingleColumnDistinctExecutor implements DistinctExec
     }
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
+
+  @Override
+  public boolean process(ValueBlock valueBlock) {
+    BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
+    int numDocs = valueBlock.getNumDocs();
+    if (blockValueSet.isSingleValue()) {
+      String[] values = blockValueSet.getStringValuesSV();
+      if (_nullHandlingEnabled) {
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          if (nullBitmap != null && nullBitmap.contains(i)) {
+            values[i] = null;
+          }
+          if (add(values[i])) {
+            return true;
+          }
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          if (add(values[i])) {
+            return true;
+          }
+        }
+      }
+    } else {
+      String[][] values = blockValueSet.getStringValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (String value : values[i]) {
+          if (add(value)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  protected abstract boolean add(String val);
 }
