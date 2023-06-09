@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan.server;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -109,7 +110,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     }
     staticSide.visit(this, context);
     int resultMapId = context.getPipelineBreakerResult().getNodeIdMap().get(dynamicSide);
-    List<TransferableBlock> transferableBlocks = context.getPipelineBreakerResult().getResultMap().get(resultMapId);
+    List<TransferableBlock> transferableBlocks = context.getPipelineBreakerResult().getResultMap().getOrDefault(
+        resultMapId, Collections.emptyList());
     List<Object[]> resultDataContainer = new ArrayList<>();
     DataSchema dataSchema = dynamicSide.getDataSchema();
     for (TransferableBlock block : transferableBlocks) {
