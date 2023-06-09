@@ -20,6 +20,11 @@ package org.apache.pinot.segment.local.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -28,10 +33,30 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  private static final int DEFAULT_LOG2M_BYTE_SIZE = 180;
-
+  private int _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
+  private int _log2MByteSize = 180;
   // Byte size won't change once we get the initial aggregated value
   private int _maxByteSize;
+
+  public DistinctCountHLLValueAggregator() {
+  }
+
+  public DistinctCountHLLValueAggregator(List<ExpressionContext> arguments) {
+    // length 1 means we use the default _log2m of 8
+    if (arguments.size() <= 1) {
+      return;
+    }
+
+    String log2mLiteral = arguments.get(1).getLiteral().getStringValue();
+    Preconditions.checkState(StringUtils.isNumeric(log2mLiteral), "log2m argument must be a numeric literal");
+
+    _log2m = Integer.parseInt(log2mLiteral);
+    try {
+      _log2MByteSize = (new HyperLogLog(_log2m)).getBytes().length;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -51,10 +76,9 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
       initialValue = deserializeAggregatedValue(bytes);
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
-      // TODO: Handle configurable log2m for StarTreeBuilder
-      initialValue = new HyperLogLog(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
+      initialValue = new HyperLogLog(_log2m);
       initialValue.offer(rawValue);
-      _maxByteSize = Math.max(_maxByteSize, DEFAULT_LOG2M_BYTE_SIZE);
+      _maxByteSize = Math.max(_maxByteSize, _log2MByteSize);
     }
     return initialValue;
   }
@@ -100,6 +124,9 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public HyperLogLog deserializeAggregatedValue(byte[] bytes) {
+    if (bytes == null || bytes.length == 0) {
+      return new HyperLogLog(_log2m);
+    }
     return CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytes);
   }
 }

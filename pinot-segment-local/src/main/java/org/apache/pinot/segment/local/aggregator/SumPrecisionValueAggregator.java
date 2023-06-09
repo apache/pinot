@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -28,6 +32,29 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
   private int _maxByteSize;
+  private int _fixedSize = -1;
+
+  public SumPrecisionValueAggregator() {
+  }
+
+  /*
+  Aggregate with a optimal maximum precision in mind. Scale is always only 1 32-bit
+  int and the storing of the scale value does not affect the size of the big decimal.
+  Given this, we won't care about scale in terms of the aggregations.
+  During query time, the optional scale parameter can be provided, but during aggregation,
+  we don't limit it.
+   */
+  public SumPrecisionValueAggregator(List<ExpressionContext> arguments) {
+    // length 1 means we don't have any caps on maximum precision nor do we have a fixed size then
+    if (arguments.size() <= 1) {
+      return;
+    }
+
+    String precision = arguments.get(1).getLiteral().getStringValue();
+    Preconditions.checkState(StringUtils.isNumeric(precision), "precision must be a numeric literal");
+
+    _fixedSize = BigDecimalUtils.byteSizeForFixedPrecision(Integer.parseInt(precision));
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -78,11 +105,17 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
 
   @Override
   public int getMaxAggregatedValueByteSize() {
+    if (_fixedSize > 0) {
+      return _fixedSize;
+    }
     return _maxByteSize;
   }
 
   @Override
   public byte[] serializeAggregatedValue(BigDecimal value) {
+    if (_fixedSize > 0) {
+      return BigDecimalUtils.serializeWithSize(value, _fixedSize);
+    }
     return BigDecimalUtils.serialize(value);
   }
 

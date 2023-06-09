@@ -50,7 +50,17 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
           setDouble(docId, (double) value);
           break;
         case BIG_DECIMAL:
-          setBigDecimal(docId, (BigDecimal) value);
+          // If the Big Decimal is already serialized as byte[], use it directly.
+          // This is only possible when the Big Decimal is generated from a realtime pre-aggregation
+          // where SumPrecisionValueAggregator uses BigDecimalUtils.serializeWithSize() to serialize the value
+          // instead of the normal BigDecimalUtils.serialize().
+          // setBigDecimal() underlying calls BigDecimalUtils.serialize() which is not the intention
+          // when the Big Decimal is already serialized.
+          if (value instanceof byte[]) {
+            setBytes(docId, (byte[]) value);
+          } else {
+            setBigDecimal(docId, (BigDecimal) value);
+          }
           break;
         case STRING:
           setString(docId, (String) value);

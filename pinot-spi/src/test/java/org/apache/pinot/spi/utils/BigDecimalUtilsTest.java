@@ -29,24 +29,62 @@ public class BigDecimalUtilsTest {
 
   @Test
   public void testBigDecimal() {
-    BigDecimal value = new BigDecimal("123456789.0123456789");
-    byte[] serializedValue = BigDecimalUtils.serialize(value);
-    assertEquals(BigDecimalUtils.byteSize(value), serializedValue.length);
-    BigDecimal deserializedValue = BigDecimalUtils.deserialize(serializedValue);
-    assertEquals(deserializedValue, value);
+    BigDecimal[] testCases = {
+        new BigDecimal("0.123456789"),
+        new BigDecimal("-0.123456789"),
+        new BigDecimal("123456789"),
+        new BigDecimal("-123456789"),
+        new BigDecimal("123456789.0123456789"),
+        new BigDecimal("-123456789.0123456789"),
+        // Set the scale to a negative value
+        new BigDecimal("123456789.0123456789").setScale(-1, RoundingMode.HALF_UP),
+        new BigDecimal("-123456789.0123456789").setScale(-1, RoundingMode.HALF_UP),
+        // Set the scale to a negative value in byte
+        new BigDecimal("123456789.0123456789").setScale(128, RoundingMode.HALF_UP),
+        new BigDecimal("-123456789.0123456789").setScale(128, RoundingMode.HALF_UP)
+    };
+    for (BigDecimal value : testCases) {
+      byte[] serializedValue = BigDecimalUtils.serialize(value);
+      assertEquals(BigDecimalUtils.byteSize(value), serializedValue.length);
+      BigDecimal deserializedValue = BigDecimalUtils.deserialize(serializedValue);
+      assertEquals(deserializedValue, value);
+    }
+  }
 
-    // Set the scale to a negative value
-    value = value.setScale(-1, RoundingMode.HALF_UP);
-    serializedValue = BigDecimalUtils.serialize(value);
-    assertEquals(BigDecimalUtils.byteSize(value), serializedValue.length);
-    deserializedValue = BigDecimalUtils.deserialize(serializedValue);
-    assertEquals(deserializedValue, value);
+  @Test
+  public void testBigDecimalSerializeWithSize() {
+    BigDecimal[] testCases = {
+        new BigDecimal("0.123456789"),
+        new BigDecimal("-0.123456789"),
+        new BigDecimal("123456789"),
+        new BigDecimal("-123456789"),
+        new BigDecimal("123456789.0123456789"),
+        new BigDecimal("-123456789.0123456789"),
+        new BigDecimal("123456789.0123456789").setScale(-1, RoundingMode.HALF_UP),
+        new BigDecimal("-123456789.0123456789").setScale(-1, RoundingMode.HALF_UP),
+        new BigDecimal("123456789.0123456789").setScale(128, RoundingMode.HALF_UP),
+        new BigDecimal("-123456789.0123456789").setScale(128, RoundingMode.HALF_UP)
+    };
+    // One case of serialization with and without padding
+    int[] sizes = {0, 4};
+    for (BigDecimal value : testCases) {
+      int actualSize = BigDecimalUtils.byteSize(value);
+      for (int size : sizes) {
+        byte[] serializedValue = BigDecimalUtils.serializeWithSize(value, actualSize + size);
+        assertEquals(actualSize + size, serializedValue.length);
+        BigDecimal deserializedValue = BigDecimalUtils.deserialize(serializedValue);
+        assertEquals(deserializedValue, value);
+      }
+    }
+  }
 
-    // Set the scale to a negative value in byte
-    value = value.setScale(128, RoundingMode.HALF_UP);
-    serializedValue = BigDecimalUtils.serialize(value);
-    assertEquals(BigDecimalUtils.byteSize(value), serializedValue.length);
-    deserializedValue = BigDecimalUtils.deserialize(serializedValue);
-    assertEquals(deserializedValue, value);
+  @Test
+  public void testGenerateMaximumNumberWithPrecision() {
+    int[] testCases = { 1, 3, 10, 38, 128 };
+    for (int precision : testCases) {
+      BigDecimal bd = BigDecimalUtils.generateMaximumNumberWithPrecision(precision);
+      assertEquals(bd.precision(), precision);
+      assertEquals(bd.add(new BigDecimal("1")).precision(), precision + 1);
+    }
   }
 }

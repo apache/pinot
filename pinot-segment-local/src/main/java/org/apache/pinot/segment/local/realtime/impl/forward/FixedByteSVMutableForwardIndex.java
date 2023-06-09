@@ -63,20 +63,30 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
   /**
    * @param storedType Data type of the values
+   * @param fixedLength Fixed length of values if known: only used for BYTES field and Hyperloglog values for now.
    * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
    * @param memoryManager Memory manager to be used for allocating memory.
    * @param allocationContext Allocation allocationContext.
    */
-  public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType storedType, int numRowsPerChunk,
-      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
+  public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType storedType, int fixedLength,
+      int numRowsPerChunk, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _dictionaryEncoded = dictionaryEncoded;
     _storedType = storedType;
-    _valueSizeInBytes = storedType.size();
+    if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
+      _valueSizeInBytes = fixedLength;
+    } else {
+      _valueSizeInBytes = storedType.size();
+    }
     _numRowsPerChunk = numRowsPerChunk;
     _chunkSizeInBytes = numRowsPerChunk * _valueSizeInBytes;
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
     addBuffer();
+  }
+
+  public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType valueType, int numRowsPerChunk,
+                                        PinotDataBufferMemoryManager memoryManager, String allocationContext) {
+    this(dictionaryEncoded, valueType, -1, numRowsPerChunk, memoryManager, allocationContext);
   }
 
   @Override
@@ -195,6 +205,22 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     getWriterForRow(docId).setDouble(docId, value);
   }
 
+  @Override
+  public byte[] getBytes(int docId) {
+    int bufferId = getBufferId(docId);
+    return _readers.get(bufferId).getBytes(docId);
+  }
+
+  @Override
+  public void setBytes(int docId, byte[] value) {
+    if (value.length != _valueSizeInBytes) {
+      throw new IllegalArgumentException("Expected value size to be " + _valueSizeInBytes + " but was " + value.length);
+    }
+
+    addBufferIfNeeded(docId);
+    getWriterForRow(docId).setBytes(docId, value);
+  }
+
   private WriterWithOffset getWriterForRow(int row) {
     return _writers.get(getBufferId(row));
   }
@@ -267,6 +293,10 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     public void setDouble(int row, double value) {
       _writer.setDouble(row - _startRowId, 0, value);
     }
+
+    public void setBytes(int row, byte[] value) {
+      _writer.setBytes(row - _startRowId, 0, value);
+    }
   }
 
   /**
@@ -305,6 +335,10 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
     public BigDecimal getBigDecimal(int row) {
       return BigDecimalUtils.deserialize(_reader.getBytes(row - _startRowId, 0));
+    }
+
+    public byte[] getBytes(int row) {
+      return _reader.getBytes(row - _startRowId, 0);
     }
 
     public FixedByteSingleValueMultiColReader getReader() {

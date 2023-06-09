@@ -58,6 +58,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
+import static org.apache.pinot.spi.data.FieldSpec.DataType.BIG_DECIMAL;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
+
 
 public class ForwardIndexType
     extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
@@ -269,13 +272,17 @@ public class ForwardIndexType
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
     FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    int maxLength = context.getFieldSpec().getMaxLength();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
       if (isSingleValue) {
         String allocationContext = IndexUtil.buildAllocationContext(context.getSegmentName(),
             context.getFieldSpec().getName(), V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-        if (storedType.isFixedWidth()) {
-          return new FixedByteSVMutableForwardIndex(false, storedType, context.getCapacity(),
+        // We consider BYTES with a specific maxLength as being also fixed width.
+        // For BIG_DECIMAL, maxLength is maximum size of a serialized big decimal,
+        // it is determined using the value aggregator if present and does not need to be specified on the schema.
+        if (isFieldFixed(context.getFieldSpec())) {
+          return new FixedByteSVMutableForwardIndex(false, storedType, maxLength, context.getCapacity(),
               context.getMemoryManager(), allocationContext);
         } else {
           // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming
@@ -315,5 +322,14 @@ public class ForwardIndexType
             FieldSpec.DataType.INT);
       }
     }
+  }
+
+  private boolean isFieldFixed(FieldSpec fieldSpec) {
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+    int maxLength = fieldSpec.getMaxLength();
+
+    return (storedType.isFixedWidth() || (
+        (storedType.getStoredType() == BYTES || storedType.getStoredType() == BIG_DECIMAL) && maxLength > 0)
+    );
   }
 }

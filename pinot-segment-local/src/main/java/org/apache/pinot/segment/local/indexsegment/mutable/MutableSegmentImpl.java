@@ -257,6 +257,14 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
+      String fieldSpecName = fieldSpec.getName();
+      if (metricsAggregators.containsKey(fieldSpecName)) {
+        int maxLength = metricsAggregators.get(fieldSpecName).getRight().getMaxAggregatedValueByteSize();
+        if (maxLength > 0) {
+          fieldSpec.setMaxLength(maxLength);
+        }
+      }
+
       String column = fieldSpec.getName();
       FieldIndexConfigs indexConfigs = Optional.ofNullable(config.getIndexConfigByCol().get(column))
           .orElse(FieldIndexConfigs.EMPTY);
@@ -289,6 +297,7 @@ public class MutableSegmentImpl implements MutableSegment {
       // Check whether to generate raw index for the column while consuming
       // Only support generating raw index on single-value columns that do not have inverted index while
       // consuming. After consumption completes and the segment is built, all single-value columns can have raw index
+
 
       // Dictionary-encoded column
       MutableDictionary dictionary;
@@ -565,6 +574,7 @@ public class MutableSegmentImpl implements MutableSegment {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       IndexContainer indexContainer = entry.getValue();
       MutableDictionary dictionary = indexContainer._dictionary;
+
       if (dictionary == null) {
         continue;
       }
@@ -619,6 +629,10 @@ public class MutableSegmentImpl implements MutableSegment {
             break;
           case DOUBLE:
             forwardIndex.add(((Number) value).doubleValue(), -1, docId);
+            break;
+          case BIG_DECIMAL:
+          case BYTES:
+            forwardIndex.add(indexContainer._valueAggregator.serializeAggregatedValue(value), -1, docId);
             break;
           default:
             throw new UnsupportedOperationException(
@@ -795,6 +809,11 @@ public class MutableSegmentImpl implements MutableSegment {
               throw new UnsupportedOperationException(String.format("Aggregation type %s of %s not supported for %s",
                   valueAggregator.getAggregatedValueType(), valueAggregator.getAggregationType(), dataType));
           }
+          break;
+        case BYTES:
+          Object currentValue = valueAggregator.deserializeAggregatedValue(forwardIndex.getBytes(docId));
+          Object newVal = valueAggregator.applyRawValue(currentValue, value);
+          forwardIndex.setBytes(docId, valueAggregator.serializeAggregatedValue(newVal));
           break;
         default:
           throw new UnsupportedOperationException(
@@ -1198,8 +1217,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
     for (String metricName : segmentConfig.getSchema().getMetricNames()) {
-      columnNameToAggregator.put(metricName,
-          Pair.of(metricName, ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM)));
+      columnNameToAggregator.put(metricName, Pair.of(metricName,
+          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.EMPTY_LIST)));
     }
     return columnNameToAggregator;
   }
@@ -1216,8 +1235,20 @@ public class MutableSegmentImpl implements MutableSegment {
           "aggregation function must be a function: %s", config);
       FunctionContext functionContext = expressionContext.getFunction();
       TableConfigUtils.validateIngestionAggregation(functionContext.getFunctionName());
-      Preconditions.checkState(functionContext.getArguments().size() == 1,
-          "aggregation function can only have one argument: %s", config);
+
+      if ("distinctcounthll".equalsIgnoreCase(functionContext.getFunctionName())) {
+        Preconditions.checkState(
+            functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
+            "distinctcounthll function can have max two arguments: %s", config);
+      } else if ("sumprecision".equalsIgnoreCase(functionContext.getFunctionName())) {
+        Preconditions.checkState(
+            functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 3,
+            "sumprecision function can have max three arguments: %s", config);
+      } else {
+        Preconditions.checkState(functionContext.getArguments().size() == 1,
+            "aggregation function can only have one argument: %s", config);
+      }
+
       ExpressionContext argument = functionContext.getArguments().get(0);
       Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
           "aggregator function argument must be a identifier: %s", config);
@@ -1225,8 +1256,8 @@ public class MutableSegmentImpl implements MutableSegment {
       AggregationFunctionType functionType =
           AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
 
-      columnNameToAggregator.put(config.getColumnName(),
-          Pair.of(argument.getIdentifier(), ValueAggregatorFactory.getValueAggregator(functionType)));
+      columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
+          ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
     }
 
     return columnNameToAggregator;
