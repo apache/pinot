@@ -47,6 +47,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     String columnName = metadata.getColumnName();
 
     FieldIndexConfigs fieldIndexConfigs = indexLoadingConfig.getFieldIndexConfig(columnName);
+    if (fieldIndexConfigs == null) {
+      fieldIndexConfigs = FieldIndexConfigs.EMPTY;
+    }
 
     _readersByIndex = new HashMap<>();
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
