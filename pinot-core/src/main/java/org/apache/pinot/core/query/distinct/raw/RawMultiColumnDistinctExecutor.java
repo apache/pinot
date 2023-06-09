@@ -98,6 +98,7 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
         }
       }
     } else {
+      // TODO(https://github.com/apache/pinot/issues/10882): support NULL for multi-value
       Object[][] svValues = new Object[numExpressions][];
       Object[][][] mvValues = new Object[numExpressions][][];
       for (int i = 0; i < numExpressions; i++) {
