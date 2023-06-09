@@ -79,14 +79,14 @@ public class PipelineBreakerOperator extends MultiStageOperator {
       Map.Entry<Integer, Operator<TransferableBlock>> worker = _workerEntries.remove();
       TransferableBlock block = worker.getValue().nextBlock();
 
-      // Release the mailbox when the block is end-of-stream
-      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
+      // Release the mailbox worker when the block is end-of-stream
+      if (block != null && !block.isNoOpBlock() && block.isSuccessfulEndOfStreamBlock()) {
         continue;
       }
 
       // Add the worker back to the queue if the block is not end-of-stream
       _workerEntries.add(worker);
-      if (block != null) {
+      if (block != null && !block.isNoOpBlock()) {
         if (block.isErrorBlock()) {
           _errorBlock = block;
           constructErrorResponse(block);
@@ -97,6 +97,7 @@ public class PipelineBreakerOperator extends MultiStageOperator {
         if (!block.isEndOfStreamBlock()) {
           blockList.add(block);
         }
+        return block;
       }
     }
 
