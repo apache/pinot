@@ -659,6 +659,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
+        // Check READY_TO_CONSUME_DATA before enter consumeLoop in the new PartitionConsumer.
         if (!_isReadyToConsumeData.getAsBoolean()) {
           do {
             //noinspection BusyWait
@@ -679,7 +680,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _realtimeTableDataManager.releaseSegment(segmentDataManager);
             }
           }
-          // wait if all segments (except the new consuming segment) for this partition not sealed completely
+          // wait if all segments (except the new consuming segment) for this partition not sealed completely.
+          // The only consuming segment should be the new consuming segment, all the other segments should be persisted.
           if (allSegmentsForPartition.stream()
               .filter(segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment())
               .count() > 1) {
@@ -1281,6 +1283,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _state = State.CONSUMING_TO_ONLINE;
     _shouldStop = false;
     try {
+      if (!_isReadyToConsumeData.getAsBoolean()) {
+        // Adding the READY_TO_CONSUME_DATA_CHECK since it's possible that we are in "INITIAL_CONSUMING" state, but
+        // startConsumerThread() haven't been called and partitionConsumer haven't been initialized.
+        // In that case, this function will be called before the READY_TO_CONSUME_DATA_CHECK in partitionConsumer.
+        do {
+          //noinspection BusyWait
+          Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+        } while (!_shouldStop && !endCriteriaReached() && !_isReadyToConsumeData.getAsBoolean());
+      }
       consumeLoop();
     } catch (Exception e) {
       // We will end up downloading the segment, so this is not a serious problem
