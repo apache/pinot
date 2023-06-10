@@ -56,6 +56,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.yscope.clp</groupId>
+      <artifactId>clp-ffi</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.uber</groupId>
       <artifactId>h3</artifactId>
     </dependency>
