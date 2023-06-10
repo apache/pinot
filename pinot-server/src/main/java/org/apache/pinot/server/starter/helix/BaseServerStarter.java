@@ -624,12 +624,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Shutting down Pinot server");
     long startTimeMs = System.currentTimeMillis();
 
-    try {
-      LOGGER.info("Closing PinotFS classes");
-      PinotFSFactory.shutdown();
-    } catch (IOException e) {
-      LOGGER.warn("Caught exception closing PinotFS classes", e);
-    }
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
@@ -648,6 +642,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _serverQueriesDisabledTracker.stop();
     _realtimeLuceneIndexRefreshState.stop();
+    try {
+      // Close PinotFS after all data managers are shutdown. Otherwise, committing segments might not be able to
+      // upload segments to the deep-store.
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.warn("Caught exception closing PinotFS classes", e);
+    }
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
     _adminApiApplication.stop();
