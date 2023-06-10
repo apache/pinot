@@ -209,8 +209,8 @@ public final class RelToPlanNodeConverter {
       case DECIMAL:
         return resolveDecimal(relDataType);
       case FLOAT:
-        return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
       case REAL:
+        return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
       case DOUBLE:
         return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.DOUBLE;
       case DATE:
