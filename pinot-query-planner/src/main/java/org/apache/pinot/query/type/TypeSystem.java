@@ -56,8 +56,7 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   }
 
   @Override
-  public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory,
-      RelDataType argumentType) {
+  public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory, RelDataType argumentType) {
     assert SqlTypeUtil.isNumeric(argumentType);
 
     switch (argumentType.getSqlTypeName()) {
@@ -68,18 +67,6 @@ public class TypeSystem extends RelDataTypeSystemImpl {
       default: {
         return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.DOUBLE), false);
       }
-    }
-  }
-
-  // overriding the function for handling comparison between different data types.
-  // based on the precision value calcite adds the CAST function to make operands of same type for comparison.
-  @Override public int getDefaultPrecision(SqlTypeName typeName) {
-    switch (typeName) {
-      case DOUBLE:
-        return 16;
-      default:
-        // Following BasicSqlType precision as the default
-        return super.getDefaultPrecision(typeName);
     }
   }
 }
