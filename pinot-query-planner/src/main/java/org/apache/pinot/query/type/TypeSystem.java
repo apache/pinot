@@ -56,7 +56,8 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   }
 
   @Override
-  public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory, RelDataType argumentType) {
+  public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory,
+      RelDataType argumentType) {
     assert SqlTypeUtil.isNumeric(argumentType);
 
     switch (argumentType.getSqlTypeName()) {
