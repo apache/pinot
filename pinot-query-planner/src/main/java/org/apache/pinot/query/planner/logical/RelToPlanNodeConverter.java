@@ -31,6 +31,8 @@ import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.SortExchange;
+import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -178,12 +180,15 @@ public final class RelToPlanNodeConverter {
 
     // Parse out all equality JOIN conditions
     JoinInfo joinInfo = node.analyzeCondition();
-    FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.leftKeys);
-    FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.rightKeys);
+    JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(new FieldSelectionKeySelector(joinInfo.leftKeys),
+        new FieldSelectionKeySelector(joinInfo.rightKeys));
+    List<RexExpression> joinClause =
+        joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    boolean isColocatedJoin =
+        PinotHintStrategyTable.containsHintOption(node.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+            PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
-        toDataSchema(node.getRight().getRowType()), joinType,
-        new JoinNode.JoinKeys(leftFieldSelectionKeySelector, rightFieldSelectionKeySelector),
-        joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList()));
+        toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, isColocatedJoin);
   }
 
   private static DataSchema toDataSchema(RelDataType rowType) {

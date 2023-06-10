@@ -65,8 +65,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     RelNode rightExchange;
     JoinInfo joinInfo = join.analyzeCondition();
 
-    boolean isColocatedJoin = PinotHintStrategyTable.containsHintOption(join.getHints(),
-        PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
+    boolean isColocatedJoin =
+        PinotHintStrategyTable.containsHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+            PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
     if (isColocatedJoin) {
       // join exchange are colocated, we should directly pass through via join key
       leftExchange = PinotLogicalExchange.create(leftInput, RelDistributions.SINGLETON);
@@ -82,10 +83,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     }
 
     RelNode newJoinNode =
-        new LogicalJoin(join.getCluster(), join.getTraitSet(), leftExchange, rightExchange, join.getCondition(),
-            join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
+        new LogicalJoin(join.getCluster(), join.getTraitSet(), join.getHints(), leftExchange, rightExchange,
+            join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
             ImmutableList.copyOf(join.getSystemFieldList()));
-
     call.transformTo(newJoinNode);
   }
 }
