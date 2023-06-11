@@ -660,11 +660,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Replaces a committed LLC REALTIME segment.
    */
   public void replaceLLSegment(String segmentName, IndexLoadingConfig indexLoadingConfig) {
-    File indexDir = new File(_indexDir, segmentName);
     // Use the latest table config and schema to load the segment
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to get table config for table: {}", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
+
+    replaceLLSegment(segmentName, indexLoadingConfig, tableConfig, schema);
+  }
+
+  /**
+   * Same as {@link #replaceLLSegment(String, IndexLoadingConfig)} except this does not make any ZK calls for
+   * retrieving table config and schema. Instead the caller needs to pass it themselves.
+   */
+  public void replaceLLSegment(
+      String segmentName, IndexLoadingConfig indexLoadingConfig, TableConfig tableConfig, Schema schema) {
+    File indexDir = new File(_indexDir, segmentName);
 
     // Construct a new indexLoadingConfig with the updated tableConfig and schema.
     InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();

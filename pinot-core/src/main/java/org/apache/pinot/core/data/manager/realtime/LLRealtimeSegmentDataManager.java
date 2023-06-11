@@ -1029,7 +1029,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return false;
     }
 
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig, _tableConfig, _schema);
     removeSegmentFile();
     return true;
   }
@@ -1061,7 +1061,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (descriptor == null) {
       return false;
     }
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig, _tableConfig, _schema);
     return true;
   }
 
