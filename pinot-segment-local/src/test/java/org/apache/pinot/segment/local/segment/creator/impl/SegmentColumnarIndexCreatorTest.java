@@ -43,6 +43,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.MAX_VALUE;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.MIN_VALUE;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
+
+
 public class SegmentColumnarIndexCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentColumnarIndexCreatorTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
@@ -189,6 +194,19 @@ public class SegmentColumnarIndexCreatorTest {
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ");
     Assert.assertTrue(Boolean.parseBoolean(
         String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+
+    props = new PropertiesConfiguration();
+    String longMinValue = RandomStringUtils.
+        randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    String longMaxValue = RandomStringUtils.
+        randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", longMinValue, longMaxValue);
+    Assert.assertFalse(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))),
+        longMinValue.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))),
+        longMaxValue.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
   }
 
   @AfterClass

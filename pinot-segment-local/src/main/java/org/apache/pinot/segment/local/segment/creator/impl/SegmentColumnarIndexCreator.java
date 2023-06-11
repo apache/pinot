@@ -83,7 +83,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   // TODO Refactor class name to match interface name
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   // Allow at most 512 characters for the metadata property
-  private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
+  static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
   private SegmentGeneratorConfig _config;
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
@@ -570,12 +570,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
       String maxValue) {
     if (isValidPropertyValue(minValue)) {
-      properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
+      properties.setProperty(getKeyFor(column, MIN_VALUE),
+          minValue.substring(0, Math.min(minValue.length(), METADATA_PROPERTY_LENGTH_LIMIT)));
     } else {
       properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
     if (isValidPropertyValue(maxValue)) {
-      properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+      properties.setProperty(getKeyFor(column, MAX_VALUE),
+          maxValue.substring(0, Math.min(maxValue.length(), METADATA_PROPERTY_LENGTH_LIMIT)));
     } else {
       properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
@@ -595,9 +597,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     int length = value.length();
     if (length == 0) {
       return true;
-    }
-    if (length > METADATA_PROPERTY_LENGTH_LIMIT) {
-      return false;
     }
     if (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1))) {
       return false;
