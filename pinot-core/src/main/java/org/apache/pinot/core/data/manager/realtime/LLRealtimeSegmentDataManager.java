@@ -689,13 +689,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 mutableSegmentsForPartition.add(segmentDataManager);
               }
             }
+            int numMutableSegmentLeft = mutableSegmentsForPartition.size();
             // wait if all segments (except the new consuming segment) for this partition not sealed completely.
-            while (mutableSegmentsForPartition.size() > 0) {
+            while (numMutableSegmentLeft > 0) {
+              numMutableSegmentLeft = 0;
               Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
               for (SegmentDataManager segmentDataManager : mutableSegmentsForPartition) {
-                if (!segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
+                if (segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
+                  numMutableSegmentLeft += 1;
+                } else {
                   _realtimeTableDataManager.releaseSegment(segmentDataManager);
-                  mutableSegmentsForPartition.remove(segmentDataManager);
                 }
               }
             }
