@@ -69,9 +69,7 @@ public class HttpClientConfig {
       builder.withMaxConnsPerRoute(Integer.parseInt(maxConnsPerRoute));
     }
     boolean disableDefaultUserAgent = pinotConfiguration.getProperty(DISABLE_DEFAULT_USER_AGENT_CONFIG_NAME, false);
-    if (disableDefaultUserAgent) {
-      builder.withDisableDefaultUserAgent(true);
-    }
+    builder.withDisableDefaultUserAgent(disableDefaultUserAgent);
     return builder;
   }
 
