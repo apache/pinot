@@ -53,7 +53,7 @@ public class ServerSegmentCompletionProtocolHandler {
   private static final String HTTP_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
 
   private static SSLContext _sslContext;
-  private static HttpClientConfig _httpClientConfig;
+  private static HttpClientConfig _httpClientConfig = HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG;
   private static Integer _controllerHttpsPort;
   private static int _segmentUploadRequestTimeoutMs;
   private static AuthProvider _authProvider;
