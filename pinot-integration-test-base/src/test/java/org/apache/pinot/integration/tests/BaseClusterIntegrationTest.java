@@ -420,22 +420,24 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
 
-  private Map<String, String> getCSVStreamConfigMap(@Nullable String topicName) {
-    Map<String, String> streamConfigsMap = getStreamConfigMap();
+  protected Map<String, String> getCSVStreamConfigMap(@Nullable String topicName, @Nullable String delimiter,
+      @Nullable String csvHeaderProperty) {
+    String streamType = "kafka";
+    Map<String, String> streamConfigsMap = new HashMap<>();
     streamConfigsMap.put(
-        StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
-            StreamConfigProperties.STREAM_DECODER_CLASS),
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
         CSVMessageDecoder.class.getName());
-    streamConfigsMap.put(
-        StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
-            "decoder.prop.delimiter"), ",");
-    streamConfigsMap.put(
-        StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
-            "decoder.prop.header"), "playerId,name,game,score,timestampInEpoch,deleted");
+    if (delimiter != null) {
+      streamConfigsMap.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.delimiter"),
+          delimiter);
+    }
+    if (csvHeaderProperty != null) {
+      streamConfigsMap.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.header"),
+          csvHeaderProperty);
+    }
     if (topicName != null) {
-      streamConfigsMap.put(
-          StreamConfigProperties.constructStreamProperty(streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE),
-              StreamConfigProperties.STREAM_TOPIC_NAME), topicName);
+      streamConfigsMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+          StreamConfigProperties.STREAM_TOPIC_NAME), topicName);
     }
     return streamConfigsMap;
   }
@@ -443,7 +445,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new Upsert enabled table config.
    */
   protected TableConfig createCSVUpsertTableConfig(String tableName, String primaryKeyColumn, String deletedColumn,
-      @Nullable String topicName, int numPartitions) {
+      @Nullable String topicName, int numPartitions, Map<String, String> streamDecoderProperties) {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
@@ -453,11 +455,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     if (topicName == null) {
       topicName = getKafkaTopic();
     }
+
+    Map<String, String> streamConfigsMap = getStreamConfigMap();
+    streamConfigsMap.putAll(streamDecoderProperties);
+
     return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setLLC(useLlc()).setStreamConfigs(getCSVStreamConfigMap(topicName))
+        .setLLC(useLlc()).setStreamConfigs(streamConfigsMap)
         .setNullHandlingEnabled(getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))

@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ResultSet;
@@ -47,6 +48,8 @@ import static org.testng.Assert.assertFalse;
  */
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String INPUT_DATA_TAR_FILE = "gameScores_csv.tar.gz";
+  private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
+  private static final String CSV_DELIMITER = ",";
   private static final String TABLE_NAME = "gameScores";
   private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "playerId";
@@ -72,8 +75,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // Create and upload schema and table config
     Schema schema = createSchema();
     addSchema(schema);
-    TableConfig tableConfig = createCSVUpsertTableConfig("gameScores",
-        PRIMARY_KEY_COL, null, getKafkaTopic(), getNumKafkaPartitions());
+
+    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(getKafkaTopic(), CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    TableConfig tableConfig = createCSVUpsertTableConfig("gameScores", PRIMARY_KEY_COL, null,
+        getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties);
     addTableConfig(tableConfig);
 
     // Wait for all documents loaded
@@ -166,13 +171,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testDeleteWithFullUpsert()
       throws Exception {
-    final String inputDataTarFile = "gameScoresWithDeleteRecords_csv.tar.gz";
     final String kafkaTopicName = getKafkaTopic() + "-with-deletes";
     final String tableName = "gameScoresWithDelete";
 
     // Create table with delete Record column
-    TableConfig tableConfig = createCSVUpsertTableConfig(tableName,
-        PRIMARY_KEY_COL, DELETED_COL, kafkaTopicName, getNumKafkaPartitions());
+    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(kafkaTopicName, CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, PRIMARY_KEY_COL, DELETED_COL, kafkaTopicName,
+        getNumKafkaPartitions(), csvDecoderProperties);
     addTableConfig(tableConfig);
 
     // Push initial 10 upsert records - 3 pks 100, 101 and 102
@@ -181,8 +186,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // TEST 1: Delete existing primary key
     // Push 2 records with deleted = true - deletes pks 100 and 102
-    dataFiles = unpackTarData(inputDataTarFile, _tempDir);
-    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
+    List<String> deleteRecords = List.of("102,Clifford,counter-strike,102,1681054200000,true",
+        "100,Zook,counter-strike,2050,1681377200000,true");
+    pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
 
     // Wait for all docs (12 with skipUpsert=true) to be loaded
     TestUtils.waitForCondition(aVoid -> {
@@ -239,6 +245,5 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
             " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
     Assert.assertTrue(rs.getRowCount() > 1);
-
   }
 }
