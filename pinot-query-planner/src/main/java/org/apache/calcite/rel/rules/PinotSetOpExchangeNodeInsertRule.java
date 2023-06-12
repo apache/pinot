@@ -27,10 +27,10 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.SetOp;
-import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalIntersect;
 import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
@@ -69,7 +69,7 @@ public class PinotSetOpExchangeNodeInsertRule extends RelOptRule {
     List<Integer> hashFields =
         IntStream.range(0, setOp.getRowType().getFieldCount()).boxed().collect(Collectors.toCollection(ArrayList::new));
     for (RelNode input : setOp.getInputs()) {
-      RelNode exchange = LogicalExchange.create(input, RelDistributions.hash(hashFields));
+      RelNode exchange = PinotLogicalExchange.create(input, RelDistributions.hash(hashFields));
       newInputs.add(exchange);
     }
     SetOp newSetOpNode;

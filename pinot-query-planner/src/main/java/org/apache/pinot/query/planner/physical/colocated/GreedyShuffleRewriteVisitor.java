@@ -173,7 +173,7 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
         return new HashSet<>();
       } else if (colocationKeyCondition(oldColocationKeys, selector) && areServersSuperset(node.getPlanFragmentId(),
           node.getSenderStageId())) {
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
+        node.setDistributionType(RelDistribution.Type.SINGLETON);
         _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).setServerInstanceToWorkerIdMap(
             _dispatchablePlanMetadataMap.get(node.getSenderStageId()).getServerInstanceToWorkerIdMap());
         return oldColocationKeys;
@@ -187,10 +187,10 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
     }
     // If the current stage is a join-stage then we already know whether shuffle can be skipped.
     if (_canSkipShuffleForJoin) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      node.setDistributionType(RelDistribution.Type.SINGLETON);
       // For the join-case, servers are already re-assigned in visitJoin. Moreover, we haven't yet changed sender's
       // distribution.
-      ((MailboxSendNode) node.getSender()).setExchangeType(RelDistribution.Type.SINGLETON);
+      ((MailboxSendNode) node.getSender()).setDistributionType(RelDistribution.Type.SINGLETON);
       return oldColocationKeys;
     } else if (selector == null) {
       return new HashSet<>();
@@ -214,7 +214,7 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
       Set<ColocationKey> colocationKeys;
       if (canSkipShuffleBasic && areServersSuperset(node.getReceiverStageId(), node.getPlanFragmentId())) {
         // Servers are not re-assigned on sender-side. If needed, they are re-assigned on the receiver side.
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
+        node.setDistributionType(RelDistribution.Type.SINGLETON);
         colocationKeys = oldColocationKeys;
       } else {
         colocationKeys = new HashSet<>();

@@ -39,7 +39,9 @@ import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
+import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -108,20 +110,27 @@ public final class RelToPlanNodeConverter {
     RelCollation collation = null;
     boolean isSortOnSender = false;
     boolean isSortOnReceiver = false;
+    PinotRelExchangeType exchangeType = PinotRelExchangeType.getDefaultExchangeType();
     if (node instanceof SortExchange) {
       collation = ((SortExchange) node).getCollation();
       if (node instanceof PinotLogicalSortExchange) {
         // These flags only take meaning if the collation is not null or empty
         isSortOnSender = ((PinotLogicalSortExchange) node).isSortOnSender();
         isSortOnReceiver = ((PinotLogicalSortExchange) node).isSortOnReceiver();
+        exchangeType = ((PinotLogicalSortExchange) node).getExchangeType();
+      }
+    } else {
+      if (node instanceof PinotLogicalExchange) {
+        exchangeType = ((PinotLogicalExchange) node).getExchangeType();
       }
     }
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
 
     // Compute all the tables involved under this exchange node
     Set<String> tableNames = getTableNamesFromRelRoot(node);
-    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), tableNames, node.getDistribution(),
-        fieldCollations, isSortOnSender, isSortOnReceiver);
+
+    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), exchangeType,
+        tableNames, node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver);
   }
 
   private static PlanNode convertLogicalSetOp(SetOp node, int currentStageId) {
