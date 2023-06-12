@@ -683,14 +683,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 // release the current consuming segment
                 _realtimeTableDataManager.releaseSegment(segmentDataManager);
               } else if (!segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
-                // Persist snapshot and release all immutable segments for this partition.
-                if (segmentDataManager.getSegment() instanceof ImmutableSegmentImpl) {
-                  if (segmentDataManager.getSegment().getValidDocIds() != null) {
-                    MutableRoaringBitmap validDocIds =
-                        segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
-                    ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
-                  }
-                }
                 _realtimeTableDataManager.releaseSegment(segmentDataManager);
               } else {
                 mutableSegmentsForPartition.add(segmentDataManager);
@@ -701,14 +693,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
               for (SegmentDataManager segmentDataManager : mutableSegmentsForPartition) {
                 if (!segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
-                  // Persist snapshot and release all immutable segments for this partition.
-                  if (segmentDataManager.getSegment() instanceof ImmutableSegmentImpl) {
-                    if (segmentDataManager.getSegment().getValidDocIds() != null) {
-                      MutableRoaringBitmap validDocIds =
-                          segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
-                      ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
-                    }
-                  }
                   _realtimeTableDataManager.releaseSegment(segmentDataManager);
                   mutableSegmentsForPartition.remove(segmentDataManager);
                 }
@@ -716,6 +700,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             } while (mutableSegmentsForPartition.size() > 0);
           } finally {
             for (SegmentDataManager segmentDataManager : allSegments) {
+              // Persist snapshot and release all immutable segments for this partition.
+              if (_partitionGroupId == SegmentUtils.getRealtimeSegmentPartitionId(segmentDataManager.getSegmentName(),
+                  _tableNameWithType, _helixManager, null)
+                  && segmentDataManager.getSegment() instanceof ImmutableSegmentImpl) {
+                if (segmentDataManager.getSegment().getValidDocIds() != null) {
+                  MutableRoaringBitmap validDocIds =
+                      segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
+                  ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+                }
+              }
               _realtimeTableDataManager.releaseSegment(segmentDataManager);
             }
           }
