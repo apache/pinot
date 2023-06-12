@@ -683,13 +683,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 // release the current consuming segment
                 _realtimeTableDataManager.releaseSegment(segmentDataManager);
               } else if (!segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
+                // release the immutable segments
                 _realtimeTableDataManager.releaseSegment(segmentDataManager);
               } else {
                 mutableSegmentsForPartition.add(segmentDataManager);
               }
             }
-            do {
-              // wait if all segments (except the new consuming segment) for this partition not sealed completely.
+            // wait if all segments (except the new consuming segment) for this partition not sealed completely.
+            while (mutableSegmentsForPartition.size() > 0) {
               Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
               for (SegmentDataManager segmentDataManager : mutableSegmentsForPartition) {
                 if (!segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
@@ -697,10 +698,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   mutableSegmentsForPartition.remove(segmentDataManager);
                 }
               }
-            } while (mutableSegmentsForPartition.size() > 0);
-          } finally {
+            }
+            // Persist snapshot and release all immutable segments for this partition.
             for (SegmentDataManager segmentDataManager : allSegments) {
-              // Persist snapshot and release all immutable segments for this partition.
               if (_partitionGroupId == SegmentUtils.getRealtimeSegmentPartitionId(segmentDataManager.getSegmentName(),
                   _tableNameWithType, _helixManager, null)
                   && segmentDataManager.getSegment() instanceof ImmutableSegmentImpl) {
@@ -710,6 +710,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
                 }
               }
+            }
+          } finally {
+            for (SegmentDataManager segmentDataManager : allSegments) {
               _realtimeTableDataManager.releaseSegment(segmentDataManager);
             }
           }
