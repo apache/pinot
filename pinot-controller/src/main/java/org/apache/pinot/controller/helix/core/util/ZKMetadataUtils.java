@@ -87,17 +87,16 @@ public class ZKMetadataUtils {
     if (segmentMetadata.getTimeInterval() != null) {
       segmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
       segmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
-      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
-      ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
-      if (isValidTimeMetadata(timeColumnMetadata)) {
-        segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
-        segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
-      }
     } else {
       segmentZKMetadata.setStartTime(-1);
       segmentZKMetadata.setEndTime(-1);
-      segmentZKMetadata.setTimeUnit(null);
     }
+
+    if (segmentMetadata.getTimeColumn() != null) {
+      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+      setRawTimeInterval(segmentZKMetadata, segmentMetadata);
+    }
+
     segmentZKMetadata.setIndexVersion(
         segmentMetadata.getVersion() != null ? segmentMetadata.getVersion().name() : null);
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
@@ -150,6 +149,14 @@ public class ZKMetadataUtils {
       if (segmentMetadata.getEndOffset() != null) {
         segmentZKMetadata.setEndOffset(segmentMetadata.getEndOffset());
       }
+    }
+  }
+
+  private static void setRawTimeInterval(SegmentZKMetadata segmentZKMetadata, SegmentMetadata segmentMetadata) {
+    ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
+    if (isValidTimeMetadata(timeColumnMetadata)) {
+      segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
+      segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
     }
   }
 

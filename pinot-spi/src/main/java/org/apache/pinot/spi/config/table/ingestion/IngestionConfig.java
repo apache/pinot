@@ -54,7 +54,8 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to validate time value for each record during ingestion")
   private boolean _rowTimeValueCheck;
 
-  @JsonPropertyDescription("Configs related to check time value for segment")
+  @JsonPropertyDescription("Configs related to check time value for segment. "
+      + "This flag should not be set to false in production environments and is only meant to be used for POC data")
   private boolean _segmentTimeValueCheck = true;
 
   @Deprecated
