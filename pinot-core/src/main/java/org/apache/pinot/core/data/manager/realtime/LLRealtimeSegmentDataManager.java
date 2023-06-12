@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -45,6 +46,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -58,7 +60,6 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -237,6 +238,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
   private final BooleanSupplier _isReadyToConsumeData;
+  private final HelixManager _helixManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
@@ -666,42 +668,56 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
           } while (!_shouldStop && !endCriteriaReached() && !_isReadyToConsumeData.getAsBoolean());
         }
-
+        // Persist snapshot for sealed segments. We need to guarantee the previous segment is already replaced with
+        // the immutable segment, otherwise the snapshot might not be persisted for the previous consuming segment.
         if (_tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig().isEnableSnapshot()) {
-          // Persist snapshot for sealed segments. We need to guarantee the previous segment is already replaced with
-          // the immutable segment, so the snapshot might not be persisted for the previous consuming segment.
+          List<SegmentDataManager> mutableSegmentsForPartition = new ArrayList<>();
           List<SegmentDataManager> allSegments = _realtimeTableDataManager.acquireAllSegments();
-          List<SegmentDataManager> allSegmentsForPartition = new ArrayList<>();
-          for (SegmentDataManager segmentDataManager: allSegments) {
-            // release segments not this partition
-            if (_partitionGroupId == new LLCSegmentName(segmentDataManager.getSegmentName()).getPartitionGroupId()) {
-              allSegmentsForPartition.add(segmentDataManager);
-            } else {
-              _realtimeTableDataManager.releaseSegment(segmentDataManager);
-            }
-          }
-          // wait if all segments (except the new consuming segment) for this partition not sealed completely.
-          // The only consuming segment should be the new consuming segment, all the other segments should be persisted.
-          if (allSegmentsForPartition.stream()
-              .filter(segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment())
-              .count() > 1) {
-            do {
-              //noinspection BusyWait
-              Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-            } while (allSegmentsForPartition.stream()
-                .filter(segmentDataManager -> segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment())
-                .count() > 1);
-          }
-          // Persist snapshot and release all immutable segments for this partition.
-          for (SegmentDataManager segmentDataManager: allSegmentsForPartition) {
-            if (segmentDataManager.getSegment() instanceof ImmutableSegment) {
-              if (segmentDataManager.getSegment().getValidDocIds() != null) {
-                MutableRoaringBitmap validDocIds =
-                    segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
-                ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+          try {
+            for (SegmentDataManager segmentDataManager : allSegments) {
+              if (_partitionGroupId != SegmentUtils.getRealtimeSegmentPartitionId(segmentDataManager.getSegmentName(),
+                  _tableNameWithType, _helixManager, null)) {
+                // release segments not this partition
+                _realtimeTableDataManager.releaseSegment(segmentDataManager);
+              } else if (_segmentNameStr == segmentDataManager.getSegmentName()) {
+                // release the current consuming segment
+                _realtimeTableDataManager.releaseSegment(segmentDataManager);
+              } else if (!segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
+                // Persist snapshot and release all immutable segments for this partition.
+                if (segmentDataManager.getSegment() instanceof ImmutableSegmentImpl) {
+                  if (segmentDataManager.getSegment().getValidDocIds() != null) {
+                    MutableRoaringBitmap validDocIds =
+                        segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
+                    ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+                  }
+                }
+                _realtimeTableDataManager.releaseSegment(segmentDataManager);
+              } else {
+                mutableSegmentsForPartition.add(segmentDataManager);
               }
             }
-            _realtimeTableDataManager.releaseSegment(segmentDataManager);
+            do {
+              // wait if all segments (except the new consuming segment) for this partition not sealed completely.
+              Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+              for (SegmentDataManager segmentDataManager : mutableSegmentsForPartition) {
+                if (!segmentDataManager.getSegment().getSegmentMetadata().isMutableSegment()) {
+                  // Persist snapshot and release all immutable segments for this partition.
+                  if (segmentDataManager.getSegment() instanceof ImmutableSegmentImpl) {
+                    if (segmentDataManager.getSegment().getValidDocIds() != null) {
+                      MutableRoaringBitmap validDocIds =
+                          segmentDataManager.getSegment().getValidDocIds().getMutableRoaringBitmap();
+                      ((ImmutableSegmentImpl) segmentDataManager.getSegment()).persistValidDocIdsSnapshot(validDocIds);
+                    }
+                  }
+                  _realtimeTableDataManager.releaseSegment(segmentDataManager);
+                  mutableSegmentsForPartition.remove(segmentDataManager);
+                }
+              }
+            } while (mutableSegmentsForPartition.size() > 0);
+          } finally {
+            for (SegmentDataManager segmentDataManager : allSegments) {
+              _realtimeTableDataManager.releaseSegment(segmentDataManager);
+            }
           }
         }
         while (!_state.isFinal()) {
@@ -1283,15 +1299,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _state = State.CONSUMING_TO_ONLINE;
     _shouldStop = false;
     try {
-      if (!_isReadyToConsumeData.getAsBoolean()) {
-        // Adding the READY_TO_CONSUME_DATA_CHECK since it's possible that we are in "INITIAL_CONSUMING" state, but
-        // startConsumerThread() haven't been called and partitionConsumer haven't been initialized.
-        // In that case, this function will be called before the READY_TO_CONSUME_DATA_CHECK in partitionConsumer.
-        do {
-          //noinspection BusyWait
-          Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-        } while (!_shouldStop && !endCriteriaReached() && !_isReadyToConsumeData.getAsBoolean());
-      }
       consumeLoop();
     } catch (Exception e) {
       // We will end up downloading the segment, so this is not a serious problem
@@ -1350,7 +1357,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
       ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isReadyToConsumeData) {
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isReadyToConsumeData,
+      HelixManager helixManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1361,6 +1369,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _schema = schema;
     _serverMetrics = serverMetrics;
     _isReadyToConsumeData = isReadyToConsumeData;
+    _helixManager = helixManager;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
