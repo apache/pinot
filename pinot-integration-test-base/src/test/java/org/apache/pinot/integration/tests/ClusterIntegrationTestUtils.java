@@ -344,23 +344,14 @@ public class ClusterIntegrationTestUtils {
   /**
    * Push the records from the given Avro files into a Kafka stream.
    *
-   * @param csvRecords List of CSV record strings
-   * @param kafkaBroker Kafka broker config
+   * @param csvFile CSV File name
    * @param kafkaTopic Kafka topic
    * @param partitionColumnIndex Optional Index of the partition column
    * @throws Exception
    */
-  public static void pushCsvIntoKafka(File csvFile, String kafkaBroker, String kafkaTopic,
-      @Nullable Integer partitionColumnIndex, boolean injectTombstones)
+  public static void pushCsvIntoKafka(File csvFile, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
       throws Exception {
-    Properties properties = new Properties();
-    properties.put("metadata.broker.list", kafkaBroker);
-    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
-    properties.put("request.required.acks", "1");
-    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
-
-    StreamDataProducer producer =
-        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
     if (injectTombstones) {
       // publish lots of tombstones to livelock the consumer if it can't handle this properly

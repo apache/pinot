@@ -37,7 +37,16 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
 
+/**
+ * Input data - Scores of players
+ * Schema
+ *  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
+ *  - Metric fields: score:float
+ *  - DataTime fields: timestampInEpoch:long
+ */
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final String INPUT_DATA_TAR_FILE = "gameScores_csv.tar.gz";
+  private static final String TABLE_NAME = "gameScores";
   private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "playerId";
   private static final String DELETED_COL = "deleted";
@@ -56,7 +65,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // Start Kafka and push data into Kafka
     startKafka();
 
-    List<File> unpackDataFiles = unpackTarData("gameScores.tar.gz", _tempDir);
+    List<File> unpackDataFiles = unpackTarData(INPUT_DATA_TAR_FILE, _tempDir);
     pushCsvIntoKafka(unpackDataFiles.get(0), getKafkaTopic(), 0);  // TODO: Fix
 
     // Create and upload schema and table config
@@ -122,7 +131,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected String getTableName() {
-    return "gameScores";
+    return TABLE_NAME;
   }
 
   @Override
@@ -145,7 +154,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return queryCountStarWithoutUpsert("gameScores") == getCountStarResultWithoutUpsert();
+        return queryCountStarWithoutUpsert(getTableName()) == getCountStarResultWithoutUpsert();
       } catch (Exception e) {
         return null;
       }
@@ -154,10 +163,11 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testDeleteWithUpsert()
+  public void testDeleteWithFullUpsert()
       throws Exception {
-    String kafkaTopicName = getKafkaTopic() + "-with-deletes";
-    String tableName = "gameScoresWithDelete";
+    final String inputDataTarFile = "gameScoresWithDeleteRecords_csv.tar.gz";
+    final String kafkaTopicName = getKafkaTopic() + "-with-deletes";
+    final String tableName = "gameScoresWithDelete";
 
     // Create table with delete Record column
     TableConfig tableConfig = createCSVUpsertTableConfig(tableName,
@@ -165,21 +175,22 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     addTableConfig(tableConfig);
 
     // Push initial 10 upsert records - 3 pks 100, 101 and 102
-    List<File> dataFiles = unpackTarData("gameScores.tar.gz", _tempDir);
+    List<File> dataFiles = unpackTarData(INPUT_DATA_TAR_FILE, _tempDir);
     pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
 
+    // TEST 1: Delete existing primary key
     // Push 2 records with deleted = true - deletes pks 100 and 102
-    dataFiles = unpackTarData("gameScores_with_deleteRecords.tar.gz", _tempDir);
+    dataFiles = unpackTarData(inputDataTarFile, _tempDir);
     pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
 
     // Wait for all docs (12 with skipUpsert=true) to be loaded
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return queryCountStarWithoutUpsert("gameScoresWithDelete") == 12;
+        return queryCountStarWithoutUpsert(tableName) == 12;
       } catch (Exception e) {
         return null;
       }
-    }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithUpsert");
+    }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithFullUpsert");
 
     // Query for number of records in the table - should only return 1
     ResultSet rs = getPinotConnection().execute("SELECT * FROM " + tableName).getResultSet(0);
@@ -207,5 +218,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       String playerId = rs.getString(i, 0);
       Assert.assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
     }
+
+    // TEST 2: Revive a previously deleted primary key
+    // Revive pk - 100 by adding a record with a newer timestamp
+
   }
 }
