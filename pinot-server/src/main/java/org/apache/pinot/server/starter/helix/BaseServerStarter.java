@@ -643,8 +643,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverQueriesDisabledTracker.stop();
     _realtimeLuceneIndexRefreshState.stop();
     try {
-      // Close PinotFS after all data managers are shutdown. Otherwise, committing segments might not be able to
-      // upload segments to the deep-store.
+      // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
+      // be uploaded to the deep-store.
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();
     } catch (IOException e) {
