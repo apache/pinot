@@ -211,12 +211,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   public boolean execute(String sql)
       throws SQLException {
     _resultSet = executeQuery(sql);
-    if (_resultSet.next()) {
-      _resultSet.beforeFirst();
-      return true;
-    } else {
-      return false;
-    }
+    return _resultSet != null;
   }
 
   @Override
