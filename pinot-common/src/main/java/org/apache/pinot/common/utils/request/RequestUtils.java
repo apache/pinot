@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -266,10 +267,20 @@ public class RequestUtils {
   }
 
   public static String getTableName(PinotQuery pinotQuery) {
-    while (pinotQuery.getDataSource().getSubquery() != null) {
-      pinotQuery = pinotQuery.getDataSource().getSubquery();
+    return getTableName(pinotQuery.getDataSource());
+  }
+
+  public static String getTableName(DataSource dataSource) {
+    if (dataSource.getSubquery() != null) {
+      return getTableName(dataSource.getSubquery());
     }
-    return pinotQuery.getDataSource().getTableName();
+    if (dataSource.getTableName() != null) {
+      return dataSource.getTableName();
+    }
+    if (dataSource.getJoin() != null) {
+      return getTableName(dataSource.getJoin().getLeft());
+    }
+    throw new IllegalArgumentException("Failed to find table name");
   }
 
   public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {

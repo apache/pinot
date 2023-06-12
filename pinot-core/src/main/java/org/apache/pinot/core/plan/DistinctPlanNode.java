@@ -56,6 +56,13 @@ public class DistinctPlanNode implements PlanNode {
     DistinctAggregationFunction distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
     List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
 
+    // DO NOT use optimized operator for JOIN queries because column might be from the right table
+    if (_queryContext.hasJoin()) {
+      BaseProjectOperator<?> projectOperator =
+          new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+      return new DistinctOperator(_indexSegment, distinctAggregationFunction, projectOperator, _queryContext);
+    }
+
     // Use dictionary to solve the query if possible
     if (_queryContext.getFilter() == null && !_queryContext.isNullHandlingEnabled() && expressions.size() == 1) {
       ExpressionContext expression = expressions.get(0);

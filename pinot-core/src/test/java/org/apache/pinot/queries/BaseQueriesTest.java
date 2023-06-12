@@ -66,6 +66,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 /**
  * Base class for queries tests.
  */
+@SuppressWarnings("unchecked")
 public abstract class BaseQueriesTest {
   protected static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   protected static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
@@ -86,11 +87,14 @@ public abstract class BaseQueriesTest {
    * Run query on single index segment.
    * <p>Use this to test a single operator.
    */
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  protected <T extends Operator> T getOperator(String query) {
+  protected <T extends Operator<?>> T getOperator(String query) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);
+    return getOperator(queryContext);
+  }
+
+  protected <T extends Operator<?>> T getOperator(QueryContext queryContext) {
     return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
   }
 
@@ -98,8 +102,7 @@ public abstract class BaseQueriesTest {
    * Run query with hard-coded filter on single index segment.
    * <p>Use this to test a single operator.
    */
-  @SuppressWarnings("rawtypes")
-  protected <T extends Operator> T getOperatorWithFilter(String query) {
+  protected <T extends Operator<?>> T getOperatorWithFilter(String query) {
     return getOperator(query + getFilter());
   }
 

@@ -70,8 +70,7 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryContext {
-  private final String _tableName;
-  private final QueryContext _subquery;
+  private final DataSourceContext _dataSource;
   private final List<ExpressionContext> _selectExpressions;
   private final List<String> _aliasList;
   private final FilterContext _filter;
@@ -123,14 +122,12 @@ public class QueryContext {
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
 
-  private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
-      List<ExpressionContext> selectExpressions, List<String> aliasList, @Nullable FilterContext filter,
-      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
-      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
-      Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
-      boolean explain) {
-    _tableName = tableName;
-    _subquery = subquery;
+  private QueryContext(DataSourceContext dataSource, List<ExpressionContext> selectExpressions, List<String> aliasList,
+      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
+      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
+      int offset, Map<String, String> queryOptions,
+      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, boolean explain) {
+    _dataSource = dataSource;
     _selectExpressions = selectExpressions;
     _aliasList = Collections.unmodifiableList(aliasList);
     _filter = filter;
@@ -144,12 +141,22 @@ public class QueryContext {
     _explain = explain;
   }
 
+  public DataSourceContext getDataSource() {
+    return _dataSource;
+  }
+
   /**
    * Returns the table name.
-   * NOTE: on the broker side, table name might be {@code null} when subquery is available.
    */
   public String getTableName() {
-    return _tableName;
+    if (_dataSource.getSubquery() != null) {
+      return _dataSource.getSubquery().getTableName();
+    }
+    if (_dataSource.getTableName() != null) {
+      return _dataSource.getTableName();
+    }
+    assert _dataSource.getJoin() != null;
+    return _dataSource.getJoin().getLeftTableName();
   }
 
   /**
@@ -157,7 +164,11 @@ public class QueryContext {
    */
   @Nullable
   public QueryContext getSubquery() {
-    return _subquery;
+    return _dataSource.getSubquery();
+  }
+
+  public boolean hasJoin() {
+    return _dataSource.getJoin() != null;
   }
 
   /**
@@ -407,21 +418,28 @@ public class QueryContext {
     return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
   }
 
+  public <K, V> V putSharedValue(Class<V> type, K key, V value) {
+    return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).put(key, value);
+  }
+
+  public <K, V> V getSharedValue(Class<V> type, K key) {
+    return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).get(key);
+  }
+
   /**
    * NOTE: For debugging only.
    */
   @Override
   public String toString() {
-    return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _subquery=" + _subquery + ", _selectExpressions="
-        + _selectExpressions + ", _aliasList=" + _aliasList + ", _filter=" + _filter + ", _groupByExpressions="
-        + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions
-        + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions
-        + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
+    return "QueryContext{" + "_dataSource=" + _dataSource + ", _selectExpressions=" + _selectExpressions
+        + ", _aliasList=" + _aliasList + ", _filter=" + _filter + ", _groupByExpressions=" + _groupByExpressions
+        + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions + ", _limit=" + _limit
+        + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions + ", _expressionOverrideHints="
+        + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
   public static class Builder {
-    private String _tableName;
-    private QueryContext _subquery;
+    private DataSourceContext _dataSource;
     private List<ExpressionContext> _selectExpressions;
     private List<String> _aliasList;
     private FilterContext _filter;
@@ -431,17 +449,11 @@ public class QueryContext {
     private int _limit;
     private int _offset;
     private Map<String, String> _queryOptions;
-    private Map<String, String> _debugOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private boolean _explain;
 
-    public Builder setTableName(String tableName) {
-      _tableName = tableName;
-      return this;
-    }
-
-    public Builder setSubquery(QueryContext subquery) {
-      _subquery = subquery;
+    public Builder setDataSource(DataSourceContext dataSource) {
+      _dataSource = dataSource;
       return this;
     }
 
@@ -507,8 +519,8 @@ public class QueryContext {
         _queryOptions = Collections.emptyMap();
       }
       QueryContext queryContext =
-          new QueryContext(_tableName, _subquery, _selectExpressions, _aliasList, _filter, _groupByExpressions,
-              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
+          new QueryContext(_dataSource, _selectExpressions, _aliasList, _filter, _groupByExpressions, _havingFilter,
+              _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
 
@@ -544,6 +556,10 @@ public class QueryContext {
         filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
         filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
       }
+
+      // TODO: Support JOIN with filtered aggregations (remove table prefix from filter columns)
+      Preconditions.checkState(!queryContext._hasFilteredAggregations || !queryContext.hasJoin(),
+          "Filtered aggregations are not supported on JOIN queries");
 
       // Add aggregation functions in the HAVING and ORDER-BY clause but not in the SELECT clause
       filteredAggregations.clear();
@@ -640,9 +656,6 @@ public class QueryContext {
       for (ExpressionContext expression : query._selectExpressions) {
         expression.getColumns(columns);
       }
-      if (query._filter != null) {
-        query._filter.getColumns(columns);
-      }
       if (query._groupByExpressions != null) {
         for (ExpressionContext expression : query._groupByExpressions) {
           expression.getColumns(columns);
@@ -667,6 +680,26 @@ public class QueryContext {
             expression.getColumns(columns);
           }
         }
+      }
+
+      // For JOIN queries, keep only the columns from the left table, and remove the table name prefix
+      JoinContext join = query.getDataSource().getJoin();
+      if (join != null) {
+        Set<String> leftTableColumns = new HashSet<>();
+        String columnPrefix = join.getRawLeftTableName() + ".";
+        int prefixLength = columnPrefix.length();
+        for (String column : columns) {
+          if (column.startsWith(columnPrefix)) {
+            leftTableColumns.add(column.substring(prefixLength));
+          }
+        }
+        join.getLeftJoinKey().getColumns(leftTableColumns);
+        columns = leftTableColumns;
+      }
+
+      // Add columns from the filter in the end because table name prefix is already removed
+      if (query._filter != null) {
+        query._filter.getColumns(columns);
       }
 
       query._columns = columns;

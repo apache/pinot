@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.request.context.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,11 +31,16 @@ import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Join;
+import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.query.request.context.DataSourceContext;
+import org.apache.pinot.core.query.request.context.JoinContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -55,13 +61,7 @@ public class QueryContextConverterUtils {
    */
   public static QueryContext getQueryContext(PinotQuery pinotQuery) {
     // FROM
-    String tableName;
-    DataSource dataSource = pinotQuery.getDataSource();
-    tableName = dataSource.getTableName();
-    QueryContext subquery = null;
-    if (dataSource.getSubquery() != null) {
-      subquery = getQueryContext(dataSource.getSubquery());
-    }
+    DataSourceContext dataSource = getDataSourceContext(pinotQuery.getDataSource());
 
     // SELECT
     List<ExpressionContext> selectExpressions;
@@ -108,7 +108,9 @@ public class QueryContextConverterUtils {
     FilterContext filter = null;
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      filter = RequestContextUtils.getFilter(filterExpression);
+      JoinContext join = dataSource.getJoin();
+      String columnPrefix = join != null ? join.getRawLeftTableName() + "." : null;
+      filter = RequestContextUtils.getFilter(filterExpression, columnPrefix);
     }
 
     // GROUP BY
@@ -160,12 +162,92 @@ public class QueryContextConverterUtils {
       }
     }
 
-    return new QueryContext.Builder().setTableName(tableName).setSubquery(subquery)
-        .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
-        .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
-        .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
-        .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
-        .setExplain(pinotQuery.isExplain()).build();
+    return new QueryContext.Builder().setDataSource(dataSource).setSelectExpressions(selectExpressions)
+        .setAliasList(aliasList).setFilter(filter).setGroupByExpressions(groupByExpressions)
+        .setOrderByExpressions(orderByExpressions).setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit())
+        .setOffset(pinotQuery.getOffset()).setQueryOptions(pinotQuery.getQueryOptions())
+        .setExpressionOverrideHints(expressionContextOverrideHints).setExplain(pinotQuery.isExplain()).build();
+  }
+
+  private static DataSourceContext getDataSourceContext(DataSource dataSource) {
+    String tableName = dataSource.getTableName();
+    QueryContext subquery = null;
+    if (dataSource.getSubquery() != null) {
+      subquery = getQueryContext(dataSource.getSubquery());
+    }
+    JoinContext joinContext = null;
+    if (dataSource.getJoin() != null) {
+      Join join = dataSource.getJoin();
+      Preconditions.checkArgument(join.getType() == JoinType.INNER, "Only INNER JOIN is supported");
+
+      DataSourceContext leftDataSource = getDataSourceContext(join.getLeft());
+      Preconditions.checkArgument(isSimpleTable(leftDataSource), "Left side of JOIN must be a table, got: %s",
+          leftDataSource);
+      String leftTableName = leftDataSource.getTableName();
+      String leftTableColumnPrefix = leftTableName + ".";
+
+      DataSourceContext rightDataSource = getDataSourceContext(join.getRight());
+      Preconditions.checkArgument(isSimpleTable(rightDataSource), "Right side of JOIN must be a table, got: %s",
+          rightDataSource);
+      String rightTableName = rightDataSource.getTableName();
+      String rightTableColumnPrefix = rightTableName + ".";
+
+      Expression condition = join.getCondition();
+      Preconditions.checkArgument(condition != null, "JOIN condition must be specified");
+      Function function = condition.getFunctionCall();
+      Preconditions.checkArgument(function != null && function.getOperator().equals("EQUALS"),
+          "Only EQ JOIN condition is supported, got: %s", condition);
+      List<Expression> operands = function.getOperands();
+      ExpressionContext firstJoinKey = RequestContextUtils.getExpression(operands.get(0));
+      ExpressionContext secondJoinKey = RequestContextUtils.getExpression(operands.get(1));
+      ExpressionContext leftJoinKey;
+      String rightJoinKey;
+      if (isRightTableColumn(secondJoinKey, rightTableColumnPrefix)) {
+        leftJoinKey = getLeftJoinKey(firstJoinKey, leftTableColumnPrefix);
+        rightJoinKey = getRightJoinKey(secondJoinKey, rightTableColumnPrefix);
+      } else {
+        Preconditions.checkArgument(isRightTableColumn(firstJoinKey, rightTableColumnPrefix),
+            "Failed to find JOIN key for right table");
+        leftJoinKey = getLeftJoinKey(secondJoinKey, leftTableColumnPrefix);
+        rightJoinKey = getRightJoinKey(firstJoinKey, rightTableColumnPrefix);
+      }
+      joinContext = new JoinContext(leftTableName, rightTableName, leftJoinKey, rightJoinKey);
+    }
+    return new DataSourceContext(tableName, subquery, joinContext);
+  }
+
+  private static boolean isSimpleTable(DataSourceContext dataSource) {
+    return dataSource.getTableName() != null && dataSource.getSubquery() == null && dataSource.getJoin() == null;
+  }
+
+  private static boolean isRightTableColumn(ExpressionContext expression, String rightTableColumnPrefix) {
+    return expression.getIdentifier() != null && expression.getIdentifier().startsWith(rightTableColumnPrefix);
+  }
+
+  private static ExpressionContext getLeftJoinKey(ExpressionContext expression, String leftTableColumnPrefix) {
+    switch (expression.getType()) {
+      case LITERAL:
+        return expression;
+      case IDENTIFIER:
+        String identifier = expression.getIdentifier();
+        if (identifier.equals("*")) {
+          return expression;
+        } else {
+          Preconditions.checkArgument(identifier.startsWith(leftTableColumnPrefix),
+              "Column: %s does not have left table prefix: %s", identifier, leftTableColumnPrefix);
+          return ExpressionContext.forIdentifier(identifier.substring(leftTableColumnPrefix.length()));
+        }
+      case FUNCTION:
+        FunctionContext function = expression.getFunction();
+        function.getArguments().replaceAll(argument -> getLeftJoinKey(argument, leftTableColumnPrefix));
+        return expression;
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  private static String getRightJoinKey(ExpressionContext expressionContext, String rightTableColumnPrefix) {
+    return expressionContext.getIdentifier().substring(rightTableColumnPrefix.length());
   }
 
   private static boolean isAsc(Expression expression) {

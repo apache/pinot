@@ -97,6 +97,15 @@ public class AggregationPlanNode implements PlanNode {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
 
+    // DO NOT use optimized operator for JOIN queries because column might be from the right table
+    if (_queryContext.hasJoin()) {
+      Set<ExpressionContext> expressionsToTransform =
+          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+      BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform,
+          DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+      return new AggregationOperator(aggregationFunctions, projectOperator, numTotalDocs, false);
+    }
+
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 

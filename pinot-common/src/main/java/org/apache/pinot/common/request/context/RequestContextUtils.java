@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.common.request.context;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -65,22 +67,29 @@ public class RequestContextUtils {
    * Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
    */
   public static ExpressionContext getExpression(Expression thriftExpression) {
+    return getExpression(thriftExpression, null);
+  }
+
+  private static ExpressionContext getExpression(Expression thriftExpression, @Nullable String columnPrefix) {
     switch (thriftExpression.getType()) {
       case LITERAL:
         return ExpressionContext.forLiteralContext(thriftExpression.getLiteral());
       case IDENTIFIER:
-        return ExpressionContext.forIdentifier(thriftExpression.getIdentifier().getName());
+        String columnName = thriftExpression.getIdentifier().getName();
+        if (columnPrefix != null) {
+          Preconditions.checkArgument(columnName.startsWith(columnPrefix), "Illegal column name: %s without prefix: %s",
+              columnName, columnPrefix);
+          columnName = columnName.substring(columnPrefix.length());
+        }
+        return ExpressionContext.forIdentifier(columnName);
       case FUNCTION:
-        return ExpressionContext.forFunction(getFunction(thriftExpression.getFunctionCall()));
+        return ExpressionContext.forFunction(getFunction(thriftExpression.getFunctionCall(), columnPrefix));
       default:
         throw new IllegalStateException();
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Function} into a {@link FunctionContext}.
-   */
-  public static FunctionContext getFunction(Function thriftFunction) {
+  private static FunctionContext getFunction(Function thriftFunction, @Nullable String columnPrefix) {
     String functionName = thriftFunction.getOperator();
     FunctionContext.Type functionType =
         AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
@@ -89,7 +98,7 @@ public class RequestContextUtils {
     if (operands != null) {
       List<ExpressionContext> arguments = new ArrayList<>(operands.size());
       for (Expression operand : operands) {
-        arguments.add(getExpression(operand));
+        arguments.add(getExpression(operand, columnPrefix));
       }
       // TODO(walterddr): a work-around for multi-stage query engine which might pass COUNT without argument, and
       //  should be removed once that issue is fixed.
@@ -109,15 +118,24 @@ public class RequestContextUtils {
    *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(Expression thriftExpression) {
+    return getFilter(thriftExpression, null);
+  }
+
+  /**
+   * Same as {@link #getFilter(Expression)}.
+   * When {@code columnPrefix} is provided, check if column (identifier) has the prefix, and remove the prefix from it.
+   */
+  public static FilterContext getFilter(Expression thriftExpression, @Nullable String columnPrefix) {
     ExpressionType type = thriftExpression.getType();
     switch (type) {
       case FUNCTION:
         Function thriftFunction = thriftExpression.getFunctionCall();
-        return getFilter(thriftFunction);
+        return getFilter(thriftFunction, columnPrefix);
       case IDENTIFIER:
         // Convert "WHERE a" to "WHERE a = true"
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
+            new EqPredicate(getExpression(thriftExpression, columnPrefix),
+                getStringValue(RequestUtils.getLiteralExpression(true))));
       case LITERAL:
         // TODO: Handle literals.
         throw new IllegalStateException();
@@ -126,13 +144,13 @@ public class RequestContextUtils {
     }
   }
 
-  public static FilterContext getFilter(Function thriftFunction) {
+  private static FilterContext getFilter(Function thriftFunction, @Nullable String columnPrefix) {
     String functionOperator = thriftFunction.getOperator();
 
     // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
     if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
       return new FilterContext(FilterContext.Type.PREDICATE, null,
-          new EqPredicate(ExpressionContext.forFunction(getFunction(thriftFunction)),
+          new EqPredicate(ExpressionContext.forFunction(getFunction(thriftFunction, columnPrefix)),
               getStringValue(RequestUtils.getLiteralExpression(true))));
     }
 
@@ -143,84 +161,84 @@ public class RequestContextUtils {
       case AND:
         List<FilterContext> children = new ArrayList<>(numOperands);
         for (Expression operand : operands) {
-          children.add(getFilter(operand));
+          children.add(getFilter(operand, columnPrefix));
         }
         return new FilterContext(FilterContext.Type.AND, children, null);
       case OR:
         children = new ArrayList<>(numOperands);
         for (Expression operand : operands) {
-          children.add(getFilter(operand));
+          children.add(getFilter(operand, columnPrefix));
         }
         return new FilterContext(FilterContext.Type.OR, children, null);
       case NOT:
         assert numOperands == 1;
         return new FilterContext(FilterContext.Type.NOT,
-            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0), columnPrefix))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new EqPredicate(getExpression(operands.get(0), columnPrefix), getStringValue(operands.get(1))));
       case NOT_EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotEqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new NotEqPredicate(getExpression(operands.get(0), columnPrefix), getStringValue(operands.get(1))));
       case IN:
         List<String> values = new ArrayList<>(numOperands - 1);
         for (int i = 1; i < numOperands; i++) {
           values.add(getStringValue(operands.get(i)));
         }
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new InPredicate(getExpression(operands.get(0)), values));
+            new InPredicate(getExpression(operands.get(0), columnPrefix), values));
       case NOT_IN:
         values = new ArrayList<>(numOperands - 1);
         for (int i = 1; i < numOperands; i++) {
           values.add(getStringValue(operands.get(i)));
         }
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotInPredicate(getExpression(operands.get(0)), values));
+            new NotInPredicate(getExpression(operands.get(0), columnPrefix), values));
       case GREATER_THAN:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), false, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+            new RangePredicate(getExpression(operands.get(0), columnPrefix), false, getStringValue(operands.get(1)),
+                false, RangePredicate.UNBOUNDED));
       case GREATER_THAN_OR_EQUAL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+            new RangePredicate(getExpression(operands.get(0), columnPrefix), true, getStringValue(operands.get(1)),
+                false, RangePredicate.UNBOUNDED));
       case LESS_THAN:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, false,
+            new RangePredicate(getExpression(operands.get(0), columnPrefix), false, RangePredicate.UNBOUNDED, false,
                 getStringValue(operands.get(1))));
       case LESS_THAN_OR_EQUAL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, true,
+            new RangePredicate(getExpression(operands.get(0), columnPrefix), false, RangePredicate.UNBOUNDED, true,
                 getStringValue(operands.get(1))));
       case BETWEEN:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), true,
-                getStringValue(operands.get(2))));
+            new RangePredicate(getExpression(operands.get(0), columnPrefix), true, getStringValue(operands.get(1)),
+                true, getStringValue(operands.get(2))));
       case RANGE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new RangePredicate(getExpression(operands.get(0), columnPrefix), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new RegexpLikePredicate(getExpression(operands.get(0), columnPrefix), getStringValue(operands.get(1))));
       case LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RegexpLikePredicate(getExpression(operands.get(0)),
+            new RegexpLikePredicate(getExpression(operands.get(0), columnPrefix),
                 RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
       case TEXT_CONTAINS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new TextContainsPredicate(getExpression(operands.get(0), columnPrefix), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new TextMatchPredicate(getExpression(operands.get(0), columnPrefix), getStringValue(operands.get(1))));
       case JSON_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new JsonMatchPredicate(getExpression(operands.get(0), columnPrefix), getStringValue(operands.get(1))));
       case IS_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNullPredicate(getExpression(operands.get(0))));
+            new IsNullPredicate(getExpression(operands.get(0), columnPrefix)));
       case IS_NOT_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNotNullPredicate(getExpression(operands.get(0))));
+            new IsNotNullPredicate(getExpression(operands.get(0), columnPrefix)));
       default:
         throw new IllegalStateException();
     }
@@ -356,7 +374,7 @@ public class RequestContextUtils {
   }
 
   private static String getStringValue(ExpressionContext expressionContext) {
-    if(expressionContext.getType() != ExpressionContext.Type.LITERAL){
+    if (expressionContext.getType() != ExpressionContext.Type.LITERAL) {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }

@@ -212,7 +212,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public DataSource getDataSource(String column) {
     DataSource result = _dataSources.get(column);
-    Preconditions.checkNotNull(result,
+    Preconditions.checkState(result != null,
         "DataSource for %s should not be null. Potentially invalid column name specified.", column);
     return result;
   }
