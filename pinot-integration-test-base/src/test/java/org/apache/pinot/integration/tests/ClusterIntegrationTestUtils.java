@@ -378,6 +378,41 @@ public class ClusterIntegrationTestUtils {
   /**
    * Push the records from the given Avro files into a Kafka stream.
    *
+   * @param csvRecords List of CSV record string
+   * @param kafkaTopic Kafka topic
+   * @param partitionColumnIndex Optional Index of the partition column
+   * @throws Exception
+   */
+  public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
+      throws Exception {
+
+    if (injectTombstones) {
+      // publish lots of tombstones to livelock the consumer if it can't handle this properly
+      for (int i = 0; i < 1000; i++) {
+        // publish a tombstone first
+        producer.produce(kafkaTopic, Longs.toByteArray(System.currentTimeMillis()), null);
+      }
+    }
+    CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
+    for (String recordCsv: csvRecords)
+    try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
+      for (CSVRecord csv : parser) {
+        byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(System.currentTimeMillis())
+            : csv.get(partitionColumnIndex).getBytes(StandardCharsets.UTF_8);
+        List<String> cols = new ArrayList<>();
+        for (String col : csv) {
+          cols.add(col);
+        }
+        byte[] bytes = String.join(",", cols).getBytes(StandardCharsets.UTF_8);
+        producer.produce(kafkaTopic, keyBytes, bytes);
+      }
+    }
+  }
+
+  /**
+   * Push the records from the given Avro files into a Kafka stream.
+   *
    * @param avroFiles List of Avro files
    * @param kafkaBroker Kafka broker config
    * @param kafkaTopic Kafka topic

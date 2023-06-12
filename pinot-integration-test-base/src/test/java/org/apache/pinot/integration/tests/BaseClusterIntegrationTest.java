@@ -591,16 +591,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex) {
     String kafkaBroker = "localhost:" + getKafkaPort();
-    Properties properties = new Properties();
-    properties.put("metadata.broker.list", kafkaBroker);
-    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
-    properties.put("request.required.acks", "1");
-    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
-
     StreamDataProducer producer = null;
     try {
       producer =
-        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+            getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -608,6 +603,30 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         producer.close();
       }
     }
+  }
+
+  protected void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic, @Nullable Integer partitionColumnIndex) {
+    String kafkaBroker = "localhost:" + getKafkaPort();
+    StreamDataProducer producer = null;
+    try {
+      producer =
+          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+              getDefaultKafkaProducerProperties(kafkaBroker));
+      ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, kafkaTopic, partitionColumnIndex, injectTombstones(),
+          producer);
+    } catch (Exception e) {
+      if (producer != null) {
+        producer.close();
+      }
+    }
+  }
+  private Properties getDefaultKafkaProducerProperties(String kafkaBroker) {
+    Properties properties = new Properties();
+    properties.put("metadata.broker.list", kafkaBroker);
+    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
+    properties.put("request.required.acks", "1");
+    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
+    return properties;
   }
 
   protected boolean injectTombstones() {

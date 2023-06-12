@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -221,6 +222,23 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
+    List<String> revivedRecord = Collections.singletonList("100,Zook-New,counter-strike,0.0,1684707335000,false");
+    pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
+
+    // Validate: pk is queryable and all columns are overwritten with new value
+    rs = getPinotConnection()
+        .execute("SELECT playerId, name FROM " + tableName +
+            " WHERE playerId = 100").getResultSet(0);
+    Assert.assertEquals(rs.getRowCount(), 1);
+    Assert.assertEquals(rs.getInt(0, 0), 100);
+    Assert.assertEquals(rs.getString(0, 1), "Zook-New");
+
+    // Validate: pk lineage still exists
+    rs = getPinotConnection()
+        .execute("SELECT playerId, name FROM " + tableName +
+            " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
+
+    Assert.assertTrue(rs.getRowCount() > 1);
 
   }
 }
