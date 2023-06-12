@@ -39,5 +39,6 @@ public class HttpClientConfigTest {
     HttpClientConfig defaultConfig = HttpClientConfig.newBuilder(new PinotConfiguration()).build();
     Assert.assertTrue(defaultConfig.getMaxConnTotal() < 0, "default value should be < 0");
     Assert.assertTrue(defaultConfig.getMaxConnPerRoute() < 0, "default value should be < 0");
+    Assert.assertFalse(defaultConfig.isDisableDefaultUserAgent(), "Default user agent should be enabled by default");
   }
 }
