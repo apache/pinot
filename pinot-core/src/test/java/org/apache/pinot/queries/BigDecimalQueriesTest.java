@@ -70,8 +70,12 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   private static BigDecimal _sum;
 
   private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
+  private static final String ID_COLUMN = "idColumn";
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL).build();
+      new Schema.SchemaBuilder()
+              .addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
+              .addSingleValueDimension(ID_COLUMN, DataType.INT)
+              .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -111,6 +115,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       } else {
         record.putValue(BIG_DECIMAL_COLUMN, null);
       }
+      record.putValue(ID_COLUMN, i);
       _records.add(record);
     }
     _sum = sum;
@@ -162,17 +167,51 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     {
+      // Note: defining decimal literals within quotes preserves precision.
+      BigDecimal lowerLimit = BigDecimal.ZERO;
+      for (int id = 0; id < NUM_RECORDS; id++) {
+        String query = String.format(
+                "SELECT * FROM testTable WHERE %s >= '%s' AND %s = %s LIMIT 30",
+                BIG_DECIMAL_COLUMN,
+                lowerLimit,
+                ID_COLUMN,
+                id);
+        BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+        ResultTable resultTable = brokerResponse.getResultTable();
+        DataSchema dataSchema = resultTable.getDataSchema();
+        assertEquals(dataSchema, new DataSchema(
+                new String[]{BIG_DECIMAL_COLUMN, ID_COLUMN},
+                new ColumnDataType[]{ColumnDataType.BIG_DECIMAL, ColumnDataType.INT})
+        );
+        List<Object[]> rows = resultTable.getRows();
+        if (id % 4 == 3) {
+          // Since value is null, comparison returns false
+          assertEquals(rows.size(), 0);
+        } else {
+          assertEquals(rows.size(), 4);
+          BigDecimal value = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(id));
+          for (Object[] row : rows) {
+            assertEquals(row.length, 2);
+            assertEquals(row[0], value);
+            assertEquals(row[1], id);
+          }
+        }
+      }
+    }
+    {
       String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      assertEquals(dataSchema, new DataSchema(
+              new String[]{BIG_DECIMAL_COLUMN, ID_COLUMN},
+              new ColumnDataType[]{ColumnDataType.BIG_DECIMAL, ColumnDataType.INT})
+      );
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
-        assertEquals(row.length, 1);
+        assertEquals(row.length, 2);
         if (row[0] != null) {
           assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
         }
@@ -186,8 +225,10 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      assertEquals(dataSchema, new DataSchema(
+              new String[]{BIG_DECIMAL_COLUMN, ID_COLUMN},
+              new ColumnDataType[]{ColumnDataType.BIG_DECIMAL, ColumnDataType.INT})
+      );
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 4000);
       // We inserted 250 nulls in _records, and since we query 4 identical index segments, the number of null values is:
@@ -200,7 +241,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         }
         for (int j = 0; j < 4; j++) {
           Object[] values = rows.get(i + j);
-          assertEquals(values.length, 1);
+          assertEquals(values.length, 2);
           if (k >= NUM_RECORDS) {
             assertNull(values[0]);
           } else {
