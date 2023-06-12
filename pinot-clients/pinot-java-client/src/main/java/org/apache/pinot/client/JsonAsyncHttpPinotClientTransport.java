@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
@@ -71,7 +72,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
       @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
-      @Nullable String appId) {
+      @Nullable String appId, @Nullable String threadPoolName) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -80,6 +81,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     Builder builder = Dsl.config();
     if (sslContext != null) {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
+    }
+
+    if (threadPoolName != null) {
+      builder.setThreadPoolName(threadPoolName);
+    }
+
+    if (connectionTimeouts.getRequestTimeoutMs() != null) {
+      builder.setRequestTimeout(connectionTimeouts.getRequestTimeoutMs());
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
@@ -92,7 +101,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionStr,
       @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
-      @Nullable String appId) {
+      @Nullable String appId, @Nullable String threadPoolName) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -101,6 +110,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     Builder builder = Dsl.config();
     if (sslContext != null) {
       builder.setSslContext(sslContext);
+    }
+
+    if (threadPoolName != null) {
+      builder.setThreadPoolName(threadPoolName);
+    }
+
+    if (connectionTimeouts.getRequestTimeoutMs() != null) {
+      builder.setRequestTimeout(connectionTimeouts.getRequestTimeoutMs());
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
@@ -114,9 +131,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   @Override
   public BrokerResponse executeQuery(String brokerAddress, String query)
       throws PinotClientException {
+    Future<BrokerResponse> future = null;
     try {
-      return executeQueryAsync(brokerAddress, query).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
+      future = executeQueryAsync(brokerAddress, query);
+      return future.get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      if (e instanceof TimeoutException) {
+        future.cancel(true);
+      }
       throw new PinotClientException(e);
     }
   }

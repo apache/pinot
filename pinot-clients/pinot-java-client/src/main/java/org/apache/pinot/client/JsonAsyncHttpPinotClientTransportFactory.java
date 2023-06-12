@@ -43,16 +43,18 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _connectTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _handshakeTimeoutMs = Integer.parseInt(DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS);
+  private Integer _requestTimeoutMs;
   private String _appId = null;
   private String _extraOptionString;
+  private String _threadPoolName;
 
   @Override
   public PinotClientTransport buildTransport() {
     ConnectionTimeouts connectionTimeouts =
-        ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs, _handshakeTimeoutMs);
+        ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs, _handshakeTimeoutMs, _requestTimeoutMs);
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
     return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _extraOptionString, _sslContext, connectionTimeouts,
-        tlsProtocols, _appId);
+        tlsProtocols, _appId, _threadPoolName);
   }
 
   public Map<String, String> getHeaders() {
@@ -98,9 +100,17 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
     _handshakeTimeoutMs =
         Integer.parseInt(properties.getProperty("brokerHandshakeTimeoutMs", DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS));
     _appId = properties.getProperty("appId");
-    _tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("brokerTlsV10Enabled", DEFAULT_BROKER_TLS_V10_ENABLED))
-        || Boolean.parseBoolean(
-        System.getProperties().getProperty("broker.tlsV10Enabled", DEFAULT_BROKER_TLS_V10_ENABLED));
+    _tlsV10Enabled =
+        Boolean.parseBoolean(properties.getProperty("brokerTlsV10Enabled", DEFAULT_BROKER_TLS_V10_ENABLED)) || Boolean
+            .parseBoolean(System.getProperties().getProperty("broker.tlsV10Enabled", DEFAULT_BROKER_TLS_V10_ENABLED));
+
+    if (properties.containsKey("brokerRequestTimeoutMs")) {
+      _requestTimeoutMs = Integer.parseInt(properties.getProperty("brokerRequestTimeoutMs"));
+    }
+
+    if (properties.containsKey("threadPoolName")) {
+      _threadPoolName = properties.getProperty("threadPoolName");
+    }
 
     _extraOptionString = properties.getProperty("queryOptions", "");
     return this;
