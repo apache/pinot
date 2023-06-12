@@ -141,4 +141,11 @@ public class RegexpPatternConverterUtilsTest {
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
     assertEquals(luceneRegExpPattern, "a\\%b\\\\cde");
   }
+  @Test
+  public void testEscapedWildcard3() {
+    String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("%2\\_2%");
+    assertEquals(regexpLikePattern, "2\\_2");
+    String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
+    assertEquals(luceneRegExpPattern, ".*2\\_2.*");
+  }
 }
