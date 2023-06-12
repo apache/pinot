@@ -125,4 +125,20 @@ public class RegexpPatternConverterUtilsTest {
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("z%");
     assertEquals(regexpLikePattern, "^z");
   }
+
+  @Test
+  public void testEscapedWildcard1() {
+    String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("a\\_b_\\");
+    assertEquals(regexpLikePattern, "^a\\_b.\\\\$");
+    String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
+    assertEquals(luceneRegExpPattern, "a\\_b.\\\\");
+  }
+
+  @Test
+  public void testEscapedWildcard2() {
+    String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("a\\%b\\cde");
+    assertEquals(regexpLikePattern, "^a\\%b\\\\cde$");
+    String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
+    assertEquals(luceneRegExpPattern, "a\\%b\\\\cde");
+  }
 }
