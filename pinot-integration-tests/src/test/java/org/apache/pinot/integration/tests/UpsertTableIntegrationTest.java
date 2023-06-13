@@ -20,13 +20,16 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -49,6 +52,7 @@ import static org.testng.Assert.assertFalse;
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String INPUT_DATA_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
+  private static final String PARTIAL_UPSERT_TABLE_SCHEMA = "partial_upsert_table_test.schema";
   private static final String CSV_DELIMITER = ",";
   private static final String TABLE_NAME = "gameScores";
   private static final int NUM_SERVERS = 2;
@@ -76,13 +80,17 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Schema schema = createSchema();
     addSchema(schema);
 
-    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(getKafkaTopic(), CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig = createCSVUpsertTableConfig("gameScores", PRIMARY_KEY_COL, null,
-        getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties);
+    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    TableConfig tableConfig = createCSVUpsertTableConfig(getTableName(), getSchemaName(), getKafkaTopic(),
+        getNumKafkaPartitions(), csvDecoderProperties, null, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+
+    // Create partial upsert table schema
+    Schema partialUpsertSchema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
+    addSchema(partialUpsertSchema);
   }
 
   @AfterClass
@@ -146,6 +154,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     return 3;
   }
 
+  private Schema createSchema(String schemaFileName)
+      throws IOException {
+    InputStream inputStream =
+        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(schemaFileName);
+    Assert.assertNotNull(inputStream);
+    return Schema.fromInputStream(inputStream);
+  }
   private long queryCountStarWithoutUpsert(String tableName) {
     return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)")
         .getResultSet(0).getLong(0);
@@ -173,11 +188,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     final String kafkaTopicName = getKafkaTopic() + "-with-deletes";
     final String tableName = "gameScoresWithDelete";
+    final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeletedRecordColumn(DELETED_COL);
 
     // Create table with delete Record column
-    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(kafkaTopicName, CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, PRIMARY_KEY_COL, DELETED_COL, kafkaTopicName,
-        getNumKafkaPartitions(), csvDecoderProperties);
+    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, getSchemaName(), kafkaTopicName,
+        getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
     // Push initial 10 upsert records - 3 pks 100, 101 and 102
@@ -228,16 +245,107 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
-    List<String> revivedRecord = Collections.singletonList("100,Zook-New,counter-strike,0.0,1684707335000,false");
+    List<String> revivedRecord = Collections.singletonList("100,Zook-New,,0.0,1684707335000,false");
     pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
 
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection()
-        .execute("SELECT playerId, name FROM " + tableName +
+        .execute("SELECT playerId, name, game FROM " + tableName +
             " WHERE playerId = 100").getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 1);
     Assert.assertEquals(rs.getInt(0, 0), 100);
     Assert.assertEquals(rs.getString(0, 1), "Zook-New");
+    Assert.assertEquals(rs.getString(0, 2), "null");
+
+    // Validate: pk lineage still exists
+    rs = getPinotConnection()
+        .execute("SELECT playerId, name FROM " + tableName +
+            " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
+
+    Assert.assertTrue(rs.getRowCount() > 1);
+  }
+
+  @Test
+  public void testDeleteWithPartialUpsert()
+      throws Exception {
+    final String partialUpsertSchemaName = "playerScoresPartialUpsert";
+    final String inputDataTarFile = "gameScores_partial_upsert_csv.tar.gz";
+    final String kafkaTopicName = getKafkaTopic() + "-partial-upsert-with-deletes";
+    final String tableName = "gameScoresPartialUpsertWithDelete";
+    final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setDeletedRecordColumn(DELETED_COL);
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
+    partialUpsertStrategies.put("game", UpsertConfig.Strategy.UNION);
+    partialUpsertStrategies.put("score", UpsertConfig.Strategy.INCREMENT);
+    partialUpsertStrategies.put(DELETED_COL, UpsertConfig.Strategy.OVERWRITE);
+
+    upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
+
+    // Create table with delete Record column
+    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, partialUpsertSchemaName, kafkaTopicName,
+        getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
+    addTableConfig(tableConfig);
+
+    // Push initial 10 upsert records - 3 pks 100, 101 and 102
+    List<File> dataFiles = unpackTarData(inputDataTarFile, _tempDir);
+    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
+
+    // TEST 1: Delete existing primary key
+    // Push 2 records with deleted = true - deletes pks 100 and 102
+    List<String> deleteRecords = List.of("102,Clifford,counter-strike,102,1681054200000,true",
+        "100,Zook,counter-strike,2050,1681377200000,true");
+    pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
+
+    // Wait for all docs (12 with skipUpsert=true) to be loaded
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return queryCountStarWithoutUpsert(tableName) == 12;
+      } catch (Exception e) {
+        return null;
+      }
+    }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithFullUpsert");
+
+    // Query for number of records in the table - should only return 1
+    ResultSet rs = getPinotConnection().execute("SELECT * FROM " + tableName).getResultSet(0);
+    Assert.assertEquals(rs.getRowCount(), 1);
+
+    // pk 101 - not deleted - only record available
+    int columnCount = rs.getColumnCount();
+    int playerIdColumnIndex = -1;
+    for (int i = 0; i < columnCount; i++) {
+      String columnName = rs.getColumnName(i);
+      if ("playerId".equalsIgnoreCase(columnName)) {
+        playerIdColumnIndex = i;
+        break;
+      }
+    }
+    Assert.assertNotEquals(playerIdColumnIndex, -1);
+    Assert.assertEquals(rs.getString(0, playerIdColumnIndex), "101");
+
+    // Validate deleted records
+    rs = getPinotConnection()
+        .execute("SELECT playerId FROM " + tableName
+            + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
+    Assert.assertEquals(rs.getRowCount(), 2);
+    for (int i = 0; i < rs.getRowCount(); i++) {
+      String playerId = rs.getString(i, 0);
+      Assert.assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
+    }
+
+    // TEST 2: Revive a previously deleted primary key
+    // Revive pk - 100 by adding a record with a newer timestamp
+    List<String> revivedRecord = Collections.singletonList("100,Zook,,0.0,1684707335000,false");
+    pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
+
+    // Validate: pk is queryable and all columns are overwritten with new value
+    rs = getPinotConnection()
+        .execute("SELECT playerId, name, game FROM " + tableName +
+            " WHERE playerId = 100").getResultSet(0);
+    Assert.assertEquals(rs.getRowCount(), 1);
+    Assert.assertEquals(rs.getInt(0, 0), 100);
+    Assert.assertEquals(rs.getString(0, 1), "Zook");
+    Assert.assertEquals(rs.getString(0, 2), "[\"null\"]");
 
     // Validate: pk lineage still exists
     rs = getPinotConnection()

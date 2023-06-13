@@ -1,0 +1,35 @@
+{
+  "schemaName": "playerScoresPartialUpsert",
+  "dimensionFieldSpecs": [
+    {
+      "name": "playerId",
+      "dataType": "INT"
+    },
+    {
+      "name": "name",
+      "dataType": "STRING"
+    },
+    {
+      "name": "game",
+      "dataType": "STRING",
+      "singleValueField": "false"
+    },
+    {
+      "name": "deleted",
+      "dataType": "BOOLEAN"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "score",
+      "dataType": "FLOAT"
+    }
+  ],
+  "dateTimeFieldSpecs": [{
+    "name": "timestampInEpoch",
+    "dataType": "LONG",
+    "format" : "1:MILLISECONDS:EPOCH",
+    "granularity": "1:MILLISECONDS"
+  }],
+  "primaryKeyColumns": [ "playerId" ]
+}

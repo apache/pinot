@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.annotation.Nullable;
+import javax.validation.constraints.Null;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -420,8 +421,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
 
-  protected Map<String, String> getCSVStreamConfigMap(@Nullable String topicName, @Nullable String delimiter,
-      @Nullable String csvHeaderProperty) {
+  protected Map<String, String> getCSVStreamConfigMap(@Nullable String delimiter, @Nullable String csvHeaderProperty) {
     String streamType = "kafka";
     Map<String, String> streamConfigsMap = new HashMap<>();
     streamConfigsMap.put(
@@ -435,41 +435,46 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       streamConfigsMap.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.header"),
           csvHeaderProperty);
     }
-    if (topicName != null) {
-      streamConfigsMap.put(StreamConfigProperties.constructStreamProperty(streamType,
-          StreamConfigProperties.STREAM_TOPIC_NAME), topicName);
-    }
     return streamConfigsMap;
   }
+
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createCSVUpsertTableConfig(String tableName, String primaryKeyColumn, String deletedColumn,
-      @Nullable String topicName, int numPartitions, Map<String, String> streamDecoderProperties) {
+  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String schemaName,
+      @Nullable String kafkaTopicName, int numPartitions, Map<String, String> streamDecoderProperties,
+      UpsertConfig upsertConfig, String primaryKeyColumn) {
+    if (schemaName == null) {
+      schemaName = getSchemaName();
+    }
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setDeletedRecordColumn(deletedColumn);
-
-    if (topicName == null) {
-      topicName = getKafkaTopic();
+    if (upsertConfig == null) {
+      upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    }
+    if (kafkaTopicName == null) {
+      kafkaTopicName = getKafkaTopic();
     }
 
     Map<String, String> streamConfigsMap = getStreamConfigMap();
+    streamConfigsMap.put(
+        StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME),
+        kafkaTopicName);
     streamConfigsMap.putAll(streamDecoderProperties);
 
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(schemaName)
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
         .setLLC(useLlc()).setStreamConfigs(streamConfigsMap)
-        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setNullHandlingEnabled(UpsertConfig.Mode.PARTIAL.equals(upsertConfig.getMode()) || getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setUpsertConfig(upsertConfig).build();
   }
+
   /**
    * Creates a new Dedup enabled table config
    */
