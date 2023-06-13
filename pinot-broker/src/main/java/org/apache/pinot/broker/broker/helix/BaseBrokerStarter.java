@@ -176,7 +176,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerMetrics = new BrokerMetrics(
             _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
             _metricsRegistry,
-            _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
+            _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS,
+                    Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
             _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
     _brokerMetrics.initializeGlobalMeters();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
@@ -212,17 +213,19 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerRequestHandler singleStageBrokerRequestHandler = null;
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler =
-              new GrpcBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory, _queryQuotaManager,
-                      tableCache, _brokerMetrics, null);
+              new GrpcBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
+                      _queryQuotaManager, tableCache, _brokerMetrics, null);
     } else { // default request handler type, e.g. netty
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         singleStageBrokerRequestHandler =
                 new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-                        _queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
+                        _queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults,
+                        _serverRoutingStatsManager);
       } else {
         singleStageBrokerRequestHandler =
                 new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-                        _queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null, _serverRoutingStatsManager);
+                        _queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null,
+                        _serverRoutingStatsManager);
       }
     }
 
