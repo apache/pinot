@@ -158,6 +158,7 @@
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.13.0</audienceannotations.version>
+    <clp-ffi.version>0.4.3</clp-ffi.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -1265,6 +1266,12 @@
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
         <version>5.5.0</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.yscope.clp</groupId>
+        <artifactId>clp-ffi</artifactId>
+        <version>${clp-ffi.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
