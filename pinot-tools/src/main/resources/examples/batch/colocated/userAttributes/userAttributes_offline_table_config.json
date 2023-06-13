@@ -5,11 +5,7 @@
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "userAttributes",
-    "replication": 2,
-    "replicaGroupStrategyConfig": {
-      "partitionColumn": "userUUID",
-      "numInstancesPerPartition": 2
-    }
+    "replication": 2
   },
   "instanceAssignmentConfigMap": {
     "OFFLINE": {
@@ -25,7 +21,8 @@
         "numInstancesPerReplicaGroup": 2,
         "numPartitions": 2,
         "numInstancesPerPartition": 1,
-        "minimizeDataMovement": false
+        "minimizeDataMovement": false,
+        "partitionColumn": "userUUID"
       },
       "partitionSelector": "INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR"
     }
