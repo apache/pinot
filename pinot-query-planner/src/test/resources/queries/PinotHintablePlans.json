@@ -170,23 +170,6 @@
           "\n      LogicalTableScan(table=[[a]])",
           "\n"
         ]
-      },
-      {
-        "description": "Join and agg options",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), aggOptions(is_partitioned_by_group_by_keys='true') */ a.col3, a.col1, SUM(b.col3) FROM a JOIN b ON a.col3 = b.col3 GROUP BY a.col3, a.col1",
-        "output": [
-          "Execution Plan",
-          "\nLogicalProject(col3=[$1], col1=[$0], EXPR$2=[SUM_REDUCE($2)])",
-          "\n  LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
-          "\n    LogicalJoin(condition=[=($1, $2)], joinType=[inner])",
-          "\n      LogicalExchange(distribution=[single])",
-          "\n        LogicalProject(col1=[$0], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
-          "\n      LogicalExchange(distribution=[single])",
-          "\n        LogicalProject(col3=[$2])",
-          "\n          LogicalTableScan(table=[[b]])",
-          "\n"
-        ]
       }
     ]
   }

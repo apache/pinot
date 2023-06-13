@@ -102,9 +102,6 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   @Override
   public MultiStageOperator visitAggregate(AggregateNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-
-    // TODO: Will need to use a collection of inputSchema when we support aggregation functions with multiple
-    //  columns.
     DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
     DataSchema resultSchema = node.getDataSchema();
 
