@@ -16,8 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.controllerjob;
+package org.apache.pinot.server.api.resources;
 
-public enum ControllerJobType {
-  RELOAD_SEGMENT, RELOAD_TABLE, FORCE_COMMIT, TABLE_REBALANCE, TENANT_REBALANCE
+public class TableReloadStatusValue {
+  private boolean _completed;
+
+  public boolean isCompleted() {
+    return _completed;
+  }
+
+  public void setCompleted(boolean completed) {
+    _completed = completed;
+  }
 }

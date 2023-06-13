@@ -21,9 +21,15 @@ package org.apache.pinot.plugin.stream.kafka20;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanRegistrationException;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -32,6 +38,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.BytesDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.common.utils.Sanitizer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,9 +75,29 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     }
     consumerProp.put(ConsumerConfig.CLIENT_ID_CONFIG, _clientId);
     _consumer = createConsumer(consumerProp);
+
+    // when we re-create the table data manager again
+    // the older table data manager's kafka client would be
+    // registered with the MBeans server
+    // we need to remove that here to ensure that we do
+    // not encounter AlreadyExistsException
+    deregisterKafkaClientMBeansIfRegistered(_clientId);
     _topicPartition = new TopicPartition(_topic, _partition);
     _consumer.assign(Collections.singletonList(_topicPartition));
     _kafkaMetadataExtractor = KafkaMetadataExtractor.build(_config.isPopulateMetadata());
+  }
+
+  private void deregisterKafkaClientMBeansIfRegistered(String clientId) {
+    MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+    ObjectName name;
+    try {
+      name = new ObjectName("kafka.consumer" + ":type=app-info,id=" + Sanitizer.jmxSanitize(clientId));
+      if (server.isRegistered(name)) {
+        server.unregisterMBean(name);
+      }
+    } catch (MalformedObjectNameException | InstanceNotFoundException | MBeanRegistrationException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private Consumer<String, Bytes> createConsumer(Properties consumerProp) {

@@ -108,6 +108,7 @@ import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
+import org.apache.pinot.common.messages.TableReloadMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -2081,6 +2082,24 @@ public class PinotHelixResourceManager {
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
 
+  /**
+   *
+   * @param tableNameWithType Table for which job is to be added
+   * @param jobId job's UUID
+   * @param numMessagesSent number of messages that were sent to servers. Saved as metadata
+   * @return boolean representing success / failure of the ZK write step
+   */
+  public boolean addNewReloadTableJob(String tableNameWithType, String jobId, int numMessagesSent) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_TABLE.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numMessagesSent));
+    return addControllerJobToZK(jobId, jobMetadata,
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_TABLE));
+  }
+
   public boolean addNewForceCommitJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
       Set<String> consumingSegmentsCommitted)
       throws JsonProcessingException {
@@ -2463,6 +2482,28 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
     return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
+  }
+
+  public Pair<Integer, String> reloadTable(String tableNameWithType, boolean force) {
+    LOGGER.info("Sending reload message for table: {}", tableNameWithType);
+
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(tableNameWithType);
+    recipientCriteria.setSessionSpecific(true);
+    TableReloadMessage tableReloadMessage = new TableReloadMessage(tableNameWithType, force);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
+    int numMessagesSent = messagingService.send(recipientCriteria, tableReloadMessage, null, timeoutMs);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} reload messages for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
+    }
+    return Pair.of(numMessagesSent, tableReloadMessage.getMsgId());
   }
 
   /**

@@ -89,4 +89,20 @@ public class ControllerJobStatusResource {
       }
     }
   }
+
+  @GET
+  @Path("/controllerJob/reloadTableStatus/{tableNameWithType}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
+  public String reloadTableStatus(@PathParam("tableNameWithType") String tableNameWithType,
+          @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp)
+          throws Exception {
+    TableDataManager tableDataManager =
+            ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    long loadTimeMs = tableDataManager.getLoadTimeMs();
+    boolean completed = loadTimeMs >= reloadJobSubmissionTimestamp;
+    TableReloadStatusValue value = new TableReloadStatusValue();
+    value.setCompleted(completed);
+    return JsonUtils.objectToString(value);
+  }
 }
