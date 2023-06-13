@@ -56,24 +56,24 @@ import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
  * this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
  * v1 operators at this point in time.
  *
- * <p>This class should be used statically via {@link #build(PlanNode, PlanRequestContext)}
+ * <p>This class should be used statically via {@link #walkPlanNode(PlanNode, PhysicalPlanContext)}
  */
-public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, PlanRequestContext> {
+public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, PhysicalPlanContext> {
 
   private static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
 
-  public static OpChain build(PlanNode node, PlanRequestContext context) {
+  public static OpChain walkPlanNode(PlanNode node, PhysicalPlanContext context) {
     MultiStageOperator root = node.visit(INSTANCE, context);
     return new OpChain(context.getOpChainExecutionContext(), root, context.getReceivingMailboxIds());
   }
 
   @Override
-  public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
+  public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, PhysicalPlanContext context) {
     if (node.isSortOnReceiver()) {
       SortedMailboxReceiveOperator sortedMailboxReceiveOperator =
           new SortedMailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
-              node.getDataSchema(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
-              node.getSenderStageId());
+              node.getDataSchema(), node.getCollationKeys(), node.getCollationDirections(),
+              node.getCollationNullDirections(), node.isSortOnSender(), node.getSenderStageId());
       context.addReceivingMailboxIds(sortedMailboxReceiveOperator.getMailboxIds());
       return sortedMailboxReceiveOperator;
     } else {
@@ -86,7 +86,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   }
 
   @Override
-  public MultiStageOperator visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
+  public MultiStageOperator visitMailboxSend(MailboxSendNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new MailboxSendOperator(context.getOpChainExecutionContext(), nextOperator, node.getExchangeType(),
         node.getPartitionKeySelector(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
@@ -94,14 +94,14 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   }
 
   @Override
-  public MultiStageOperator visitAggregate(AggregateNode node, PlanRequestContext context) {
+  public MultiStageOperator visitAggregate(AggregateNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
         node.getAggCalls(), node.getGroupSet(), node.getInputs().get(0).getDataSchema());
   }
 
   @Override
-  public MultiStageOperator visitWindow(WindowNode node, PlanRequestContext context) {
+  public MultiStageOperator visitWindow(WindowNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new WindowAggregateOperator(context.getOpChainExecutionContext(), nextOperator, node.getGroupSet(),
         node.getOrderSet(), node.getOrderSetDirection(), node.getOrderSetNullDirection(), node.getAggCalls(),
@@ -110,7 +110,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   }
 
   @Override
-  public MultiStageOperator visitSetOp(SetOpNode setOpNode, PlanRequestContext context) {
+  public MultiStageOperator visitSetOp(SetOpNode setOpNode, PhysicalPlanContext context) {
     List<MultiStageOperator> inputs = new ArrayList<>();
     for (PlanNode input : setOpNode.getInputs()) {
       MultiStageOperator visited = input.visit(this, context);
@@ -132,19 +132,19 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   }
 
   @Override
-  public MultiStageOperator visitExchange(ExchangeNode exchangeNode, PlanRequestContext context) {
+  public MultiStageOperator visitExchange(ExchangeNode exchangeNode, PhysicalPlanContext context) {
     throw new UnsupportedOperationException("ExchangeNode should not be visited");
   }
 
   @Override
-  public MultiStageOperator visitFilter(FilterNode node, PlanRequestContext context) {
+  public MultiStageOperator visitFilter(FilterNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new FilterOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
         node.getCondition());
   }
 
   @Override
-  public MultiStageOperator visitJoin(JoinNode node, PlanRequestContext context) {
+  public MultiStageOperator visitJoin(JoinNode node, PhysicalPlanContext context) {
     PlanNode left = node.getInputs().get(0);
     PlanNode right = node.getInputs().get(1);
 
@@ -156,27 +156,28 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   }
 
   @Override
-  public MultiStageOperator visitProject(ProjectNode node, PlanRequestContext context) {
+  public MultiStageOperator visitProject(ProjectNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
         node.getProjects(), node.getInputs().get(0).getDataSchema());
   }
 
   @Override
-  public MultiStageOperator visitSort(SortNode node, PlanRequestContext context) {
+  public MultiStageOperator visitSort(SortNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     boolean isInputSorted = nextOperator instanceof SortedMailboxReceiveOperator;
     return new SortOperator(context.getOpChainExecutionContext(), nextOperator, node.getCollationKeys(),
-        node.getCollationDirections(), node.getFetch(), node.getOffset(), node.getDataSchema(), isInputSorted);
+        node.getCollationDirections(), node.getCollationNullDirections(), node.getFetch(), node.getOffset(),
+        node.getDataSchema(), isInputSorted);
   }
 
   @Override
-  public MultiStageOperator visitTableScan(TableScanNode node, PlanRequestContext context) {
+  public MultiStageOperator visitTableScan(TableScanNode node, PhysicalPlanContext context) {
     throw new UnsupportedOperationException("Stage node of type TableScanNode is not supported!");
   }
 
   @Override
-  public MultiStageOperator visitValue(ValueNode node, PlanRequestContext context) {
+  public MultiStageOperator visitValue(ValueNode node, PhysicalPlanContext context) {
     return new LiteralValueOperator(context.getOpChainExecutionContext(), node.getDataSchema(), node.getLiteralRows());
   }
 }

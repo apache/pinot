@@ -651,12 +651,140 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testSkipDuplicateOrderByExpressions() {
-    String query = "SELECT name FROM employees ORDER BY name, name";
+  void testDeduplicateOrderByExpressions() {
+    String query = "SELECT name FROM employees ORDER BY name DESC NULLS LAST, name ASC";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
     assertNotNull(queryContext.getOrderByExpressions());
     assertEquals(queryContext.getOrderByExpressions().size(), 1);
+  }
+
+  @Test
+  void testRemoveOrderByFunctions() {
+    String query = "SELECT A FROM testTable ORDER BY datetrunc(A) DESC NULLS LAST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isDesc());
+    assertTrue(orderByExpressionContext.isNullsLast());
+    assertEquals(orderByExpressionContext.getExpression().getFunction().getFunctionName(), "datetrunc");
+    assertEquals(orderByExpressionContext.getExpression().getFunction().getArguments().get(0).getIdentifier(), "A");
+  }
+
+  @Test
+  void testOrderByDefault() {
+    String query = "SELECT A FROM testTable ORDER BY A";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isAsc());
+    assertTrue(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  void testOrderByNullsLast() {
+    String query = "SELECT A FROM testTable ORDER BY A NULLS LAST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isAsc());
+    assertTrue(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  void testOrderByNullsFirst() {
+    String query = "SELECT A FROM testTable ORDER BY A NULLS FIRST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isAsc());
+    assertFalse(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  void testOrderByAscNullsFirst() {
+    String query = "SELECT A FROM testTable ORDER BY A ASC NULLS FIRST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isAsc());
+    assertFalse(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  void testOrderByAscNullsLast() {
+    String query = "SELECT A FROM testTable ORDER BY A ASC NULLS LAST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isAsc());
+    assertTrue(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  void testOrderByDescNullsFirst() {
+    String query = "SELECT A FROM testTable ORDER BY A DESC NULLS FIRST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  void testOrderByDescNullsLast() {
+    String query = "SELECT A FROM testTable ORDER BY A DESC NULLS LAST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertTrue(orderByExpressionContext.isDesc());
+    assertTrue(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  void testDistinctOrderByNullsLast() {
+    String query = "SELECT DISTINCT A FROM testTable ORDER BY A NULLS LAST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertFalse(orderByExpressionContext.isDesc());
+    assertTrue(orderByExpressionContext.isNullsLast());
   }
 }

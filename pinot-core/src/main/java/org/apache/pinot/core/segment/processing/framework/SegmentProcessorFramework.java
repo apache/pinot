@@ -63,6 +63,7 @@ public class SegmentProcessorFramework {
   private final File _mapperOutputDir;
   private final File _reducerOutputDir;
   private final File _segmentsOutputDir;
+  private Map<String, GenericRowFileManager> _partitionToFileManagerMap;
 
   /**
    * Initializes the SegmentProcessorFramework with record readers, config and working directory.
@@ -91,33 +92,55 @@ public class SegmentProcessorFramework {
    */
   public List<File> process()
       throws Exception {
+    try {
+      return doProcess();
+    } catch (Exception e) {
+      // Cleaning up file managers no matter they are from map phase or reduce phase. For those from reduce phase, the
+      // reducers should have cleaned up the corresponding file managers from map phase already.
+      if (_partitionToFileManagerMap != null) {
+        for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
+          fileManager.cleanUp();
+        }
+      }
+      // Cleaning up output dir as processing has failed.
+      FileUtils.deleteQuietly(_segmentsOutputDir);
+      throw e;
+    } finally {
+      FileUtils.deleteDirectory(_mapperOutputDir);
+      FileUtils.deleteDirectory(_reducerOutputDir);
+    }
+  }
+
+  private List<File> doProcess()
+      throws Exception {
     // Map phase
     LOGGER.info("Beginning map phase on {} record readers", _recordReaders.size());
     SegmentMapper mapper = new SegmentMapper(_recordReaders, _segmentProcessorConfig, _mapperOutputDir);
-    Map<String, GenericRowFileManager> partitionToFileManagerMap = mapper.map();
+    _partitionToFileManagerMap = mapper.map();
 
     // Check for mapper output files
-    if (partitionToFileManagerMap.isEmpty()) {
+    if (_partitionToFileManagerMap.isEmpty()) {
       LOGGER.info("No partition generated from mapper phase, skipping the reducer phase");
       return Collections.emptyList();
     }
 
     // Reduce phase
-    LOGGER.info("Beginning reduce phase on partitions: {}", partitionToFileManagerMap.keySet());
+    LOGGER.info("Beginning reduce phase on partitions: {}", _partitionToFileManagerMap.keySet());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
-    int totalCount = partitionToFileManagerMap.keySet().size();
+    int totalCount = _partitionToFileManagerMap.keySet().size();
     int count = 1;
-    for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
+    for (Map.Entry<String, GenericRowFileManager> entry : _partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
-      observer.accept(String
-          .format("Doing reduce phase on data from partition: %s (%d out of %d)", partitionId, count++, totalCount));
+      observer.accept(
+          String.format("Doing reduce phase on data from partition: %s (%d out of %d)", partitionId, count++,
+              totalCount));
       GenericRowFileManager fileManager = entry.getValue();
       Reducer reducer = ReducerFactory.getReducer(partitionId, fileManager, _segmentProcessorConfig, _reducerOutputDir);
       entry.setValue(reducer.reduce());
     }
 
     // Segment creation phase
-    LOGGER.info("Beginning segment creation phase on partitions: {}", partitionToFileManagerMap.keySet());
+    LOGGER.info("Beginning segment creation phase on partitions: {}", _partitionToFileManagerMap.keySet());
     List<File> outputSegmentDirs = new ArrayList<>();
     TableConfig tableConfig = _segmentProcessorConfig.getTableConfig();
     Schema schema = _segmentProcessorConfig.getSchema();
@@ -128,9 +151,9 @@ public class SegmentProcessorFramework {
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
 
     if (tableConfig.getIndexingConfig().getSegmentNameGeneratorType() != null) {
-      generatorConfig.setSegmentNameGenerator(SegmentNameGeneratorFactory
-          .createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix, segmentNamePostfix, fixedSegmentName,
-              false));
+      generatorConfig.setSegmentNameGenerator(
+          SegmentNameGeneratorFactory.createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix,
+              segmentNamePostfix, fixedSegmentName, false));
     } else {
       // SegmentNameGenerator will be inferred by the SegmentGeneratorConfig.
       generatorConfig.setSegmentNamePrefix(segmentNamePrefix);
@@ -139,7 +162,7 @@ public class SegmentProcessorFramework {
 
     int maxNumRecordsPerSegment = _segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment();
     int sequenceId = 0;
-    for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
+    for (Map.Entry<String, GenericRowFileManager> entry : _partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
       GenericRowFileManager fileManager = entry.getValue();
       try {
@@ -168,9 +191,6 @@ public class SegmentProcessorFramework {
         fileManager.cleanUp();
       }
     }
-    FileUtils.deleteDirectory(_mapperOutputDir);
-    FileUtils.deleteDirectory(_reducerOutputDir);
-
     LOGGER.info("Successfully created segments: {}", outputSegmentDirs);
     return outputSegmentDirs;
   }

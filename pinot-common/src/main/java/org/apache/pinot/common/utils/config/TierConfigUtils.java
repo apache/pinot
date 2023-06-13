@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -63,10 +62,6 @@ public final class TierConfigUtils {
     return tierName == null ? "default" : tierName;
   }
 
-  public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
-    return getDataDirForTier(tableConfig, tierName, Collections.emptyMap());
-  }
-
   /**
    * Consider configured tiers and compute default instance partitions for the segment
    *
@@ -93,6 +88,12 @@ public final class TierConfigUtils {
     return null;
   }
 
+  @Nullable
+  public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
+    return getDataDirForTier(tableConfig, tierName, Collections.emptyMap());
+  }
+
+  @Nullable
   public static String getDataDirForTier(TableConfig tableConfig, String tierName,
       Map<String, Map<String, String>> instanceTierConfigs) {
     String tableNameWithType = tableConfig.getTableName();
@@ -108,17 +109,17 @@ public final class TierConfigUtils {
       }
       if (tierCfg != null) {
         Map<String, String> backendProps = tierCfg.getTierBackendProperties();
-        if (backendProps != null) {
-          dataDir = backendProps.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR);
-        } else {
+        if (backendProps == null) {
           LOGGER.debug("No backend props for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
-        }
-        if (StringUtils.isNotEmpty(dataDir)) {
-          LOGGER.debug("Got dataDir: {} for tier: {} in TableConfig of table: {}", dataDir, tierName,
-              tableNameWithType);
-          return dataDir;
         } else {
-          LOGGER.debug("No dataDir for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
+          dataDir = backendProps.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR);
+          if (StringUtils.isNotEmpty(dataDir)) {
+            LOGGER.debug("Got dataDir: {} for tier: {} in TableConfig of table: {}", dataDir, tierName,
+                tableNameWithType);
+            return dataDir;
+          } else {
+            LOGGER.debug("No dataDir for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
+          }
         }
       }
     }
@@ -128,8 +129,6 @@ public final class TierConfigUtils {
       // All instance config names are lower cased while being passed down here.
       dataDir = instanceCfgs.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR.toLowerCase());
     }
-    Preconditions.checkState(StringUtils.isNotEmpty(dataDir), "No dataDir for tier: %s for table: %s", tierName,
-        tableNameWithType);
     LOGGER.debug("Got dataDir: {} for tier: {} for table: {} in instance configs", dataDir, tierName,
         tableNameWithType);
     return dataDir;

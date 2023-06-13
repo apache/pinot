@@ -27,18 +27,21 @@ netstat -i
 
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
-  mvn clean install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
+  mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true -am -B \
+    -pl 'pinot-integration-tests' -T 16 || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn test -am -B \
         -pl 'pinot-integration-tests' \
         -Dtest='C*Test,L*Test,M*Test,R*Test,S*Test' \
-        -P github-actions,integration-tests-only && exit 0 || exit 1
+        -P github-actions,integration-tests-only \
+        -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn test -am -B \
         -pl 'pinot-integration-tests' \
         -Dtest='!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' \
-        -P github-actions,integration-tests-only && exit 0 || exit 1
+        -P github-actions,integration-tests-only \
+        -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true && exit 0 || exit 1
   fi
 else
   # Unit Tests
@@ -60,10 +63,11 @@ else
         -pl ':pinot-csv' \
         -pl ':pinot-json' \
         -pl ':pinot-segment-uploader-default' \
-        -P github-actions,no-integration-tests && exit 0 || exit 1
+        -P github-actions,no-integration-tests \
+        -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn clean install -DskipTests -T 16 || exit 1
+    mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true -T 16 || exit 1
     mvn test -am -B \
         -pl '!pinot-spi' \
         -pl '!pinot-segment-spi' \
@@ -79,7 +83,9 @@ else
         -pl '!:pinot-csv' \
         -pl '!:pinot-json' \
         -pl '!:pinot-segment-uploader-default' \
-        -P github-actions,no-integration-tests && exit 0 || exit 1
+        -P github-actions,no-integration-tests \
+        -Dspotless.apply.skip -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true \
+         && exit 0 || exit 1
   fi
 fi
 

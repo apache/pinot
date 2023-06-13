@@ -62,24 +62,11 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void copyTo(long offset, byte[] buffer, int destOffset, int size) {
-    if (size <= BULK_BYTES_PROCESSING_THRESHOLD) {
-      int end = destOffset + size;
-      for (int i = destOffset; i < end; i++) {
-        buffer[i] = _buffer.getByte(offset++);
-      }
-    } else {
-      _buffer.toDirectByteBuffer(offset, size).get(buffer, destOffset, size);
-    }
-  }
-
-  @Override
   public void copyTo(long offset, PinotDataBuffer buffer, long destOffset, long size) {
     if (buffer instanceof BasePinotLBuffer) {
       _buffer.copyTo(offset, ((BasePinotLBuffer) buffer)._buffer, destOffset, size);
     } else {
-      assert size <= Integer.MAX_VALUE;
-      buffer.readFrom(destOffset, _buffer.toDirectByteBuffer(offset, (int) size));
+      super.copyTo(offset, buffer, destOffset, size);
     }
   }
 

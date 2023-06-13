@@ -16,48 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.plan;
+package org.apache.pinot.query.runtime.plan.server;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.query.planner.plannode.AggregateNode;
-import org.apache.pinot.query.planner.plannode.ExchangeNode;
-import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
-import org.apache.pinot.query.planner.plannode.MailboxSendNode;
-import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
-import org.apache.pinot.query.planner.plannode.ProjectNode;
-import org.apache.pinot.query.planner.plannode.SetOpNode;
-import org.apache.pinot.query.planner.plannode.SortNode;
-import org.apache.pinot.query.planner.plannode.TableScanNode;
-import org.apache.pinot.query.planner.plannode.ValueNode;
-import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
@@ -67,18 +56,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Plan visitor for direct leaf-stage server request.
- *
- * This should be merged with logics in {@link org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2} in the future
- * to directly produce operator chain.
- *
- * As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
- * filtering and other auxiliary functionalities.
- */
-public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
-  private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
-  private static final Logger LOGGER = LoggerFactory.getLogger(ServerRequestPlanVisitor.class);
+public class ServerPlanRequestUtils {
+  private static final int DEFAULT_LEAF_NODE_LIMIT = Integer.MAX_VALUE;
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerPlanRequestUtils.class);
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
       ImmutableList.of(PredicateComparisonRewriter.class.getName(),
           NonAggregationGroupByToDistinctQueryRewriter.class.getName());
@@ -86,11 +66,14 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
       new ArrayList<>(QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
 
-  private static final ServerRequestPlanVisitor INSTANCE = new ServerRequestPlanVisitor();
+  private ServerPlanRequestUtils() {
+    // do not instantiate.
+  }
 
   public static ServerPlanRequestContext build(MailboxService mailboxService, DistributedStagePlan stagePlan,
-      Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo,
-      TableType tableType, List<String> segmentList, long deadlineMs) {
+      Map<String, String> requestMetadataMap, PipelineBreakerResult pipelineBreakerResult,
+      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
+      List<String> segmentList, long deadlineMs) {
     // Before-visit: construct the ServerPlanRequestContext baseline
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
     long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16) + (
@@ -108,11 +91,11 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
-            stagePlan.getServer(), stagePlan.getStageMetadata(), pinotQuery, tableType, timeBoundaryInfo,
-            traceEnabled);
+            stagePlan.getServer(), stagePlan.getStageMetadata(), pipelineBreakerResult, pinotQuery, tableType,
+            timeBoundaryInfo, traceEnabled);
 
     // visit the plan and create query physical plan.
-    ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);
+    ServerPlanRequestVisitor.walkStageNode(stagePlan.getStageRoot(), context);
 
     // Post-visit: finalize context.
     // 1. global rewrite/optimize
@@ -149,6 +132,9 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
     return context;
   }
 
+  /**
+   * Helper method to update query options.
+   */
   private static void updateQueryOptions(PinotQuery pinotQuery, Map<String, String> requestMetadataMap, long timeoutMs,
       boolean traceEnabled) {
     Map<String, String> queryOptions = new HashMap<>();
@@ -160,114 +146,6 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
     // overwrite with requestMetadataMap to carry query options from request:
     queryOptions.putAll(requestMetadataMap);
     pinotQuery.setQueryOptions(queryOptions);
-  }
-
-  private static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
-    node.visit(INSTANCE, context);
-  }
-
-  @Override
-  public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    // set group-by list
-    context.getPinotQuery()
-        .setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), context.getPinotQuery()));
-    // set agg list
-    context.getPinotQuery().setSelectList(
-        CalciteRexExpressionParser.addSelectList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
-            context.getPinotQuery()));
-    return null;
-  }
-
-  @Override
-  public Void visitWindow(WindowNode node, ServerPlanRequestContext context) {
-    throw new UnsupportedOperationException("Window not yet supported!");
-  }
-
-  @Override
-  public Void visitSetOp(SetOpNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
-  }
-
-  @Override
-  public Void visitExchange(ExchangeNode exchangeNode, ServerPlanRequestContext context) {
-    throw new UnsupportedOperationException("Exchange not yet supported!");
-  }
-
-  @Override
-  public Void visitFilter(FilterNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    context.getPinotQuery()
-        .setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), context.getPinotQuery()));
-    return null;
-  }
-
-  @Override
-  public Void visitJoin(JoinNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
-  }
-
-  @Override
-  public Void visitMailboxReceive(MailboxReceiveNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
-  }
-
-  @Override
-  public Void visitMailboxSend(MailboxSendNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
-  }
-
-  @Override
-  public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    context.getPinotQuery()
-        .setSelectList(CalciteRexExpressionParser.overwriteSelectList(node.getProjects(), context.getPinotQuery()));
-    return null;
-  }
-
-  @Override
-  public Void visitSort(SortNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    if (node.getCollationKeys().size() > 0) {
-      context.getPinotQuery().setOrderByList(
-          CalciteRexExpressionParser.convertOrderByList(node.getCollationKeys(), node.getCollationDirections(),
-              context.getPinotQuery()));
-    }
-    if (node.getFetch() > 0) {
-      context.getPinotQuery().setLimit(node.getFetch());
-    }
-    if (node.getOffset() > 0) {
-      context.getPinotQuery().setOffset(node.getOffset());
-    }
-    return null;
-  }
-
-  @Override
-  public Void visitTableScan(TableScanNode node, ServerPlanRequestContext context) {
-    DataSource dataSource = new DataSource();
-    String tableNameWithType = TableNameBuilder.forType(context.getTableType())
-        .tableNameWithType(TableNameBuilder.extractRawTableName(node.getTableName()));
-    dataSource.setTableName(tableNameWithType);
-    context.getPinotQuery().setDataSource(dataSource);
-    context.getPinotQuery().setSelectList(
-        node.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression).collect(Collectors.toList()));
-    return null;
-  }
-
-  @Override
-  public Void visitValue(ValueNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
-  }
-
-  private void visitChildren(PlanNode node, ServerPlanRequestContext context) {
-    for (PlanNode child : node.getInputs()) {
-      child.visit(this, context);
-    }
   }
 
   /**
@@ -289,6 +167,108 @@ public class ServerRequestPlanVisitor implements PlanNodeVisitor<Void, ServerPla
       pinotQuery.setFilterExpression(andFilterExpression);
     } else {
       pinotQuery.setFilterExpression(timeFilterExpression);
+    }
+  }
+
+  /**
+   * attach the dynamic filter to the given PinotQuery.
+   */
+  static void attachDynamicFilter(PinotQuery pinotQuery, JoinNode.JoinKeys joinKeys, List<Object[]> dataContainer,
+      DataSchema dataSchema) {
+    FieldSelectionKeySelector leftSelector = (FieldSelectionKeySelector) joinKeys.getLeftJoinKeySelector();
+    FieldSelectionKeySelector rightSelector = (FieldSelectionKeySelector) joinKeys.getRightJoinKeySelector();
+    List<Expression> expressions = new ArrayList<>();
+    for (int i = 0; i < leftSelector.getColumnIndices().size(); i++) {
+      Expression leftExpr = pinotQuery.getSelectList().get(leftSelector.getColumnIndices().get(i));
+      int rightIdx = rightSelector.getColumnIndices().get(i);
+      Expression inFilterExpr = RequestUtils.getFunctionExpression(FilterKind.IN.name());
+      List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
+      operands.add(leftExpr);
+      operands.addAll(computeInOperands(dataContainer, dataSchema, rightIdx));
+      inFilterExpr.getFunctionCall().setOperands(operands);
+      expressions.add(inFilterExpr);
+    }
+    attachFilterExpression(pinotQuery, FilterKind.AND, expressions);
+  }
+
+  private static List<Expression> computeInOperands(List<Object[]> dataContainer, DataSchema dataSchema, int colIdx) {
+    final DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colIdx);
+    final FieldSpec.DataType storedType = columnDataType.getStoredType().toDataType();;
+    final int numRows = dataContainer.size();
+    List<Expression> expressions = new ArrayList<>();
+    switch (storedType) {
+      case INT:
+        int[] arrInt = new int[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrInt[rowIdx] = (int) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrInt);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrInt[rowIdx]));
+        }
+        break;
+      case LONG:
+        long[] arrLong = new long[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrLong[rowIdx] = (long) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrLong);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrLong[rowIdx]));
+        }
+        break;
+      case FLOAT:
+        float[] arrFloat = new float[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrFloat[rowIdx] = (float) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrFloat);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrFloat[rowIdx]));
+        }
+        break;
+      case DOUBLE:
+        double[] arrDouble = new double[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrDouble[rowIdx] = (double) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrDouble);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrDouble[rowIdx]));
+        }
+        break;
+      case STRING:
+        String[] arrString = new String[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrString[rowIdx] = (String) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrString);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrString[rowIdx]));
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
+    }
+    return expressions;
+  }
+
+  /**
+   * Attach Filter Expression to existing PinotQuery.
+   */
+  private static void attachFilterExpression(PinotQuery pinotQuery, FilterKind attachKind, List<Expression> exprs) {
+    Preconditions.checkState(attachKind == FilterKind.AND || attachKind == FilterKind.OR);
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    List<Expression> arrayList = new ArrayList<>(exprs);
+    if (filterExpression != null) {
+      arrayList.add(filterExpression);
+    }
+    if (arrayList.size() > 1) {
+      Expression attachFilterExpression = RequestUtils.getFunctionExpression(attachKind.name());
+      attachFilterExpression.getFunctionCall().setOperands(arrayList);
+      pinotQuery.setFilterExpression(attachFilterExpression);
+    } else {
+      pinotQuery.setFilterExpression(arrayList.get(0));
     }
   }
 }

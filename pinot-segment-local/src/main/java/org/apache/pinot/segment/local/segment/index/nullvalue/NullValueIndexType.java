@@ -115,9 +115,6 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
     public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
           throws IOException {
-      // TODO: Change this behavior and make it closer to other indexes.
-      //  For historical and test reasons, NullValueIndexType doesn't really care about its config
-      //  if there is a buffer for this index, it is read even if the config explicitly ask to disable it.
       if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector())) {
         return null;
       }

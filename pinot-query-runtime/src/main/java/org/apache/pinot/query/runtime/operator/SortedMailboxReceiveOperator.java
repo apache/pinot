@@ -23,7 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
@@ -48,7 +49,8 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   private final DataSchema _dataSchema;
   private final List<RexExpression> _collationKeys;
-  private final List<RelFieldCollation.Direction> _collationDirections;
+  private final List<Direction> _collationDirections;
+  private final List<NullDirection> _collationNullDirections;
   private final boolean _isSortOnSender;
   private final List<Object[]> _rows = new ArrayList<>();
 
@@ -56,13 +58,14 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private boolean _isSortedBlockConstructed;
 
   public SortedMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
-      DataSchema dataSchema, List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
-      boolean isSortOnSender, int senderStageId) {
+      DataSchema dataSchema, List<RexExpression> collationKeys, List<Direction> collationDirections,
+      List<NullDirection> collationNullDirections, boolean isSortOnSender, int senderStageId) {
     super(context, exchangeType, senderStageId);
     Preconditions.checkState(!CollectionUtils.isEmpty(collationKeys), "Collation keys must be set");
     _dataSchema = dataSchema;
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
+    _collationNullDirections = collationNullDirections;
     _isSortOnSender = isSortOnSender;
   }
 
@@ -110,7 +113,9 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     }
 
     if (!_isSortedBlockConstructed && !_rows.isEmpty()) {
-      _rows.sort(new SortUtils.SortComparator(_collationKeys, _collationDirections, _dataSchema, false, false));
+      _rows.sort(
+          new SortUtils.SortComparator(_collationKeys, _collationDirections, _collationNullDirections, _dataSchema,
+              false));
       _isSortedBlockConstructed = true;
       return new TransferableBlock(_rows, _dataSchema, DataBlock.Type.ROW);
     } else {

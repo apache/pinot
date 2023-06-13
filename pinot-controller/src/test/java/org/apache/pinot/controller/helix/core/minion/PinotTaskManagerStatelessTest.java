@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -209,7 +210,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     TestUtils.waitForCondition((aVoid) -> {
       try {
         long tableSize = getTableSize(OFFLINE_TABLE_NAME);
-        return tableSize >= 0;
+        return tableSize == TableSizeReader.DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       } catch (Exception e) {
         return false;
       }

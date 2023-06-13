@@ -33,9 +33,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByt
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.memory.PinotNativeOrderLBuffer;
-import org.apache.pinot.segment.spi.memory.PinotNonNativeOrderLBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -248,17 +247,15 @@ public class VarByteChunkSVForwardIndexTest {
     }
 
     // For large variable width column values (where total size of data
-    // across all rows in the segment is > 2GB), LBuffer will be used for
-    // reading the fwd index. However, to test this scenario the unit test
+    // across all rows in the segment is > 2GB), Pinot may try to use different buffer
+    // implementation when the fwd index. However, to test this scenario the unit test
     // will take a long time to execute due to comparison
     // (75000 characters in each row and 10000 rows will hit this scenario).
-    // So we specifically test for mapping the index file into a LBuffer
-    // to exercise the LBuffer code
-    if (ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN) {
-      buffer = PinotNativeOrderLBuffer.mapFile(outFile, true, 0, outFile.length());
-    } else {
-      buffer = PinotNonNativeOrderLBuffer.mapFile(outFile, true, 0, outFile.length());
-    }
+    // So we specifically test for mapping the index file using the default factory
+    // trying to exercise the buffer used in larger cases
+    buffer = PinotDataBuffer.createDefaultFactory(false)
+        .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN);
+    assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
 
     try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
         ChunkReaderContext readerContext = reader.createContext()) {

@@ -162,9 +162,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
           throws IndexReaderConstraintException {
-      if (fieldIndexConfigs == null) {
-        return null;
-      }
       if (metadata.getDataType() != FieldSpec.DataType.STRING) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.text(),
             "Text index is currently only supported on STRING type columns");
@@ -176,9 +173,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
         return new NativeTextIndexReader(metadata.getColumnName(), segmentDir);
       }
       TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
-      if (!indexConfig.isEnabled()) {
-        return null;
-      }
       return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
     }
   }

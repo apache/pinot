@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -124,17 +125,20 @@ public class QueryContextConverterUtils {
     List<OrderByExpressionContext> orderByExpressions = null;
     List<Expression> orderByList = pinotQuery.getOrderByList();
     if (CollectionUtils.isNotEmpty(orderByList)) {
-      // Deduplicate the order-by expressions
       orderByExpressions = new ArrayList<>(orderByList.size());
-      Set<ExpressionContext> expressionSet = new HashSet<>();
+      Set<Expression> seen = new HashSet<>();
       for (Expression orderBy : orderByList) {
-        // NOTE: Order-by is always a Function with the ordering of the Expression
-        Function thriftFunction = orderBy.getFunctionCall();
-        ExpressionContext expression = RequestContextUtils.getExpression(thriftFunction.getOperands().get(0));
-        // Skip duplicate order by expressions, e.g.: SELECT name FROM employees ORDER BY name, name
-        if (expressionSet.add(expression)) {
-          boolean isAsc = thriftFunction.getOperator().equalsIgnoreCase("ASC");
-          orderByExpressions.add(new OrderByExpressionContext(expression, isAsc));
+        boolean isAsc = isAsc(orderBy);
+        Boolean isNullsLast = isNullsLast(orderBy);
+        Expression orderByFunctionsRemoved = CalciteSqlParser.removeOrderByFunctions(orderBy);
+        // Deduplicate the order-by expressions
+        if (seen.add(orderByFunctionsRemoved)) {
+          ExpressionContext expressionContext = RequestContextUtils.getExpression(orderByFunctionsRemoved);
+          if (isNullsLast != null) {
+            orderByExpressions.add(new OrderByExpressionContext(expressionContext, isAsc, isNullsLast));
+          } else {
+            orderByExpressions.add(new OrderByExpressionContext(expressionContext, isAsc));
+          }
         }
       }
     }
@@ -162,5 +166,29 @@ public class QueryContextConverterUtils {
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(pinotQuery.isExplain()).build();
+  }
+
+  private static boolean isAsc(Expression expression) {
+    while (expression != null && expression.isSetFunctionCall()) {
+      if (expression.getFunctionCall().getOperator().equals(CalciteSqlParser.ASC)) {
+        return true;
+      }
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return false;
+  }
+
+  @Nullable
+  private static Boolean isNullsLast(Expression expression) {
+    while (expression != null && expression.isSetFunctionCall()) {
+      String operator = expression.getFunctionCall().getOperator();
+      if (operator.equals(CalciteSqlParser.NULLS_LAST)) {
+        return true;
+      } else if (operator.equals(CalciteSqlParser.NULLS_FIRST)) {
+        return false;
+      }
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return null;
   }
 }

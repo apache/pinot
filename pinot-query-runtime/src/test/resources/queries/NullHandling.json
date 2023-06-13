@@ -45,6 +45,16 @@
       {
         "description": "LEFT JOIN and GROUP BY with AGGREGATE",
         "sql": "SELECT {tbl1}.strCol2, COUNT({tbl2}.intCol1), MIN({tbl2}.intCol1), MAX({tbl2}.doubleCol1), SUM({tbl2}.doubleCol1) FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 GROUP BY {tbl1}.strCol2"
+      },
+      {
+        "description": "LEFT JOIN and SORT (by default, H2 treats null as the smallest value, which is different from Postgres, thus we don't test the default ordering)",
+        "sql": "SELECT {tbl2}.doubleCol1 AS col FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 ORDER BY col NULLS FIRST",
+        "keepOutputRowOrder": true
+      },
+      {
+        "description": "LEFT JOIN and GROUP BY with AGGREGATE AND SORT",
+        "sql": "SELECT {tbl1}.strCol2, COUNT({tbl2}.intCol1), MIN({tbl2}.intCol1) AS minCol, MAX({tbl2}.doubleCol1) AS maxCol, SUM({tbl2}.doubleCol1) FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 GROUP BY {tbl1}.strCol2 ORDER BY minCol DESC NULLS LAST, maxCol ASC NULLS LAST",
+        "keepOutputRowOrder": true
       }
     ]
   }
