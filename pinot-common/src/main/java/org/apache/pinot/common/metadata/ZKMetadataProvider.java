@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -315,6 +316,15 @@ public class ZKMetadataProvider {
   public static TableConfig getTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     return toTableConfig(propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
         AccessOption.PERSISTENT));
+  }
+
+  public static Pair<TableConfig, ZNRecord> getTableConfigWithZNRecord(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    Stat stat = new Stat();
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), stat,
+        AccessOption.PERSISTENT);
+    znRecord.setVersion(stat.getVersion());
+    return Pair.of(toTableConfig(znRecord), znRecord);
   }
 
   @Nullable

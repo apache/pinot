@@ -237,4 +237,10 @@ public interface TableDataManager {
    */
   default void onConsumingToOnline(String segmentNameStr) {
   };
+
+  /**
+   * Returns the load time of this table data manager (in milliseconds).
+   * @return load time in ms
+   */
+  long getLoadTimeMs();
 }

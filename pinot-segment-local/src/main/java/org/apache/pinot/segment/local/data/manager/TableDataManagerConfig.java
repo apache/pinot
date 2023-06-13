@@ -40,10 +40,13 @@ public class TableDataManagerConfig {
 
   private final InstanceDataManagerConfig _instanceDataManagerConfig;
   private final TableConfig _tableConfig;
+  private final int _tableConfigZNRecordVersion;
 
-  public TableDataManagerConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
+  public TableDataManagerConfig(InstanceDataManagerConfig instanceDataManagerConfig,
+      TableConfig tableConfig, int tableConfigZNRecordVersion) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _tableConfig = tableConfig;
+    _tableConfigZNRecordVersion = tableConfigZNRecordVersion;
   }
 
   public InstanceDataManagerConfig getInstanceDataManagerConfig() {
@@ -52,6 +55,10 @@ public class TableDataManagerConfig {
 
   public TableConfig getTableConfig() {
     return _tableConfig;
+  }
+
+  public int getTableConfigZNRecordVersion() {
+    return _tableConfigZNRecordVersion;
   }
 
   public String getTableName() {

@@ -31,6 +31,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -42,11 +43,14 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -60,6 +64,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +107,73 @@ public class PinotRealtimeTableResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/reload")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RELOAD_TABLE)
+  @ApiOperation(value = "Reloads the table across all the servers", notes = "This would reconstruct the table data"
+      + "manager in case of configuration changes. Example usage: trigger after converting the upsert mode"
+      + "from full to partial.")
+  public SuccessResponse reloadTable(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName")
+      String tableName,
+      @ApiParam(value = "Whether to force the reload (if table config is not updated, reload will not be done)")
+      @QueryParam("force") boolean force,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @Context HttpHeaders httpHeaders, @Context Request request) {
+    List<String> tableNamesWithType = ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager,
+        tableName, Constants.validateTableType(tableTypeStr), LOGGER);
+    if (tableNamesWithType.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableName,
+          Response.Status.NOT_FOUND);
+    }
+    // TODO: check if another ongoing reload job exists and fail the request
+    // this cannot be done right now because reload controller job doesn't have a status field
+    StringBuilder response = new StringBuilder();
+    for (String tableNameWithType: tableNamesWithType) {
+      Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadTable(tableNameWithType, force);
+      boolean zkJobMetaWriteSuccess = false;
+      if (msgInfo.getLeft() > 0) {
+        try {
+          if (_pinotHelixResourceManager.addNewReloadTableJob(tableNameWithType, msgInfo.getRight(),
+              msgInfo.getLeft())) {
+            zkJobMetaWriteSuccess = true;
+          } else {
+            LOGGER.error("Failed to add reload table job meta into zookeeper for table: {}", tableNameWithType);
+          }
+        } catch (Exception e) {
+          LOGGER.error("Failed to add reload segment job meta into zookeeper for table: {}", tableNameWithType, e);
+        }
+        response.append(String.format("Submitted reload table job for table: %s, with id: %s, sent %d reload messages."
+                + " Job meta ZK storage status: %s", tableNameWithType, msgInfo.getRight(), msgInfo.getLeft(),
+            zkJobMetaWriteSuccess ? "SUCCESS" : "FAILED")).append(". ");
+      } else {
+        throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableNameWithType,
+            Response.Status.NOT_FOUND);
+      }
+    }
+    return new SuccessResponse(response.toString().trim());
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/tableReloadStatus/{jobId}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_RELOAD_STATUS)
+  @ApiOperation(value = "Fetches the reloading status of the table across all the servers and returns it", notes =
+      "This involves gathering the response from all the servers and collating them together.")
+  public ServerReloadTableControllerJobStatusResponse reloadTableStatus(
+      @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
+      throws InvalidConfigException {
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_TABLE);
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
+          Response.Status.NOT_FOUND);
+    }
+    return ResourceUtils.getReloadTableStatusFromServers(_connectionManager, _executor, _pinotHelixResourceManager,
+        controllerJobZKMetadata);
   }
 
   @POST
