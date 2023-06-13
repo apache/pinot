@@ -395,17 +395,18 @@ public class ClusterIntegrationTestUtils {
       }
     }
     CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
-    for (String recordCsv: csvRecords)
-    try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
-      for (CSVRecord csv : parser) {
-        byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(System.currentTimeMillis())
-            : csv.get(partitionColumnIndex).getBytes(StandardCharsets.UTF_8);
-        List<String> cols = new ArrayList<>();
-        for (String col : csv) {
-          cols.add(col);
+    for (String recordCsv: csvRecords) {
+      try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
+        for (CSVRecord csv : parser) {
+          byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(System.currentTimeMillis())
+              : csv.get(partitionColumnIndex).getBytes(StandardCharsets.UTF_8);
+          List<String> cols = new ArrayList<>();
+          for (String col : csv) {
+            cols.add(col);
+          }
+          byte[] bytes = String.join(",", cols).getBytes(StandardCharsets.UTF_8);
+          producer.produce(kafkaTopic, keyBytes, bytes);
         }
-        byte[] bytes = String.join(",", cols).getBytes(StandardCharsets.UTF_8);
-        producer.produce(kafkaTopic, keyBytes, bytes);
       }
     }
   }

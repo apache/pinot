@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.annotation.Nullable;
-import javax.validation.constraints.Null;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -495,7 +494,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * Returns the REALTIME table config in the cluster.
+   * Returns the REALTIME tab le config in the cluster.
    */
   protected TableConfig getRealtimeTableConfig() {
     return getRealtimeTableConfig(getTableName());

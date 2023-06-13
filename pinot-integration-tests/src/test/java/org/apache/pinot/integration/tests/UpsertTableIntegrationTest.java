@@ -250,8 +250,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection()
-        .execute("SELECT playerId, name, game FROM " + tableName +
-            " WHERE playerId = 100").getResultSet(0);
+        .execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100").getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 1);
     Assert.assertEquals(rs.getInt(0, 0), 100);
     Assert.assertEquals(rs.getString(0, 1), "Zook-New");
@@ -259,8 +258,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Validate: pk lineage still exists
     rs = getPinotConnection()
-        .execute("SELECT playerId, name FROM " + tableName +
-            " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
+        .execute("SELECT playerId, name FROM " + tableName
+            + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
     Assert.assertTrue(rs.getRowCount() > 1);
   }
@@ -340,8 +339,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection()
-        .execute("SELECT playerId, name, game FROM " + tableName +
-            " WHERE playerId = 100").getResultSet(0);
+        .execute("SELECT playerId, name, game FROM " + tableName
+            + " WHERE playerId = 100").getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 1);
     Assert.assertEquals(rs.getInt(0, 0), 100);
     Assert.assertEquals(rs.getString(0, 1), "Zook");
@@ -349,8 +348,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Validate: pk lineage still exists
     rs = getPinotConnection()
-        .execute("SELECT playerId, name FROM " + tableName +
-            " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
+        .execute("SELECT playerId, name FROM " + tableName
+            + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
     Assert.assertTrue(rs.getRowCount() > 1);
   }
