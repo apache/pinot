@@ -82,17 +82,9 @@ public class RegexpPatternConverterUtils {
     while (i < likePattern.length()) {
       char c = likePattern.charAt(i);
       if (c == '_') {
-        if (isPrevCharBackSlash) {
-          sb.append(c);
-        } else {
-          sb.append(".");
-        }
+        sb.append(isPrevCharBackSlash ? c : ".");
       } else if (c == '%') {
-        if (isPrevCharBackSlash) {
-          sb.append(c);
-        } else {
-          sb.append(".*");
-        }
+        sb.append(isPrevCharBackSlash ? c : ".*");
       } else if (REGEXP_METACHARACTERS.contains(String.valueOf(c))) {
         sb.append('\\').append(c);
       } else {
