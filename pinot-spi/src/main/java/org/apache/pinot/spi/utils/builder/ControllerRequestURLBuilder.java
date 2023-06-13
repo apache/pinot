@@ -414,6 +414,12 @@ public class ControllerRequestURLBuilder {
     return url.append(parameter).toString();
   }
 
+  public String forSegmentDeleteAPI(String tableName) {
+    StringBuilder url = new StringBuilder();
+    url.append(StringUtil.join("/", _baseUrl, "segments", tableName, "select"));
+    return url.toString();
+  }
+
   private void appendUrlParameter(StringBuilder url, String urlParameterKey, String urlParameterValue) {
     if (url.length() == 0) {
       url.append("?").append(urlParameterKey).append("=").append(urlParameterValue);

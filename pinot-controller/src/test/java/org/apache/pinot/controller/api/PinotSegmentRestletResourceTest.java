@@ -165,6 +165,30 @@ public class PinotSegmentRestletResourceTest {
     checkCrcRequest(rawTableName, segmentMetadataTable, 9);
   }
 
+  @Test
+  public void testDeleteSegmentsWithTimeWindow()
+      throws Exception {
+    // Adding table
+    String rawTableName = "deleteWithTimeWindowTestTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1)
+            .setDeletedSegmentsRetentionPeriod("0d").build();
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    resourceManager.addTable(tableConfig);
+
+    for (int i = 0; i < 4; i++) {
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName, "s" + i);
+      resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+    }
+
+    // There should be no segment lineage at this point.
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    String segmentDeleteReply =
+        ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteAPI(rawTableName));
+    assertTrue(segmentDeleteReply.contains("Deleted 4 segments"));
+  }
+
   private void checkCrcRequest(String tableName, Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
     String crcMapStr = ControllerTest.sendGetRequest(
