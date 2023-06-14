@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Set;
 
 /**
  * Utility for converting regex patterns.
@@ -33,8 +31,9 @@ public class RegexpPatternConverterUtils {
    * This excludes the \ (back slash) character as that doubles up as an escape character as well.
    * So it is handled separately in the conversion logic.
    */
-  public static final Set<String> REGEXP_METACHARACTERS = ImmutableSet.of(
-          "^", "$", ".", "{", "}", "[", "]", "(", ")", "*", "+", "?", "|", "<", ">", "-", "&", "/");
+  public static final char[] REGEXP_METACHARACTERS = new char[]{
+          '^', '$', '.', '{', '}', '[', ']', '(', ')', '*', '+', '?', '|', '<', '>', '-', '&', '/'};
+  public static final char BACK_SLASH = '\\';
 
   /**
    * Converts a LIKE pattern into REGEXP_LIKE pattern.
@@ -85,29 +84,38 @@ public class RegexpPatternConverterUtils {
         sb.append(isPrevCharBackSlash ? c : ".");
       } else if (c == '%') {
         sb.append(isPrevCharBackSlash ? c : ".*");
-      } else if (REGEXP_METACHARACTERS.contains(String.valueOf(c))) {
-        sb.append('\\').append(c);
+      } else if (indexOf(REGEXP_METACHARACTERS, c) >= 0) {
+        sb.append(BACK_SLASH).append(c);
       } else {
         if (isPrevCharBackSlash) {
           // this means the previous character is a \
           // but it was not used for escaping SQL wildcards
           // so let's escape this \ in the output
           // this case is separately handled outside of the meta characters list
-          sb.append('\\');
+          sb.append(BACK_SLASH);
         }
         sb.append(c);
       }
-      isPrevCharBackSlash = (c == '\\');
+      isPrevCharBackSlash = (c == BACK_SLASH);
       ++i;
     }
 
     // handle trailing \
     if (isPrevCharBackSlash) {
-      sb.append('\\');
+      sb.append(BACK_SLASH);
     }
 
     sb.append(suffix);
     return sb.toString();
+  }
+
+  private static int indexOf(char[] arr, char c) {
+    for (int i = 0; i < arr.length; ++i) {
+      if (arr[i] == c) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private static int indexOfFirstDifferent(String str, char character) {
