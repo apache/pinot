@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -138,8 +139,7 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
   }
 
   private boolean isSubPlanSplitter(PlanNode node) {
-    // TODO: implement this when we introduce a new type of exchange node for sub-plan splitter
-    return false;
+    return ((ExchangeNode) node).getExchangeType() == PinotRelExchangeType.SUB_PLAN;
   }
 
   public static class Context {

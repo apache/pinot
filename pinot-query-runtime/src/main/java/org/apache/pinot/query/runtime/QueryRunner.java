@@ -220,7 +220,7 @@ public class QueryRunner {
         new LeafStageTransferableBlockOperator(opChainExecutionContext, this::processServerQueryRequest,
             serverQueryRequests, sendNode.getDataSchema());
     MailboxSendOperator mailboxSendOperator =
-        new MailboxSendOperator(opChainExecutionContext, leafStageOperator, sendNode.getExchangeType(),
+        new MailboxSendOperator(opChainExecutionContext, leafStageOperator, sendNode.getDistributionType(),
             sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
             sendNode.isSortOnSender(), sendNode.getReceiverStageId());
     return new OpChain(opChainExecutionContext, mailboxSendOperator, Collections.emptyList());

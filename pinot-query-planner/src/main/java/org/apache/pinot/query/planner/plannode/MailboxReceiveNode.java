@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -38,7 +39,9 @@ public class MailboxReceiveNode extends AbstractPlanNode {
   @ProtoProperties
   private int _senderStageId;
   @ProtoProperties
-  private RelDistribution.Type _exchangeType;
+  private RelDistribution.Type _distributionType;
+  @ProtoProperties
+  private PinotRelExchangeType _exchangeType;
   @ProtoProperties
   private KeySelector<Object[], Object[]> _partitionKeySelector;
   @ProtoProperties
@@ -61,11 +64,13 @@ public class MailboxReceiveNode extends AbstractPlanNode {
   }
 
   public MailboxReceiveNode(int planFragmentId, DataSchema dataSchema, int senderStageId,
-      RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object[]> partitionKeySelector,
+      RelDistribution.Type distributionType, PinotRelExchangeType exchangeType,
+      @Nullable KeySelector<Object[], Object[]> partitionKeySelector,
       @Nullable List<RelFieldCollation> fieldCollations, boolean isSortOnSender, boolean isSortOnReceiver,
       PlanNode sender) {
     super(planFragmentId, dataSchema);
     _senderStageId = senderStageId;
+    _distributionType = distributionType;
     _exchangeType = exchangeType;
     _partitionKeySelector = partitionKeySelector;
     if (!CollectionUtils.isEmpty(fieldCollations)) {
@@ -104,11 +109,19 @@ public class MailboxReceiveNode extends AbstractPlanNode {
     return _senderStageId;
   }
 
-  public void setExchangeType(RelDistribution.Type exchangeType) {
+  public void setDistributionType(RelDistribution.Type distributionType) {
+    _distributionType = distributionType;
+  }
+
+  public RelDistribution.Type getDistributionType() {
+    return _distributionType;
+  }
+
+  public void setExchangeType(PinotRelExchangeType exchangeType) {
     _exchangeType = exchangeType;
   }
 
-  public RelDistribution.Type getExchangeType() {
+  public PinotRelExchangeType getExchangeType() {
     return _exchangeType;
   }
 
@@ -142,7 +155,7 @@ public class MailboxReceiveNode extends AbstractPlanNode {
 
   @Override
   public String explain() {
-    return "MAIL_RECEIVE(" + _exchangeType + ")";
+    return "MAIL_RECEIVE(" + _distributionType + ")";
   }
 
   @Override
