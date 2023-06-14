@@ -494,7 +494,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * Returns the REALTIME tab le config in the cluster.
+   * Returns the REALTIME table config in the cluster.
    */
   protected TableConfig getRealtimeTableConfig() {
     return getRealtimeTableConfig(getTableName());
@@ -560,22 +560,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     _queryGenerator = new QueryGenerator(avroFiles, tableName, tableName);
   }
 
+  protected List<File> unpackAvroData(File outputDir)
+      throws Exception {
+    return unpackTarData(getAvroTarFileName(), outputDir);
+  }
+
   /**
-   * Unpack the tarred Avro data into the given directory.
+   * Unpack the tarred data into the given directory.
    *
+   * @param tarFileName Input tar filename
    * @param outputDir Output directory
    * @return List of files unpacked.
    * @throws Exception
    */
-  protected List<File> unpackAvroData(File outputDir)
-      throws Exception {
-    // TODO: make this use unpackTarData
-    InputStream inputStream =
-        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getAvroTarFileName());
-    Assert.assertNotNull(inputStream);
-    return TarGzCompressionUtils.untar(inputStream, outputDir);
-  }
-
   protected List<File> unpackTarData(String tarFileName, File outputDir)
       throws Exception {
     InputStream inputStream =
