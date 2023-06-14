@@ -110,7 +110,7 @@ public class RegexpPatternConverterUtils {
   }
 
   private static int indexOf(char[] arr, char c) {
-    for (int i = 0; i < arr.length; ++i) {
+    for (int i = 0; i < arr.length; i++) {
       if (arr[i] == c) {
         return i;
       }
