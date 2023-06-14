@@ -247,6 +247,15 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // Revive pk - 100 by adding a record with a newer timestamp
     List<String> revivedRecord = Collections.singletonList("100,Zook-New,,0.0,1684707335000,false");
     pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
+    // Wait for the new record (13 with skipUpsert=true) to be indexed
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return queryCountStarWithoutUpsert(tableName) == 13;
+      } catch (Exception e) {
+        return null;
+      }
+    }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithFullUpsert");
+
 
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection()
@@ -336,6 +345,14 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // Revive pk - 100 by adding a record with a newer timestamp
     List<String> revivedRecord = Collections.singletonList("100,Zook,,0.0,1684707335000,false");
     pushCsvIntoKafka(revivedRecord, kafkaTopicName, 0);
+    // Wait for the new record (13 with skipUpsert=true) to be indexed
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return queryCountStarWithoutUpsert(tableName) == 13;
+      } catch (Exception e) {
+        return null;
+      }
+    }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithFullUpsert");
 
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection()
