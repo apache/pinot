@@ -1159,12 +1159,8 @@ public class PinotSegmentRestletResource {
   }
 
   private List<Pair<TableType, List<String>>> selectSegments(
-      String tableName,
-      String tableTypeStr,
-      boolean excludeReplacedSegments,
-      String startTimestampStr,
-      String endTimestampStr,
-      boolean excludeOverlapping) {
+      String tableName, String tableTypeStr, boolean excludeReplacedSegments, String startTimestampStr,
+      String endTimestampStr, boolean excludeOverlapping) {
     long startTimestamp;
     long endTimestamp;
     try {
