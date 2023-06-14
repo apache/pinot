@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -168,7 +169,7 @@ public class PinotSegmentRestletResourceTest {
   @Test
   public void testDeleteSegmentsWithTimeWindow()
       throws Exception {
-    // Adding table
+    // Adding table and segment
     String rawTableName = "deleteWithTimeWindowTestTable";
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig =
@@ -176,17 +177,26 @@ public class PinotSegmentRestletResourceTest {
             .setDeletedSegmentsRetentionPeriod("0d").build();
     PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
     resourceManager.addTable(tableConfig);
+    SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName,
+        10L, 20L, TimeUnit.MILLISECONDS);
+    resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
 
-    for (int i = 0; i < 4; i++) {
-      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName, "s" + i);
-      resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
-    }
-
-    // There should be no segment lineage at this point.
+    // Send query and verify
     ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
-    String segmentDeleteReply =
-        ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteAPI(rawTableName));
-    assertTrue(segmentDeleteReply.contains("Deleted 4 segments"));
+    // case 1: no overlapping
+    String reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 0L, 10L));
+    assertTrue(reply.contains("Deleted 0 segments"));
+
+    // case 2: partial overlapping
+    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 10L, 20L));
+    assertTrue(reply.contains("Deleted 0 segments"));
+
+    // case 3: fully within the time window
+    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 10L, 21L));
+    assertTrue(reply.contains("Deleted 1 segments"));
   }
 
   private void checkCrcRequest(String tableName, Map<String, SegmentMetadata> metadataTable, int expectedSize)

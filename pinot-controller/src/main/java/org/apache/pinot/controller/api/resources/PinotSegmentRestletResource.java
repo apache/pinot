@@ -881,9 +881,9 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to keep replaced segments, which have been replaced"
           + " specified in the segment lineage entries and cannot be queried from the table, false by default")
       @QueryParam("excludeReplacedSegments") @DefaultValue("false") boolean excludeReplacedSegments,
-      @ApiParam(value = "Start timestamp (inclusive)") @QueryParam("startTimestamp") @DefaultValue("")
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds") @QueryParam("startTimestamp") @DefaultValue("")
           String startTimestampStr,
-      @ApiParam(value = "End timestamp (exclusive)") @QueryParam("endTimestamp") @DefaultValue("")
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds") @QueryParam("endTimestamp") @DefaultValue("")
           String endTimestampStr,
       @ApiParam(value = "Whether to keep segments overlapping with the [start, end) from deletion, true by default")
       @QueryParam("excludeOverlapping") @DefaultValue("true") boolean excludeOverlapping,
@@ -1040,9 +1040,9 @@ public class PinotSegmentRestletResource {
   public List<Map<TableType, List<String>>> getSelectedSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Start timestamp (inclusive)") @QueryParam("startTimestamp") @DefaultValue("")
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds") @QueryParam("startTimestamp") @DefaultValue("")
           String startTimestampStr,
-      @ApiParam(value = "End timestamp (exclusive)") @QueryParam("endTimestamp") @DefaultValue("")
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds") @QueryParam("endTimestamp") @DefaultValue("")
           String endTimestampStr,
       @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
       @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping) {
@@ -1153,7 +1153,7 @@ public class PinotSegmentRestletResource {
       return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableNameWithType);
   }
 
-  public List<Pair<TableType, List<String>>> selectSegments(
+  private List<Pair<TableType, List<String>>> selectSegments(
       String tableName,
       String tableTypeStr,
       boolean excludeReplacedSegments,

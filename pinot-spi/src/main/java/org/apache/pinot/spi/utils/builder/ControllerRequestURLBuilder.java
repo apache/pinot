@@ -414,9 +414,11 @@ public class ControllerRequestURLBuilder {
     return url.append(parameter).toString();
   }
 
-  public String forSegmentDeleteAPI(String tableName) {
+  public String forSegmentDeleteWithTimeWindowAPI(String tableName, long startTimeInMilliSeconds,
+      long endTimeInMilliSeconds) {
     StringBuilder url = new StringBuilder();
-    url.append(StringUtil.join("/", _baseUrl, "segments", tableName, "select"));
+    url.append(StringUtil.join("/", _baseUrl, "segments", tableName,
+        String.format("select?startTimestamp=%d&endTimestamp=%d", startTimeInMilliSeconds, endTimeInMilliSeconds)));
     return url.toString();
   }
 
