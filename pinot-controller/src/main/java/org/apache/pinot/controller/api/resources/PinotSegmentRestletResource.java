@@ -878,19 +878,24 @@ public class PinotSegmentRestletResource {
   public SuccessResponse deleteSegmentsWithTimeWindow(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Whether to keep replaced segments, which have been replaced"
+      @ApiParam(value = "Whether to ignore replaced segments for deletion, which have been replaced"
           + " specified in the segment lineage entries and cannot be queried from the table, false by default")
       @QueryParam("excludeReplacedSegments") @DefaultValue("false") boolean excludeReplacedSegments,
-      @ApiParam(value = "Start timestamp (inclusive) in milliseconds") @QueryParam("startTimestamp") @DefaultValue("")
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds", required = true) @QueryParam("startTimestamp")
           String startTimestampStr,
-      @ApiParam(value = "End timestamp (exclusive) in milliseconds") @QueryParam("endTimestamp") @DefaultValue("")
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds", required = true) @QueryParam("endTimestamp")
           String endTimestampStr,
-      @ApiParam(value = "Whether to keep segments overlapping with the [start, end) from deletion, true by default")
+      @ApiParam(value = "Whether to ignore segments that are partially overlapping with the [start, end)"
+          + "for deletion, true by default")
       @QueryParam("excludeOverlapping") @DefaultValue("true") boolean excludeOverlapping,
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod) {
+    if (Strings.isNullOrEmpty(startTimestampStr) || Strings.isNullOrEmpty(endTimestampStr)) {
+      throw new ControllerApplicationException(LOGGER, "start and end timestamp must by non empty", Status.BAD_REQUEST);
+    }
+
     int numSegments = 0;
     for (Pair<TableType, List<String>> tableTypeSegments : selectSegments(
         tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr, excludeOverlapping)) {
