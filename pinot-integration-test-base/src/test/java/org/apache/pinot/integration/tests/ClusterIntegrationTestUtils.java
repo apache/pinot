@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
@@ -77,7 +76,6 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -342,42 +340,6 @@ public class ClusterIntegrationTestUtils {
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
-    segmentGeneratorConfig.setOutDir(segmentDir.getPath());
-    segmentGeneratorConfig.setTableName(tableConfig.getTableName());
-    segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);
-
-    // Build the segment
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig);
-    driver.build();
-
-    // Tar the segment
-    String segmentName = driver.getSegmentName();
-    File indexDir = new File(segmentDir, segmentName);
-    File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
-  }
-
-  public static void buildSegmentsFromParquet(List<File> parquetFiles, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir)
-      throws Exception {
-    Preconditions.checkState(parquetFiles.size() == 1, "Only single parquet file supported");
-    buildSegmentFromParquet(parquetFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
-  }
-
-  public static void buildSegmentFromParquet(File parquetFile, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
-      throws Exception {
-    // Test segment with space and special character in the file name
-    buildSegmentFromParquet(parquetFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir);
-  }
-
-  public static void buildSegmentFromParquet(File parquetFile, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir)
-    throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    segmentGeneratorConfig.setFormat(FileFormat.PARQUET);
-    segmentGeneratorConfig.setInputFilePath(parquetFile.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);
