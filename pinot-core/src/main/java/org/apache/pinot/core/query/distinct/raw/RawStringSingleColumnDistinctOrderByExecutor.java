@@ -38,9 +38,19 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
+    int nullComparisonFactor = orderByExpression.isNullsLast() ? -1 : 1;
     if (nullHandlingEnabled) {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-          (s1, s2) -> s1 == null ? (s2 == null ? 0 : 1) : (s2 == null ? -1 : s1.compareTo(s2)) * comparisonFactor);
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY), (s1, s2) -> {
+        if (s1 == null && s2 == null) {
+          return 0;
+        } else if (s1 == null) {
+          return nullComparisonFactor;
+        } else if (s2 == null) {
+          return -nullComparisonFactor;
+        } else {
+          return s1.compareTo(s2) * comparisonFactor;
+        }
+      });
     } else {
       _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
           (s1, s2) -> s1.compareTo(s2) * comparisonFactor);

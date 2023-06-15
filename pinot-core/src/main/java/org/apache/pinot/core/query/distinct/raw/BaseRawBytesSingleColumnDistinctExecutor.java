@@ -78,13 +78,13 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
         if (nullBitmap != null && nullBitmap.contains(i)) {
           values[i] = null;
         }
-        if (add(values[i])) {
+        if (add(values[i] == null ? null : new ByteArray(values[i]))) {
           return true;
         }
       }
     } else {
       for (int i = 0; i < numDocs; i++) {
-        if (add(values[i])) {
+        if (add(new ByteArray(values[i]))) {
           return true;
         }
       }
@@ -92,5 +92,5 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
     return false;
   }
 
-  protected abstract boolean add(byte[] value);
+  protected abstract boolean add(ByteArray byteArray);
 }

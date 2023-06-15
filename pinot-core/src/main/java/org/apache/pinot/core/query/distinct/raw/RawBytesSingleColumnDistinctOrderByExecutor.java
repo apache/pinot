@@ -39,9 +39,19 @@ public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSin
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
+    int nullComparisonFactor = orderByExpression.isNullsLast() ? -1 : 1;
     if (nullHandlingEnabled) {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-          (b1, b2) -> b1 == null ? (b2 == null ? 0 : 1) : (b2 == null ? -1 : b1.compareTo(b2)) * comparisonFactor);
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY), (b1, b2) -> {
+        if (b1 == null && b2 == null) {
+          return 0;
+        } else if (b1 == null) {
+          return nullComparisonFactor;
+        } else if (b2 == null) {
+          return -nullComparisonFactor;
+        } else {
+          return b1.compareTo(b2) * comparisonFactor;
+        }
+      });
     } else {
       _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
           (b1, b2) -> b1.compareTo(b2) * comparisonFactor);
@@ -49,8 +59,7 @@ public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSin
   }
 
   @Override
-  protected boolean add(byte[] value) {
-    ByteArray byteArray = new ByteArray(value);
+  protected boolean add(ByteArray byteArray) {
     if (!_valueSet.contains(byteArray)) {
       if (_valueSet.size() < _limit) {
         _valueSet.add(byteArray);
