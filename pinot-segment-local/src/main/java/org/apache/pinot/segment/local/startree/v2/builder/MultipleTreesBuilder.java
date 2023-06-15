@@ -119,15 +119,20 @@ public class MultipleTreesBuilder implements Closeable {
 
   private SeparatedStarTreesMetadata getExistingStarTrees()
       throws Exception {
-    if (_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT)) {
-      // Extract existing startrees
-      // clean star-tree related files and configs once all the star-trees are separated and extracted
-      SeparatedStarTreesMetadata existingStarTrees = extractStarTrees();
-      StarTreeBuilderUtils.removeStarTrees(_segmentDirectory);
-      _metadataProperties.refresh();
-      return existingStarTrees;
-    } else {
-      return new SeparatedStarTreesMetadata(_segmentDirectory);
+    try {
+      if (_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT)) {
+        // Extract existing startrees
+        // clean star-tree related files and configs once all the star-trees are separated and extracted
+        SeparatedStarTreesMetadata existingStarTrees = extractStarTrees();
+        StarTreeBuilderUtils.removeStarTrees(_segmentDirectory);
+        _metadataProperties.refresh();
+        return existingStarTrees;
+      } else {
+        return new SeparatedStarTreesMetadata(_segmentDirectory);
+      }
+    } catch (Exception e) {
+      SeparatedStarTreesMetadata.cleanOutputDirectory(_segmentDirectory);
+      throw e;
     }
   }
 
@@ -246,6 +251,12 @@ public class MultipleTreesBuilder implements Closeable {
         throws IOException {
       _outputDirectory = new File(segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(_outputDirectory);
+    }
+
+    public static void cleanOutputDirectory(File segmentDirectory)
+        throws IOException {
+      File outputDirectory = new File(segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
+      FileUtils.forceDelete(outputDirectory);
     }
 
     public File getOutputDirectory() {
