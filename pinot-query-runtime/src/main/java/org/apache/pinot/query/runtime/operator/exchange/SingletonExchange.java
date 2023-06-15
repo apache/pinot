@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import java.io.IOException;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
@@ -37,28 +37,14 @@ class SingletonExchange extends BlockExchange {
   SingletonExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
       Consumer<OpChainId> callback, long deadlineMs) {
     super(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
+    Preconditions.checkArgument(
+        sendingMailboxes.size() == 1 && sendingMailboxes.get(0) instanceof InMemorySendingMailbox,
+        "Expect single InMemorySendingMailbox for SingletonExchange");
   }
 
   @Override
-  protected void route(List<SendingMailbox> mailbox, TransferableBlock block)
+  protected void route(List<SendingMailbox> sendingMailboxes, TransferableBlock block)
       throws Exception {
-    boolean isLocalExchangeSent = false;
-    for (SendingMailbox sendingMailbox : mailbox) {
-      if (isLocal(sendingMailbox)) {
-        if (!isLocalExchangeSent) {
-          sendBlock(sendingMailbox, block);
-          isLocalExchangeSent = true;
-        } else {
-          throw new IOException("Local exchange has already been sent for singleton exchange!");
-        }
-      }
-    }
-    if (!isLocalExchangeSent) {
-      throw new IOException("Local exchange has not been sent successfully!");
-    }
-  }
-
-  private static boolean isLocal(SendingMailbox sendingMailbox) {
-    return sendingMailbox instanceof InMemorySendingMailbox;
+    sendBlock(sendingMailboxes.get(0), block);
   }
 }

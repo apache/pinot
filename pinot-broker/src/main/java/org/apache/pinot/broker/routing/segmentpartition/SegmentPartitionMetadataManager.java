@@ -30,6 +30,8 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
+import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TablePartitionInfo.PartitionInfo;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
@@ -120,7 +122,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   }
 
   private void computeTablePartitionInfo() {
-    TablePartitionInfo.PartitionInfo[] partitionInfoMap = new TablePartitionInfo.PartitionInfo[_numPartitions];
+    PartitionInfo[] partitionInfoMap = new PartitionInfo[_numPartitions];
     Set<String> segmentsWithInvalidPartition = new HashSet<>();
     for (Map.Entry<String, SegmentInfo> entry : _segmentInfoMap.entrySet()) {
       String segment = entry.getKey();
@@ -131,16 +133,16 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         segmentsWithInvalidPartition.add(segment);
         continue;
       }
-      TablePartitionInfo.PartitionInfo partitionInfo = partitionInfoMap[partitionId];
+      PartitionInfo partitionInfo = partitionInfoMap[partitionId];
       if (partitionInfo == null) {
-        partitionInfo = new TablePartitionInfo.PartitionInfo();
-        partitionInfo._segments = new ArrayList<>();
-        partitionInfo._segments.add(segment);
-        partitionInfo._fullyReplicatedServers = new HashSet<>(onlineServers);
+        Set<String> fullyReplicatedServers = new HashSet<>(onlineServers);
+        List<String> segments = new ArrayList<>();
+        segments.add(segment);
+        partitionInfo = new PartitionInfo(fullyReplicatedServers, segments);
         partitionInfoMap[partitionId] = partitionInfo;
       } else {
-        partitionInfo._segments.add(segment);
         partitionInfo._fullyReplicatedServers.retainAll(onlineServers);
+        partitionInfo._segments.add(segment);
       }
     }
     if (!segmentsWithInvalidPartition.isEmpty()) {
