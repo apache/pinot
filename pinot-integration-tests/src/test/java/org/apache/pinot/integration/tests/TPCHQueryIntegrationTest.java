@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -46,15 +46,22 @@ import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
-public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SSBQueryIntegrationTest.class);
-  private static final Map<String, String> SSB_QUICKSTART_TABLE_RESOURCES = ImmutableMap.of(
-      "customer", "examples/batch/ssb/customer",
-      "dates", "examples/batch/ssb/dates",
-      "lineorder", "examples/batch/ssb/lineorder",
-      "part", "examples/batch/ssb/part",
-      "supplier", "examples/batch/ssb/supplier");
-  private static final String SSB_QUERY_SET_RESOURCE_NAME = "ssb/ssb_query_set.yaml";
+public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TPCHQueryIntegrationTest.class);
+  private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
+  private static final String TPCH_QUERY_SET_RESOURCE_NAME = "tpch/tpch_query_set.yaml";
+
+  static {
+    TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("orders", "examples/batch/tpch/orders");
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("lineitem", "examples/batch/tpch/lineitem");
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("region", "examples/batch/tpch/region");
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("partsupp", "examples/batch/tpch/partsupp");
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("customer", "examples/batch/tpch/customer");
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("nation", "examples/batch/tpch/nation");
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
+    TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
+  }
 
   @BeforeClass
   public void setUp()
@@ -68,7 +75,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
 
     setUpH2Connection();
-    for (Map.Entry<String, String> tableResource : SSB_QUICKSTART_TABLE_RESOURCES.entrySet()) {
+    for (Map.Entry<String, String> tableResource : TPCH_QUICKSTART_TABLE_RESOURCES.entrySet()) {
       String tableName = tableResource.getKey();
       URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
       Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
@@ -102,7 +109,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test(dataProvider = "QueryDataProvider")
-  public void testSSBQueries(String query)
+  public void testTPCHQueries(String query)
       throws Exception {
     testQueriesValidateAgainstH2(query);
   }
@@ -145,7 +152,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override
   protected long getCurrentCountStarResult() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM lineorder").getResultSet(0).getLong(0);
+    return getPinotConnection().execute("SELECT COUNT(*) FROM orders").getResultSet(0).getLong(0);
   }
 
   @Override
@@ -166,8 +173,8 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass
   public void tearDown()
       throws Exception {
-    // unload all SSB tables.
-    for (String table : SSB_QUICKSTART_TABLE_RESOURCES.keySet()) {
+    // unload all TPCH tables.
+    for (String table : TPCH_QUICKSTART_TABLE_RESOURCES.keySet()) {
       dropOfflineTable(table);
     }
 
@@ -183,10 +190,10 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   @DataProvider(name = "QueryDataProvider")
   public static Object[][] queryDataProvider() {
     Yaml yaml = new Yaml();
-    InputStream inputStream = SSBQueryIntegrationTest.class.getClassLoader()
-        .getResourceAsStream(SSB_QUERY_SET_RESOURCE_NAME);
-    Map<String, List<String>> ssbQuerySet = yaml.load(inputStream);
-    List<String> ssbQueryList = ssbQuerySet.get("sqls");
-    return ssbQueryList.stream().map(s -> new Object[]{s}).toArray(Object[][]::new);
+    InputStream inputStream = TPCHQueryIntegrationTest.class.getClassLoader()
+        .getResourceAsStream(TPCH_QUERY_SET_RESOURCE_NAME);
+    Map<String, List<String>> tpchQuerySet = yaml.load(inputStream);
+    List<String> tpchQueryList = tpchQuerySet.get("sqls");
+    return tpchQueryList.stream().map(s -> new Object[]{s}).toArray(Object[][]::new);
   }
 }

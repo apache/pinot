@@ -1,0 +1,43 @@
+{
+  "schemaName": "orders",
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "name": "o_totalprice"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "o_orderkey"
+    },
+    {
+      "dataType": "INT",
+      "name": "o_custkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "o_orderstatus"
+    },
+    {
+      "dataType": "STRING",
+      "name": "o_orderdate"
+    },
+    {
+      "dataType": "STRING",
+      "name": "o_order_priority"
+    },
+    {
+      "dataType": "STRING",
+      "name": "o_clerk"
+    },
+    {
+      "dataType": "STRING",
+      "name": "o_ship_priority"
+    },
+    {
+      "dataType": "STRING",
+      "name": "o_comment"
+    }
+  ]
+}
