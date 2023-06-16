@@ -70,7 +70,7 @@ abstract class BaseRawIntSingleColumnDistinctExecutor implements DistinctExecuto
     if (_hasNull) {
       records.add(new Record(new Object[]{null}));
     }
-    assert records.size() <= _limit + 1;
+    assert records.size() - (_hasNull ? 1 : 0) <= _limit;
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 
