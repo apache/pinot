@@ -206,7 +206,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
         groupByExpressions[i] = ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[i]));
       }
       groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_projectOperator, groupByExpressions,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
     }
     groupKeyGenerator.generateKeysForBlock(_valueBlock, new int[NUM_RECORDS]);
 

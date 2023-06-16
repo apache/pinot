@@ -99,7 +99,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
                   _nullHandlingEnabled);
         } else {
           _groupKeyGenerator =
-              new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit);
+              new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
+                  _nullHandlingEnabled);
         }
       } else {
         _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
