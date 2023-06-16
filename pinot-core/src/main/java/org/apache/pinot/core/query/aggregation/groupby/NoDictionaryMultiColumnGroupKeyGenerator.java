@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -47,6 +48,8 @@ import org.apache.pinot.spi.utils.FixedIntArray;
  * 2. Add support for trimming group-by results.
  */
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
+  private static final int ID_FOR_NULL = INVALID_ID - 1;
+
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
   private final DataType[] _storedTypes;
@@ -55,23 +58,25 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
   private final boolean[] _isSingleValueExpressions;
   private final int _globalGroupIdUpperBound;
+  private final boolean _nullHandlingEnabled;
 
   private int _numGroups = 0;
 
   public NoDictionaryMultiColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
-      ExpressionContext[] groupByExpressions, int numGroupsLimit) {
+      ExpressionContext[] groupByExpressions, int numGroupsLimit, boolean nullHandlingEnabled) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
     _storedTypes = new DataType[_numGroupByExpressions];
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
     _isSingleValueExpressions = new boolean[_numGroupByExpressions];
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       _storedTypes[i] = columnContext.getDataType().getStoredType();
-      Dictionary dictionary = columnContext.getDictionary();
+      Dictionary dictionary = _nullHandlingEnabled ? null : columnContext.getDictionary();
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {
@@ -126,29 +131,60 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     int[] keyValues = new int[_numGroupByExpressions];
     // note that we are mutating its backing array for memory efficiency
     FixedIntArray flyweightKey = new FixedIntArray(keyValues);
-    for (int row = 0; row < numDocs; row++) {
-      for (int col = 0; col < _numGroupByExpressions; col++) {
-        Object columnValues = values[col];
-        ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
-        if (columnValues instanceof int[]) {
-          if (onTheFlyDictionary == null) {
-            keyValues[col] = ((int[]) columnValues)[row];
-          } else {
-            keyValues[col] = onTheFlyDictionary.put(((int[]) columnValues)[row]);
-          }
-        } else if (columnValues instanceof long[]) {
-          keyValues[col] = onTheFlyDictionary.put(((long[]) columnValues)[row]);
-        } else if (columnValues instanceof float[]) {
-          keyValues[col] = onTheFlyDictionary.put(((float[]) columnValues)[row]);
-        } else if (columnValues instanceof double[]) {
-          keyValues[col] = onTheFlyDictionary.put(((double[]) columnValues)[row]);
-        } else if (columnValues instanceof String[]) {
-          keyValues[col] = onTheFlyDictionary.put(((String[]) columnValues)[row]);
-        } else if (columnValues instanceof byte[][]) {
-          keyValues[col] = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
-        }
+    if (_nullHandlingEnabled) {
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numGroupByExpressions];
+      for (int i = 0; i < _numGroupByExpressions; i++) {
+        nullBitmaps[i] = valueBlock.getBlockValueSet(_groupByExpressions[i]).getNullBitmap();
       }
-      groupKeys[row] = getGroupIdForFlyweightKey(flyweightKey);
+      for (int row = 0; row < numDocs; row++) {
+        for (int col = 0; col < _numGroupByExpressions; col++) {
+          if (nullBitmaps[col] != null && nullBitmaps[col].contains(row)) {
+            keyValues[col] = ID_FOR_NULL;
+          } else {
+            Object columnValues = values[col];
+            ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
+            if (columnValues instanceof int[]) {
+              keyValues[col] = onTheFlyDictionary.put(((int[]) columnValues)[row]);
+            } else if (columnValues instanceof long[]) {
+              keyValues[col] = onTheFlyDictionary.put(((long[]) columnValues)[row]);
+            } else if (columnValues instanceof float[]) {
+              keyValues[col] = onTheFlyDictionary.put(((float[]) columnValues)[row]);
+            } else if (columnValues instanceof double[]) {
+              keyValues[col] = onTheFlyDictionary.put(((double[]) columnValues)[row]);
+            } else if (columnValues instanceof String[]) {
+              keyValues[col] = onTheFlyDictionary.put(((String[]) columnValues)[row]);
+            } else if (columnValues instanceof byte[][]) {
+              keyValues[col] = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
+            }
+          }
+        }
+        groupKeys[row] = getGroupIdForFlyweightKey(flyweightKey);
+      }
+    } else {
+      for (int row = 0; row < numDocs; row++) {
+        for (int col = 0; col < _numGroupByExpressions; col++) {
+          Object columnValues = values[col];
+          ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
+          if (columnValues instanceof int[]) {
+            if (onTheFlyDictionary == null) {
+              keyValues[col] = ((int[]) columnValues)[row];
+            } else {
+              keyValues[col] = onTheFlyDictionary.put(((int[]) columnValues)[row]);
+            }
+          } else if (columnValues instanceof long[]) {
+            keyValues[col] = onTheFlyDictionary.put(((long[]) columnValues)[row]);
+          } else if (columnValues instanceof float[]) {
+            keyValues[col] = onTheFlyDictionary.put(((float[]) columnValues)[row]);
+          } else if (columnValues instanceof double[]) {
+            keyValues[col] = onTheFlyDictionary.put(((double[]) columnValues)[row]);
+          } else if (columnValues instanceof String[]) {
+            keyValues[col] = onTheFlyDictionary.put(((String[]) columnValues)[row]);
+          } else if (columnValues instanceof byte[][]) {
+            keyValues[col] = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
+          }
+        }
+        groupKeys[row] = getGroupIdForFlyweightKey(flyweightKey);
+      }
     }
   }
 
@@ -392,10 +428,14 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     Object[] keys = new Object[_numGroupByExpressions];
     int[] dictIds = keyList.elements();
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      if (_dictionaries[i] != null) {
-        keys[i] = _dictionaries[i].getInternal(dictIds[i]);
+      if (dictIds[i] == ID_FOR_NULL) {
+        keys[i] = null;
       } else {
-        keys[i] = _onTheFlyDictionaries[i].get(dictIds[i]);
+        if (_dictionaries[i] != null) {
+          keys[i] = _dictionaries[i].getInternal(dictIds[i]);
+        } else {
+          keys[i] = _onTheFlyDictionaries[i].get(dictIds[i]);
+        }
       }
     }
     return keys;
