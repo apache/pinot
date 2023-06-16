@@ -158,7 +158,7 @@ public class InvertedIndexType
     public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
-      if (fieldIndexConfigs == null || !fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
+      if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.inverted())) {
         return null;
       }
       if (!metadata.hasDictionary()) {

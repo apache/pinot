@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
@@ -33,7 +34,10 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
 public class ExchangeNode extends AbstractPlanNode {
 
   @ProtoProperties
-  private RelDistribution.Type _exchangeType;
+  private PinotRelExchangeType _exchangeType;
+
+  @ProtoProperties
+  private RelDistribution.Type _distributionType;
 
   @ProtoProperties
   private List<Integer> _keys;
@@ -57,12 +61,13 @@ public class ExchangeNode extends AbstractPlanNode {
     super(planFragmentId);
   }
 
-  public ExchangeNode(int currentStageId, DataSchema dataSchema, Set<String> tableNames, RelDistribution distribution,
-      List<RelFieldCollation> collations, boolean isSortOnSender,
+  public ExchangeNode(int currentStageId, DataSchema dataSchema, PinotRelExchangeType exchangeType,
+      Set<String> tableNames, RelDistribution distribution, List<RelFieldCollation> collations, boolean isSortOnSender,
       boolean isSortOnReceiver) {
     super(currentStageId, dataSchema);
+    _exchangeType = exchangeType;
     _keys = distribution.getKeys();
-    _exchangeType = distribution.getType();
+    _distributionType = distribution.getType();
     _isSortOnSender = isSortOnSender;
     _isSortOnReceiver = isSortOnReceiver;
     _collations = collations;
@@ -79,8 +84,12 @@ public class ExchangeNode extends AbstractPlanNode {
     return visitor.visitExchange(this, context);
   }
 
-  public RelDistribution.Type getDistributionType() {
+  public PinotRelExchangeType getExchangeType() {
     return _exchangeType;
+  }
+
+  public RelDistribution.Type getDistributionType() {
+    return _distributionType;
   }
 
   public List<Integer> getDistributionKeys() {

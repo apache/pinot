@@ -31,6 +31,8 @@ import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.SortExchange;
+import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -39,7 +41,9 @@ import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
+import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -108,20 +112,27 @@ public final class RelToPlanNodeConverter {
     RelCollation collation = null;
     boolean isSortOnSender = false;
     boolean isSortOnReceiver = false;
+    PinotRelExchangeType exchangeType = PinotRelExchangeType.getDefaultExchangeType();
     if (node instanceof SortExchange) {
       collation = ((SortExchange) node).getCollation();
       if (node instanceof PinotLogicalSortExchange) {
         // These flags only take meaning if the collation is not null or empty
         isSortOnSender = ((PinotLogicalSortExchange) node).isSortOnSender();
         isSortOnReceiver = ((PinotLogicalSortExchange) node).isSortOnReceiver();
+        exchangeType = ((PinotLogicalSortExchange) node).getExchangeType();
+      }
+    } else {
+      if (node instanceof PinotLogicalExchange) {
+        exchangeType = ((PinotLogicalExchange) node).getExchangeType();
       }
     }
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
 
     // Compute all the tables involved under this exchange node
     Set<String> tableNames = getTableNamesFromRelRoot(node);
-    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), tableNames, node.getDistribution(),
-        fieldCollations, isSortOnSender, isSortOnReceiver);
+
+    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), exchangeType,
+        tableNames, node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver);
   }
 
   private static PlanNode convertLogicalSetOp(SetOp node, int currentStageId) {
@@ -169,12 +180,15 @@ public final class RelToPlanNodeConverter {
 
     // Parse out all equality JOIN conditions
     JoinInfo joinInfo = node.analyzeCondition();
-    FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.leftKeys);
-    FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.rightKeys);
+    JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(new FieldSelectionKeySelector(joinInfo.leftKeys),
+        new FieldSelectionKeySelector(joinInfo.rightKeys));
+    List<RexExpression> joinClause =
+        joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    boolean isColocatedJoin =
+        PinotHintStrategyTable.containsHintOption(node.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+            PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
-        toDataSchema(node.getRight().getRowType()), joinType,
-        new JoinNode.JoinKeys(leftFieldSelectionKeySelector, rightFieldSelectionKeySelector),
-        joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList()));
+        toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, isColocatedJoin);
   }
 
   private static DataSchema toDataSchema(RelDataType rowType) {
@@ -209,8 +223,8 @@ public final class RelToPlanNodeConverter {
       case DECIMAL:
         return resolveDecimal(relDataType);
       case FLOAT:
-        return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
       case REAL:
+        return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
       case DOUBLE:
         return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.DOUBLE;
       case DATE:

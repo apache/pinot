@@ -39,8 +39,8 @@ import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -134,11 +134,11 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // 2. attach exchange.
     List<Integer> groupSetIndices = ImmutableIntList.range(0, oldAggRel.getGroupCount());
-    LogicalExchange exchange = null;
+    PinotLogicalExchange exchange = null;
     if (groupSetIndices.size() == 0) {
-      exchange = LogicalExchange.create(newLeafAgg, RelDistributions.hash(Collections.emptyList()));
+      exchange = PinotLogicalExchange.create(newLeafAgg, RelDistributions.hash(Collections.emptyList()));
     } else {
-      exchange = LogicalExchange.create(newLeafAgg, RelDistributions.hash(groupSetIndices));
+      exchange = PinotLogicalExchange.create(newLeafAgg, RelDistributions.hash(groupSetIndices));
     }
 
     // 3. attach intermediate agg stage.
@@ -146,7 +146,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     call.transformTo(newAggNode);
   }
 
-  private RelNode makeNewIntermediateAgg(RelOptRuleCall ruleCall, Aggregate oldAggRel, LogicalExchange exchange,
+  private RelNode makeNewIntermediateAgg(RelOptRuleCall ruleCall, Aggregate oldAggRel, PinotLogicalExchange exchange,
       boolean isLeafStageAggregationPresent, List<Integer> argList, List<Integer> groupByList) {
 
     // add the exchange as the input node to the relation builder.
@@ -257,7 +257,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     }
 
     // 2. Create an exchange on top of the LogicalProject.
-    LogicalExchange exchange = LogicalExchange.create(project, RelDistributions.hash(newAggGroupByColumns));
+    PinotLogicalExchange exchange = PinotLogicalExchange.create(project, RelDistributions.hash(newAggGroupByColumns));
 
     // 3. Create an intermediate stage aggregation.
     RelNode newAggNode =

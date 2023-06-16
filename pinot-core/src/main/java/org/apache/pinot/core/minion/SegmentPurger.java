@@ -28,6 +28,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -45,19 +46,21 @@ public class SegmentPurger {
   private final File _indexDir;
   private final File _workingDir;
   private final TableConfig _tableConfig;
+  private final Schema _schema;
   private final RecordPurger _recordPurger;
   private final RecordModifier _recordModifier;
 
   private int _numRecordsPurged;
   private int _numRecordsModified;
 
-  public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, @Nullable RecordPurger recordPurger,
-      @Nullable RecordModifier recordModifier) {
+  public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, Schema schema,
+      @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier) {
     Preconditions.checkArgument(recordPurger != null || recordModifier != null,
         "At least one of record purger and modifier should be non-null");
     _indexDir = indexDir;
     _workingDir = workingDir;
     _tableConfig = tableConfig;
+    _schema = schema;
     _recordPurger = recordPurger;
     _recordModifier = recordModifier;
   }
@@ -79,7 +82,7 @@ public class SegmentPurger {
         return null;
       }
 
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, segmentMetadata.getSchema());
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
       config.setOutDir(_workingDir.getPath());
       config.setSegmentName(segmentName);
 

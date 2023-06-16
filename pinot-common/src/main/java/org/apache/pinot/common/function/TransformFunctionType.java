@@ -113,6 +113,7 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
+  CLPDECODE("clpDecode"),
 
   // Regexp functions
   REGEXP_EXTRACT("regexpExtract"),

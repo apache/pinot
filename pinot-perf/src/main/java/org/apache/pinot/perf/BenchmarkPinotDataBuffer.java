@@ -22,113 +22,136 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.segment.spi.memory.ByteBufferPinotBufferFactory;
+import org.apache.pinot.segment.spi.memory.LArrayPinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.SmallWithFallbackPinotBufferFactory;
+import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
 @BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 3, time = 3)
-@Measurement(iterations = 5, time = 3)
-@Fork(1)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@Warmup(iterations = 3, time = 1)
+@Measurement(iterations = 3, time = 1)
+@Fork(value = 1, jvmArgsPrepend = {
+    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+})
 @State(Scope.Benchmark)
 public class BenchmarkPinotDataBuffer {
   private static final Random RANDOM = new Random();
-  private static final int NUM_ROUNDS = 1_000_000;
+  private static final int BUFFER_SIZE = 1_000_000;
 
-  @Param({"1", "2", "4", "8", "16", "32", "64", "128", "256", "512", "1024"})
+  @Param({"1", "32", "1024"})
   private int _valueLength;
+  @Param({"bytebuffer", "larray", "unsafe", "wrapper+unsafe"})
+  private String _bufferLibrary;
+  private byte[] _bytes;
+  private PinotDataBuffer _buffer;
 
-  @Benchmark
-  public int batchRead()
-      throws IOException {
-    byte[] value = new byte[_valueLength];
-    RANDOM.nextBytes(value);
+  @Setup(Level.Iteration)
+  public void onIterationStart() {
+    _bytes = new byte[_valueLength];
+    RANDOM.nextBytes(_bytes);
 
-    int sum = 0;
-    try (
-        PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(_valueLength, ByteOrder.nativeOrder(), null)) {
-      pinotDataBuffer.readFrom(0, value);
-      byte[] buffer = new byte[_valueLength];
-      for (int i = 0; i < NUM_ROUNDS; i++) {
-        pinotDataBuffer.copyTo(0, buffer);
-        sum += buffer[0];
-      }
+    _buffer = PinotDataBuffer.allocateDirect(BUFFER_SIZE, ByteOrder.nativeOrder(), null);
+    int i = 0;
+    while (i < BUFFER_SIZE - 8) {
+      _buffer.putLong(i, RANDOM.nextLong());
+      i += 8;
     }
+    while (i < BUFFER_SIZE) {
+      _buffer.putByte(i, (byte) (RANDOM.nextInt() & 0xFF));
+      i++;
+    }
+  }
 
-    return sum;
+  @TearDown(Level.Iteration)
+  public void onIterationFinish()
+      throws IOException {
+    _buffer.close();
+  }
+
+  @Setup
+  public void setupBufferLibrary() {
+
+    switch (_bufferLibrary) {
+      case "bytebuffer":
+        PinotDataBuffer.useFactory(new ByteBufferPinotBufferFactory());
+        break;
+      case "larray":
+        PinotDataBuffer.useFactory(new LArrayPinotBufferFactory());
+        break;
+      case "unsafe":
+        PinotDataBuffer.useFactory(new UnsafePinotBufferFactory());
+        break;
+      case "wrapper+larray":
+        PinotDataBuffer.useFactory(new SmallWithFallbackPinotBufferFactory(
+            new ByteBufferPinotBufferFactory(), new LArrayPinotBufferFactory()));
+        break;
+      case "wrapper+unsafe":
+        PinotDataBuffer.useFactory(new SmallWithFallbackPinotBufferFactory(
+            new ByteBufferPinotBufferFactory(), new UnsafePinotBufferFactory()));
+        break;
+      default:
+        throw new IllegalArgumentException("Unrecognized buffer library \"" + _bufferLibrary + "\"");
+    }
   }
 
   @Benchmark
-  public int nonBatchRead()
+  public void allocate(Blackhole bh)
       throws IOException {
-    byte[] value = new byte[_valueLength];
-    RANDOM.nextBytes(value);
-
-    int sum = 0;
-    try (
-        PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(_valueLength, ByteOrder.nativeOrder(), null)) {
-      pinotDataBuffer.readFrom(0, value);
-      byte[] buffer = new byte[_valueLength];
-      for (int i = 0; i < NUM_ROUNDS; i++) {
-        for (int j = 0; j < _valueLength; j++) {
-          buffer[j] = pinotDataBuffer.getByte(j);
-        }
-        sum += buffer[0];
-      }
+    ByteOrder byteOrder = ByteOrder.nativeOrder();
+    try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(_valueLength, byteOrder, null)) {
+      bh.consume(pinotDataBuffer);
     }
-
-    return sum;
   }
 
   @Benchmark
-  public int batchWrite()
-      throws IOException {
-    byte[] value = new byte[_valueLength];
-    RANDOM.nextBytes(value);
-
-    int sum = 0;
-    try (
-        PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(_valueLength, ByteOrder.nativeOrder(), null)) {
-      for (int i = 0; i < NUM_ROUNDS; i++) {
-        pinotDataBuffer.readFrom(0, value);
-        sum += pinotDataBuffer.getByte(0);
-      }
-    }
-
-    return sum;
+  public void batchRead() {
+    long index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
+    _buffer.copyTo(index, _bytes);
   }
 
   @Benchmark
-  public int nonBatchWrite()
-      throws IOException {
-    byte[] value = new byte[_valueLength];
-    RANDOM.nextBytes(value);
-
-    int sum = 0;
-    try (
-        PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(_valueLength, ByteOrder.nativeOrder(), null)) {
-      for (int i = 0; i < NUM_ROUNDS; i++) {
-        for (int j = 0; j < _valueLength; j++) {
-          pinotDataBuffer.putByte(j, value[j]);
-        }
-        sum += pinotDataBuffer.getByte(0);
-      }
+  public void nonBatchRead() {
+    int index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
+    for (int j = 0; j < _valueLength; j++) {
+      _bytes[j] = _buffer.getByte(j + index);
     }
+  }
 
-    return sum;
+  @Benchmark
+  public void batchWrite() {
+    int index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
+
+    _buffer.readFrom(index, _bytes);
+  }
+
+  @Benchmark
+  public void nonBatchWrite() {
+    int index = RANDOM.nextInt(BUFFER_SIZE - _valueLength);
+
+    for (int j = 0; j < _valueLength; j++) {
+      _buffer.putByte(j + index, _bytes[j]);
+    }
   }
 
   public static void main(String[] args)

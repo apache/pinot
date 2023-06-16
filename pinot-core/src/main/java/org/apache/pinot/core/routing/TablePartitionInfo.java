@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.segmentpartition;
+package org.apache.pinot.core.routing;
 
 import java.util.List;
 import java.util.Set;
@@ -65,7 +65,12 @@ public class TablePartitionInfo {
   }
 
   public static class PartitionInfo {
-    List<String> _segments;
-    Set<String> _fullyReplicatedServers;
+    public final Set<String> _fullyReplicatedServers;
+    public final List<String> _segments;
+
+    public PartitionInfo(Set<String> fullyReplicatedServers, List<String> segments) {
+      _fullyReplicatedServers = fullyReplicatedServers;
+      _segments = segments;
+    }
   }
 }

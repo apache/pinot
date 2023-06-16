@@ -89,17 +89,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             // JOIN is exchanged with hash distribution (data shuffle)
             MailboxReceiveNode left = (MailboxReceiveNode) node.getInputs().get(0);
             MailboxReceiveNode right = (MailboxReceiveNode) node.getInputs().get(1);
-            Assert.assertEquals(left.getExchangeType(), RelDistribution.Type.HASH_DISTRIBUTED);
-            Assert.assertEquals(right.getExchangeType(), RelDistribution.Type.HASH_DISTRIBUTED);
+            Assert.assertEquals(left.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+            Assert.assertEquals(right.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
             break;
           }
           if (node instanceof AggregateNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
             // AGG is exchanged with singleton since it has already been distributed by JOIN.
             MailboxReceiveNode input = (MailboxReceiveNode) node.getInputs().get(0);
             if (shouldRewrite) {
-              Assert.assertEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+              Assert.assertEquals(input.getDistributionType(), RelDistribution.Type.SINGLETON);
             } else {
-              Assert.assertNotEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+              Assert.assertNotEquals(input.getDistributionType(), RelDistribution.Type.SINGLETON);
             }
             break;
           }
@@ -330,18 +330,18 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
-            + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
+            + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+            + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
             + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "}\n"},
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"
             + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
-            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0])\n"
             + "        LogicalTableScan(table=[[a]])\n"
-            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0], col3=[$2])\n"
             + "        LogicalTableScan(table=[[b]])\n"
         },

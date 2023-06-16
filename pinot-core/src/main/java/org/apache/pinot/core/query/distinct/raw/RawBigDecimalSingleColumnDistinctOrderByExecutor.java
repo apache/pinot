@@ -23,11 +23,8 @@ import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -52,25 +49,7 @@ public class RawBigDecimalSingleColumnDistinctOrderByExecutor extends BaseRawBig
   }
 
   @Override
-  public boolean process(ValueBlock valueBlock) {
-    BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
-    BigDecimal[] values = blockValueSet.getBigDecimalValuesSV();
-    int numDocs = valueBlock.getNumDocs();
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      for (int i = 0; i < numDocs; i++) {
-        BigDecimal value = nullBitmap != null && nullBitmap.contains(i) ? null : values[i];
-        processInternal(value);
-      }
-    } else {
-      for (int i = 0; i < numDocs; i++) {
-        processInternal(values[i]);
-      }
-    }
-    return false;
-  }
-
-  private void processInternal(BigDecimal value) {
+  protected boolean add(BigDecimal value) {
     if (!_valueSet.contains(value)) {
       if (_valueSet.size() < _limit) {
         _valueSet.add(value);
@@ -85,5 +64,6 @@ public class RawBigDecimalSingleColumnDistinctOrderByExecutor extends BaseRawBig
         }
       }
     }
+    return false;
   }
 }

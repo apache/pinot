@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.PlanFragmentMetadata;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -92,12 +93,14 @@ public class PinotLogicalQueryPlanner {
       // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
       PlanNode subPlanRootSenderNode =
           new MailboxSendNode(subPlanRoot.getPlanFragmentId(), subPlanRoot.getDataSchema(),
-              0, RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false);
+              0, RelDistribution.Type.RANDOM_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
+              false);
       subPlanRootSenderNode.addInput(subPlanRoot);
 
       PlanNode subPlanRootReceiverNode =
           new MailboxReceiveNode(0, subPlanRoot.getDataSchema(), subPlanRoot.getPlanFragmentId(),
-              RelDistribution.Type.RANDOM_DISTRIBUTED, null, null, false, false, subPlanRootSenderNode);
+              RelDistribution.Type.RANDOM_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
+              false, false, subPlanRootSenderNode);
       subPlanRoot = subPlanRootReceiverNode;
       PlanFragment planFragment1 = planFragmentContext._planFragmentIdToRootNodeMap.get(1);
       planFragmentContext._planFragmentIdToRootNodeMap.put(1,

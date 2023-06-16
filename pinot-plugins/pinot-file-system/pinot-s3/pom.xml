@@ -35,10 +35,10 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <aws.sdk.version>2.14.28</aws.sdk.version>
+    <aws.sdk.version>2.20.83</aws.sdk.version>
     <http.client.version>4.5.13</http.client.version>
     <http.core.version>4.4.13</http.core.version>
-    <s3mock.version>2.1.19</s3mock.version>
+    <s3mock.version>2.12.2</s3mock.version>
     <javax.version>3.1.0</javax.version>
     <phase.prop>package</phase.prop>
   </properties>
@@ -183,27 +183,9 @@
     </dependency>
     <dependency>
       <groupId>com.adobe.testing</groupId>
-      <artifactId>s3mock-testng</artifactId>
+      <artifactId>s3mock-testcontainers</artifactId>
       <version>${s3mock.version}</version>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>ch.qos.logback</groupId>
-          <artifactId>logback-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-to-slf4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.httpcomponents</groupId>
-          <artifactId>httpclient</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>

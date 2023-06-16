@@ -19,11 +19,8 @@
 package org.apache.pinot.core.query.distinct.raw;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -37,42 +34,8 @@ public class RawLongSingleColumnDistinctOnlyExecutor extends BaseRawLongSingleCo
   }
 
   @Override
-  public boolean process(ValueBlock valueBlock) {
-    BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
-    int numDocs = valueBlock.getNumDocs();
-    if (blockValueSet.isSingleValue()) {
-      long[] values = blockValueSet.getLongValuesSV();
-      if (_nullHandlingEnabled) {
-        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-        for (int i = 0; i < numDocs; i++) {
-          if (nullBitmap != null && nullBitmap.contains(i)) {
-            _hasNull = true;
-          } else {
-            _valueSet.add(values[i]);
-            if (_valueSet.size() >= _limit - (_hasNull ? 1 : 0)) {
-              return true;
-            }
-          }
-        }
-      } else {
-        for (int i = 0; i < numDocs; i++) {
-          _valueSet.add(values[i]);
-          if (_valueSet.size() >= _limit) {
-            return true;
-          }
-        }
-      }
-    } else {
-      long[][] values = blockValueSet.getLongValuesMV();
-      for (int i = 0; i < numDocs; i++) {
-        for (long value : values[i]) {
-          _valueSet.add(value);
-          if (_valueSet.size() >= _limit) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
+  protected boolean add(long val) {
+    _valueSet.add(val);
+    return _valueSet.size() >= _limit;
   }
 }

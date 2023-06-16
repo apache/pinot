@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -39,10 +41,13 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.AssertJUnit.assertTrue;
 
 
 public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
@@ -50,7 +55,10 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String COLUMN1 = "column1";
+  private static final String COLUMN2 = "column2";
+  private static final int NULL_PLACEHOLDER = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
 
+  private List<GenericRow> _rows;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -69,10 +77,9 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  private void setUp(TableConfig tableConfig, List<GenericRow> records)
+  private void setUpSegments(TableConfig tableConfig, Schema schema, List<GenericRow> records)
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
@@ -88,17 +95,29 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
+  private void insertRow(Object value) {
+    GenericRow row = new GenericRow();
+    row.putValue(COLUMN1, value);
+    _rows.add(row);
+  }
+
+  private void insertRowWithTwoColumns(Object column1Value, Object column2Value) {
+    GenericRow row = new GenericRow();
+    row.putValue(COLUMN1, column1Value);
+    row.putValue(COLUMN2, column2Value);
+    _rows.add(row);
+  }
+
   @Test
   public void testSelectDistinctOrderByNullsFirst()
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
-    GenericRow nonNullRow = new GenericRow();
-    nonNullRow.putValue(COLUMN1, 1);
-    GenericRow nullRow = new GenericRow();
-    nullRow.putValue(COLUMN1, null);
-    List<GenericRow> rows = Arrays.asList(nonNullRow, nullRow);
+    _rows = new ArrayList<>();
+    insertRow(1);
+    insertRow(null);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    setUp(tableConfig, rows);
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema, _rows);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s NULLS FIRST", COLUMN1, COLUMN1);
@@ -114,13 +133,12 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   public void testSelectDistinctOrderByNullsLast()
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
-    GenericRow nonNullRow = new GenericRow();
-    nonNullRow.putValue(COLUMN1, 1);
-    GenericRow nullRow = new GenericRow();
-    nullRow.putValue(COLUMN1, null);
-    List<GenericRow> rows = Arrays.asList(nonNullRow, nullRow);
+    _rows = new ArrayList<>();
+    insertRow(1);
+    insertRow(null);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    setUp(tableConfig, rows);
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema, _rows);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s NULLS LAST", COLUMN1, COLUMN1);
@@ -130,5 +148,132 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     assertNotNull(resultTable.getRows().get(0)[0]);
     assertNull(resultTable.getRows().get(1)[0]);
+  }
+
+  @Test
+  public void testSelectDistinctNullPlaceholderDiffersFromNull()
+      throws Exception {
+    FileUtils.deleteDirectory(INDEX_DIR);
+    _rows = new ArrayList<>();
+    insertRow(1);
+    insertRow(NULL_PLACEHOLDER);
+    insertRow(null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s NULLS LAST", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 3);
+  }
+
+  @Test
+  public void testSelectDistinctMultiColumn()
+      throws Exception {
+    _rows = new ArrayList<>();
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query =
+        String.format("SELECT DISTINCT %s,%s FROM testTable ORDER BY %s,%s", COLUMN1, COLUMN2, COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 4);
+  }
+
+  @Test
+  public void testSelectDistinctOrderByMultiColumn()
+      throws Exception {
+    _rows = new ArrayList<>();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query =
+        String.format("SELECT DISTINCT %s,%s FROM testTable ORDER BY %s,%s", COLUMN1, COLUMN2, COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 4);
+    assertEquals(resultTable.getRows().get(0), new Object[]{1, 1});
+    assertEquals(resultTable.getRows().get(1), new Object[]{null, 1});
+    assertEquals(resultTable.getRows().get(2), new Object[]{null, 2});
+    assertEquals(resultTable.getRows().get(3), new Object[]{null, null});
+  }
+
+  @DataProvider(name = "DataTypes")
+  public static Object[][] getDataTypes() {
+    return new Object[][]{
+        {FieldSpec.DataType.INT}, {FieldSpec.DataType.LONG}, {FieldSpec.DataType.DOUBLE}, {FieldSpec.DataType.FLOAT}
+    };
+  }
+
+  @Test(dataProvider = "DataTypes")
+  public void testSelectDistinctWithLimit(FieldSpec.DataType dataType)
+      throws Exception {
+    _rows = new ArrayList<>();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT 3", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 3);
+  }
+
+  @Test(dataProvider = "DataTypes")
+  public void testSelectDistinctOrderByWithLimit(FieldSpec.DataType dataType)
+      throws Exception {
+    double delta = 0.01;
+    _rows = new ArrayList<>();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT 3", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 3);
+    assertTrue(Math.abs(((Number) resultTable.getRows().get(0)[0]).doubleValue() - 1.0) < delta);
+    assertTrue(Math.abs(((Number) resultTable.getRows().get(1)[0]).doubleValue() - 2.0) < delta);
+    assertTrue(Math.abs(((Number) resultTable.getRows().get(2)[0]).doubleValue() - 3.0) < delta);
   }
 }

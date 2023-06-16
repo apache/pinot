@@ -186,6 +186,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Initialize Pinot Environment Provider
     _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
 
+    // Initialize the data buffer factory
+    PinotDataBuffer.loadDefaultFactory(serverConf);
+
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
@@ -624,12 +627,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Shutting down Pinot server");
     long startTimeMs = System.currentTimeMillis();
 
-    try {
-      LOGGER.info("Closing PinotFS classes");
-      PinotFSFactory.shutdown();
-    } catch (IOException e) {
-      LOGGER.warn("Caught exception closing PinotFS classes", e);
-    }
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
@@ -648,6 +645,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _serverQueriesDisabledTracker.stop();
     _realtimeLuceneIndexRefreshState.stop();
+    try {
+      // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
+      // be uploaded to the deep-store.
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.warn("Caught exception closing PinotFS classes", e);
+    }
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
     _adminApiApplication.stop();

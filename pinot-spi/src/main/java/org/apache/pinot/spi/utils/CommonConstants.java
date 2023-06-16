@@ -84,10 +84,9 @@ public class CommonConstants {
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
 
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
+    public static final boolean DEFAULT_ENABLE_CASE_INSENSITIVE = true;
     public static final String ALLOW_TABLE_NAME_WITH_DATABASE = "allow.table.name.with.database";
     public static final boolean DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE = false;
-    @Deprecated
-    public static final String DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive.pql";
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;

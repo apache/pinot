@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.MailboxMetadata;
@@ -35,57 +36,58 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
 
   @Override
   public Void process(PlanNode node, DispatchablePlanContext context) {
-    if (node instanceof MailboxSendNode || node instanceof MailboxReceiveNode) {
-      int receiverStageId =
-          isMailboxReceiveNode(node) ? node.getPlanFragmentId() : ((MailboxSendNode) node).getReceiverStageId();
-      int senderStageId =
-          isMailboxReceiveNode(node) ? ((MailboxReceiveNode) node).getSenderStageId() : node.getPlanFragmentId();
-      DispatchablePlanMetadata receiverStagePlanMetadata =
-          context.getDispatchablePlanMetadataMap().get(receiverStageId);
-      DispatchablePlanMetadata senderStagePlanMetadata = context.getDispatchablePlanMetadataMap().get(senderStageId);
-      receiverStagePlanMetadata.getServerInstanceToWorkerIdMap().entrySet().stream().forEach(receiverEntry -> {
-        QueryServerInstance receiverServerInstance = receiverEntry.getKey();
-        List<Integer> receiverWorkerIds = receiverEntry.getValue();
-        for (int receiverWorkerId : receiverWorkerIds) {
-          receiverStagePlanMetadata.getWorkerIdToMailBoxIdsMap().putIfAbsent(receiverWorkerId, new HashMap<>());
-          senderStagePlanMetadata.getServerInstanceToWorkerIdMap().entrySet().stream().forEach(senderEntry -> {
-            QueryServerInstance senderServerInstance = senderEntry.getKey();
-            List<Integer> senderWorkerIds = senderEntry.getValue();
-            for (int senderWorkerId : senderWorkerIds) {
-              MailboxMetadata mailboxMetadata =
-                  isMailboxReceiveNode(node)
-                      ? getMailboxMetadata(receiverStagePlanMetadata, senderStageId, receiverWorkerId)
-                      : getMailboxMetadata(senderStagePlanMetadata, receiverStageId, senderWorkerId);
-              mailboxMetadata.getMailBoxIdList().add(
-                  MailboxIdUtils.toPlanMailboxId(senderStageId, senderWorkerId, receiverStageId, receiverWorkerId));
-              VirtualServerAddress virtualServerAddress =
-                  isMailboxReceiveNode(node)
-                      ? new VirtualServerAddress(senderServerInstance, senderWorkerId)
-                      : new VirtualServerAddress(receiverServerInstance, receiverWorkerId);
-              mailboxMetadata.getVirtualAddressList().add(virtualServerAddress);
-            }
-          });
-        }
-      });
+    if (node instanceof MailboxSendNode) {
+      MailboxSendNode sendNode = (MailboxSendNode) node;
+      int senderFragmentId = sendNode.getPlanFragmentId();
+      int receiverFragmentId = sendNode.getReceiverStageId();
+      Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
+      DispatchablePlanMetadata senderMetadata = metadataMap.get(senderFragmentId);
+      DispatchablePlanMetadata receiverMetadata = metadataMap.get(receiverFragmentId);
+      Map<QueryServerInstance, List<Integer>> senderWorkerIdsMap = senderMetadata.getServerInstanceToWorkerIdMap();
+      Map<QueryServerInstance, List<Integer>> receiverWorkerIdsMap = receiverMetadata.getServerInstanceToWorkerIdMap();
+      Map<Integer, Map<Integer, MailboxMetadata>> senderMailboxesMap = senderMetadata.getWorkerIdToMailBoxIdsMap();
+      Map<Integer, Map<Integer, MailboxMetadata>> receiverMailboxesMap = receiverMetadata.getWorkerIdToMailBoxIdsMap();
+
+      if (sendNode.getDistributionType() == RelDistribution.Type.SINGLETON) {
+        // For SINGLETON exchange type, send the data to the same instance (same worker id)
+        senderWorkerIdsMap.forEach((serverInstance, workerIds) -> {
+          for (int workerId : workerIds) {
+            MailboxMetadata mailboxMetadata = new MailboxMetadata(Collections.singletonList(
+                MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId)),
+                Collections.singletonList(new VirtualServerAddress(serverInstance, workerId)), Collections.emptyMap());
+            senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverFragmentId, mailboxMetadata);
+            receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxMetadata);
+          }
+        });
+      } else {
+        // For other exchange types, send the data to all the instances in the receiver fragment
+        // TODO: Add support for more exchange types
+        senderWorkerIdsMap.forEach((senderServerInstance, senderWorkerIds) -> {
+          for (int senderWorkerId : senderWorkerIds) {
+            Map<Integer, MailboxMetadata> senderMailboxMetadataMap =
+                senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>());
+            receiverWorkerIdsMap.forEach((receiverServerInstance, receiverWorkerIds) -> {
+              for (int receiverWorkerId : receiverWorkerIds) {
+                Map<Integer, MailboxMetadata> receiverMailboxMetadataMap =
+                    receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>());
+                String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, senderWorkerId, receiverFragmentId,
+                    receiverWorkerId);
+                MailboxMetadata senderMailboxMetadata =
+                    senderMailboxMetadataMap.computeIfAbsent(receiverFragmentId, k -> new MailboxMetadata());
+                senderMailboxMetadata.getMailBoxIdList().add(mailboxId);
+                senderMailboxMetadata.getVirtualAddressList()
+                    .add(new VirtualServerAddress(receiverServerInstance, receiverWorkerId));
+                MailboxMetadata receiverMailboxMetadata =
+                    receiverMailboxMetadataMap.computeIfAbsent(senderFragmentId, k -> new MailboxMetadata());
+                receiverMailboxMetadata.getMailBoxIdList().add(mailboxId);
+                receiverMailboxMetadata.getVirtualAddressList()
+                    .add(new VirtualServerAddress(senderServerInstance, senderWorkerId));
+              }
+            });
+          }
+        });
+      }
     }
     return null;
-  }
-
-  private static boolean isMailboxReceiveNode(PlanNode node) {
-    return node instanceof MailboxReceiveNode;
-  }
-
-  private MailboxMetadata getMailboxMetadata(DispatchablePlanMetadata dispatchablePlanMetadata, int planFragmentId,
-      int workerId) {
-    Map<Integer, Map<Integer, MailboxMetadata>> workerIdToMailBoxIdsMap =
-        dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap();
-    if (!workerIdToMailBoxIdsMap.containsKey(workerId)) {
-      workerIdToMailBoxIdsMap.put(workerId, new HashMap<>());
-    }
-    Map<Integer, MailboxMetadata> planFragmentToMailboxMetadataMap = workerIdToMailBoxIdsMap.get(workerId);
-    if (!planFragmentToMailboxMetadataMap.containsKey(planFragmentId)) {
-      planFragmentToMailboxMetadataMap.put(planFragmentId, new MailboxMetadata());
-    }
-    return planFragmentToMailboxMetadataMap.get(planFragmentId);
   }
 }

@@ -171,10 +171,42 @@ if $cygwin; then
   [ -n "$REPO" ] && REPO=`cygpath --path --windows "$REPO"`
 fi
 
+
+jdk_version() {
+  IFS='
+'
+  # remove \r for Cygwin
+  lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
+  for line in $lines; do
+    if test -z $result && echo "$line" | grep -q 'version "'
+    then
+      ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
+      # on macOS, sed doesn't support '?'
+      if case $ver in "1."*) true;; *) false;; esac;
+      then
+        result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
+      else
+        result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
+      fi
+    fi
+  done
+  unset IFS
+  echo "$result"
+}
+
 if [ -z "$JAVA_OPTS" ] ; then
   ALL_JAVA_OPTS="@EXTRA_JVM_ARGUMENTS@"
 else
   ALL_JAVA_OPTS=$JAVA_OPTS
+fi
+
+if [ "$(jdk_version)" -gt 11 ]; then
+  ALL_JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED \
+  --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+  --add-opens=java.base/java.lang=ALL-UNNAMED \
+  --add-opens=java.base/java.util=ALL-UNNAMED \
+  --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+  $JAVA_OPTS"
 fi
 
 if [ -z "$PLUGINS_DIR" ] ; then

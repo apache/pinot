@@ -45,4 +45,7 @@
 
   <!-- Allow static imports in tests -->
   <suppress checks="AvoidStaticImport" files="[\\/]src[\\/]test[\\/].*" />
+
+  <suppress checks="IllegalImport" files="Unsafer.java"/>
+  <suppress checks="IllegalImport" files="UnsafePinotBuffer.java"/>
 </suppressions>
