@@ -61,7 +61,7 @@ abstract class BaseRawFloatSingleColumnDistinctExecutor implements DistinctExecu
   public DistinctTable getResult() {
     DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
         new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
-    List<Record> records = new ArrayList<>(_valueSet.size());
+    List<Record> records = new ArrayList<>(_valueSet.size() + (_hasNull ? 1 : 0));
     FloatIterator valueIterator = _valueSet.iterator();
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextFloat()}));
