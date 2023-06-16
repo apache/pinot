@@ -76,6 +76,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
 
     setUpH2Connection();
     for (Map.Entry<String, String> tableResource : TPCH_QUICKSTART_TABLE_RESOURCES.entrySet()) {
+      File tableSegmentDir = new File(_segmentDir, tableResource.getKey());
+      File tarDir = new File(_tarDir, tableResource.getKey());
       String tableName = tableResource.getKey();
       URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
       Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
@@ -94,14 +96,14 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
       File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
       // Pinot
-      TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+      TestUtils.ensureDirectoriesExistAndEmpty(tableSegmentDir, tarDir);
       Schema schema = createSchema(schemaFile);
       addSchema(schema);
       TableConfig tableConfig = createTableConfig(tableFile);
       addTableConfig(tableConfig);
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
-          _segmentDir, _tarDir);
-      uploadSegments(tableName, _tarDir);
+          tableSegmentDir, tarDir);
+      uploadSegments(tableName, tarDir);
       // H2
       ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection,
           schema);
