@@ -218,7 +218,6 @@ public class FunnelCountAggregationFunction implements AggregationFunction<List<
 
   enum Option {
     STEPS("steps"),
-    //SEQUENCE_BY("sequenceby"),
     CORRELATE_BY("correlateby");
 
     final String _name;
