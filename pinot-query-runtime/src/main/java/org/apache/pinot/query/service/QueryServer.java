@@ -100,7 +100,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     try {
       distributedStagePlans = QueryPlanSerDeUtils.deserializeStagePlan(request);
     } catch (Exception e) {
-      LOGGER.error("Caught exception while deserializing the request: {}, payload: {}", requestId, request, e);
+      LOGGER.error("Caught exception while deserializing the request: {}", requestId, e);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
