@@ -128,7 +128,6 @@ public class ColumnMinMaxValueGenerator {
   private void addColumnMinMaxValueForColumn(String columnName)
       throws Exception {
     // Skip column without dictionary or with min/max value already set
-    System.out.println(_segmentMetadata.getName());
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     if (columnMetadata.getMinValue() != null || columnMetadata.getMaxValue() != null) {
       return;
