@@ -29,6 +29,8 @@ import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -37,7 +39,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -119,65 +120,127 @@ public class ColumnMinMaxValueGenerator {
 
   private boolean needAddColumnMinMaxValueForColumn(String columnName) {
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
-    return columnMetadata.hasDictionary() && columnMetadata.getMinValue() == null
+    return columnMetadata.getMinValue() == null
         && columnMetadata.getMaxValue() == null && !columnMetadata.isMinMaxValueInvalid();
   }
 
   private void addColumnMinMaxValueForColumn(String columnName)
       throws Exception {
     // Skip column without dictionary or with min/max value already set
+    System.out.println(_segmentMetadata.getName());
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
-    if (!columnMetadata.hasDictionary() || columnMetadata.getMinValue() != null
-        || columnMetadata.getMaxValue() != null) {
+    if (columnMetadata.getMinValue() != null || columnMetadata.getMaxValue() != null) {
       return;
     }
 
-    PinotDataBuffer dictionaryBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.dictionary());
     DataType dataType = columnMetadata.getDataType().getStoredType();
-    int length = columnMetadata.getCardinality();
-    switch (dataType) {
-      case INT:
-        try (IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1));
-        }
-        break;
-      case LONG:
-        try (LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1));
-        }
-        break;
-      case FLOAT:
-        try (FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1));
-        }
-        break;
-      case DOUBLE:
-        try (DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1));
-        }
-        break;
-      case STRING:
-        try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
-            columnMetadata.getColumnMaxLength())) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              stringDictionary.getStringValue(0), stringDictionary.getStringValue(length - 1));
-        }
-        break;
-      case BYTES:
-        try (BytesDictionary bytesDictionary = new BytesDictionary(dictionaryBuffer, length,
-            columnMetadata.getColumnMaxLength())) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              bytesDictionary.getStringValue(0), bytesDictionary.getStringValue(length - 1));
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
+    if (columnMetadata.hasDictionary()) {
+      PinotDataBuffer dictionaryBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.dictionary());
+      int length = columnMetadata.getCardinality();
+      switch (dataType) {
+        case INT:
+          try (IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, length)) {
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1));
+          }
+          break;
+        case LONG:
+          try (LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, length)) {
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1));
+          }
+          break;
+        case FLOAT:
+          try (FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, length)) {
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1));
+          }
+          break;
+        case DOUBLE:
+          try (DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, length)) {
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1));
+          }
+          break;
+        case STRING:
+          try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
+              columnMetadata.getColumnMaxLength())) {
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                stringDictionary.getStringValue(0), stringDictionary.getStringValue(length - 1));
+          }
+          break;
+        case BYTES:
+          try (BytesDictionary bytesDictionary = new BytesDictionary(dictionaryBuffer, length,
+              columnMetadata.getColumnMaxLength())) {
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                bytesDictionary.getStringValue(0), bytesDictionary.getStringValue(length - 1));
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
+      }
+    } else {
+      // setting min/max for non-dictionary columns.
+      PinotDataBuffer forwardBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
+      switch (dataType) {
+        case INT:
+          try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(forwardBuffer,
+              DataType.INT); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+            Integer[] minMaxValue = {Integer.MAX_VALUE, Integer.MIN_VALUE};
+            for (int docs = 0; docs < columnMetadata.getTotalDocs(); docs++) {
+              minMaxValue = getMinMaxValue(minMaxValue, rawIndexReader.getInt(docs, readerContext));
+            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                String.valueOf(minMaxValue[0]), String.valueOf(minMaxValue[1]));
+          }
+          break;
+        case LONG:
+          try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(forwardBuffer,
+              DataType.LONG); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+            Long[] minMaxValue = {Long.MAX_VALUE, Long.MIN_VALUE};
+            for (int docs = 0; docs < columnMetadata.getTotalDocs(); docs++) {
+              minMaxValue = getMinMaxValue(minMaxValue, rawIndexReader.getLong(docs, readerContext));
+            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                String.valueOf(minMaxValue[0]), String.valueOf(minMaxValue[1]));
+          }
+          break;
+        case FLOAT:
+          try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(forwardBuffer,
+              DataType.FLOAT); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+            Float[] minMaxValue = {Float.MAX_VALUE, Float.MIN_VALUE};
+            for (int docs = 0; docs < columnMetadata.getTotalDocs(); docs++) {
+              minMaxValue = getMinMaxValue(minMaxValue, rawIndexReader.getFloat(docs, readerContext));
+            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                String.valueOf(minMaxValue[0]), String.valueOf(minMaxValue[1]));
+          }
+          break;
+        case DOUBLE:
+          try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(forwardBuffer,
+              DataType.DOUBLE); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+            Double[] minMaxValue = {Double.MAX_VALUE, Double.MIN_VALUE};
+            for (int docs = 0; docs < columnMetadata.getTotalDocs(); docs++) {
+              minMaxValue = getMinMaxValue(minMaxValue, rawIndexReader.getDouble(docs, readerContext));
+            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                String.valueOf(minMaxValue[0]), String.valueOf(minMaxValue[1]));
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
+      }
     }
-
     _minMaxValueAdded = true;
+  }
+
+  private <T extends Comparable<T>> T[] getMinMaxValue(T[] minMaxValues, T val) {
+    if (val.compareTo(minMaxValues[0]) < 0) {
+      minMaxValues[0] = val;
+    }
+    if (val.compareTo(minMaxValues[1]) > 0) {
+      minMaxValues[1] = val;
+    }
+    return minMaxValues;
   }
 }
