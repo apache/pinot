@@ -179,7 +179,7 @@ public class ColumnMinMaxValueGenerator {
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
       }
-    } else if(_segmentMetadata.getSchema().getFieldSpecFor(columnName).getFieldType() == FieldSpec.FieldType.METRIC) {
+    } else if (_segmentMetadata.getSchema().getFieldSpecFor(columnName).getFieldType() == FieldSpec.FieldType.METRIC) {
       // setting min/max for non-dictionary columns.
       PinotDataBuffer forwardBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
       switch (dataType) {
