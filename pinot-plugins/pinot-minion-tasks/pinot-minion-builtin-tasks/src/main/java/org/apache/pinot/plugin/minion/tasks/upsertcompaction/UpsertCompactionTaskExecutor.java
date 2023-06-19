@@ -187,6 +187,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     return config;
   }
 
+  // TODO: Consider moving this method to a more appropriate class (eg ServerSegmentMetadataReader)
   private static ImmutableRoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs)
       throws URISyntaxException {
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
