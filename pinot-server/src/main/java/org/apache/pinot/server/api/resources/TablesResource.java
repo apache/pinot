@@ -503,7 +503,7 @@ public class TablesResource {
       }
       Map<String, Integer> validDocIdMetadata = new HashMap<>();
       int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
-      int totalValidDocs = (int) validDocIds.stream().count();
+      int totalValidDocs = validDocIds.getCardinality();
       int totalInvalidDocs = totalDocs - totalValidDocs;
       validDocIdMetadata.put("totalDocs", totalDocs);
       validDocIdMetadata.put("totalValidDocs", totalValidDocs);
