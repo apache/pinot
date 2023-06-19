@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.ingestion.batch;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -140,6 +141,7 @@ public class IngestionJobLauncher {
     LOGGER.info("Trying to create instance for class {}", ingestionJobRunnerClassName);
     IngestionJobRunner ingestionJobRunner;
     try {
+      Preconditions.checkState(ingestionJobRunnerClassName != null, "Only 1 stream supported per table");
       ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
     } catch (Exception e) {
       throw new RuntimeException(
