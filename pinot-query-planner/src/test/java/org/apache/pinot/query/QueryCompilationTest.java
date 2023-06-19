@@ -334,6 +334,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(tableNames.get(2), "c");
     Assert.assertEquals(tableNames.get(3), "d");
 
+    // query with aliases, JOIN, IN/NOT-IN, group-by and explain
+    query = "explain plan for with tmp as (select col1, sum(col3) as col3, count(*) from a where col1 = 'a' "
+        + "group by col1), tmp2 as (select A.col1, B.col3 from b as A JOIN c AS B on A.col1 = B.col1) "
+        + "select sum(col3) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from d)";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+    Assert.assertEquals(tableNames.get(3), "d");
+
     // test for self join queries
     query = "SELECT a.col1 FROM a JOIN(SELECT col2 FROM a) as self ON a.col1=self.col2 ";
     tableNames = _queryEnvironment.getTableNamesForQuery(query);

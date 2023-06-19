@@ -213,8 +213,11 @@ public class QueryEnvironment {
   @VisibleForTesting
   public List<String> getTableNamesForQuery(String sqlQuery) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
-      RelRoot relRoot = compileQuery(CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode(),
-          plannerContext);
+      SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
+      if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
+          sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+      }
+      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (CalciteContextException e) {
