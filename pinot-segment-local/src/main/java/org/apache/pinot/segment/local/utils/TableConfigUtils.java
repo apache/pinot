@@ -535,12 +535,17 @@ public final class TableConfigUtils {
           // check upsert enabled
           Preconditions.checkState(tableConfig.isUpsertEnabled(),
               "Upsert must be enabled for UpsertCompactionTask");
+
           // check no malformed period
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
+          if (taskTypeConfig.containsKey("bufferTimePeriod")) {
+            TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
+          }
           // check maxNumRecordsPerSegment
-          Preconditions.checkState(Double.parseDouble(
-                  taskTypeConfig.getOrDefault("invalidRecordsThresholdPercent", "10.0")) >= 0,
-              "invalidRecordsThresholdPercent must be >= 0");
+          if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
+            Preconditions.checkState(
+                Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) >= 0,
+                "invalidRecordsThresholdPercent must be >= 0");
+          }
         }
       }
     }
