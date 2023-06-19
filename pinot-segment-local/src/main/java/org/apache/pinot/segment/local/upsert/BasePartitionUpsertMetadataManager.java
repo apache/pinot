@@ -375,9 +375,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _numOutOfOrderEvents++;
     long currentTimeNs = System.nanoTime();
     if (currentTimeNs - _lastOutOfOrderEventReportTimeNs > OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS) {
-      _logger.warn("Skipped {} out-of-order events for partial-upsert table (the last event has current comparison "
-              + "value: {}, record comparison value: {})", _numOutOfOrderEvents, currentComparisonValue,
-          recordComparisonValue);
+      _logger.warn("Skipped {} out-of-order events for upsert table {} (the last event has current comparison "
+              + "value: {}, record comparison value: {})", _numOutOfOrderEvents, _tableNameWithType,
+          currentComparisonValue, recordComparisonValue);
       _lastOutOfOrderEventReportTimeNs = currentTimeNs;
       _numOutOfOrderEvents = 0;
     }
