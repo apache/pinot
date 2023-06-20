@@ -56,6 +56,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 30.0;
+  private static final long DEFAULT_MIN_RECORD_COUNT = 100_000;
   @Override
   public String getTaskType() {
     return MinionConstants.UpsertCompactionTask.TASK_TYPE;
@@ -79,7 +80,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> completedSegments = getCompletedSegments(tableNameWithType, compactionConfigs);
 
       if (completedSegments.isEmpty()) {
-        LOGGER.info("No completed segments were available for compaction for table: {}", tableNameWithType);
+        LOGGER.info("No completed segments were eligible for compaction for table: {}", tableNameWithType);
         continue;
       }
 
@@ -188,11 +189,14 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     String bufferPeriod = compactionConfigs.getOrDefault(
         UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
     long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
+    long minRecordCount =
+        Long.parseLong(compactionConfigs.getOrDefault(UpsertCompactionTask.MIN_RECORD_COUNT,
+            String.valueOf(DEFAULT_MIN_RECORD_COUNT)));
     List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
     for (SegmentZKMetadata segment : allSegments) {
       CommonConstants.Segment.Realtime.Status status = segment.getStatus();
-      // initial segments selection based on status and age
-      if (status.isCompleted()) {
+      // initial segments selection based on status, record count, and age
+      if (status.isCompleted() && segment.getTotalDocs() >= minRecordCount) {
         boolean endedWithinBufferPeriod = segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs);
         boolean endsInTheFuture = segment.getEndTimeMs() > System.currentTimeMillis();
         if (endedWithinBufferPeriod || endsInTheFuture) {
@@ -220,6 +224,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final String[] VALID_CONFIG_KEYS = {
       UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY,
       UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
+      UpsertCompactionTask.MIN_RECORD_COUNT
   };
 
   private Map<String, String> getCompactionConfigs(Map<String, String> taskConfig) {

@@ -146,8 +146,13 @@ public class MinionConstants {
     public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
     /**
      * The maximum percent of old records allowed for a completed segment.
-     * e.g. if the percent surpasses 30, then the segment will be compacted
+     * e.g. if the percent surpasses 30, then the segment may be compacted
      */
     public static final String INVALID_RECORDS_THRESHOLD_PERCENT = "invalidRecordsThresholdPercent";
+    /**
+     * The minimum count of records for a completed segment
+     * e.g. if the count surpasses 100k, then the segment may be compacted
+     */
+    public static final String MIN_RECORD_COUNT = "minRecordCount";
   }
 }
