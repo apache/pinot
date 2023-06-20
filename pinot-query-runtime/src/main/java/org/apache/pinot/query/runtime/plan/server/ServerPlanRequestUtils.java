@@ -36,11 +36,10 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -70,10 +69,9 @@ public class ServerPlanRequestUtils {
     // do not instantiate.
   }
 
-  public static ServerPlanRequestContext build(MailboxService mailboxService, DistributedStagePlan stagePlan,
-      Map<String, String> requestMetadataMap, PipelineBreakerResult pipelineBreakerResult,
-      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
-      List<String> segmentList, long deadlineMs) {
+  public static ServerPlanRequestContext build(PhysicalPlanContext planContext, DistributedStagePlan stagePlan,
+      Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo,
+      TableType tableType, List<String> segmentList) {
     // Before-visit: construct the ServerPlanRequestContext baseline
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
     long requestId = (Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)) << 16) + (
@@ -89,13 +87,10 @@ public class ServerPlanRequestUtils {
     }
     LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     pinotQuery.setExplain(false);
-    ServerPlanRequestContext context =
-        new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs, deadlineMs,
-            stagePlan.getServer(), stagePlan.getStageMetadata(), pipelineBreakerResult, pinotQuery, tableType,
-            timeBoundaryInfo, traceEnabled);
+    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(planContext, pinotQuery, tableType);
 
     // visit the plan and create query physical plan.
-    ServerPlanRequestVisitor.walkStageNode(stagePlan.getStageRoot(), context);
+    ServerPlanRequestVisitor.walkStageNode(stagePlan.getStageRoot(), serverContext);
 
     // Post-visit: finalize context.
     // 1. global rewrite/optimize
@@ -128,8 +123,8 @@ public class ServerPlanRequestUtils {
     instanceRequest.setSearchSegments(segmentList);
     instanceRequest.setQuery(brokerRequest);
 
-    context.setInstanceRequest(instanceRequest);
-    return context;
+    serverContext.setInstanceRequest(instanceRequest);
+    return serverContext;
   }
 
   /**

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -42,6 +43,7 @@ public class OpChainExecutionContext {
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
+  @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long timeoutMs, long deadlineMs, StageMetadata stageMetadata,
       boolean traceEnabled) {
