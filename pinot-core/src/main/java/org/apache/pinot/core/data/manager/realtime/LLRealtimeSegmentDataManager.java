@@ -687,7 +687,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _state = State.HOLDING;
           SegmentCompletionProtocol.Response response = postSegmentConsumedMsg();
           SegmentCompletionProtocol.ControllerResponseStatus status = response.getStatus();
-          StreamPartitionMsgOffset rspOffset = extractOffset(response);
           boolean success;
           switch (status) {
             case NOT_LEADER:
@@ -696,6 +695,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               hold();
               break;
             case CATCH_UP:
+              StreamPartitionMsgOffset rspOffset = extractOffset(response);
               if (rspOffset.compareTo(_currentOffset) <= 0) {
                 // Something wrong with the controller. Back off and try again.
                 _segmentLogger.error("Invalid catchup offset {} in controller response, current offset {}", rspOffset,

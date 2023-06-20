@@ -46,7 +46,6 @@ import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager;
-import org.apache.pinot.broker.routing.segmentpartition.TablePartitionInfo;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelectorFactory;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
@@ -63,6 +62,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -651,8 +651,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   @Override
   public Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType) {
-    return _tableTenantServersMap.containsKey(tableNameWithType) ? _tableTenantServersMap.get(tableNameWithType)
-        : new HashMap<String, ServerInstance>();
+    return _tableTenantServersMap.getOrDefault(tableNameWithType, Collections.emptyMap());
   }
 
   private String getIdealStatePath(String tableNameWithType) {
@@ -680,6 +679,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   @Nullable
+  @Override
   public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {

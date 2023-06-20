@@ -38,10 +38,7 @@ public class ColocatedJoinEngineQuickStart extends MultistageEngineQuickStart {
 
   @Override
   public String[] getDefaultBatchTableDirectories() {
-    List<String> colocatedTableDirs = new ArrayList<>(Arrays.asList(COLOCATED_JOIN_DIRECTORIES));
-    String[] multiStageTableDirs = super.getDefaultBatchTableDirectories();
-    colocatedTableDirs.addAll(Arrays.asList(multiStageTableDirs));
-    return colocatedTableDirs.toArray(new String[0]);
+    return COLOCATED_JOIN_DIRECTORIES;
   }
 
   @Override

@@ -3,21 +3,17 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "userGroups",
     "replication": "2",
     "replicaGroupStrategyConfig": {
       "partitionColumn": "userUUID",
       "numInstancesPerPartition": 2
     }
   },
-  "instancePartitionsMap": {
-    "OFFLINE": "userAttributes_OFFLINE"
-  },
   "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
   },
   "tableIndexConfig": {
-    "loadMode": "HEAP",
     "invertedIndexColumns": [
       "userUUID",
       "groupUUID"
@@ -30,6 +26,9 @@
         }
       }
     }
+  },
+  "instancePartitionsMap": {
+    "OFFLINE": "userAttributes_OFFLINE"
   },
   "routing": {
     "instanceSelectorType": "multiStageReplicaGroup"
