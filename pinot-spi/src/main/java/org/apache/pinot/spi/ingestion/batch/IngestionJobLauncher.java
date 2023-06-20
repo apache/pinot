@@ -28,7 +28,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
@@ -128,7 +127,7 @@ public class IngestionJobLauncher {
         kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassNameNotNull());
         break;
       case SegmentCreationAndMetadataPush:
-        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassNameNotNull();
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassNameNotNull());
         kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassNameNotNull());
 
         break;
