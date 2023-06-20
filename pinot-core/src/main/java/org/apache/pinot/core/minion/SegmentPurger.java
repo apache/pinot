@@ -230,6 +230,11 @@ public class SegmentPurger {
      * Get the {@link RecordPurger} for the given table.
      */
     RecordPurger getRecordPurger(String rawTableName);
+
+    default RecordPurger getRecordPurger(String rawTableName, PinotTaskConfig taskConfig, TableConfig tableConfig,
+        Schema tableSchema) {
+      return null;
+    }
   }
 
   /**
