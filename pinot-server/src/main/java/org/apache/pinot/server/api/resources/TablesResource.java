@@ -465,7 +465,7 @@ public class TablesResource {
   }
 
   @GET
-  @Path("/tables/{tableNameWithType}/segments/{segmentName}/validDocIdMetadata")
+  @Path("/tables/{tableNameWithType}/validDocIdMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provides segment validDocId metadata",
       notes = "Provides segment validDocId metadata")
@@ -477,41 +477,47 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName) {
+      @ApiParam(value = "Segment name", allowMultiple = true, required = true) @QueryParam("segmentNames")
+        List<String> segmentNames) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
-    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-    if (segmentDataManager == null) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+    List<String> missingSegments = new ArrayList<>();
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentNames, missingSegments);
+    if (!missingSegments.isEmpty()) {
+      throw new WebApplicationException(String.format("Table %s has missing segments", tableNameWithType),
           Response.Status.NOT_FOUND);
     }
-
-    try {
-      IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-        throw new WebApplicationException(
-            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
-            Response.Status.BAD_REQUEST);
+    List<Map<String, Object>> allValidDocIdMetadata = new ArrayList<>();
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      try {
+        IndexSegment indexSegment = segmentDataManager.getSegment();
+        if (!(indexSegment instanceof ImmutableSegmentImpl)) {
+          throw new WebApplicationException(String.format("Table %s segment %s is not a immutable segment",
+              tableNameWithType, segmentDataManager.getSegmentName()),
+              Response.Status.BAD_REQUEST);
+        }
+        MutableRoaringBitmap validDocIds =
+            indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
+        if (validDocIds == null) {
+          throw new WebApplicationException(
+              String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
+                  segmentDataManager.getSegmentName()),
+              Response.Status.NOT_FOUND);
+        }
+        Map<String, Object> validDocIdMetadata = new HashMap<>();
+        int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+        int totalValidDocs = validDocIds.getCardinality();
+        int totalInvalidDocs = totalDocs - totalValidDocs;
+        validDocIdMetadata.put("segmentName", segmentDataManager.getSegmentName());
+        validDocIdMetadata.put("totalDocs", totalDocs);
+        validDocIdMetadata.put("totalValidDocs", totalValidDocs);
+        validDocIdMetadata.put("totalInvalidDocs", totalInvalidDocs);
+        allValidDocIdMetadata.add(validDocIdMetadata);
+      } finally {
+        tableDataManager.releaseSegment(segmentDataManager);
       }
-      MutableRoaringBitmap validDocIds =
-          indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
-      if (validDocIds == null) {
-        throw new WebApplicationException(
-            String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
-            Response.Status.NOT_FOUND);
-      }
-      Map<String, Integer> validDocIdMetadata = new HashMap<>();
-      int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
-      int totalValidDocs = validDocIds.getCardinality();
-      int totalInvalidDocs = totalDocs - totalValidDocs;
-      validDocIdMetadata.put("totalDocs", totalDocs);
-      validDocIdMetadata.put("totalValidDocs", totalValidDocs);
-      validDocIdMetadata.put("totalInvalidDocs", totalInvalidDocs);
-      return ResourceUtils.convertToJsonString(validDocIdMetadata);
-    } finally {
-      tableDataManager.releaseSegment(segmentDataManager);
     }
+    return ResourceUtils.convertToJsonString(allValidDocIdMetadata);
   }
 
   /**

@@ -25,9 +25,12 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -82,7 +85,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // get server to segment mappings
       Map<String, List<String>> serverToSegments = _clusterInfoAccessor.getServerToSegmentsMap(tableNameWithType);
-      Map<String, String> segmentToServer = getSegmentToServer(serverToSegments);
       PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
       BiMap<String, String> serverToEndpoints;
       try {
@@ -91,10 +93,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         throw new RuntimeException(e);
       }
 
-      Map<String, SegmentZKMetadata> urlToSegment;
+      Map<String, SegmentZKMetadata> completedSegmentsMap = completedSegments.stream()
+          .collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
+
+      List<String> validDocIdUrls;
       try {
-        urlToSegment =
-            getUrlToSegmentMappings(tableNameWithType, completedSegments, segmentToServer, serverToEndpoints);
+        validDocIdUrls = getValidDocIdMetadataUrls(
+            serverToSegments, serverToEndpoints, tableNameWithType, completedSegmentsMap);
       } catch (URISyntaxException e) {
         throw new RuntimeException(e);
       }
@@ -103,8 +108,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(
             Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager(), serverToEndpoints.inverse());
       CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-            completionServiceHelper.doMultiGetRequest(
-                new ArrayList<>(urlToSegment.keySet()), tableNameWithType, true, 3000);
+            completionServiceHelper.doMultiGetRequest(validDocIdUrls, tableNameWithType, false, 3000);
 
       // only compact segments that exceed the threshold
       double invalidRecordsThresholdPercent =
@@ -112,19 +116,23 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
               String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
       List<SegmentZKMetadata> selectedSegments = new ArrayList<>();
       for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-        JsonNode validDocIdMetadata;
+        JsonNode allValidDocIdMetadata;
         try {
-          validDocIdMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
+          allValidDocIdMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
         } catch (IOException e) {
           LOGGER.error("Unable to parse validDocIdMetadata response for: {}", streamResponse.getKey());
           continue;
         }
-
-        double invalidRecordCount = validDocIdMetadata.get("totalInvalidDocs").asDouble();
-        SegmentZKMetadata segment = urlToSegment.get(streamResponse.getKey());
-        double invalidRecordPercent = (invalidRecordCount / segment.getTotalDocs()) * 100;
-        if (invalidRecordPercent > invalidRecordsThresholdPercent) {
-          selectedSegments.add(segment);
+        Iterator<JsonNode> iterator = allValidDocIdMetadata.elements();
+        while (iterator.hasNext()) {
+          JsonNode validDocIdMetadata = iterator.next();
+          double invalidRecordCount = validDocIdMetadata.get("totalInvalidDocs").asDouble();
+          String segmentName = validDocIdMetadata.get("segmentName").asText();
+          SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
+          double invalidRecordPercent = (invalidRecordCount / segment.getTotalDocs()) * 100;
+          if (invalidRecordPercent > invalidRecordsThresholdPercent) {
+            selectedSegments.add(segment);
+          }
         }
       }
 
@@ -149,6 +157,31 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  @VisibleForTesting
+  public static List<String> getValidDocIdMetadataUrls(Map<String, List<String>> serverToSegments,
+      BiMap<String, String> serverToEndpoints, String tableNameWithType,
+      Map<String, SegmentZKMetadata> completedSegments) throws URISyntaxException {
+    List<String> urls = new ArrayList<>();
+    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
+      String server = entry.getKey();
+      List<String> segmentNames = entry.getValue();
+      URIBuilder uriBuilder = new URIBuilder(serverToEndpoints.get(server)).setPath(
+          String.format("/tables/%s/validDocIdMetadata", tableNameWithType));
+      int completedSegmentCountPerServer = 0;
+      for (String segmentName : segmentNames) {
+        if (completedSegments.containsKey(segmentName)) {
+          completedSegmentCountPerServer++;
+          uriBuilder.addParameter("segmentNames", segmentName);
+        }
+      }
+      if (completedSegmentCountPerServer > 0) {
+        // only add to the list if the server has completed segments
+        urls.add(uriBuilder.toString());
+      }
+    }
+    return urls;
+  }
+
   private List<SegmentZKMetadata> getCompletedSegments(String tableNameWithType,
       Map<String, String> compactionConfigs) {
     List<SegmentZKMetadata> completedSegments = new ArrayList<>();
@@ -171,25 +204,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  public static Map<String, SegmentZKMetadata> getUrlToSegmentMappings(String tableNameWithType,
-      List<SegmentZKMetadata> completedSegments, Map<String, String> segmentToServer,
-      BiMap<String, String> serverToEndpoints)
-      throws URISyntaxException {
-    // get url to segment mappings
-    Map<String, SegmentZKMetadata> urlToSegment = new HashMap<>();
-    for (SegmentZKMetadata completedSegment : completedSegments) {
-      String segmentName = completedSegment.getSegmentName();
-      String server = segmentToServer.get(segmentName);
-      String endpoint = serverToEndpoints.get(server);
-      String url = new URIBuilder(endpoint)
-          .setPath(String.format("/tables/%s/segments/%s/validDocIdMetadata", tableNameWithType, segmentName))
-          .toString();
-      urlToSegment.put(url, completedSegment);
-    }
-    return urlToSegment;
-  }
-
-  @VisibleForTesting
   public static int getMaxTasks(String taskType, String tableNameWithType, Map<String, String> taskConfigs) {
     int maxTasks = Integer.MAX_VALUE;
     String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
@@ -201,20 +215,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
     }
     return maxTasks;
-  }
-
-  @VisibleForTesting
-  public static Map<String, String> getSegmentToServer(Map<String, List<String>> serverToSegments) {
-    Map<String, String> segmentToServer = new HashMap<>();
-    for (String server : serverToSegments.keySet()) {
-      List<String> segments = serverToSegments.get(server);
-      for (String segment : segments) {
-        if (!segmentToServer.containsKey(segment)) {
-          segmentToServer.put(segment, server);
-        }
-      }
-    }
-    return segmentToServer;
   }
 
   private static final String[] VALID_CONFIG_KEYS = {

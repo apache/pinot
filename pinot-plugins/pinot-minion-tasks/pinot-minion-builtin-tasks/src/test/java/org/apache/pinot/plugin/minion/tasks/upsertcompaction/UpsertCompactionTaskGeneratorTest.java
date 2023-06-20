@@ -56,6 +56,7 @@ public class UpsertCompactionTaskGeneratorTest {
   private TableConfig _tableConfig;
   private ClusterInfoAccessor _mockClusterInfoAccessor;
   private SegmentZKMetadata _completedSegment;
+  private SegmentZKMetadata _completedSegment2;
 
   @BeforeClass
   public void setUp() {
@@ -70,13 +71,18 @@ public class UpsertCompactionTaskGeneratorTest {
         .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
         .build();
     _mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
+
     _completedSegment = new SegmentZKMetadata("testTable__0");
     _completedSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    Long endTime = System.currentTimeMillis();
-    Long startTime = endTime - TimeUtils.convertPeriodToMillis("1d");
-    _completedSegment.setStartTime(startTime);
-    _completedSegment.setEndTime(endTime);
+    _completedSegment.setStartTime(System.currentTimeMillis() - TimeUtils.convertPeriodToMillis("2d"));
+    _completedSegment.setEndTime(System.currentTimeMillis() - TimeUtils.convertPeriodToMillis("1d"));
     _completedSegment.setTimeUnit(TimeUnit.MILLISECONDS);
+
+    _completedSegment2 = new SegmentZKMetadata("testTable__1");
+    _completedSegment2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    _completedSegment2.setStartTime(System.currentTimeMillis() - TimeUtils.convertPeriodToMillis("1d"));
+    _completedSegment2.setEndTime(System.currentTimeMillis());
+    _completedSegment2.setTimeUnit(TimeUnit.MILLISECONDS);
   }
 
   @Test
@@ -151,22 +157,28 @@ public class UpsertCompactionTaskGeneratorTest {
   }
 
   @Test
-  public void testGetUrlToSegmentMappings()
-      throws URISyntaxException {
-    List<SegmentZKMetadata> completedSegments = Lists.newArrayList(_completedSegment);
-    Map<String, String> segmentToServer = new HashMap<>();
-    segmentToServer.put(_completedSegment.getSegmentName(), "server1");
+  public void testGetValidDocIdMetadataUrls()
+    throws URISyntaxException {
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    serverToSegments.put("server1",
+        Lists.newArrayList(_completedSegment.getSegmentName(), _completedSegment2.getSegmentName()));
+    serverToSegments.put("server2", Lists.newArrayList("consumingSegment"));
     BiMap<String, String> serverToEndpoints = HashBiMap.create(1);
     serverToEndpoints.put("server1", "http://endpoint1");
+    serverToEndpoints.put("server2", "http://endpoint2");
+    Map<String, SegmentZKMetadata> completedSegments = new HashMap<>();
+    completedSegments.put(_completedSegment.getSegmentName(), _completedSegment);
+    completedSegments.put(_completedSegment2.getSegmentName(), _completedSegment2);
 
-    Map<String, SegmentZKMetadata> urlToSegment =
-        UpsertCompactionTaskGenerator.getUrlToSegmentMappings(
-            REALTIME_TABLE_NAME, completedSegments, segmentToServer, serverToEndpoints);
+    List<String> validDocIdUrls =
+        UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(
+            serverToSegments, serverToEndpoints, REALTIME_TABLE_NAME, completedSegments);
 
-    String expectedUrl = String.format("%s/tables/%s/segments/%s/validDocIdMetadata",
-        "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName());
-    SegmentZKMetadata seg = urlToSegment.get(expectedUrl);
-    assertEquals(seg.getSegmentName(), _completedSegment.getSegmentName());
+    String expectedUrl = String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s",
+        "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName(),
+        _completedSegment2.getSegmentName());
+    assertEquals(validDocIdUrls.get(0), expectedUrl);
+    assertEquals(validDocIdUrls.size(), 1);
   }
 
   @Test
@@ -178,15 +190,5 @@ public class UpsertCompactionTaskGeneratorTest {
         UpsertCompactionTaskGenerator.getMaxTasks(UpsertCompactionTask.TASK_TYPE, REALTIME_TABLE_NAME, taskConfigs);
 
     assertEquals(maxTasks, 10);
-  }
-
-  @Test
-  public void testGetSegmentToServer() {
-    Map<String, List<String>> serverToSegments = new HashMap<>();
-    serverToSegments.put("server1", Lists.newArrayList(_completedSegment.getSegmentName()));
-
-    Map<String, String> segmentToServer = UpsertCompactionTaskGenerator.getSegmentToServer(serverToSegments);
-
-    assertEquals(segmentToServer.get(_completedSegment.getSegmentName()), "server1");
   }
 }
