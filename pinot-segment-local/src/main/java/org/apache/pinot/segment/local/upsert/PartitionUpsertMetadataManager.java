@@ -85,6 +85,12 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   GenericRow updateRecord(GenericRow record, RecordInfo recordInfo);
 
   /**
+   * Takes snapshot for all the tracked immutable segments when snapshot is enabled. This method should be invoked
+   * before a new consuming segment starts consuming.
+   */
+  void takeSnapshot();
+
+  /**
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
