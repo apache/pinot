@@ -328,6 +328,24 @@
           "\n              LogicalTableScan(table=[[b]])",
           "\n"
         ]
+      },
+      {
+        "description": "Lateral join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL (SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE;\n",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], sum_col3=[$3])",
+          "\n  LogicalJoin(condition=[=($1, $2)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalAggregate(group=[{0}], sum_col3=[$SUM0($1)])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalAggregate(group=[{1}], sum_col3=[$SUM0($2)])",
+          "\n            LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
       }
     ]
   },
