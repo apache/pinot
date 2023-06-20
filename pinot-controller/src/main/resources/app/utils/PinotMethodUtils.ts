@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import jwtDecode from "jwt-decode";
 import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
 import { DataTable, SQLResult } from 'Models';
 import moment from 'moment';
@@ -1154,6 +1155,52 @@ const updateUser = (userObject, passwordChanged) =>{
   })
 }
 
+const getAuthUserNameFromAccessToken = (
+  accessToken: string
+): string => {
+  if (!accessToken) {
+      return "";
+  }
+
+  let decoded;
+  try {
+      decoded = jwtDecode(accessToken);
+  } catch (e) {
+      return "";
+  }
+
+  if (!decoded) {
+      return "";
+  }
+
+  const name = get(decoded, "name") || "";
+  return name;
+};
+
+const getAuthUserEmailFromAccessToken = (
+  accessToken: string
+): string => {
+  if (!accessToken) {
+      return "";
+  }
+
+  let decoded;
+  try {
+      decoded = jwtDecode(accessToken);
+  } catch (e) {
+      return "";
+  }
+
+  if (!decoded) {
+      return "";
+  }
+
+  const email =
+      get(decoded, "email") || "";
+
+  return email;
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -1236,5 +1283,7 @@ export default {
   getUserList,
   addUser,
   deleteUser,
-  updateUser
+  updateUser,
+  getAuthUserNameFromAccessToken,
+  getAuthUserEmailFromAccessToken
 };
