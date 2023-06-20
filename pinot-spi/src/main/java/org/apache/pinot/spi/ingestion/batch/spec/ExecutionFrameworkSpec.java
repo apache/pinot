@@ -76,6 +76,7 @@ public class ExecutionFrameworkSpec implements Serializable {
             "segmentGenerationJobRunnerClassName in job spec was null"
     );
     return getSegmentGenerationJobRunnerClassName();
+
   }
 
   public void setSegmentGenerationJobRunnerClassName(String segmentGenerationJobRunnerClassName) {
@@ -92,6 +93,7 @@ public class ExecutionFrameworkSpec implements Serializable {
             "segmentTarPushJobRunnerClassName in job spec was null"
     );
     return getSegmentTarPushJobRunnerClassName();
+
   }
 
   public void setSegmentTarPushJobRunnerClassName(String segmentTarPushJobRunnerClassName) {
@@ -108,6 +110,7 @@ public class ExecutionFrameworkSpec implements Serializable {
             "segmentUriPushJobRunnerClassName in job spec was null"
     );
     return getSegmentUriPushJobRunnerClassName();
+
   }
 
   public void setSegmentUriPushJobRunnerClassName(String segmentUriPushJobRunnerClassName) {
@@ -132,6 +135,7 @@ public class ExecutionFrameworkSpec implements Serializable {
             "segmentMetadataPushJobRunnerClassName in job spec was null"
     );
     return getSegmentMetadataPushJobRunnerClassName();
+
   }
 
   public void setSegmentMetadataPushJobRunnerClassName(String segmentMetadataPushJobRunnerClassName) {

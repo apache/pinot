@@ -28,6 +28,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Supplier;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
@@ -129,6 +131,7 @@ public class IngestionJobLauncher {
       case SegmentCreationAndMetadataPush:
         kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassNameNotNull();
         kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassNameNotNull());
+
         break;
       default:
         LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
@@ -141,11 +144,10 @@ public class IngestionJobLauncher {
     LOGGER.info("Trying to create instance for class {}", ingestionJobRunnerClassName);
     IngestionJobRunner ingestionJobRunner;
     try {
-      Preconditions.checkState(ingestionJobRunnerClassName != null, "Only 1 stream supported per table");
       ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);
+              "Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);
     }
     ingestionJobRunner.init(spec);
     try {
@@ -154,7 +156,7 @@ public class IngestionJobLauncher {
       throw new RuntimeException("Caught exception during running - " + ingestionJobRunnerClassName, e);
     }
   }
-
+  
   /**
    * Ingestion Job type Enum.
    */
