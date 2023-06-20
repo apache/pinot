@@ -586,7 +586,7 @@ public final class TableConfigUtils {
       }
 
       // Delete record column exist and is a BOOLEAN field
-      String deleteRecordColumn = upsertConfig.getDeletedRecordColumn();
+      String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
       if (deleteRecordColumn != null) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
         Preconditions.checkState(

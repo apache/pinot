@@ -406,7 +406,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setDeletedRecordColumn(deletedColumn);
+    upsertConfig.setDeleteRecordColumn(deletedColumn);
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
@@ -419,22 +419,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setUpsertConfig(upsertConfig).build();
   }
 
-
-  protected Map<String, String> getCSVStreamConfigMap(@Nullable String delimiter, @Nullable String csvHeaderProperty) {
+  protected Map<String, String> getCSVDecoderProperties(@Nullable String delimiter,
+      @Nullable String csvHeaderProperty) {
     String streamType = "kafka";
-    Map<String, String> streamConfigsMap = new HashMap<>();
-    streamConfigsMap.put(
+    Map<String, String> csvDecoderProperties = new HashMap<>();
+    csvDecoderProperties.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
         CSVMessageDecoder.class.getName());
     if (delimiter != null) {
-      streamConfigsMap.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.delimiter"),
+      csvDecoderProperties.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.delimiter"),
           delimiter);
     }
     if (csvHeaderProperty != null) {
-      streamConfigsMap.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.header"),
+      csvDecoderProperties.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.header"),
           csvHeaderProperty);
     }
-    return streamConfigsMap;
+    return csvDecoderProperties;
   }
 
   /**
@@ -596,7 +596,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    *
    * @param csvFile List of CSV strings
    */
-  protected void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex) {
+  protected void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex)
+      throws Exception {
     String kafkaBroker = "localhost:" + getKafkaPort();
     StreamDataProducer producer = null;
     try {
@@ -609,6 +610,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       if (producer != null) {
         producer.close();
       }
+      throw e;
     }
   }
 

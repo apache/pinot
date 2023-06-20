@@ -163,7 +163,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final List<String> _upsertComparisonColumns;
-  private final String _deletedRecordColumn;
+  private final String _deleteRecordColumn;
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
 
@@ -359,16 +359,16 @@ public class MutableSegmentImpl implements MutableSegment {
       List<String> upsertComparisonColumns = config.getUpsertComparisonColumns();
       _upsertComparisonColumns =
           upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
-      _deletedRecordColumn = config.getUpsertDeleteRecordColumn();
+      _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
-      if (_deletedRecordColumn != null) {
+      if (_deleteRecordColumn != null) {
         _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       } else {
         _queryableDocIds = null;
       }
     } else {
       _upsertComparisonColumns = null;
-      _deletedRecordColumn = null;
+      _deleteRecordColumn = null;
       _validDocIds = null;
       _queryableDocIds = null;
     }
@@ -518,7 +518,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Comparable comparisonValue = getComparisonValue(row);
-    boolean deleteRecord = _deletedRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deletedRecordColumn));
+    boolean deleteRecord = _deleteRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deleteRecordColumn));
     return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
   }
 

@@ -55,7 +55,7 @@ public class UpsertConfig extends BaseJsonConfig {
   private List<String> _comparisonColumns;
 
   @JsonPropertyDescription("Boolean column to indicate whether a records should be deleted")
-  private String _deletedRecordColumn;
+  private String _deleteRecordColumn;
 
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
@@ -100,8 +100,8 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public String getDeletedRecordColumn() {
-    return _deletedRecordColumn;
+  public String getDeleteRecordColumn() {
+    return _deleteRecordColumn;
   }
 
   public boolean isEnableSnapshot() {
@@ -162,9 +162,9 @@ public class UpsertConfig extends BaseJsonConfig {
     }
   }
 
-  public void setDeletedRecordColumn(String deletedRecordColumn) {
-    if (deletedRecordColumn != null) {
-      _deletedRecordColumn = deletedRecordColumn;
+  public void setDeleteRecordColumn(String deleteRecordColumn) {
+    if (deleteRecordColumn != null) {
+      _deleteRecordColumn = deleteRecordColumn;
     }
   }
 

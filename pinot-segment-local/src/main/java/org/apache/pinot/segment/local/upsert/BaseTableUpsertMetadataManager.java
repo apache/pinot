@@ -61,7 +61,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       _comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
     }
 
-    _deleteRecordColumn = upsertConfig.getDeletedRecordColumn();
+    _deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
     _hashFunction = upsertConfig.getHashFunction();
 
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {

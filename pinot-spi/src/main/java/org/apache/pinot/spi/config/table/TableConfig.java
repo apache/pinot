@@ -391,7 +391,7 @@ public class TableConfig extends BaseJsonConfig {
   @JsonIgnore
   @Nullable
   public String getUpsertDeleteRecordColumn() {
-    return _upsertConfig == null ? null : _upsertConfig.getDeletedRecordColumn();
+    return _upsertConfig == null ? null : _upsertConfig.getDeleteRecordColumn();
   }
 
   @JsonProperty(TUNER_CONFIG_LIST_KEY)

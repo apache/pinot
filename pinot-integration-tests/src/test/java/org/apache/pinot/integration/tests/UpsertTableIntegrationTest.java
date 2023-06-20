@@ -80,7 +80,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Schema schema = createSchema();
     addSchema(schema);
 
-    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
     TableConfig tableConfig = createCSVUpsertTableConfig(getTableName(), getSchemaName(), getKafkaTopic(),
         getNumKafkaPartitions(), csvDecoderProperties, null, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
@@ -189,10 +189,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     final String kafkaTopicName = getKafkaTopic() + "-with-deletes";
     final String tableName = "gameScoresWithDelete";
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setDeletedRecordColumn(DELETED_COL);
+    upsertConfig.setDeleteRecordColumn(DELETED_COL);
 
     // Create table with delete Record column
-    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
     TableConfig tableConfig = createCSVUpsertTableConfig(tableName, getSchemaName(), kafkaTopicName,
         getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
@@ -281,7 +281,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     final String kafkaTopicName = getKafkaTopic() + "-partial-upsert-with-deletes";
     final String tableName = "gameScoresPartialUpsertWithDelete";
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    upsertConfig.setDeletedRecordColumn(DELETED_COL);
+    upsertConfig.setDeleteRecordColumn(DELETED_COL);
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("game", UpsertConfig.Strategy.UNION);
     partialUpsertStrategies.put("score", UpsertConfig.Strategy.INCREMENT);
@@ -290,7 +290,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
 
     // Create table with delete Record column
-    Map<String, String> csvDecoderProperties = getCSVStreamConfigMap(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
     TableConfig tableConfig = createCSVUpsertTableConfig(tableName, partialUpsertSchemaName, kafkaTopicName,
         getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
