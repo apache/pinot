@@ -52,7 +52,7 @@ public class IngestionJobLauncherTest {
     Assert.assertFalse(spec.isSearchRecursively());
   }
 
-  @Test()
+  @Test
   public void testIngestionJobLauncherWithMissingJobRunner() {
 
     SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
@@ -65,7 +65,6 @@ public class IngestionJobLauncherTest {
       Throwable cause = e.getCause();
       Assert.assertTrue(cause instanceof IllegalStateException);
       Assert.assertEquals(cause.getMessage(), "segmentGenerationJobRunnerClassName in job spec was null");
-
     }
   }
 
