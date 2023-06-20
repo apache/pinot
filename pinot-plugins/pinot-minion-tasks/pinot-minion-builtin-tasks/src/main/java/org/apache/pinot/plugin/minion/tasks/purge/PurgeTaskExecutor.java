@@ -49,7 +49,7 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
     SegmentPurger.RecordPurger recordPurger =
-        getRecordPurger(pinotTaskConfig, rawTableName, recordPurgerFactory, tableConfig, schema);
+        getRecordPurger(pinotTaskConfig, recordPurgerFactory, tableConfig, schema);
     SegmentPurger.RecordModifierFactory recordModifierFactory = MINION_CONTEXT.getRecordModifierFactory();
     SegmentPurger.RecordModifier recordModifier =
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
@@ -78,13 +78,11 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
             String.valueOf(System.currentTimeMillis())));
   }
 
-  private static SegmentPurger.RecordPurger getRecordPurger(PinotTaskConfig pinotTaskConfig, String rawTableName,
+  private static SegmentPurger.RecordPurger getRecordPurger(PinotTaskConfig pinotTaskConfig,
       SegmentPurger.RecordPurgerFactory recordPurgerFactory, TableConfig tableConfig, Schema schema) {
     if (recordPurgerFactory == null) {
       return null;
     }
-    SegmentPurger.RecordPurger recordPurger =
-        recordPurgerFactory.getRecordPurger(rawTableName, pinotTaskConfig, tableConfig, schema);
-    return recordPurger != null ? recordPurger : recordPurgerFactory.getRecordPurger(rawTableName);
+    return recordPurgerFactory.getRecordPurger(pinotTaskConfig, tableConfig, schema);
   }
 }
