@@ -45,7 +45,7 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
   final boolean _nullHandlingEnabled;
 
   final ObjectSet<ByteArray> _valueSet;
-  protected boolean _hasNull;
+  private boolean _hasNull;
 
   BaseRawBytesSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
       boolean nullHandlingEnabled) {

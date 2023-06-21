@@ -45,7 +45,7 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
   final boolean _nullHandlingEnabled;
 
   final ObjectSet<BigDecimal> _valueSet;
-  protected boolean _hasNull;
+  private boolean _hasNull;
 
   BaseRawBigDecimalSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
       boolean nullHandlingEnabled) {

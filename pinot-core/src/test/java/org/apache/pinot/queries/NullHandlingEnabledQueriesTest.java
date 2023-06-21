@@ -329,4 +329,23 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(resultTable.getRows().size(), 1);
     assertNotNull(resultTable.getRows().get(0)[0]);
   }
+
+  @Test
+  public void testTransformBlockValSetGetNullBitmap()
+      throws Exception {
+    _rows = new ArrayList<>();
+    insertRow(null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query = String.format("SELECT (CASE WHEN %s IS NULL THEN 1 END) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), NUM_OF_SEGMENT_COPIES);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
+  }
 }

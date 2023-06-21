@@ -44,7 +44,7 @@ abstract class BaseRawStringSingleColumnDistinctExecutor implements DistinctExec
   final boolean _nullHandlingEnabled;
 
   final ObjectSet<String> _valueSet;
-  protected boolean _hasNull;
+  private boolean _hasNull;
 
   BaseRawStringSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
       boolean nullHandlingEnabled) {
