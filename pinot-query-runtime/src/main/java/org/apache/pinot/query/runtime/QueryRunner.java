@@ -139,8 +139,7 @@ public class QueryRunner {
    * <p>This execution entry point should be asynchronously called by the request handler and caller should not wait
    * for results/exceptions.</p>
    */
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap)
-      throws Exception {
+  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     boolean isTraceEnabled =
@@ -148,16 +147,8 @@ public class QueryRunner {
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     // run pre-stage execution for all pipeline breakers
-    PipelineBreakerResult pipelineBreakerResult;
-    try {
-      pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService,
-          distributedStagePlan, deadlineMs, requestId, isTraceEnabled);
-    } catch (Exception e) {
-      LOGGER.error("Error executing pre-stage pipeline breaker for: {}:{}", requestId,
-          distributedStagePlan.getStageId(), e);
-      _scheduler.cancel(requestId);
-      throw e;
-    }
+    PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(_scheduler,
+        _mailboxService, distributedStagePlan, deadlineMs, requestId, isTraceEnabled);
 
     // run OpChain
     if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
@@ -175,7 +166,8 @@ public class QueryRunner {
         PlanNode stageRoot = distributedStagePlan.getStageRoot();
         OpChain rootOperator = PhysicalPlanVisitor.walkPlanNode(stageRoot,
             new PhysicalPlanContext(_mailboxService, requestId, stageRoot.getPlanFragmentId(), deadlineMs,
-                distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled));
+                distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), pipelineBreakerResult,
+                isTraceEnabled));
         _scheduler.register(rootOperator);
       } catch (Exception e) {
         LOGGER.error("Error executing intermediate stage for: {}:{}", requestId, distributedStagePlan.getStageId(), e);

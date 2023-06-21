@@ -25,18 +25,14 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
 /**
- * This class used to record the pipeline breaker operator that needs to be run before the main opChain.
+ * This class used by {@link PipelineBreakerVisitor} as context to detect the {@link PlanNode} that needs to be run
+ * before the main opChain starts.
  */
-public class PipelineBreakerContext {
-  private final Map<Integer, PlanNode> _pipelineBreakerMap = new HashMap<>();
+class PipelineBreakerContext {
   private final Map<PlanNode, Integer> _planNodeObjectToIdMap = new HashMap<>();
+  private final Map<Integer, PlanNode> _pipelineBreakerMap = new HashMap<>();
 
-  private final boolean _isLeafStage;
   private int _currentNodeId = 0;
-
-  public PipelineBreakerContext(boolean isLeafStage) {
-    _isLeafStage = isLeafStage;
-  }
 
   public void addPipelineBreaker(MailboxReceiveNode mailboxReceiveNode) {
     int nodeId = _planNodeObjectToIdMap.get(mailboxReceiveNode);
@@ -54,9 +50,5 @@ public class PipelineBreakerContext {
 
   public Map<Integer, PlanNode> getPipelineBreakerMap() {
     return _pipelineBreakerMap;
-  }
-
-  public boolean isLeafStage() {
-    return _isLeafStage;
   }
 }
