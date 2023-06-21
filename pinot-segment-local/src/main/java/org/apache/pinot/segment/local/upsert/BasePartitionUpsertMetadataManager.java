@@ -371,13 +371,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo);
 
   protected void handleOutOfOrderEvent(Object currentComparisonValue, Object recordComparisonValue) {
-    _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER, 1L);
+    boolean isPartialUpsertTable = (_partialUpsertHandler != null);
+    _serverMetrics.addMeteredTableValue(_tableNameWithType,
+        isPartialUpsertTable ? ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER : ServerMeter.UPSERT_OUT_OF_ORDER, 1L);
     _numOutOfOrderEvents++;
     long currentTimeNs = System.nanoTime();
     if (currentTimeNs - _lastOutOfOrderEventReportTimeNs > OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS) {
-      _logger.warn("Skipped {} out-of-order events for upsert table {} (the last event has current comparison "
-              + "value: {}, record comparison value: {})", _numOutOfOrderEvents, _tableNameWithType,
-          currentComparisonValue, recordComparisonValue);
+      _logger.warn("Skipped {} out-of-order events for {} upsert table {} (the last event has current comparison "
+              + "value: {}, record comparison value: {})", _numOutOfOrderEvents,
+          (isPartialUpsertTable ? "partial" : ""), _tableNameWithType, currentComparisonValue, recordComparisonValue);
       _lastOutOfOrderEventReportTimeNs = currentTimeNs;
       _numOutOfOrderEvents = 0;
     }
