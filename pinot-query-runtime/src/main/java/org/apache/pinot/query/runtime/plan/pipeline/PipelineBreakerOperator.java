@@ -93,7 +93,6 @@ class PipelineBreakerOperator extends MultiStageOperator {
           return _errorBlock;
         }
         List<TransferableBlock> blockList = _resultMap.computeIfAbsent(worker.getKey(), (k) -> new ArrayList<>());
-        // TODO: only data block is handled, we also need to handle metadata block from upstream in the future.
         if (!block.isEndOfStreamBlock()) {
           blockList.add(block);
         }

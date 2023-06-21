@@ -180,6 +180,6 @@ public class RoundRobinSchedulerTest {
 
   private OpChainExecutionContext getOpChainExecutionContext(long requestId, int stageId, int virtualServerId) {
     return new OpChainExecutionContext(null, requestId, stageId,
-        new VirtualServerAddress("localhost", 1234, virtualServerId), 0, null, true);
+        new VirtualServerAddress("localhost", 1234, virtualServerId), 0, null, null, true);
   }
 }
