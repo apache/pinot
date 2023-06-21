@@ -62,6 +62,7 @@ public class MultipleTreesBuilder implements Closeable {
   private final List<StarTreeV2BuilderConfig> _builderConfigs;
   private final BuildMode _buildMode;
   private final File _segmentDirectory;
+  private final File _indexDirectory;
   private final PropertiesConfiguration _metadataProperties;
   private final ImmutableSegment _segment;
   private final SeparatedStarTreesMetadata _existingStarTrees;
@@ -83,6 +84,7 @@ public class MultipleTreesBuilder implements Closeable {
     _builderConfigs = builderConfigs;
     _buildMode = buildMode;
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    _indexDirectory = indexDir;
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _existingStarTrees = getExistingStarTrees();
@@ -103,6 +105,7 @@ public class MultipleTreesBuilder implements Closeable {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(indexConfigs) || enableDefaultStarTree,
         "Must provide star-tree index configs or enable default star-tree");
     _buildMode = buildMode;
+    _indexDirectory = indexDir;
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
@@ -124,7 +127,7 @@ public class MultipleTreesBuilder implements Closeable {
         // Extract existing startrees
         // clean star-tree related files and configs once all the star-trees are separated and extracted
         SeparatedStarTreesMetadata existingStarTrees = extractStarTrees();
-        StarTreeBuilderUtils.removeStarTrees(_segmentDirectory);
+        StarTreeBuilderUtils.removeStarTrees(_indexDirectory);
         _metadataProperties.refresh();
         return existingStarTrees;
       } else {
