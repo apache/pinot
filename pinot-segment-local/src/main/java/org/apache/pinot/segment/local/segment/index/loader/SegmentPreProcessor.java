@@ -226,7 +226,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     // We need reprocessing if existing configs are to be removed, or new configs have been added
     if (starTreeMetadataList != null) {
-      return StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList);
+      return StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList);
     }
     return !starTreeBuilderConfigs.isEmpty();
   }
@@ -242,7 +242,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
       if (starTreeMetadataList != null) {
         // There are existing star-trees
-        if (StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+        if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
           LOGGER.info("Change detected in star-trees for segment: {}", _segmentMetadata.getName());
           shouldGenerateStarTree = true;
         } else {
