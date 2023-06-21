@@ -560,6 +560,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Decode message
       StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
       msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
+      if (msgMetadata == null) {
+        _segmentLogger.error("metadata is null");
+      } else {
+        _segmentLogger.error("metadata getRecordIngestionTimeMs: {}", msgMetadata.getRecordIngestionTimeMs());
+      }
       if (decodedRow.getException() != null) {
         // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
         // decode error
