@@ -138,7 +138,9 @@ public class SegmentMapper {
                   recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
           mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
         } finally {
-          recordReader.close();
+          if (recordReader != null) {
+            recordReader.close();
+          }
         }
       } else {
         mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
