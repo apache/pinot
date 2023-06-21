@@ -3113,20 +3113,9 @@ public class PinotHelixResourceManager {
    * </ul>
    */
   public PinotResourceManagerResponse dropInstance(String instanceName) {
-    // Check if the instance is live
-    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceName + " is still live");
-    }
-
-    // Check if any ideal state includes the instance
-    for (String resource : getAllResources()) {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-      for (String partition : idealState.getPartitionSet()) {
-        if (idealState.getInstanceSet(partition).contains(instanceName)) {
-          return PinotResourceManagerResponse.failure(
-              "Instance " + instanceName + " exists in ideal state for " + resource);
-        }
-      }
+    List<String> issues = instanceDropSafetyCheck(instanceName);
+    if (!issues.isEmpty()) {
+      return PinotResourceManagerResponse.failure(issues.get(0));
     }
 
     // Remove '/INSTANCES/<instanceName>'
@@ -3146,6 +3135,25 @@ public class PinotHelixResourceManager {
     }
 
     return PinotResourceManagerResponse.success("Instance " + instanceName + " dropped");
+  }
+
+  public List<String> instanceDropSafetyCheck(String instanceName) {
+    List<String> issues = new ArrayList<>();
+    // Check if the instance is live
+    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
+      issues.add(String.format("Instance %s is still live", instanceName));
+    }
+    // Check if any ideal state includes the instance
+    getAllResources().forEach(resource -> {
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
+      for (String partition : idealState.getPartitionSet()) {
+        if (idealState.getInstanceSet(partition).contains(instanceName)) {
+          issues.add(String.format("Instance %s exists in ideal state for %s", instanceName, resource));
+          break;
+        }
+      }
+    });
+    return issues;
   }
 
   /**
