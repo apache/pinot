@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -35,21 +36,20 @@ public class OpChainExecutionContext {
   private final long _requestId;
   private final int _stageId;
   private final VirtualServerAddress _server;
-  private final long _timeoutMs;
   private final long _deadlineMs;
   private final StageMetadata _stageMetadata;
   private final OpChainId _id;
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
+  @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long timeoutMs, long deadlineMs, StageMetadata stageMetadata,
+      VirtualServerAddress server, long deadlineMs, StageMetadata stageMetadata,
       boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _server = server;
-    _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
     _stageMetadata = stageMetadata;
     _id = new OpChainId(requestId, server.workerId(), stageId);
@@ -59,7 +59,7 @@ public class OpChainExecutionContext {
 
   public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext) {
     this(physicalPlanContext.getMailboxService(), physicalPlanContext.getRequestId(), physicalPlanContext.getStageId(),
-        physicalPlanContext.getServer(), physicalPlanContext.getTimeoutMs(), physicalPlanContext.getDeadlineMs(),
+        physicalPlanContext.getServer(), physicalPlanContext.getDeadlineMs(),
         physicalPlanContext.getStageMetadata(), physicalPlanContext.isTraceEnabled());
   }
 
@@ -81,10 +81,6 @@ public class OpChainExecutionContext {
 
   public VirtualServerAddress getServer() {
     return _server;
-  }
-
-  public long getTimeoutMs() {
-    return _timeoutMs;
   }
 
   public long getDeadlineMs() {

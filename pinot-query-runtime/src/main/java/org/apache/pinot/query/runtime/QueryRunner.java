@@ -151,7 +151,7 @@ public class QueryRunner {
     PipelineBreakerResult pipelineBreakerResult;
     try {
       pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService,
-          distributedStagePlan, timeoutMs, deadlineMs, requestId, isTraceEnabled);
+          distributedStagePlan, deadlineMs, requestId, isTraceEnabled);
     } catch (Exception e) {
       LOGGER.error("Error executing pre-stage pipeline breaker for: {}:{}", requestId,
           distributedStagePlan.getStageId(), e);
@@ -174,7 +174,7 @@ public class QueryRunner {
       try {
         PlanNode stageRoot = distributedStagePlan.getStageRoot();
         OpChain rootOperator = PhysicalPlanVisitor.walkPlanNode(stageRoot,
-            new PhysicalPlanContext(_mailboxService, requestId, stageRoot.getPlanFragmentId(), timeoutMs, deadlineMs,
+            new PhysicalPlanContext(_mailboxService, requestId, stageRoot.getPlanFragmentId(), deadlineMs,
                 distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled));
         _scheduler.register(rootOperator);
       } catch (Exception e) {
@@ -203,19 +203,18 @@ public class QueryRunner {
       PipelineBreakerResult pipelineBreakerResult, long timeoutMs, long deadlineMs, long requestId) {
     boolean isTraceEnabled =
         Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
+    PhysicalPlanContext planContext = new PhysicalPlanContext(_mailboxService, requestId,
+        distributedStagePlan.getStageId(), deadlineMs, distributedStagePlan.getServer(),
+        distributedStagePlan.getStageMetadata(), pipelineBreakerResult, isTraceEnabled);
     List<ServerPlanRequestContext> serverPlanRequestContexts =
-        constructServerQueryRequests(distributedStagePlan, requestMetadataMap, pipelineBreakerResult,
-            _helixPropertyStore, _mailboxService, deadlineMs);
+        constructServerQueryRequests(planContext, distributedStagePlan, requestMetadataMap, _helixPropertyStore);
     List<ServerQueryRequest> serverQueryRequests = new ArrayList<>(serverPlanRequestContexts.size());
     for (ServerPlanRequestContext requestContext : serverPlanRequestContexts) {
       serverQueryRequests.add(new ServerQueryRequest(requestContext.getInstanceRequest(),
           new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis()));
     }
     MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
-    OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(_mailboxService, requestId, sendNode.getPlanFragmentId(),
-            distributedStagePlan.getServer(), timeoutMs, deadlineMs, distributedStagePlan.getStageMetadata(),
-            isTraceEnabled);
+    OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(planContext);
     MultiStageOperator leafStageOperator =
         new LeafStageTransferableBlockOperator(opChainExecutionContext, this::processServerQueryRequest,
             serverQueryRequests, sendNode.getDataSchema());
@@ -226,9 +225,9 @@ public class QueryRunner {
     return new OpChain(opChainExecutionContext, mailboxSendOperator, Collections.emptyList());
   }
 
-  private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
-      Map<String, String> requestMetadataMap, PipelineBreakerResult pipelineBreakerResult,
-      ZkHelixPropertyStore<ZNRecord> helixPropertyStore, MailboxService mailboxService, long deadlineMs) {
+  private static List<ServerPlanRequestContext> constructServerQueryRequests(PhysicalPlanContext planContext,
+      DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap,
+      ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
     StageMetadata stageMetadata = distributedStagePlan.getStageMetadata();
     WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
     String rawTableName = StageMetadata.getTableName(stageMetadata);
@@ -244,17 +243,15 @@ public class QueryRunner {
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
-        requests.add(ServerPlanRequestUtils.build(mailboxService, distributedStagePlan, requestMetadataMap,
-            pipelineBreakerResult, tableConfig, schema, StageMetadata.getTimeBoundary(stageMetadata),
-            TableType.OFFLINE, tableEntry.getValue(), deadlineMs));
+        requests.add(ServerPlanRequestUtils.build(planContext, distributedStagePlan, requestMetadataMap, tableConfig,
+            schema, StageMetadata.getTimeBoundary(stageMetadata), TableType.OFFLINE, tableEntry.getValue()));
       } else if (TableType.REALTIME.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
-        requests.add(ServerPlanRequestUtils.build(mailboxService, distributedStagePlan, requestMetadataMap,
-            pipelineBreakerResult, tableConfig, schema, StageMetadata.getTimeBoundary(stageMetadata),
-            TableType.REALTIME, tableEntry.getValue(), deadlineMs));
+        requests.add(ServerPlanRequestUtils.build(planContext, distributedStagePlan, requestMetadataMap, tableConfig,
+            schema, StageMetadata.getTimeBoundary(stageMetadata), TableType.REALTIME, tableEntry.getValue()));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
       }

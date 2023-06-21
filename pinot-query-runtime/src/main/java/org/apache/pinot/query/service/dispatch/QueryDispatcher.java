@@ -58,6 +58,7 @@ import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.QueryConfig;
@@ -193,12 +194,13 @@ public class QueryDispatcher {
     DispatchablePlanFragment reduceStagePlanFragment = dispatchableSubPlan.getQueryStageList().get(reduceStageId);
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) reduceStagePlanFragment.getPlanFragment().getFragmentRoot();
     VirtualServerAddress server = new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), 0);
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(mailboxService, requestId, reduceStageId, server, timeoutMs,
-            System.currentTimeMillis() + timeoutMs,
-            new StageMetadata.Builder().setWorkerMetadataList(reduceStagePlanFragment.getWorkerMetadataList())
-                .addCustomProperties(reduceStagePlanFragment.getCustomProperties()).build(),
-            traceEnabled);
+    StageMetadata brokerStageMetadata = new StageMetadata.Builder()
+        .setWorkerMetadataList(reduceStagePlanFragment.getWorkerMetadataList())
+        .addCustomProperties(reduceStagePlanFragment.getCustomProperties())
+        .build();
+    PhysicalPlanContext planContext = new PhysicalPlanContext(mailboxService, requestId, reduceStageId,
+        System.currentTimeMillis() + timeoutMs, server, brokerStageMetadata, null, traceEnabled);
+    OpChainExecutionContext context = new OpChainExecutionContext(planContext);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context, reduceNode.getSenderStageId());
     List<DataBlock> resultDataBlocks =
         reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, dispatchableSubPlan,

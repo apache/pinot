@@ -53,7 +53,7 @@ public class PipelineBreakerExecutor {
    * Currently, pipeline breaker executor can only execute mailbox receive pipeline breaker.
    */
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
-      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, long timeoutMs, long deadlineMs,
+      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, long deadlineMs,
       long requestId, boolean isTraceEnabled)
       throws Exception {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext(
@@ -65,7 +65,7 @@ public class PipelineBreakerExecutor {
       //     receive-mail callbacks.
       // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
       PhysicalPlanContext physicalPlanContext =
-          new PhysicalPlanContext(mailboxService, requestId, stageRoot.getPlanFragmentId(), timeoutMs, deadlineMs,
+          new PhysicalPlanContext(mailboxService, requestId, stageRoot.getPlanFragmentId(), deadlineMs,
               distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
       Map<Integer, List<TransferableBlock>> resultMap =
           PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
