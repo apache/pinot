@@ -39,7 +39,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 
 
 /**
@@ -57,7 +56,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TABLE_NAME = "gameScores";
   private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "playerId";
-  private static final String DELETED_COL = "deleted";
+  protected static final String DELETED_COL = "deleted";
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -97,22 +96,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   public void tearDown()
       throws IOException {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-
-    // Test dropping all segments one by one
-    List<String> segments = listSegments(realtimeTableName);
-    assertFalse(segments.isEmpty());
-    for (String segment : segments) {
-      dropSegment(realtimeTableName, segment);
-    }
-    // NOTE: There is a delay to remove the segment from property store
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        return listSegments(realtimeTableName).isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to drop the segments");
-
     dropRealtimeTable(realtimeTableName);
     stopServer();
     stopBroker();
@@ -184,13 +167,17 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testDeleteWithFullUpsert()
+  protected void testDeleteWithFullUpsert()
       throws Exception {
-    final String kafkaTopicName = getKafkaTopic() + "-with-deletes";
-    final String tableName = "gameScoresWithDelete";
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETED_COL);
 
+    testDeleteWithFullUpsert(getKafkaTopic() + "-with-deletes", "gameScoresWithDelete", upsertConfig);
+  }
+
+  protected void testDeleteWithFullUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
+      throws Exception {
+    // SETUP
     // Create table with delete Record column
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
     TableConfig tableConfig = createCSVUpsertTableConfig(tableName, getSchemaName(), kafkaTopicName,
@@ -271,22 +258,30 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
             + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
     Assert.assertTrue(rs.getRowCount() > 1);
+
+    // TEARDOWN
+    dropRealtimeTable(tableName);
   }
 
   @Test
   public void testDeleteWithPartialUpsert()
       throws Exception {
-    final String partialUpsertSchemaName = "playerScoresPartialUpsert";
-    final String inputDataTarFile = "gameScores_partial_upsert_csv.tar.gz";
-    final String kafkaTopicName = getKafkaTopic() + "-partial-upsert-with-deletes";
-    final String tableName = "gameScoresPartialUpsertWithDelete";
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setDeleteRecordColumn(DELETED_COL);
+
+    testDeleteWithPartialUpsert(getKafkaTopic() + "-partial-upsert-with-deletes",
+        "gameScoresPartialUpsertWithDelete", upsertConfig);
+  }
+
+  protected void testDeleteWithPartialUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
+      throws Exception {
+    final String partialUpsertSchemaName = "playerScoresPartialUpsert";
+    final String inputDataTarFile = "gameScores_partial_upsert_csv.tar.gz";
+
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("game", UpsertConfig.Strategy.UNION);
     partialUpsertStrategies.put("score", UpsertConfig.Strategy.INCREMENT);
     partialUpsertStrategies.put(DELETED_COL, UpsertConfig.Strategy.OVERWRITE);
-
     upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
 
     // Create table with delete Record column
@@ -369,5 +364,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
             + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
     Assert.assertTrue(rs.getRowCount() > 1);
+
+    // TEARDOWN
+    dropRealtimeTable(tableName);
   }
 }
