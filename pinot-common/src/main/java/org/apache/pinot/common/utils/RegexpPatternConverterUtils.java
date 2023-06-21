@@ -93,8 +93,9 @@ public class RegexpPatternConverterUtils {
     // handling SQL wildcards (_, %) by replacing them with corresponding regex equivalents
     // we ignore them if the SQL wildcards are escaped
     int i = 0;
+    int len = input.length();
     boolean isPrevCharBackSlash = false;
-    while (i < input.length()) {
+    while (i < len) {
       char c = input.charAt(i);
       if (c == '_') {
         sb.append(isPrevCharBackSlash ? c : ".");
@@ -113,7 +114,7 @@ public class RegexpPatternConverterUtils {
         sb.append(c);
       }
       isPrevCharBackSlash = (c == BACK_SLASH);
-      ++i;
+      i++;
     }
 
     // handle trailing \
