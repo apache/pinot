@@ -97,21 +97,25 @@ public class RegexpPatternConverterUtils {
     boolean isPrevCharBackSlash = false;
     while (i < len) {
       char c = input.charAt(i);
-      if (c == '_') {
-        sb.append(isPrevCharBackSlash ? c : ".");
-      } else if (c == '%') {
-        sb.append(isPrevCharBackSlash ? c : ".*");
-      } else if (Chars.indexOf(REGEXP_METACHARACTERS, c) >= 0) {
-        sb.append(BACK_SLASH).append(c);
-      } else {
-        if (isPrevCharBackSlash) {
+      switch (c) {
+        case '_':
+          sb.append(isPrevCharBackSlash ? c : ".");
+          break;
+        case '%':
+          sb.append(isPrevCharBackSlash ? c : ".*");
+          break;
+        default:
+          // either the current character is a meta-character
+          // OR
           // this means the previous character is a \
           // but it was not used for escaping SQL wildcards
           // so let's escape this \ in the output
-          // this case is separately handled outside of the meta characters list
-          sb.append(BACK_SLASH);
-        }
-        sb.append(c);
+          // this case is separately handled outside the meta characters list
+          if (Chars.indexOf(REGEXP_METACHARACTERS, c) >= 0 || isPrevCharBackSlash) {
+            sb.append(BACK_SLASH);
+          }
+          sb.append(c);
+          break;
       }
       isPrevCharBackSlash = (c == BACK_SLASH);
       i++;
