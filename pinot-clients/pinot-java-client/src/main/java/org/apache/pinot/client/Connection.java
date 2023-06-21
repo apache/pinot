@@ -25,6 +25,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -190,8 +192,10 @@ public class Connection {
   private static String[] resolveTableName(String query) {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-      return tableNames.toArray(new String[0]);
+      String tableName = (sqlNodeAndOptions.getSqlNode() != null
+          ? RequestUtils.getTableName(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode()))
+          : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName());
+      return new String[]{tableName};
     } catch (Exception e) {
       LOGGER.error("Cannot parse table name from query: {}", query, e);
     }
