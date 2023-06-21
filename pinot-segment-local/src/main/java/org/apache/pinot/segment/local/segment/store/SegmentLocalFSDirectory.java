@@ -332,11 +332,9 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         PREFETCHED_PAGES.incrementAndGet();
       }
     } else {
-      // pos needs to be long because buffer.size() is 32 bit but
-      // adding 4k can make it go over int size
       for (long pos = 0; pos < buffer.size() && PREFETCHED_PAGES.get() < prefetchSlowdownPageLimit;
           pos += PAGE_SIZE_BYTES) {
-        buffer.getByte((int) pos);
+        buffer.getByte(pos);
         PREFETCHED_PAGES.incrementAndGet();
       }
     }
