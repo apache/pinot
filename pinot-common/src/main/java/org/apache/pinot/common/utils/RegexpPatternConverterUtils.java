@@ -19,6 +19,8 @@
 package org.apache.pinot.common.utils;
 
 
+import com.google.common.primitives.Chars;
+
 /**
  * Utility for converting regex patterns.
  */
@@ -71,20 +73,34 @@ public class RegexpPatternConverterUtils {
     }
 
     likePattern = likePattern.substring(start, end);
+    return escapeMetaCharsAndWildcards(likePattern, prefix, suffix);
+  }
+
+  /**
+   * Escapes the provided pattern by considering the following constraints:
+   * <ul>
+   *     <li> SQL wildcards escaping is handled (_, %) </li>
+   *     <li> Regex meta characters escaping is handled </li>
+   * </ul>
+   * @param input the provided input string
+   * @param prefix the prefix to be added to the output string
+   * @param suffix the suffix to be added to the output string
+   * @return the final output string
+   */
+  private static String escapeMetaCharsAndWildcards(String input, String prefix, String suffix) {
     StringBuilder sb = new StringBuilder();
     sb.append(prefix);
-
-    // handling SQL wildcards by replacing them with corresponding regex equivalents
+    // handling SQL wildcards (_, %) by replacing them with corresponding regex equivalents
     // we ignore them if the SQL wildcards are escaped
     int i = 0;
     boolean isPrevCharBackSlash = false;
-    while (i < likePattern.length()) {
-      char c = likePattern.charAt(i);
+    while (i < input.length()) {
+      char c = input.charAt(i);
       if (c == '_') {
         sb.append(isPrevCharBackSlash ? c : ".");
       } else if (c == '%') {
         sb.append(isPrevCharBackSlash ? c : ".*");
-      } else if (indexOf(REGEXP_METACHARACTERS, c) >= 0) {
+      } else if (Chars.indexOf(REGEXP_METACHARACTERS, c) >= 0) {
         sb.append(BACK_SLASH).append(c);
       } else {
         if (isPrevCharBackSlash) {
@@ -107,15 +123,6 @@ public class RegexpPatternConverterUtils {
 
     sb.append(suffix);
     return sb.toString();
-  }
-
-  private static int indexOf(char[] arr, char c) {
-    for (int i = 0; i < arr.length; i++) {
-      if (arr[i] == c) {
-        return i;
-      }
-    }
-    return -1;
   }
 
   private static int indexOfFirstDifferent(String str, char character) {

@@ -128,6 +128,10 @@ public class RegexpPatternConverterUtilsTest {
 
   @Test
   public void testEscapedWildcard1() {
+    // the first underscore (_ in _b) is escaped, so it is meant to match an actual "_b" string in the provided
+    // string
+    // the second underscore (_ in b_) is not escaped, so it is a SQL wildcard that is used to match a single
+    // character, which in the regex space is "."
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("a\\_b_\\");
     assertEquals(regexpLikePattern, "^a\\_b.\\\\$");
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
@@ -136,6 +140,13 @@ public class RegexpPatternConverterUtilsTest {
 
   @Test
   public void testEscapedWildcard2() {
+    // the % (% in %b) is escaped, so it is meant to match an actual "%b" string in the provided
+    // string
+    // the "\" before c is a normal "\", so it is meant to match an actual "\" string in the provided
+    // string, this is done because "c" is not a SQL wildcard - hence the "\" before that is used as-is
+    // and is not used for escaping "c"
+    // so, this "\" is escaped in the output as it is a regex metacharacter and the converted regex
+    // will match "a%b\cde" in the provided string
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("a\\%b\\cde");
     assertEquals(regexpLikePattern, "^a\\%b\\\\cde$");
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
@@ -143,6 +154,9 @@ public class RegexpPatternConverterUtilsTest {
   }
   @Test
   public void testEscapedWildcard3() {
+    // here the "\" character is used to escape _, so _ here is not treated as a SQL wildcard
+    // but it is meant to actually match "_" in the provided string
+    // so the corresponding regex doesn't convert the "_" to "."
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("%2\\_2%");
     assertEquals(regexpLikePattern, "2\\_2");
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
