@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -230,6 +231,13 @@ public class SegmentPurger {
      * Get the {@link RecordPurger} for the given table.
      */
     RecordPurger getRecordPurger(String rawTableName);
+
+    /**
+     * Get the {@link RecordPurger} associated with the given taskConfig, tableConfig and tableSchema
+     */
+    default RecordPurger getRecordPurger(PinotTaskConfig taskConfig, TableConfig tableConfig, Schema tableSchema) {
+      return getRecordPurger(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
+    }
   }
 
   /**
