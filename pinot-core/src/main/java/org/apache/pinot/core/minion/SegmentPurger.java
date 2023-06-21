@@ -232,6 +232,9 @@ public class SegmentPurger {
      */
     RecordPurger getRecordPurger(String rawTableName);
 
+    /**
+     * Get the {@link RecordPurger} associated with the given taskConfig, tableConfig and tableSchema
+     */
     default RecordPurger getRecordPurger(PinotTaskConfig taskConfig, TableConfig tableConfig, Schema tableSchema) {
       return getRecordPurger(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
     }
