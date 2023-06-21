@@ -202,6 +202,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               }
               return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
             } else {
+              handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
               return currentRecordLocation;
             }
           } else {
