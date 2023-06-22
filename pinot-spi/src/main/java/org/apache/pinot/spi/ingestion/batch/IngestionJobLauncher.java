@@ -153,7 +153,7 @@ public class IngestionJobLauncher {
       throw new RuntimeException("Caught exception during running - " + ingestionJobRunnerClassName, e);
     }
   }
-  
+
   /**
    * Ingestion Job type Enum.
    */
