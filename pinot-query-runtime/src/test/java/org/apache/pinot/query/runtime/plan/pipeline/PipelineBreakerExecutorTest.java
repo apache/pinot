@@ -87,8 +87,7 @@ public class PipelineBreakerExecutorTest {
           .addMailBoxInfoMap(2, new MailboxMetadata(
               ImmutableList.of(org.apache.pinot.query.planner.physical.MailboxIdUtils.toPlanMailboxId(2, 0, 0, 0)),
               ImmutableList.of(_server), ImmutableMap.of()))
-          .build())
-      .collect(Collectors.toList())).build();
+          .build()).collect(Collectors.toList())).build();
 
   @BeforeClass
   public void setUpClass() {
@@ -127,7 +126,7 @@ public class PipelineBreakerExecutorTest {
     Object[] row2 = new Object[]{2, 3};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
         OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(0, 1, _server)));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
@@ -138,6 +137,10 @@ public class PipelineBreakerExecutorTest {
     Assert.assertNotNull(pipelineBreakerResult);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().values().iterator().next().size(), 2);
+
+    // should collect stats from previous stage here
+    Assert.assertNotNull(pipelineBreakerResult.getOpChainStats());
+    Assert.assertEquals(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap().size(), 1);
   }
 
   @Test
@@ -160,9 +163,9 @@ public class PipelineBreakerExecutorTest {
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(0, 1, _server)));
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(0, 2, _server)));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
@@ -176,6 +179,10 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(it.next().size(), 1);
     Assert.assertEquals(it.next().size(), 1);
     Assert.assertFalse(it.hasNext());
+
+    // should collect stats from previous stage here
+    Assert.assertNotNull(pipelineBreakerResult.getOpChainStats());
+    Assert.assertEquals(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap().size(), 2);
   }
 
   @Test
@@ -199,6 +206,9 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(resultBlocks.size(), 1);
     Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
     Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
+
+    // should have null stats from previous stage here
+    Assert.assertNull(pipelineBreakerResult.getOpChainStats());
   }
 
   @Test
@@ -229,6 +239,9 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(resultBlocks.size(), 1);
     Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
     Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
+
+    // should have null stats from previous stage here
+    Assert.assertNull(pipelineBreakerResult.getOpChainStats());
   }
 
   @Test
@@ -268,6 +281,9 @@ public class PipelineBreakerExecutorTest {
       Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
       Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
     }
+
+    // should have null stats from previous stage here
+    Assert.assertNull(pipelineBreakerResult.getOpChainStats());
   }
 
   @Test
