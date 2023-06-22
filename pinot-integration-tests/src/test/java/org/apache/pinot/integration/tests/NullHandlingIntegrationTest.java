@@ -326,4 +326,16 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
     testQuery(pinotQuery, h2Query);
   }
+
+  @Test
+  public void testSelectNullLiteral() throws Exception {
+    // Need to also select an identifier column to skip the all literal query optimization which returns without
+    // querying the segment.
+    String sqlQuery = "SELECT NULL, salary FROM mytable OPTION(enableNullHandling=true)";
+
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asText(), "null");
+  }
 }
