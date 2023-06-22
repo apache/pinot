@@ -329,8 +329,8 @@ public class ForwardIndexType
     int maxLength = fieldSpec.getMaxLength();
 
     return (storedType.isFixedWidth() || (
-        (storedType.getStoredType() == BYTES || storedType.getStoredType() == BIG_DECIMAL) && maxLength > 0 &&
-            maxLength != FieldSpec.DEFAULT_MAX_LENGTH)
+        (storedType.getStoredType() == BYTES || storedType.getStoredType() == BIG_DECIMAL) && maxLength > 0
+            && maxLength != FieldSpec.DEFAULT_MAX_LENGTH)
     );
   }
 }
