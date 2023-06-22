@@ -278,9 +278,6 @@ public class ForwardIndexType
       if (isSingleValue) {
         String allocationContext = IndexUtil.buildAllocationContext(context.getSegmentName(),
             context.getFieldSpec().getName(), V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-        // We consider BYTES with a specific maxLength as being also fixed width.
-        // For BIG_DECIMAL, maxLength is maximum size of a serialized big decimal,
-        // it is determined using the value aggregator if present and does not need to be specified on the schema.
         if (isFieldFixed(context.getFieldSpec())) {
           return new FixedByteSVMutableForwardIndex(false, storedType, maxLength, context.getCapacity(),
               context.getMemoryManager(), allocationContext);
@@ -324,12 +321,16 @@ public class ForwardIndexType
     }
   }
 
+  // We consider BYTES with a specific maxLength as being also fixed width.
+  // For BIG_DECIMAL, maxLength is maximum size of a serialized big decimal,
+  // it is determined using the value aggregator if present and does not need to be specified on the schema.
   private boolean isFieldFixed(FieldSpec fieldSpec) {
     FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
     int maxLength = fieldSpec.getMaxLength();
 
     return (storedType.isFixedWidth() || (
-        (storedType.getStoredType() == BYTES || storedType.getStoredType() == BIG_DECIMAL) && maxLength > 0)
+        (storedType.getStoredType() == BYTES || storedType.getStoredType() == BIG_DECIMAL) && maxLength > 0 &&
+            maxLength != FieldSpec.DEFAULT_MAX_LENGTH)
     );
   }
 }
