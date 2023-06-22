@@ -6,7 +6,7 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ *n
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
@@ -33,6 +33,7 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -138,6 +139,11 @@ public class SegmentGenerationUtils {
     } catch (IOException e) {
       throw new RuntimeException("Failed to decode table config into JSON from String - '" + tableConfigJson + "'", e);
     }
+
+    if(tableJsonNode.has(OFFLINE) && tableJsonNode.has(REALTIME)) {
+      throw new RuntimeException("You must specify 'REALTIME' or 'OFFLINE' when providing the tableConfigURI for a hybrid table");
+    }
+
     if (tableJsonNode.has(OFFLINE)) {
       tableJsonNode = tableJsonNode.get(OFFLINE);
     }

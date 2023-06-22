@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FilenameFilter;
@@ -44,8 +45,10 @@ import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -55,10 +58,7 @@ import static org.testng.Assert.fail;
 public class SegmentGenerationJobRunnerTest {
 
   @Test
-  public void testSegmentGeneration() throws Exception {
-    // TODO use common resource definitions & code shared with Hadoop unit test.
-    // So probably need a pinot-batch-ingestion-common tests jar that we depend on.
-
+  public void testSegmentGenerationOnHybridTable() throws Exception {
     File testDir = makeTestDir();
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
@@ -75,7 +75,47 @@ public class SegmentGenerationJobRunnerTest {
 
     final String schemaName = "mySchema";
     File schemaFile = makeSchemaFile(testDir, schemaName);
-    File tableConfigFile = makeTableConfigFile(testDir, schemaName);
+    File tableConfigFile = makeHybridTableConfigFile(testDir, schemaName);
+    SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
+    jobSpec.setOverwriteOutput(false);
+
+    try {
+      new SegmentGenerationJobRunner(jobSpec);
+    } catch (Exception e) {
+      Assert.assertEquals("You must specify 'REALTIME' or 'OFFLINE' when providing the tableConfigURI for a hybrid table", e.getMessage());
+    }
+  }
+
+  @DataProvider(name = "tableTypes")
+  public Object[][] testData() {
+    return new Object[][]{
+            {TableType.REALTIME},
+            {TableType.OFFLINE},
+    };
+  }
+
+  @Test(dataProvider = "tableTypes")
+  public void testSegmentGeneration(TableType tableType) throws Exception {
+    // TODO use common resource definitions & code shared with Hadoop unit test.
+    // So probably need a pinot-batch-ingestion-common tests jar that we depend on.
+
+    File testDir = makeTestDir();
+    File inputDir = new File(testDir, "input");
+    inputDir.mkdirs();
+    File inputFile = new File(inputDir, "input.csv");
+    FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+
+    // Create an output directory, with two empty files in it. One we'll overwrite,
+    // and one we'll leave alone.
+    final String outputFilename = "myTable_" + tableType.name() + "_0.tar.gz";
+    final String existingFilename = "myTable_" + tableType.name() + "_100.tar.gz";
+    File outputDir = new File(testDir, "output");
+    FileUtils.touch(new File(outputDir, outputFilename));
+    FileUtils.touch(new File(outputDir, existingFilename));
+
+    final String schemaName = "mySchema";
+    File schemaFile = makeSchemaFile(testDir, schemaName);
+    File tableConfigFile = makeTableConfigFile(testDir, schemaName, tableType);
     SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
     jobSpec.setOverwriteOutput(false);
     SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
@@ -135,8 +175,8 @@ public class SegmentGenerationJobRunnerTest {
     assertEquals(list.length, 1);
   }
 
-  @Test
-  public void testInputFilesWithSameNameInDifferentDirectories()
+  @Test(dataProvider = "tableTypes")
+  public void testInputFilesWithSameNameInDifferentDirectories(TableType tableType)
       throws Exception {
     File testDir = makeTestDir();
     File inputDir = new File(testDir, "input");
@@ -155,7 +195,7 @@ public class SegmentGenerationJobRunnerTest {
 
     final String schemaName = "mySchema";
     File schemaFile = makeSchemaFile(testDir, schemaName);
-    File tableConfigFile = makeTableConfigFile(testDir, schemaName);
+    File tableConfigFile = makeTableConfigFile(testDir, schemaName, tableType);
     SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
     jobSpec.setSearchRecursively(true);
     SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
@@ -163,19 +203,19 @@ public class SegmentGenerationJobRunnerTest {
 
     // Check that both segment files are created
 
-    File newSegmentFile2009 = new File(outputDir, "2009/myTable_OFFLINE_0.tar.gz");
+    File newSegmentFile2009 = new File(outputDir, "2009/myTable_" + tableType.name() + "_0.tar.gz");
     Assert.assertTrue(newSegmentFile2009.exists());
     Assert.assertTrue(newSegmentFile2009.isFile());
     Assert.assertTrue(newSegmentFile2009.length() > 0);
 
-    File newSegmentFile2010 = new File(outputDir, "2010/myTable_OFFLINE_0.tar.gz");
+    File newSegmentFile2010 = new File(outputDir, "2010/myTable_" + tableType.name() + "_0.tar.gz");
     Assert.assertTrue(newSegmentFile2010.exists());
     Assert.assertTrue(newSegmentFile2010.isFile());
     Assert.assertTrue(newSegmentFile2010.length() > 0);
   }
 
-  @Test
-  public void testFailureHandling()
+  @Test(dataProvider = "tableTypes")
+  public void testFailureHandling(TableType tableType)
       throws Exception {
     File testDir = makeTestDir();
     File inputDir = new File(testDir, "input");
@@ -194,7 +234,7 @@ public class SegmentGenerationJobRunnerTest {
 
     final String schemaName = "mySchema";
     File schemaFile = makeSchemaFile(testDir, schemaName);
-    File tableConfigFile = makeTableConfigFile(testDir, schemaName);
+    File tableConfigFile = makeTableConfigFile(testDir, schemaName, tableType);
     SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
 
     // Set up for a segment name that matches our input filename, so we can validate
@@ -247,14 +287,35 @@ public class SegmentGenerationJobRunnerTest {
     return schemaFile;
   }
 
-  private File makeTableConfigFile(File testDir, String schemaName) throws IOException {
+  private File makeTableConfigFile(File testDir, String schemaName, TableType tableType) throws IOException {
     File tableConfigFile = new File(testDir, "tableConfig");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+    TableConfig tableConfig = new TableConfigBuilder(tableType)
         .setTableName("myTable")
         .setSchemaName(schemaName)
         .setNumReplicas(1)
         .build();
-    FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
+
+    ObjectNode ret = JsonUtils.newObjectNode();
+    ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
+
+    FileUtils.write(tableConfigFile, ret.toString(), StandardCharsets.UTF_8);
+    return tableConfigFile;
+  }
+
+
+  private File makeHybridTableConfigFile(File testDir, String schemaName) throws IOException {
+    File tableConfigFile = new File(testDir, "tableConfig");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+            .setTableName("myTable")
+            .setSchemaName(schemaName)
+            .setNumReplicas(1)
+            .build();
+
+    ObjectNode ret = JsonUtils.newObjectNode();
+    ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
+    ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
+
+    FileUtils.write(tableConfigFile, ret.toString(), StandardCharsets.UTF_8);
     return tableConfigFile;
   }
 
@@ -267,7 +328,11 @@ public class SegmentGenerationJobRunnerTest {
         .setNumReplicas(1)
         .setIngestionConfig(ingestionConfig)
         .build();
-    FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
+
+    ObjectNode ret = JsonUtils.newObjectNode();
+    ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
+
+    FileUtils.write(tableConfigFile, ret.toString(), StandardCharsets.UTF_8);
     return tableConfigFile;
   }
 
