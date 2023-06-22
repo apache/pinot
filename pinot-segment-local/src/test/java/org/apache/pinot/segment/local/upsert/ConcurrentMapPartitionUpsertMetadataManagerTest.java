@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
@@ -53,7 +54,6 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
 
 
 public class ConcurrentMapPartitionUpsertMetadataManagerTest {
@@ -78,6 +78,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList(comparisonColumn), hashFunction, null, false, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
     // Add the first segment
     int numRecords = 6;
@@ -99,6 +100,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       recordInfoList1 = getRecordInfoList(numRecords, primaryKeys, timestamps);
     }
     upsertMetadataManager.addSegment(segment1, validDocIds1, recordInfoList1.iterator());
+    trackedSegments.add(segment1);
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
     assertEquals(recordLocationMap.size(), 3);
     checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, hashFunction);
@@ -125,6 +127,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       recordInfoList2 = getRecordInfoList(numRecords, primaryKeys, timestamps);
     }
     upsertMetadataManager.addSegment(segment2, validDocIds2, recordInfoList2.iterator());
+    trackedSegments.add(segment2);
 
     // segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
@@ -153,6 +156,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap newValidDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl newSegment1 = mockImmutableSegment(1, newValidDocIds1, primaryKeys1);
     upsertMetadataManager.replaceSegment(newSegment1, newValidDocIds1, recordInfoList1.iterator(), segment1);
+    trackedSegments.add(newSegment1);
+    trackedSegments.remove(segment1);
     // original segment1: 1 -> {4, 120} (not in the map)
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // new segment1: 1 -> {4, 120}
@@ -164,7 +169,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(upsertMetadataManager._replacedSegments, Collections.singleton(segment1));
 
     // Remove the original segment1
     upsertMetadataManager.removeSegment(segment1);
@@ -178,7 +182,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertTrue(upsertMetadataManager._replacedSegments.isEmpty());
 
     // Remove the empty segment
     upsertMetadataManager.removeSegment(emptySegment);
@@ -200,6 +203,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
+    assertEquals(trackedSegments, Collections.singleton(newSegment1));
 
     // Stop the metadata manager
     upsertMetadataManager.stop();
@@ -210,6 +214,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
+    assertEquals(trackedSegments, Collections.singleton(newSegment1));
 
     // Close the metadata manager
     upsertMetadataManager.close();
@@ -218,8 +223,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private List<RecordInfo> getRecordInfoList(int numRecords, int[] primaryKeys, int[] timestamps) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
-      recordInfoList.add(
-          new RecordInfo(makePrimaryKey(primaryKeys[i]), i, new IntWrapper(timestamps[i])));
+      recordInfoList.add(new RecordInfo(makePrimaryKey(primaryKeys[i]), i, new IntWrapper(timestamps[i])));
     }
     return recordInfoList;
   }
@@ -288,8 +292,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertNotNull(recordLocation);
     assertSame(recordLocation.getSegment(), segment);
     assertEquals(recordLocation.getDocId(), docId);
-    assertEquals(((IntWrapper) recordLocation.getComparisonValue())._value,
-        comparisonValue);
+    assertEquals(((IntWrapper) recordLocation.getComparisonValue())._value, comparisonValue);
   }
 
   @Test

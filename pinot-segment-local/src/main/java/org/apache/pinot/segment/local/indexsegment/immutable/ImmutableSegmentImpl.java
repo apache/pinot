@@ -123,7 +123,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return null;
   }
 
-  public void persistValidDocIdsSnapshot(MutableRoaringBitmap validDocIds) {
+  public void persistValidDocIdsSnapshot() {
     File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
     try {
       if (validDocIdsSnapshotFile.exists()) {
@@ -132,14 +132,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
           return;
         }
       }
+      MutableRoaringBitmap validDocIdsSnapshot = _validDocIds.getMutableRoaringBitmap();
       try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
-        validDocIds.serialize(dataOutputStream);
+        validDocIdsSnapshot.serialize(dataOutputStream);
       }
       LOGGER.info("Persisted valid doc ids for segment: {} with: {} valid docs", getSegmentName(),
-          validDocIds.getCardinality());
+          validDocIdsSnapshot.getCardinality());
     } catch (Exception e) {
       LOGGER.warn("Caught exception while persisting valid doc ids to snapshot file: {}, skipping",
-          validDocIdsSnapshotFile);
+          validDocIdsSnapshotFile, e);
     }
   }
 
