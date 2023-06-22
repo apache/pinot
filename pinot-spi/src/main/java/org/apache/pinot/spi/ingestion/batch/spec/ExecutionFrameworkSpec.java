@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.ingestion.batch.spec;
 
+import com.google.common.base.Preconditions;
+
 import java.io.Serializable;
 import java.util.Map;
 
@@ -68,6 +70,14 @@ public class ExecutionFrameworkSpec implements Serializable {
     return _segmentGenerationJobRunnerClassName;
   }
 
+  public String getSegmentGenerationJobRunnerClassNameNotNull() {
+    Preconditions.checkState(
+            _segmentGenerationJobRunnerClassName != null,
+            "segmentGenerationJobRunnerClassName in job spec was null"
+    );
+    return getSegmentGenerationJobRunnerClassName();
+  }
+
   public void setSegmentGenerationJobRunnerClassName(String segmentGenerationJobRunnerClassName) {
     _segmentGenerationJobRunnerClassName = segmentGenerationJobRunnerClassName;
   }
@@ -76,12 +86,28 @@ public class ExecutionFrameworkSpec implements Serializable {
     return _segmentTarPushJobRunnerClassName;
   }
 
+  public String getSegmentTarPushJobRunnerClassNameNotNull() {
+    Preconditions.checkState(
+            _segmentTarPushJobRunnerClassName != null,
+            "segmentTarPushJobRunnerClassName in job spec was null"
+    );
+    return getSegmentTarPushJobRunnerClassName();
+  }
+
   public void setSegmentTarPushJobRunnerClassName(String segmentTarPushJobRunnerClassName) {
     _segmentTarPushJobRunnerClassName = segmentTarPushJobRunnerClassName;
   }
 
   public String getSegmentUriPushJobRunnerClassName() {
     return _segmentUriPushJobRunnerClassName;
+  }
+
+  public String getSegmentUriPushJobRunnerClassNameNotNull() {
+    Preconditions.checkState(
+            _segmentUriPushJobRunnerClassName != null,
+            "segmentUriPushJobRunnerClassName in job spec was null"
+    );
+    return getSegmentUriPushJobRunnerClassName();
   }
 
   public void setSegmentUriPushJobRunnerClassName(String segmentUriPushJobRunnerClassName) {
@@ -98,6 +124,14 @@ public class ExecutionFrameworkSpec implements Serializable {
 
   public String getSegmentMetadataPushJobRunnerClassName() {
     return _segmentMetadataPushJobRunnerClassName;
+  }
+
+  public String getSegmentMetadataPushJobRunnerClassNameNotNull() {
+    Preconditions.checkState(
+            _segmentMetadataPushJobRunnerClassName != null,
+            "segmentMetadataPushJobRunnerClassName in job spec was null"
+    );
+    return getSegmentMetadataPushJobRunnerClassName();
   }
 
   public void setSegmentMetadataPushJobRunnerClassName(String segmentMetadataPushJobRunnerClassName) {
