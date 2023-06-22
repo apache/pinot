@@ -49,6 +49,7 @@ import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
+import org.apache.pinot.plugin.minion.tasks.mergerollup.segmentgroupmananger.MergeRollupTaskSegmentGroupManagerProvider;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -409,7 +410,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         if (segmentPartitionConfig == null) {
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
             pinotTaskConfigsForTable.addAll(
-                createPinotTaskConfigs(selectedSegmentsPerBucket, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
+                createPinotTaskConfigs(selectedSegmentsPerBucket, tableConfig, maxNumRecordsPerTask, mergeLevel,
                     null, mergeConfigs, taskConfigs));
           }
         } else {
@@ -448,13 +449,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               List<Integer> partition = entry.getKey();
               List<SegmentZKMetadata> partitionedSegments = entry.getValue();
               pinotTaskConfigsForTable.addAll(
-                  createPinotTaskConfigs(partitionedSegments, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
+                  createPinotTaskConfigs(partitionedSegments, tableConfig, maxNumRecordsPerTask, mergeLevel,
                       partition, mergeConfigs, taskConfigs));
             }
 
             if (!outlierSegments.isEmpty()) {
               pinotTaskConfigsForTable.addAll(
-                  createPinotTaskConfigs(outlierSegments, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
+                  createPinotTaskConfigs(outlierSegments, tableConfig, maxNumRecordsPerTask, mergeLevel,
                       null, mergeConfigs, taskConfigs));
             }
           }
@@ -651,72 +652,77 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    * Create pinot task configs with selected segments and configs
    */
   private List<PinotTaskConfig> createPinotTaskConfigs(List<SegmentZKMetadata> selectedSegments,
-      String tableNameWithType, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
+      TableConfig tableConfig, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
       Map<String, String> mergeConfigs, Map<String, String> taskConfigs) {
-    int numRecordsPerTask = 0;
-    List<List<String>> segmentNamesList = new ArrayList<>();
-    List<List<String>> downloadURLsList = new ArrayList<>();
-    List<String> segmentNames = new ArrayList<>();
-    List<String> downloadURLs = new ArrayList<>();
-
-    for (int i = 0; i < selectedSegments.size(); i++) {
-      SegmentZKMetadata targetSegment = selectedSegments.get(i);
-      segmentNames.add(targetSegment.getSegmentName());
-      downloadURLs.add(targetSegment.getDownloadUrl());
-      numRecordsPerTask += targetSegment.getTotalDocs();
-      if (numRecordsPerTask >= maxNumRecordsPerTask || i == selectedSegments.size() - 1) {
-        segmentNamesList.add(segmentNames);
-        downloadURLsList.add(downloadURLs);
-        numRecordsPerTask = 0;
-        segmentNames = new ArrayList<>();
-        downloadURLs = new ArrayList<>();
-      }
-    }
-
+    String tableNameWithType = tableConfig.getTableName();
+    List<List<SegmentZKMetadata>> segmentGroups = MergeRollupTaskSegmentGroupManagerProvider.create(taskConfigs)
+        .getSegmentGroups(tableConfig, _clusterInfoAccessor, selectedSegments);
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
-    StringBuilder partitionSuffixBuilder = new StringBuilder();
-    if (partition != null && !partition.isEmpty()) {
-      for (int columnPartition : partition) {
-        partitionSuffixBuilder.append(DELIMITER_IN_SEGMENT_NAME).append(columnPartition);
-      }
-    }
-    String partitionSuffix = partitionSuffixBuilder.toString();
+    for (List<SegmentZKMetadata> segments : segmentGroups) {
+      int numRecordsPerTask = 0;
+      List<List<String>> segmentNamesList = new ArrayList<>();
+      List<List<String>> downloadURLsList = new ArrayList<>();
+      List<String> segmentNames = new ArrayList<>();
+      List<String> downloadURLs = new ArrayList<>();
 
-    for (int i = 0; i < segmentNamesList.size(); i++) {
-      String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
-      Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs,
-          _clusterInfoAccessor);
-      configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
-      configs.put(MinionConstants.SEGMENT_NAME_KEY,
-          StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
-      configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
-      configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-      configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");
-
-      for (Map.Entry<String, String> taskConfig : taskConfigs.entrySet()) {
-        if (taskConfig.getKey().endsWith(MinionConstants.MergeRollupTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
-          configs.put(taskConfig.getKey(), taskConfig.getValue());
+      for (int i = 0; i < segments.size(); i++) {
+        SegmentZKMetadata targetSegment = segments.get(i);
+        segmentNames.add(targetSegment.getSegmentName());
+        downloadURLs.add(targetSegment.getDownloadUrl());
+        numRecordsPerTask += targetSegment.getTotalDocs();
+        if (numRecordsPerTask >= maxNumRecordsPerTask || i == segments.size() - 1) {
+          segmentNamesList.add(segmentNames);
+          downloadURLsList.add(downloadURLs);
+          numRecordsPerTask = 0;
+          segmentNames = new ArrayList<>();
+          downloadURLs = new ArrayList<>();
         }
       }
 
-      configs.put(BatchConfigProperties.OVERWRITE_OUTPUT,
-          taskConfigs.getOrDefault(BatchConfigProperties.OVERWRITE_OUTPUT, "false"));
-      configs.put(MergeRollupTask.MERGE_TYPE_KEY, mergeConfigs.get(MergeTask.MERGE_TYPE_KEY));
-      configs.put(MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
-      configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
-      configs.put(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY));
-      configs.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
-          mergeConfigs.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY));
+      StringBuilder partitionSuffixBuilder = new StringBuilder();
+      if (partition != null && !partition.isEmpty()) {
+        for (int columnPartition : partition) {
+          partitionSuffixBuilder.append(DELIMITER_IN_SEGMENT_NAME).append(columnPartition);
+        }
+      }
+      String partitionSuffix = partitionSuffixBuilder.toString();
 
-      // Segment name conflict happens when the current method "createPinotTaskConfigs" is invoked more than once within
-      // the same epoch millisecond, which may happen when there are multiple partitions.
-      // To prevent such name conflict, we include a partitionSeqSuffix to the segment name.
-      configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
-          MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
-              + System.currentTimeMillis() + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i
-              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableNameWithType));
-      pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
+      for (int i = 0; i < segmentNamesList.size(); i++) {
+        String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
+        Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs,
+            _clusterInfoAccessor);
+        configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
+        configs.put(MinionConstants.SEGMENT_NAME_KEY,
+            StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
+        configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
+        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");
+
+        for (Map.Entry<String, String> taskConfig : taskConfigs.entrySet()) {
+          if (taskConfig.getKey().endsWith(MinionConstants.MergeRollupTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+            configs.put(taskConfig.getKey(), taskConfig.getValue());
+          }
+        }
+
+        configs.put(BatchConfigProperties.OVERWRITE_OUTPUT,
+            taskConfigs.getOrDefault(BatchConfigProperties.OVERWRITE_OUTPUT, "false"));
+        configs.put(MergeRollupTask.MERGE_TYPE_KEY, mergeConfigs.get(MergeTask.MERGE_TYPE_KEY));
+        configs.put(MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+        configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
+        configs.put(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY));
+        configs.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
+            mergeConfigs.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY));
+
+        // Segment name conflict happens when the current method "createPinotTaskConfigs" is invoked more than once
+        // within the same epoch millisecond, which may happen when there are multiple partitions.
+        // To prevent such name conflict, we include a partitionSeqSuffix to the segment name.
+        configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
+            MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
+                + System.currentTimeMillis() + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i
+                + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableNameWithType));
+        pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
+      }
     }
 
     return pinotTaskConfigs;
