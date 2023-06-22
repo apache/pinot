@@ -19,10 +19,8 @@
 package org.apache.pinot.spi.ingestion.batch.spec;
 
 import com.google.common.base.Preconditions;
-
 import java.io.Serializable;
 import java.util.Map;
-import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 
 
 /**

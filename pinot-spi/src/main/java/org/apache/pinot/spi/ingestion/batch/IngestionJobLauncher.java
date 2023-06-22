@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.ingestion.batch;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
