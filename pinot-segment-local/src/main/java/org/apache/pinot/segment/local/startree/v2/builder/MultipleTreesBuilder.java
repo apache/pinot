@@ -164,11 +164,10 @@ public class MultipleTreesBuilder implements Closeable {
       for (int i = 0; i < numStarTrees; i++) {
         StarTreeV2BuilderConfig builderConfig = _builderConfigs.get(i);
         Configuration metadataProperties = _metadataProperties.subset(MetadataKey.getStarTreePrefix(i));
-        if (_existingStarTrees != null && _existingStarTrees.containsTree(builderConfig)) {
-          // Use existing tree if its unchanged
-          LOGGER.info("Reusing existing star-tree: {}", builderConfig.toString());
+        if (handleExistingStarTreeAddition(starTreeIndexDir, metadataProperties, builderConfig)) {
+          // Used existing tree
+          LOGGER.info("Reused existing star-tree: {}", builderConfig.toString());
           reusedStarTrees++;
-          handleExistingStarTreeAddition(starTreeIndexDir, metadataProperties, builderConfig);
         } else {
           try (SingleTreeBuilder singleTreeBuilder = getSingleTreeBuilder(builderConfig, starTreeIndexDir, _segment,
               metadataProperties, _buildMode)) {
@@ -212,12 +211,20 @@ public class MultipleTreesBuilder implements Closeable {
   /**
    * Helper utility to move the individual star-tree files to the {@param starTreeIndexDir} from where it will be picked
    * by the combiner to merge them into the single star-tree index file. The method also takes care of updating the
-   * {@param metadataProperties} for the star-tree
+   * {@param metadataProperties} for the star-tree.
+   * Returns {@code false} if the star-tree is not present in the existing star-trees, otherwise returns {@code true}
+   * upon successful transfer completion
    */
-  private void handleExistingStarTreeAddition(File starTreeIndexDir, Configuration metadataProperties,
+  private boolean handleExistingStarTreeAddition(File starTreeIndexDir, Configuration metadataProperties,
       StarTreeV2BuilderConfig builderConfig)
       throws IOException {
-    int builderConfigIndex = _existingStarTrees.getIndexOf(builderConfig);
+    int builderConfigIndex = -1;
+    if (_existingStarTrees != null) {
+      builderConfigIndex = _existingStarTrees.getIndexOf(builderConfig);
+    }
+    if (builderConfigIndex == -1) {
+      return false;
+    }
     File existingStarTreeIndexSubDir = _existingStarTrees.getSubDirectory(builderConfigIndex);
     for (File file : FileUtils.listFiles(existingStarTreeIndexSubDir, null, false)) {
       FileUtils.moveFileToDirectory(file, starTreeIndexDir, false);
@@ -228,6 +235,7 @@ public class MultipleTreesBuilder implements Closeable {
     metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, builderConfig.getMaxLeafRecords());
     metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         builderConfig.getSkipStarNodeCreationForDimensions());
+    return true;
   }
 
   private static SingleTreeBuilder getSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir,
