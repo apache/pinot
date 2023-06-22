@@ -130,11 +130,14 @@ public class MultipleTreesBuilder implements Closeable {
         StarTreeBuilderUtils.removeStarTrees(_indexDir);
         _metadataProperties.refresh();
         return existingStarTrees;
-      } else {
-        return new SeparatedStarTreesMetadata(_segmentDirectory);
       }
+      return null;
     } catch (Exception e) {
-      SeparatedStarTreesMetadata.cleanOutputDirectory(_segmentDirectory);
+      try {
+        SeparatedStarTreesMetadata.cleanOutputDirectory(_segmentDirectory);
+      } catch (Exception e1) {
+        LOGGER.warn(e1.getMessage(), e1);
+      }
       throw e;
     }
   }
@@ -161,7 +164,7 @@ public class MultipleTreesBuilder implements Closeable {
       for (int i = 0; i < numStarTrees; i++) {
         StarTreeV2BuilderConfig builderConfig = _builderConfigs.get(i);
         Configuration metadataProperties = _metadataProperties.subset(MetadataKey.getStarTreePrefix(i));
-        if (_existingStarTrees.containsTree(builderConfig)) {
+        if (_existingStarTrees != null && _existingStarTrees.containsTree(builderConfig)) {
           // Use existing tree if its unchanged
           LOGGER.info("Reusing existing star-tree: {}", builderConfig.toString());
           reusedStarTrees++;
@@ -180,7 +183,6 @@ public class MultipleTreesBuilder implements Closeable {
       StarTreeIndexMapUtils
           .storeToFile(indexMaps, new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
       FileUtils.forceDelete(starTreeIndexDir);
-      _existingStarTrees.cleanOutputDirectory();
     }
 
     LOGGER.info("Newly built start-trees {}.\n Reused star-trees {}.", numStarTrees - reusedStarTrees, reusedStarTrees);
@@ -242,6 +244,13 @@ public class MultipleTreesBuilder implements Closeable {
 
   @Override
   public void close() {
+    try {
+      if(_existingStarTrees != null) {
+        _existingStarTrees.cleanOutputDirectory();
+      }
+    } catch (Exception e) {
+      LOGGER.warn(e.getMessage(), e);
+    }
     _segment.destroy();
   }
 
