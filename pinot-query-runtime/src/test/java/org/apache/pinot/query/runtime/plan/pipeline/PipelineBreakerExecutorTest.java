@@ -219,7 +219,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis(), 0, false);
+            System.currentTimeMillis() - 10_000L, 0, false);
 
     // then
     // should contain only failure error blocks
