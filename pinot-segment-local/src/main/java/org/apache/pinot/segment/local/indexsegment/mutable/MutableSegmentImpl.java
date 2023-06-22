@@ -164,6 +164,14 @@ public class MutableSegmentImpl implements MutableSegment {
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
+  // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
+  // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
+  //    ids for the consuming segment.
+  // 2. During the segment commitment, when loading the immutable version of this segment, in order to keep the result
+  //    correct, the valid doc ids should not be changed, only the record location should be changed.
+  // FIXME: There is a corner case for this approach which could cause inconsistency. When there is segment load during
+  //        consumption with newer timestamp (late event in consuming segment), the record location will be updated, but
+  //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
 
