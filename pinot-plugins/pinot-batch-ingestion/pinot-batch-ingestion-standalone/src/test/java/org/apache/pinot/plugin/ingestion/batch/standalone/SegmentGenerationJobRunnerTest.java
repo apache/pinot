@@ -82,7 +82,9 @@ public class SegmentGenerationJobRunnerTest {
     try {
       new SegmentGenerationJobRunner(jobSpec);
     } catch (Exception e) {
-      Assert.assertEquals("You must specify 'REALTIME' or 'OFFLINE' when providing the tableConfigURI for a hybrid table", e.getMessage());
+      Assert.assertEquals(
+              "You must specify 'REALTIME' or 'OFFLINE' when providing the tableConfigURI for a hybrid table",
+              e.getMessage());
     }
   }
 
