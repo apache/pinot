@@ -185,8 +185,8 @@ public class MultipleTreesBuilder implements Closeable {
       FileUtils.forceDelete(starTreeIndexDir);
     }
 
-    LOGGER.info("Newly built start-trees {}.\n Reused star-trees {}.", numStarTrees - reusedStarTrees, reusedStarTrees);
-    LOGGER.info("Finished building star-trees in {}ms", System.currentTimeMillis() - startTime);
+    LOGGER.info("Finished building {} star-trees ({} reused) in {}ms", numStarTrees, reusedStarTrees,
+        System.currentTimeMillis() - startTime);
   }
 
   /**
@@ -197,16 +197,14 @@ public class MultipleTreesBuilder implements Closeable {
   private SeparatedStarTreesMetadata extractStarTrees()
       throws Exception {
     SeparatedStarTreesMetadata metadata = new SeparatedStarTreesMetadata(_segmentDirectory);
-    if (_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT)) {
-      File indexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
-      File indexMapFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
-      try (StarTreeIndexSeparator separator =
-          new StarTreeIndexSeparator(indexMapFile, indexFile,
-              _metadataProperties.getInt(MetadataKey.STAR_TREE_COUNT))) {
-        separator.separate(metadata.getOutputDirectory());
-        metadata.setBuilderConfigList(separator.extractBuilderConfigs(_metadataProperties));
-        metadata.setTotalDocsList(separator.extractTotalDocsList(_metadataProperties));
-      }
+    File indexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
+    File indexMapFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
+    try (StarTreeIndexSeparator separator =
+        new StarTreeIndexSeparator(indexMapFile, indexFile,
+            _metadataProperties.getInt(MetadataKey.STAR_TREE_COUNT))) {
+      separator.separate(metadata.getOutputDirectory());
+      metadata.setBuilderConfigList(separator.extractBuilderConfigs(_metadataProperties));
+      metadata.setTotalDocsList(separator.extractTotalDocsList(_metadataProperties));
     }
     return metadata;
   }
