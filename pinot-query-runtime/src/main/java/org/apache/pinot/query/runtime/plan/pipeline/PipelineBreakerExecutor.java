@@ -87,7 +87,9 @@ public class PipelineBreakerExecutor {
         TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
         Map<Integer, List<TransferableBlock>> resultMap = new HashMap<>();
         for (int key : pipelineBreakerContext.getNodeIdMap().values()) {
-          resultMap.put(key, Collections.singletonList(errorBlock));
+          if (pipelineBreakerContext.getPipelineBreakerMap().containsKey(key)) {
+            resultMap.put(key, Collections.singletonList(errorBlock));
+          }
         }
         return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), resultMap);
       }
@@ -103,7 +105,6 @@ public class PipelineBreakerExecutor {
     for (Map.Entry<Integer, PlanNode> e : context.getPipelineBreakerMap().entrySet()) {
       int key = e.getKey();
       PlanNode planNode = e.getValue();
-      // TODO: supprot other pipeline breaker node type as well.
       if (!(planNode instanceof MailboxReceiveNode)) {
         throw new UnsupportedOperationException("Only MailboxReceiveNode is supported to run as pipeline breaker now");
       }
