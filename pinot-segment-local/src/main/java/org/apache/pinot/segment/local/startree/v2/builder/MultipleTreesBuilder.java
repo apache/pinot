@@ -251,7 +251,7 @@ public class MultipleTreesBuilder implements Closeable {
   @Override
   public void close() {
     try {
-      if(_existingStarTrees != null) {
+      if (_existingStarTrees != null) {
         _existingStarTrees.cleanOutputDirectory();
       }
     } catch (Exception e) {
