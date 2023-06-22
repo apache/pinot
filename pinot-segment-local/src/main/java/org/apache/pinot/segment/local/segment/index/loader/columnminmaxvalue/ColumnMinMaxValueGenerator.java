@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -39,6 +40,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.ByteArray;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -179,7 +181,7 @@ public class ColumnMinMaxValueGenerator {
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
       }
-    } else if (_segmentMetadata.getSchema().getFieldSpecFor(columnName).getFieldType() == FieldSpec.FieldType.METRIC) {
+    } else if (_segmentMetadata.getSchema().getFieldSpecFor(columnName).isSingleValueField()) {
       // setting min/max for non-dictionary columns.
       PinotDataBuffer forwardBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
       switch (dataType) {
@@ -227,6 +229,28 @@ public class ColumnMinMaxValueGenerator {
                 String.valueOf(minMaxValue[0]), String.valueOf(minMaxValue[1]));
           }
           break;
+        case STRING:
+          try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(forwardBuffer,
+              DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+            String[] minMaxValue = {null, null};
+            for (int docs = 0; docs < columnMetadata.getTotalDocs(); docs++) {
+              minMaxValue = getMinMaxValue(minMaxValue, rawIndexReader.getString(docs, readerContext));
+            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                String.valueOf(minMaxValue[0]), String.valueOf(minMaxValue[1]));
+          }
+          break;
+        case BYTES:
+          try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(forwardBuffer,
+              DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+            ByteArray[] minMaxValue = {null, null};
+            for (int docs = 0; docs < columnMetadata.getTotalDocs(); docs++) {
+              minMaxValue = getMinMaxValue(minMaxValue, new ByteArray(rawIndexReader.getBytes(docs, readerContext)));
+            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                String.valueOf(minMaxValue[0]), String.valueOf(minMaxValue[1]));
+          }
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
       }
@@ -235,6 +259,11 @@ public class ColumnMinMaxValueGenerator {
   }
 
   private <T extends Comparable<T>> T[] getMinMaxValue(T[] minMaxValues, T val) {
+    if (minMaxValues[0] == null) {
+      minMaxValues[0] = val;
+      minMaxValues[1] = val;
+      return minMaxValues;
+    }
     if (val.compareTo(minMaxValues[0]) < 0) {
       minMaxValues[0] = val;
     }

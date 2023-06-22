@@ -570,14 +570,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
       String maxValue) {
     if (isValidPropertyValue(minValue)) {
-      properties.setProperty(getKeyFor(column, MIN_VALUE),
-          minValue.substring(0, Math.min(minValue.length(), METADATA_PROPERTY_LENGTH_LIMIT)));
+      if (minValue.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
+        properties.setProperty(getKeyFor(column, MIN_VALUE), getTrimmedPropertyValue(minValue));
+      } else {
+        properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
+      }
     } else {
       properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
     if (isValidPropertyValue(maxValue)) {
-      properties.setProperty(getKeyFor(column, MAX_VALUE),
-          maxValue.substring(0, Math.min(maxValue.length(), METADATA_PROPERTY_LENGTH_LIMIT)));
+      if (maxValue.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
+        properties.setProperty(getKeyFor(column, MAX_VALUE), getTrimmedPropertyValue(maxValue));
+      } else {
+        properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+      }
     } else {
       properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
@@ -602,6 +608,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return false;
     }
     return value.indexOf(',') == -1;
+  }
+
+  static String getTrimmedPropertyValue(String value) {
+    return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
