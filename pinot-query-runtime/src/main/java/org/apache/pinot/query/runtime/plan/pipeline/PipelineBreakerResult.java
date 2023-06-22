@@ -24,6 +24,9 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
+/**
+ * execution result encapsulation for {@link PipelineBreakerExecutor}.
+ */
 public class PipelineBreakerResult {
   private final Map<PlanNode, Integer> _nodeIdMap;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
