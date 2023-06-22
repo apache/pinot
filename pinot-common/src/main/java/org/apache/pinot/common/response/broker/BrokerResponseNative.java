@@ -559,13 +559,13 @@ public class BrokerResponseNative implements BrokerResponse {
     return _processingExceptions.size();
   }
 
-
   @JsonProperty("requestId")
   @Override
   public String getRequestId() {
     return _requestId;
   }
 
+  @JsonProperty("requestId")
   @Override
   public void setRequestId(String requestId) {
     _requestId = requestId;

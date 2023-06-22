@@ -46,7 +46,7 @@ public class BrokerResponseTest {
         + "\"aggregationResults\":[{\"function\":\"count_star\",\"value\":\"36542\"}],\"timeUsedMs\":30,"
         + "\"segmentStatistics\":[],\"exceptions\":[],\"totalDocs\":115545}";
     BrokerResponse brokerResponse = BrokerResponse.fromJson(OBJECT_READER.readTree(responseJson));
-    Assert.assertEquals("-1", brokerResponse.getRequestId());
+    Assert.assertEquals("unknown", brokerResponse.getRequestId());
     Assert.assertTrue(!brokerResponse.hasExceptions());
   }
 }

@@ -36,7 +36,7 @@ public class BrokerResponse {
   }
 
   private BrokerResponse(JsonNode brokerResponse) {
-    _requestId = brokerResponse.get("requestId") != null ? brokerResponse.get("requestId").asText() : "-1";
+    _requestId = brokerResponse.get("requestId") != null ? brokerResponse.get("requestId").asText() : "unknown";
     _aggregationResults = brokerResponse.get("aggregationResults");
     _exceptions = brokerResponse.get("exceptions");
     _selectionResults = brokerResponse.get("selectionResults");
