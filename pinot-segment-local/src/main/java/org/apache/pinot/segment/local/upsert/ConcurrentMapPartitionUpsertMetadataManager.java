@@ -235,7 +235,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       if (previousRecord != null) {
         return _partialUpsertHandler.merge(previousRecord, record);
       } else {
-        handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
         return record;
       }
     } else {
