@@ -423,7 +423,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (currentTimeNs - _lastOutOfOrderEventReportTimeNs > OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS) {
       _logger.warn("Skipped {} out-of-order events for {} upsert table {} (the last event has current comparison "
               + "value: {}, record comparison value: {})", _numOutOfOrderEvents,
-          (isPartialUpsertTable ? "partial" : ""), _tableNameWithType, currentComparisonValue, recordComparisonValue);
+          (isPartialUpsertTable ? "partial" : "full"), _tableNameWithType, currentComparisonValue,
+          recordComparisonValue);
       _lastOutOfOrderEventReportTimeNs = currentTimeNs;
       _numOutOfOrderEvents = 0;
     }

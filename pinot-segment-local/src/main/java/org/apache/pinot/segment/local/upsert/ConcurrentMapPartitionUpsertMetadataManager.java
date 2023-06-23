@@ -284,7 +284,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         }
         return _partialUpsertHandler.merge(previousRecord, record);
       } else {
-        handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
         return record;
       }
     } else {
