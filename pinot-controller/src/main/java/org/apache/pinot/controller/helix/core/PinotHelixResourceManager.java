@@ -3137,6 +3137,12 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.success("Instance " + instanceName + " dropped");
   }
 
+  /**
+   * Utility to perform a safety check of the operation to drop an instance.
+   * If the resource is not safe to drop the utility lists all the possible reasons.
+   * @param instanceName Pinot instance name
+   * @return List of reasons why the operation is unsafe. Empty list if the operation is safe.
+   */
   public List<String> instanceDropSafetyCheck(String instanceName) {
     List<String> issues = new ArrayList<>();
     // Check if the instance is live
