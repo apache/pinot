@@ -134,7 +134,8 @@ public class MultipleTreesBuilder implements Closeable {
     try {
       _separatorTempDir = new File(_segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(_separatorTempDir);
-      FileUtils.copyFileToDirectory(new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME), _separatorTempDir, false);
+      FileUtils.copyFileToDirectory(
+          new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME), _separatorTempDir, false);
       FileUtils.copyFileToDirectory(
           new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME), _separatorTempDir, false);
       return new StarTreeIndexSeparator(new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
