@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -256,40 +255,26 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
     assert _partialUpsertHandler != null;
     AtomicReference<GenericRow> previousRecordReference = new AtomicReference<>();
-    AtomicBoolean outOfOrder = new AtomicBoolean();
-    RecordLocation currentRecordLocation = _primaryKeyToRecordLocationMap.computeIfPresent(
-        HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (pk, recordLocation) -> {
-          if (recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
-            if (!recordInfo.isDeleteRecord()) {
-              IndexSegment currentSegment = recordLocation.getSegment();
-              int currentDocId = recordLocation.getDocId();
-              ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
-              if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-                // if delete is not enabled or previous record not marked as deleted
-                _reuse.clear();
-                previousRecordReference.set(currentSegment.getRecord(currentDocId, _reuse));
-              }
+    _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+        (pk, recordLocation) -> {
+          // Read the previous record if the following conditions are met:
+          // - New record is not a DELETE record
+          // - New record is not out-of-order
+          // - Previous record is not deleted
+          if (!recordInfo.isDeleteRecord()
+              && recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
+            IndexSegment currentSegment = recordLocation.getSegment();
+            ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
+            int currentDocId = recordLocation.getDocId();
+            if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
+              _reuse.clear();
+              previousRecordReference.set(currentSegment.getRecord(currentDocId, _reuse));
             }
-          } else {
-            outOfOrder.set(true);
           }
           return recordLocation;
         });
-    if (currentRecordLocation != null) {
-      // Existing primary key
-      if (!outOfOrder.get()) {
-        GenericRow previousRecord = previousRecordReference.get();
-        if (previousRecord == null) {
-          return record;
-        }
-        return _partialUpsertHandler.merge(previousRecord, record);
-      } else {
-        return record;
-      }
-    } else {
-      // New primary key
-      return record;
-    }
+    GenericRow previousRecord = previousRecordReference.get();
+    return previousRecord != null ? _partialUpsertHandler.merge(previousRecord, record) : record;
   }
 
   @VisibleForTesting
