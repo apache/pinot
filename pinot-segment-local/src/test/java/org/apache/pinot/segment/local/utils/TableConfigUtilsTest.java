@@ -1545,7 +1545,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail("Invalid delete column type (string) should have failed table creation");
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "The deleted record column must be a single-valued BOOLEAN column");
+      Assert.assertEquals(e.getMessage(), "The delete record column must be a single-valued BOOLEAN column");
     }
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);

@@ -591,7 +591,7 @@ public final class TableConfigUtils {
         FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
         Preconditions.checkState(
             fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
-            "The deleted record column must be a single-valued BOOLEAN column");
+            "The delete record column must be a single-valued BOOLEAN column");
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);

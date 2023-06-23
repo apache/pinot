@@ -260,24 +260,26 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     RecordLocation currentRecordLocation = _primaryKeyToRecordLocationMap.computeIfPresent(
         HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (pk, recordLocation) -> {
           if (recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
-            IndexSegment currentSegment = recordLocation.getSegment();
-            int currentDocId = recordLocation.getDocId();
-            ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
-            if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              // if delete is not enabled or previous record not marked as deleted
-              _reuse.clear();
-              previousRecordReference.set(currentSegment.getRecord(currentDocId, _reuse));
+            if (!recordInfo.isDeleteRecord()) {
+              IndexSegment currentSegment = recordLocation.getSegment();
+              int currentDocId = recordLocation.getDocId();
+              ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
+              if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
+                // if delete is not enabled or previous record not marked as deleted
+                _reuse.clear();
+                previousRecordReference.set(currentSegment.getRecord(currentDocId, _reuse));
+              }
             }
           } else {
             outOfOrder.set(true);
           }
           return recordLocation;
         });
-    GenericRow previousRecord = previousRecordReference.get();
     if (currentRecordLocation != null) {
       // Existing primary key
       if (!outOfOrder.get()) {
-        if (recordInfo.isDeleteRecord() || previousRecord == null) {
+        GenericRow previousRecord = previousRecordReference.get();
+        if (previousRecord == null) {
           return record;
         }
         return _partialUpsertHandler.merge(previousRecord, record);

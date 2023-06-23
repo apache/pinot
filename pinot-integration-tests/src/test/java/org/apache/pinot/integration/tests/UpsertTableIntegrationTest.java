@@ -56,7 +56,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TABLE_NAME = "gameScores";
   private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "playerId";
-  protected static final String DELETED_COL = "deleted";
+  protected static final String DELETE_COL = "deleted";
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -170,7 +171,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   protected void testDeleteWithFullUpsert()
       throws Exception {
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setDeleteRecordColumn(DELETED_COL);
+    upsertConfig.setDeleteRecordColumn(DELETE_COL);
 
     testDeleteWithFullUpsert(getKafkaTopic() + "-with-deletes", "gameScoresWithDelete", upsertConfig);
   }
@@ -267,7 +268,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testDeleteWithPartialUpsert()
       throws Exception {
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    upsertConfig.setDeleteRecordColumn(DELETED_COL);
+    upsertConfig.setDeleteRecordColumn(DELETE_COL);
 
     testDeleteWithPartialUpsert(getKafkaTopic() + "-partial-upsert-with-deletes",
         "gameScoresPartialUpsertWithDelete", upsertConfig);
@@ -281,7 +282,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("game", UpsertConfig.Strategy.UNION);
     partialUpsertStrategies.put("score", UpsertConfig.Strategy.INCREMENT);
-    partialUpsertStrategies.put(DELETED_COL, UpsertConfig.Strategy.OVERWRITE);
+    partialUpsertStrategies.put(DELETE_COL, UpsertConfig.Strategy.OVERWRITE);
     upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
 
     // Create table with delete Record column
