@@ -31,6 +31,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.ClientErrorException;
 import javax.ws.rs.Consumes;
@@ -387,6 +388,35 @@ public class PinotInstanceRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to update broker resource for instance: " + instanceName,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @Path("/instances/safetyCheck/dropInstance")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Check if it's safe to drop the given instances. If not list all the reasons why its not safe.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public List<OperationSafetyCheckResponse> instanceDropSafetyCheck(
+      @ApiParam(value = "Instance names", required = true,
+          example = "Broker_my.broker.com_30000")
+      @QueryParam("instanceNames") List<String> instanceNames) {
+    LOGGER.info("Performing safety check on drop operation request received for instances: {}", instanceNames);
+    try {
+      return instanceNames.stream().map(instance -> {
+        List<String> issues = _pinotHelixResourceManager.instanceDropSafetyCheck(instance);
+        return new OperationSafetyCheckResponse()
+            .setInstanceName(instance)
+            .setSafe(issues.isEmpty())
+            .setIssues(issues);
+      }).collect(Collectors.toList());
+    } catch (ClientErrorException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to check the safety for instance drop operation.",
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
