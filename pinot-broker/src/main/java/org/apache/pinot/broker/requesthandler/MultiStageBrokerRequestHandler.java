@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -45,6 +46,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
@@ -54,6 +56,8 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -75,6 +79,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final long _defaultBrokerTimeoutMs;
 
   private final MailboxService _mailboxService;
+  private final OpChainSchedulerService _reducerScheduler;
+
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
   private final MultiStageRequestIdGenerator _multistageRequestIdGenerator;
@@ -104,12 +110,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
     _queryDispatcher = new QueryDispatcher();
 
-    // it is OK to ignore the onDataAvailable callback because the broker top-level operators
-    // always run in-line (they don't have any scheduler)
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, ignored -> {
-    });
+    long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
+        QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
+    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
+        Executors.newCachedThreadPool(new NamedThreadFactory("query_broker_reducer_" + _reducerPort + "_port")));
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, _reducerScheduler::onDataAvailable);
 
     // TODO: move this to a startUp() function.
+    _reducerScheduler.startAsync();
     _mailboxService.start();
 
     _multistageRequestIdGenerator = new MultiStageRequestIdGenerator(brokerIdFromConfig);
@@ -211,8 +219,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
+      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService,
+          _reducerScheduler,
+          queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
@@ -321,6 +330,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
+    _reducerScheduler.stopAsync();
   }
 
   /**

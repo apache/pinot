@@ -34,10 +34,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -52,14 +52,16 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -85,7 +87,7 @@ public class QueryDispatcher {
   }
 
   public ResultTable submitAndReduce(long requestId, DispatchableSubPlan dispatchableSubPlan,
-      MailboxService mailboxService, long timeoutMs,
+      MailboxService mailboxService, OpChainSchedulerService scheduler, long timeoutMs,
       Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator,
       boolean traceEnabled)
       throws Exception {
@@ -93,7 +95,7 @@ public class QueryDispatcher {
       // submit all the distributed stages.
       int reduceStageId = submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
       // run reduce stage and return result.
-      return runReducer(requestId, dispatchableSubPlan, reduceStageId, timeoutMs, mailboxService,
+      return runReducer(requestId, dispatchableSubPlan, reduceStageId, timeoutMs, mailboxService, scheduler,
           executionStatsAggregator,
           traceEnabled);
     } catch (Exception e) {
@@ -189,73 +191,60 @@ public class QueryDispatcher {
 
   @VisibleForTesting
   public static ResultTable runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, int reduceStageId,
-      long timeoutMs,
-      MailboxService mailboxService, Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled) {
+      long timeoutMs, MailboxService mailboxService, OpChainSchedulerService scheduler,
+      Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled) {
     DispatchablePlanFragment reduceStagePlanFragment = dispatchableSubPlan.getQueryStageList().get(reduceStageId);
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) reduceStagePlanFragment.getPlanFragment().getFragmentRoot();
+    reduceNode.setExchangeType(PinotRelExchangeType.PIPELINE_BREAKER);
     VirtualServerAddress server = new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), 0);
     StageMetadata brokerStageMetadata = new StageMetadata.Builder()
         .setWorkerMetadataList(reduceStagePlanFragment.getWorkerMetadataList())
         .addCustomProperties(reduceStagePlanFragment.getCustomProperties())
         .build();
-    PhysicalPlanContext planContext = new PhysicalPlanContext(mailboxService, requestId, reduceStageId,
-        System.currentTimeMillis() + timeoutMs, server, brokerStageMetadata, null, traceEnabled);
-    OpChainExecutionContext context = new OpChainExecutionContext(planContext);
-    MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context, reduceNode.getSenderStageId());
-    List<DataBlock> resultDataBlocks =
-        reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, statsAggregatorMap, dispatchableSubPlan,
-            context.getStats());
+    DistributedStagePlan reducerStagePlan = new DistributedStagePlan(0, server, reduceNode, brokerStageMetadata);
+    PipelineBreakerResult pipelineBreakerResult =
+        PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, reducerStagePlan,
+            System.currentTimeMillis() + timeoutMs, requestId, traceEnabled);
+    if (pipelineBreakerResult == null) {
+      throw new RuntimeException("Broker reducer error during query execution!");
+    }
+    collectStats(dispatchableSubPlan, pipelineBreakerResult.getOpChainStats(), statsAggregatorMap);
+    List<TransferableBlock> resultDataBlocks = pipelineBreakerResult.getResultMap().get(0);
     return toResultTable(resultDataBlocks, dispatchableSubPlan.getQueryResultFields(),
         dispatchableSubPlan.getQueryStageList().get(0).getPlanFragment().getFragmentRoot().getDataSchema());
   }
 
-  private static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
-      @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap,
-      DispatchableSubPlan dispatchableSubPlan,
-      OpChainStats stats) {
-    List<DataBlock> resultDataBlocks = new ArrayList<>();
-    TransferableBlock transferableBlock;
-    long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
-    while (System.nanoTime() < timeoutWatermark) {
-      transferableBlock = mailboxReceiveOperator.nextBlock();
-      if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
-        // TODO: we only received bubble up error from the execution stage tree.
-        // TODO: query dispatch should also send cancel signal to the rest of the execution stage tree.
-        throw new RuntimeException(
-            "Received error query execution result block: " + transferableBlock.getDataBlock().getExceptions());
-      }
-      if (transferableBlock.isNoOpBlock()) {
-        continue;
-      } else if (transferableBlock.isEndOfStreamBlock()) {
-        if (executionStatsAggregatorMap != null) {
-          for (Map.Entry<String, OperatorStats> entry : stats.getOperatorStatsMap().entrySet()) {
-            LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
-                OperatorUtils.operatorStatsToJson(entry.getValue()));
-            OperatorStats operatorStats = entry.getValue();
-            ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
-            ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
-            rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
-            if (stageStatsAggregator != null) {
-              if (dispatchableSubPlan != null) {
-                OperatorUtils.recordTableName(operatorStats,
-                    dispatchableSubPlan.getQueryStageList().get(operatorStats.getStageId()));
-              }
-              stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
-            }
+  private static void collectStats(DispatchableSubPlan dispatchableSubPlan, @Nullable OpChainStats opChainStats,
+      @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+    if (executionStatsAggregatorMap != null && opChainStats != null) {
+      for (Map.Entry<String, OperatorStats> entry : opChainStats.getOperatorStatsMap().entrySet()) {
+        LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
+            OperatorUtils.operatorStatsToJson(entry.getValue()));
+        OperatorStats operatorStats = entry.getValue();
+        ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
+        ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
+        rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+        if (stageStatsAggregator != null) {
+          if (dispatchableSubPlan != null) {
+            OperatorUtils.recordTableName(operatorStats,
+                dispatchableSubPlan.getQueryStageList().get(operatorStats.getStageId()));
           }
+          stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
         }
-        return resultDataBlocks;
       }
-      resultDataBlocks.add(transferableBlock.getDataBlock());
     }
-    throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
   }
 
-  private static ResultTable toResultTable(List<DataBlock> queryResult, List<Pair<Integer, String>> fields,
+  private static ResultTable toResultTable(List<TransferableBlock> queryResult, List<Pair<Integer, String>> fields,
       DataSchema sourceSchema) {
     List<Object[]> resultRows = new ArrayList<>();
     DataSchema resultSchema = toResultSchema(sourceSchema, fields);
-    for (DataBlock dataBlock : queryResult) {
+    for (TransferableBlock transferableBlock : queryResult) {
+      if (transferableBlock.isErrorBlock()) {
+        throw new RuntimeException(
+            "Received error query execution result block: " + transferableBlock.getDataBlock().getExceptions());
+      }
+      DataBlock dataBlock = transferableBlock.getDataBlock();
       int numColumns = resultSchema.getColumnNames().length;
       int numRows = dataBlock.getNumberOfRows();
       List<Object[]> rows = new ArrayList<>(dataBlock.getNumberOfRows());
