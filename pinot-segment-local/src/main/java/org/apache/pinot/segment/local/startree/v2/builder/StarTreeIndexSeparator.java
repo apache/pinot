@@ -43,15 +43,19 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
  * The {@code StarTreeIndexSeparator} pulls out the individual star-trees from the common star-tree index file
  */
 public class StarTreeIndexSeparator implements Closeable {
-  public static final String STARTREE_SEPARATOR_PREFIX = "startree_";
 
   private final FileChannel _indexFileChannel;
   private final List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> _indexMapList;
+  private final List<StarTreeV2BuilderConfig> _builderConfigList;
+  private final List<Integer> _totalDocsList;
 
-  public StarTreeIndexSeparator(File indexMapFile, File indexFile, int numStarTrees)
+  public StarTreeIndexSeparator(File indexMapFile, File indexFile, PropertiesConfiguration metadataProperties)
       throws IOException {
-    _indexMapList = extractIndexMap(indexMapFile, numStarTrees);
+    _indexMapList = extractIndexMap(indexMapFile,
+        metadataProperties.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT));
     _indexFileChannel = new RandomAccessFile(indexFile, "r").getChannel();
+    _builderConfigList = extractBuilderConfigs(metadataProperties);
+    _totalDocsList = extractTotalDocsList(metadataProperties);
   }
 
   private List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> extractIndexMap(File indexMapFile,
@@ -92,33 +96,43 @@ public class StarTreeIndexSeparator implements Closeable {
   }
 
   /**
-   * Extract separate star-tree index files for each of the star-tree present in the provided index file.
-   * The extracted star-trees are written to the provided starTreeOutputDir.
+   * Extract star-tree index files of the star-tree represented by the builderConfig.
+   * The extracted star-tree index files are written to the provided starTreeOutputDir.
+   *
    * @param starTreeOutputDir output directory for extracted star-trees
+   * @param builderConfig {@link StarTreeV2BuilderConfig} of the star-tree to separate
+   * @return if star-tree exist then total docs in the separated tree, else -1
    * @throws IOException
    */
-  public void separate(File starTreeOutputDir)
+  public int separate(File starTreeOutputDir, StarTreeV2BuilderConfig builderConfig)
       throws IOException {
-    for (int i = 0; i < _indexMapList.size(); i++) {
-      Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue> indexMap = _indexMapList.get(i);
-      File currentTreeDir = new File(starTreeOutputDir, STARTREE_SEPARATOR_PREFIX + i);
-      FileUtils.forceMkdir(currentTreeDir);
-      for (StarTreeIndexMapUtils.IndexKey key : indexMap.keySet()) {
-        File destIndexFile;
-        switch (key._indexType) {
-          case STAR_TREE:
-            destIndexFile = new File(currentTreeDir, StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME);
-            writeIndexToFile(destIndexFile, indexMap.get(key));
-            break;
-          case FORWARD_INDEX:
-            String suffix = key._column.contains(AggregationFunctionColumnPair.DELIMITER)
-                ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
-                : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-            destIndexFile = new File(currentTreeDir, key._column + suffix);
-            writeIndexToFile(destIndexFile, indexMap.get(key));
-            break;
-          default:
-        }
+    int treeIndex = _builderConfigList.indexOf(builderConfig);
+    if (treeIndex == -1) {
+      return treeIndex;
+    }
+    separate(starTreeOutputDir, treeIndex);
+    return _totalDocsList.get(treeIndex);
+  }
+
+  private void separate(File starTreeOutputDir, int treeIndex)
+      throws IOException {
+    Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue> indexMap = _indexMapList.get(treeIndex);
+    FileUtils.forceMkdir(starTreeOutputDir);
+    for (StarTreeIndexMapUtils.IndexKey key : indexMap.keySet()) {
+      File destIndexFile;
+      switch (key._indexType) {
+        case STAR_TREE:
+          destIndexFile = new File(starTreeOutputDir, StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME);
+          writeIndexToFile(destIndexFile, indexMap.get(key));
+          break;
+        case FORWARD_INDEX:
+          String suffix = key._column.contains(AggregationFunctionColumnPair.DELIMITER)
+              ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
+              : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+          destIndexFile = new File(starTreeOutputDir, key._column + suffix);
+          writeIndexToFile(destIndexFile, indexMap.get(key));
+          break;
+        default:
       }
     }
   }
