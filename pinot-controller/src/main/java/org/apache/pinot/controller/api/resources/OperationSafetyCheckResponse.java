@@ -13,7 +13,7 @@ public class OperationSafetyCheckResponse {
   }
 
   public OperationSafetyCheckResponse setInstanceName(String instanceName) {
-    this._instanceName = instanceName;
+    _instanceName = instanceName;
     return this;
   }
 
@@ -22,7 +22,7 @@ public class OperationSafetyCheckResponse {
   }
 
   public OperationSafetyCheckResponse setSafe(boolean safe) {
-    this._safe = safe;
+    _safe = safe;
     return this;
   }
 
@@ -31,7 +31,7 @@ public class OperationSafetyCheckResponse {
   }
 
   public OperationSafetyCheckResponse setIssues(List<String> issues) {
-    this._issues = issues;
+    _issues = issues;
     return this;
   }
 }
