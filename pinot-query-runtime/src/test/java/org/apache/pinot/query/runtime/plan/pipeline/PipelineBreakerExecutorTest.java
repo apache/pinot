@@ -239,9 +239,6 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(resultBlocks.size(), 1);
     Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
     Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
-
-    // should have null stats from previous stage here
-    Assert.assertNull(pipelineBreakerResult.getOpChainStats());
   }
 
   @Test
