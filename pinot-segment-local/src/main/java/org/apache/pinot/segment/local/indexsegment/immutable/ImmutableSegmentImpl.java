@@ -76,6 +76,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   // For upsert
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private ThreadSafeMutableRoaringBitmap _validDocIds;
+  private ThreadSafeMutableRoaringBitmap _queryableDocIds;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
@@ -100,9 +101,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
    * Enables upsert for this segment. It should be called before the segment getting queried.
    */
   public void enableUpsert(PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      ThreadSafeMutableRoaringBitmap validDocIds) {
+      ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds) {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _validDocIds = validDocIds;
+    _queryableDocIds = queryableDocIds;
   }
 
   @Nullable
@@ -287,6 +289,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public ThreadSafeMutableRoaringBitmap getValidDocIds() {
     return _validDocIds;
+  }
+
+  @Nullable
+  @Override
+  public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
+    return _queryableDocIds;
   }
 
   @Override

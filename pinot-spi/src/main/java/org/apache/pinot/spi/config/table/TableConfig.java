@@ -388,6 +388,12 @@ public class TableConfig extends BaseJsonConfig {
     return _upsertConfig == null ? null : _upsertConfig.getComparisonColumns();
   }
 
+  @JsonIgnore
+  @Nullable
+  public String getUpsertDeleteRecordColumn() {
+    return _upsertConfig == null ? null : _upsertConfig.getDeleteRecordColumn();
+  }
+
   @JsonProperty(TUNER_CONFIG_LIST_KEY)
   public List<TunerConfig> getTunerConfigsList() {
     return _tunerConfigList;

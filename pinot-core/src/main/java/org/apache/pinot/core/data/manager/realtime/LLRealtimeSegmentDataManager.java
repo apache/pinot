@@ -1425,6 +1425,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
+            .setUpsertDeleteRecordColumn(tableConfig.getUpsertDeleteRecordColumn())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
