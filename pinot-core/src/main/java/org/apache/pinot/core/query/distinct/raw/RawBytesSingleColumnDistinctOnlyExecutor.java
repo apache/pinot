@@ -35,8 +35,8 @@ public class RawBytesSingleColumnDistinctOnlyExecutor extends BaseRawBytesSingle
   }
 
   @Override
-  protected boolean add(byte[] value) {
-    _valueSet.add(new ByteArray(value));
+  protected boolean add(ByteArray byteArray) {
+    _valueSet.add(byteArray);
     return _valueSet.size() >= _limit;
   }
 }

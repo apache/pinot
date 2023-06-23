@@ -225,14 +225,14 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(resultTable.getRows().get(3), new Object[]{null, null});
   }
 
-  @DataProvider(name = "DataTypes")
-  public static Object[][] getDataTypes() {
+  @DataProvider(name = "NumberTypes")
+  public static Object[][] getPrimitiveDataTypes() {
     return new Object[][]{
         {FieldSpec.DataType.INT}, {FieldSpec.DataType.LONG}, {FieldSpec.DataType.DOUBLE}, {FieldSpec.DataType.FLOAT}
     };
   }
 
-  @Test(dataProvider = "DataTypes")
+  @Test(dataProvider = "NumberTypes")
   public void testSelectDistinctWithLimit(FieldSpec.DataType dataType)
       throws Exception {
     _rows = new ArrayList<>();
@@ -253,7 +253,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(resultTable.getRows().size(), 3);
   }
 
-  @Test(dataProvider = "DataTypes")
+  @Test(dataProvider = "NumberTypes")
   public void testSelectDistinctOrderByWithLimit(FieldSpec.DataType dataType)
       throws Exception {
     double delta = 0.01;
@@ -276,6 +276,58 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertTrue(Math.abs(((Number) resultTable.getRows().get(0)[0]).doubleValue() - 1.0) < delta);
     assertTrue(Math.abs(((Number) resultTable.getRows().get(1)[0]).doubleValue() - 2.0) < delta);
     assertTrue(Math.abs(((Number) resultTable.getRows().get(2)[0]).doubleValue() - 3.0) < delta);
+  }
+
+
+  @DataProvider(name = "ObjectTypes")
+  public static Object[][] getObjectDataTypes() {
+    return new Object[][]{
+        {FieldSpec.DataType.STRING, "a"}, {
+        FieldSpec.DataType.BIG_DECIMAL, 1
+    }, {
+        FieldSpec.DataType.BYTES, "a string".getBytes()
+    }
+    };
+  }
+
+  @Test(dataProvider = "ObjectTypes")
+  public void testObjectSingleColumnDistinctOrderByNullsFirst(FieldSpec.DataType dataType, Object value)
+      throws Exception {
+    _rows = new ArrayList<>();
+    insertRow(null);
+    insertRow(value);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s NULLS FIRST LIMIT 1", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertNull(resultTable.getRows().get(0)[0]);
+  }
+
+  @Test(dataProvider = "ObjectTypes")
+  public void testObjectSingleColumnDistinctOrderByNullsLast(FieldSpec.DataType dataType, Object value)
+      throws Exception {
+    _rows = new ArrayList<>();
+    insertRow(null);
+    insertRow(value);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s NULLS LAST LIMIT 1", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertNotNull(resultTable.getRows().get(0)[0]);
   }
 
   @Test

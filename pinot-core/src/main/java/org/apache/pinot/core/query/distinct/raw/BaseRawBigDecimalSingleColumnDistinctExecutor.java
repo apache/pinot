@@ -45,6 +45,7 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
   final boolean _nullHandlingEnabled;
 
   final ObjectSet<BigDecimal> _valueSet;
+  private boolean _hasNull;
 
   BaseRawBigDecimalSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
       boolean nullHandlingEnabled) {
@@ -64,6 +65,10 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
     for (BigDecimal value : _valueSet) {
       records.add(new Record(new Object[]{value}));
     }
+    if (_hasNull) {
+      records.add(new Record(new Object[]{null}));
+    }
+    assert records.size() <= _limit + 1;
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 
@@ -76,9 +81,8 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
       RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
       for (int i = 0; i < numDocs; i++) {
         if (nullBitmap != null && nullBitmap.contains(i)) {
-          values[i] = null;
-        }
-        if (add(values[i])) {
+          _hasNull = true;
+        } else if (add(values[i])) {
           return true;
         }
       }
