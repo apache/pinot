@@ -57,6 +57,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   private static final String COLUMN1 = "column1";
   private static final String COLUMN2 = "column2";
   private static final int NULL_PLACEHOLDER = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+  private static final int NUM_OF_SEGMENT_COPIES = 4;
 
   private List<GenericRow> _rows;
   private IndexSegment _indexSegment;
@@ -275,5 +276,24 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertTrue(Math.abs(((Number) resultTable.getRows().get(0)[0]).doubleValue() - 1.0) < delta);
     assertTrue(Math.abs(((Number) resultTable.getRows().get(1)[0]).doubleValue() - 2.0) < delta);
     assertTrue(Math.abs(((Number) resultTable.getRows().get(2)[0]).doubleValue() - 3.0) < delta);
+  }
+
+  @Test
+  public void testTransformBlockValSetGetNullBitmap()
+      throws Exception {
+    _rows = new ArrayList<>();
+    insertRow(null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema, _rows);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    String query = String.format("SELECT (CASE WHEN %s IS NULL THEN 1 END) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), NUM_OF_SEGMENT_COPIES);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
   }
 }
