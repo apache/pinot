@@ -77,9 +77,7 @@ public class PipelineBreakerExecutor {
       PhysicalPlanContext physicalPlanContext =
           new PhysicalPlanContext(mailboxService, requestId, stageRoot.getPlanFragmentId(), deadlineMs,
               distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
-      Map<Integer, List<TransferableBlock>> resultMap =
-          PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
-      return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), resultMap);
+      return PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
       } catch (Exception e) {
         LOGGER.error("Unable to create pipeline breaker results for Req: " + requestId + ", Stage: "
             + distributedStagePlan.getStageId(), e);
@@ -91,14 +89,14 @@ public class PipelineBreakerExecutor {
             resultMap.put(key, Collections.singletonList(errorBlock));
           }
         }
-        return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), resultMap);
+        return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), resultMap, null);
       }
     } else {
       return null;
     }
   }
 
-  private static Map<Integer, List<TransferableBlock>> execute(OpChainSchedulerService scheduler,
+  private static PipelineBreakerResult execute(OpChainSchedulerService scheduler,
       PipelineBreakerContext context, PhysicalPlanContext physicalPlanContext)
       throws Exception {
     Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap = new HashMap<>();
@@ -111,11 +109,11 @@ public class PipelineBreakerExecutor {
       OpChain tempOpChain = PhysicalPlanVisitor.walkPlanNode(planNode, physicalPlanContext);
       pipelineWorkerMap.put(key, tempOpChain.getRoot());
     }
-    return runMailboxReceivePipelineBreaker(scheduler, pipelineWorkerMap, physicalPlanContext);
+    return runMailboxReceivePipelineBreaker(scheduler, context, pipelineWorkerMap, physicalPlanContext);
   }
 
-  private static Map<Integer, List<TransferableBlock>> runMailboxReceivePipelineBreaker(
-      OpChainSchedulerService scheduler, Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap,
+  private static PipelineBreakerResult runMailboxReceivePipelineBreaker(OpChainSchedulerService scheduler,
+      PipelineBreakerContext context, Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap,
       PhysicalPlanContext physicalPlanContext)
       throws Exception {
     PipelineBreakerOperator pipelineBreakerOperator = new PipelineBreakerOperator(
@@ -126,7 +124,8 @@ public class PipelineBreakerExecutor {
     scheduler.register(pipelineBreakerOpChain);
     long timeoutMs = physicalPlanContext.getDeadlineMs() - System.currentTimeMillis();
     if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-      return pipelineBreakerOperator.getResultMap();
+      return new PipelineBreakerResult(context.getNodeIdMap(), pipelineBreakerOperator.getResultMap(),
+          pipelineBreakerOpChain.getStats());
     } else {
       throw new IOException("Exception occur when awaiting breaker results!");
     }
