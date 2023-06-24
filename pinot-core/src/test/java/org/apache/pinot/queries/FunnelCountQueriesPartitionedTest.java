@@ -31,7 +31,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * Queries test for FUNNEL_COUNT queries.
  */
 @SuppressWarnings("rawtypes")
-public class FunnelCountQueriesNonSortedTest extends BaseFunnelCountQueriesTest {
+public class FunnelCountQueriesPartitionedTest extends BaseFunnelCountQueriesTest {
 
   @Override
   protected int getExpectedNumEntriesScannedInFilter() {
@@ -53,5 +53,10 @@ public class FunnelCountQueriesNonSortedTest extends BaseFunnelCountQueriesTest 
       mutableSegment.index(record, null);
     }
     return mutableSegment;
+  }
+
+  @Override
+  protected String getSettings() {
+    return " SETTINGS('partitioned')";
   }
 }

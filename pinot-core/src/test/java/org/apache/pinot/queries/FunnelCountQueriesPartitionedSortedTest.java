@@ -35,7 +35,7 @@ import org.apache.pinot.spi.utils.ReadMode;
  * Queries test for FUNNEL_COUNT queries using sorted strategy.
  */
 @SuppressWarnings("rawtypes")
-public class FunnelCountQueriesSortedTest extends BaseFunnelCountQueriesTest {
+public class FunnelCountQueriesPartitionedSortedTest extends BaseFunnelCountQueriesTest {
 
   @Override
   protected int getExpectedNumEntriesScannedInFilter() {
@@ -61,5 +61,10 @@ public class FunnelCountQueriesSortedTest extends BaseFunnelCountQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
+  }
+
+  @Override
+  protected String getSettings() {
+    return " SETTINGS('partitioned', 'sorted')";
   }
 }

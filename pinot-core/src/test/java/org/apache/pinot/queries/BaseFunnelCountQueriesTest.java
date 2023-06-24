@@ -90,6 +90,8 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
   protected abstract TableConfig getTableConfig();
   protected abstract IndexSegment buildSegment(List<GenericRow> records) throws Exception;
 
+  protected abstract String getSettings();
+
   @Override
   protected String getFilter() {
     return String.format(" WHERE idColumn >= %s", FILTER_LIMIT);
@@ -137,7 +139,8 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
     String query = String.format("SELECT "
         + "FUNNEL_COUNT("
         + " STEPS(stepColumn = 'A', stepColumn = 'B'),"
-        + " CORRELATE_BY(idColumn)"
+        + " CORRELATE_BY(idColumn),"
+        + getSettings()
         + ") FROM testTable");
 
     // Inner segment
@@ -178,7 +181,8 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
         + "MOD(idColumn, %s), "
         + "FUNNEL_COUNT("
         + " STEPS(stepColumn = 'A', stepColumn = 'B'),"
-        + " CORRELATE_BY(idColumn)"
+        + " CORRELATE_BY(idColumn),"
+        + getSettings()
         + ") FROM testTable "
         + "WHERE idColumn >= %s "
         + "GROUP BY 1 ORDER BY 1 LIMIT %s", NUM_GROUPS, FILTER_LIMIT, NUM_GROUPS);
