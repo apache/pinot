@@ -217,9 +217,8 @@ public class QueryDispatcher {
   private static void collectStats(DispatchableSubPlan dispatchableSubPlan, @Nullable OpChainStats opChainStats,
       @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     if (executionStatsAggregatorMap != null && opChainStats != null) {
+      LOGGER.info("Extracting broker query execution stats, Runtime: {}ms", opChainStats.getExecutionTime());
       for (Map.Entry<String, OperatorStats> entry : opChainStats.getOperatorStatsMap().entrySet()) {
-        LOGGER.info("Broker Query Execution Stats - OperatorId: {}, OperatorStats: {}", entry.getKey(),
-            OperatorUtils.operatorStatsToJson(entry.getValue()));
         OperatorStats operatorStats = entry.getValue();
         ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
         ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
