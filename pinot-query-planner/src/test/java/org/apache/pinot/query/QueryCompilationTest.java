@@ -345,6 +345,14 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(tableNames.get(2), "c");
     Assert.assertEquals(tableNames.get(3), "d");
 
+    // lateral join query
+    query = "EXPLAIN PLAN FOR SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL "
+        + "(SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
     // test for self join queries
     query = "SELECT a.col1 FROM a JOIN(SELECT col2 FROM a) as self ON a.col1=self.col2 ";
     tableNames = _queryEnvironment.getTableNamesForQuery(query);
