@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -191,7 +192,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // TEST 1: Delete existing primary key
     // Push 2 records with deleted = true - deletes pks 100 and 102
-    List<String> deleteRecords = List.of("102,Clifford,counter-strike,102,1681054200000,true",
+    List<String> deleteRecords = ImmutableList.of("102,Clifford,counter-strike,102,1681054200000,true",
         "100,Zook,counter-strike,2050,1681377200000,true");
     pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
 
@@ -297,7 +298,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // TEST 1: Delete existing primary key
     // Push 2 records with deleted = true - deletes pks 100 and 102
-    List<String> deleteRecords = List.of("102,Clifford,counter-strike,102,1681054200000,true",
+    List<String> deleteRecords = ImmutableList.of("102,Clifford,counter-strike,102,1681054200000,true",
         "100,Zook,counter-strike,2050,1681377200000,true");
     pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
 
