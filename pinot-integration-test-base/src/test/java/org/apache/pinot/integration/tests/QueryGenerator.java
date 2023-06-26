@@ -897,7 +897,16 @@ public class QueryGenerator {
       } else {
         boolean isItBetween = RANDOM.nextBoolean();
         if (isItBetween) {
-          return String.format("BETWEEN %s AND %s", generateRandomValue(generateInt), generateRandomValue(generateInt));
+          String leftValue = generateRandomValue(generateInt);
+          String rightValue = generateRandomValue(generateInt);
+          if (swapBetweenValues(leftValue, rightValue)) {
+            // swapping leftValue and rightValue if leftValue greater than rightValue
+            String tmp = leftValue;
+            leftValue = rightValue;
+            rightValue = tmp;
+          }
+
+          return String.format("BETWEEN %s AND %s", leftValue, rightValue);
         } else {
           int numValues = RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1;
           Set<String> values = new HashSet<>();
