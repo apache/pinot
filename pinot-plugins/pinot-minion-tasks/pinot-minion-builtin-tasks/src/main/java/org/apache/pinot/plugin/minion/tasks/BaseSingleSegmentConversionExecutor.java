@@ -191,8 +191,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + segmentName);
       boolean uploadSuccessful = true;
       try {
-        SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
-            convertedTarredSegmentFile);
+        SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName,
+            uploadURL, convertedTarredSegmentFile);
       } catch (Exception e) {
         uploadSuccessful = false;
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
