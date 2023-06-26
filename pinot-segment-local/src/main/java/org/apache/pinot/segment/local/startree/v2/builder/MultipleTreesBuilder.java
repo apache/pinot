@@ -89,7 +89,7 @@ public class MultipleTreesBuilder implements Closeable {
     _separator = getSeparator();
     if (_separator != null) {
       StarTreeBuilderUtils.removeStarTrees(indexDir);
-      _metadataProperties.refresh();
+      _metadataProperties.reload();
     }
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
   }
@@ -192,7 +192,7 @@ public class MultipleTreesBuilder implements Closeable {
       FileUtils.forceDelete(starTreeIndexDir);
     }
 
-    LOGGER.error("Finished building {} star-trees ({} reused) in {}ms", numStarTrees, reusedStarTrees,
+    LOGGER.info("Finished building {} star-trees ({} reused) in {}ms", numStarTrees, reusedStarTrees,
         System.currentTimeMillis() - startTime);
   }
 

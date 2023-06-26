@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.startree.v2.builder;
 
+import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
@@ -87,9 +88,10 @@ public class StarTreeIndexSeparator implements Closeable {
     for (int i = 0; i < _indexMapList.size(); i++) {
       Configuration metadata = metadataProperties.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i));
       builderConfigList.add(i, StarTreeV2BuilderConfig.fromIndexConfig(new StarTreeIndexConfig(
-          (List<String>) metadata.getProperty(StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER),
-          (List<String>) metadata.getProperty(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS),
-          (List<String>) metadata.getProperty(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS),
+          Lists.newArrayList(metadata.getStringArray(StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER)),
+          Lists.newArrayList(
+              metadata.getStringArray(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)),
+          Lists.newArrayList(metadata.getStringArray(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS)),
           metadata.getInt(StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS))));
     }
     return builderConfigList;
