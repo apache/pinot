@@ -192,7 +192,7 @@ public class OpChainTest {
     int receivedStageId = 2;
     int senderStageId = 1;
     OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
-        System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -206,7 +206,7 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -231,7 +231,7 @@ public class OpChainTest {
     int receivedStageId = 2;
     int senderStageId = 1;
     OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
-        System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -243,7 +243,7 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 

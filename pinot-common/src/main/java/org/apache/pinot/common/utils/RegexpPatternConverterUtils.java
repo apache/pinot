@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
+
+import com.google.common.primitives.Chars;
+
 /**
  * Utility for converting regex patterns.
  */
@@ -25,9 +28,14 @@ public class RegexpPatternConverterUtils {
   private RegexpPatternConverterUtils() {
   }
 
-  /* Represents all metacharacters to be processed */
-  public static final String[] REGEXP_METACHARACTERS =
-      {"\\", "^", "$", ".", "{", "}", "[", "]", "(", ")", "*", "+", "?", "|", "<", ">", "-", "&", "/"};
+  /*
+   * Represents all metacharacters to be processed.
+   * This excludes the \ (back slash) character as that doubles up as an escape character as well.
+   * So it is handled separately in the conversion logic.
+   */
+  public static final char[] REGEXP_METACHARACTERS = new char[]{
+          '^', '$', '.', '{', '}', '[', ']', '(', ')', '*', '+', '?', '|', '<', '>', '-', '&', '/'};
+  public static final char BACK_SLASH = '\\';
 
   /**
    * Converts a LIKE pattern into REGEXP_LIKE pattern.
@@ -64,24 +72,61 @@ public class RegexpPatternConverterUtils {
         break;
     }
 
-    String escaped = escapeMetaCharacters(likePattern.substring(start, end));
-    StringBuilder sb = new StringBuilder(escaped.length() + 2);
-    sb.append(prefix);
-    sb.append(escaped);
-    sb.append(suffix);
+    likePattern = likePattern.substring(start, end);
+    return escapeMetaCharsAndWildcards(likePattern, prefix, suffix);
+  }
 
+  /**
+   * Escapes the provided pattern by considering the following constraints:
+   * <ul>
+   *     <li> SQL wildcards escaping is handled (_, %) </li>
+   *     <li> Regex meta characters escaping is handled </li>
+   * </ul>
+   * @param input the provided input string
+   * @param prefix the prefix to be added to the output string
+   * @param suffix the suffix to be added to the output string
+   * @return the final output string
+   */
+  private static String escapeMetaCharsAndWildcards(String input, String prefix, String suffix) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(prefix);
+    // handling SQL wildcards (_, %) by replacing them with corresponding regex equivalents
+    // we ignore them if the SQL wildcards are escaped
     int i = 0;
-    while (i < sb.length()) {
-      char c = sb.charAt(i);
-      if (c == '_') {
-        sb.replace(i, i + 1, ".");
-      } else if (c == '%') {
-        sb.replace(i, i + 1, ".*");
-        i++;
+    int len = input.length();
+    boolean isPrevCharBackSlash = false;
+    while (i < len) {
+      char c = input.charAt(i);
+      switch (c) {
+        case '_':
+          sb.append(isPrevCharBackSlash ? c : ".");
+          break;
+        case '%':
+          sb.append(isPrevCharBackSlash ? c : ".*");
+          break;
+        default:
+          // either the current character is a meta-character
+          // OR
+          // this means the previous character is a \
+          // but it was not used for escaping SQL wildcards
+          // so let's escape this \ in the output
+          // this case is separately handled outside the meta characters list
+          if (Chars.indexOf(REGEXP_METACHARACTERS, c) >= 0 || isPrevCharBackSlash) {
+            sb.append(BACK_SLASH);
+          }
+          sb.append(c);
+          break;
       }
+      isPrevCharBackSlash = (c == BACK_SLASH);
       i++;
     }
 
+    // handle trailing \
+    if (isPrevCharBackSlash) {
+      sb.append(BACK_SLASH);
+    }
+
+    sb.append(suffix);
     return sb.toString();
   }
 
@@ -101,18 +146,6 @@ public class RegexpPatternConverterUtils {
       }
     }
     return -1;
-  }
-
-  /**
-   * Add escape characters before special characters
-   */
-  private static String escapeMetaCharacters(String pattern) {
-    for (String metaCharacter : REGEXP_METACHARACTERS) {
-      if (pattern.contains(metaCharacter)) {
-        pattern = pattern.replace(metaCharacter, "\\" + metaCharacter);
-      }
-    }
-    return pattern;
   }
 
   /**

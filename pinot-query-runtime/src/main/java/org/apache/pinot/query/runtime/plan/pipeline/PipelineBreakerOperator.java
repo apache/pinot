@@ -35,7 +35,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-public class PipelineBreakerOperator extends MultiStageOperator {
+class PipelineBreakerOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
   private final Deque<Map.Entry<Integer, Operator<TransferableBlock>>> _workerEntries;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
@@ -93,7 +93,6 @@ public class PipelineBreakerOperator extends MultiStageOperator {
           return _errorBlock;
         }
         List<TransferableBlock> blockList = _resultMap.computeIfAbsent(worker.getKey(), (k) -> new ArrayList<>());
-        // TODO: only data block is handled, we also need to handle metadata block from upstream in the future.
         if (!block.isEndOfStreamBlock()) {
           blockList.add(block);
         }
