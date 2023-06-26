@@ -583,6 +583,15 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   }
 
   /**
+   * Check if the segment is merged at the given merge level
+   */
+  private boolean isMergedSegment(SegmentZKMetadata segmentZKMetadata, String mergeLevel) {
+    Map<String, String> customMap = segmentZKMetadata.getCustomMap();
+    return customMap != null && mergeLevel.equalsIgnoreCase(
+        customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
+  }
+
+  /**
    * Check if the segment is merged for given and higher merge levels
    *
    * @param segmentZKMetadata segment zk metadata
@@ -658,23 +667,31 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     List<List<SegmentZKMetadata>> segmentGroups = MergeRollupTaskSegmentGroupManagerProvider.create(taskConfigs)
         .getSegmentGroups(tableConfig, _clusterInfoAccessor, selectedSegments);
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    boolean skipAllMerged = Boolean.TRUE.toString().equalsIgnoreCase(taskConfigs.get(MergeTask.SKIP_ALL_MERGED));
 
     for (List<SegmentZKMetadata> segments : segmentGroups) {
       int numRecordsPerTask = 0;
       List<List<String>> segmentNamesList = new ArrayList<>();
       List<List<String>> downloadURLsList = new ArrayList<>();
+      List<SegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
       List<String> segmentNames = new ArrayList<>();
       List<String> downloadURLs = new ArrayList<>();
 
       for (int i = 0; i < segments.size(); i++) {
         SegmentZKMetadata targetSegment = segments.get(i);
+        segmentZKMetadataList.add(targetSegment);
         segmentNames.add(targetSegment.getSegmentName());
         downloadURLs.add(targetSegment.getDownloadUrl());
         numRecordsPerTask += targetSegment.getTotalDocs();
         if (numRecordsPerTask >= maxNumRecordsPerTask || i == segments.size() - 1) {
-          segmentNamesList.add(segmentNames);
-          downloadURLsList.add(downloadURLs);
+          // If "skipAllMerged" is set to true, skip generating task with all merged segments
+          if (!skipAllMerged || !segmentZKMetadataList.stream().allMatch(
+              segment -> isMergedSegment(segment, mergeLevel))) {
+            segmentNamesList.add(segmentNames);
+            downloadURLsList.add(downloadURLs);
+          }
           numRecordsPerTask = 0;
+          segmentZKMetadataList = new ArrayList<>();
           segmentNames = new ArrayList<>();
           downloadURLs = new ArrayList<>();
         }

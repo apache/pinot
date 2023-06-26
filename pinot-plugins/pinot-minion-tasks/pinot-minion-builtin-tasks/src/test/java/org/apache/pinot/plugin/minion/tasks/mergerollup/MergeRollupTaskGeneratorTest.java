@@ -861,6 +861,57 @@ public class MergeRollupTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
+  /**
+   * Test not generate rollup task for all merged segments when "skipAllMerged" is set to true
+   */
+  @Test
+  public void testNotGenerateRollupTaskForAllMergedSegments() {
+    Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put("daily.mergeType", "rollup");
+    tableTaskConfigs.put("daily.bufferTimePeriod", "2d");
+    tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
+    tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put("daily.maxNumRecordsPerTask", "5000000");
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
+
+    String mergedSegmentName1 = "merged_testTable__1";
+    String segmentName1 = "testTable__1";
+    SegmentZKMetadata metadata1 =
+        getSegmentZKMetadata(mergedSegmentName1, 90_000_000L, 100_000_000L, TimeUnit.MILLISECONDS, null);
+    metadata1.setTotalDocs(10_000_000L);
+    SegmentZKMetadata metadata2 =
+        getSegmentZKMetadata(segmentName1, 90_000_000L, 100_000_000L, TimeUnit.MILLISECONDS, null);
+    metadata2.setTotalDocs(10_000_000L);
+    metadata1.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(metadata1, metadata2));
+
+    Map<String, Long> waterMarkMap = new TreeMap<>();
+    waterMarkMap.put(DAILY, 86_400_000L);
+    when(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME))
+        .thenReturn(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap).toZNRecord());
+
+    mockMergeRollupTaskMetadataGetterAndSetter(mockClusterInfoProvide);
+
+    MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
+    generator.init(mockClusterInfoProvide);
+
+    // Generate task when "skipAllMerged" is not set to true
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 2);
+
+    // Generate task when "skipAllMerged" is set to true
+    tableTaskConfigs.put("skipAllMerged", "true");
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+    offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
+    pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 1);
+  }
+
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, long startTime, long endTime, TimeUnit timeUnit,
       String downloadURL) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);

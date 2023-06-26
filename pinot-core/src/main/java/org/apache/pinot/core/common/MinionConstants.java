@@ -94,6 +94,7 @@ public class MinionConstants {
     public static final String MODE = "mode";
     public static final String PROCESS_FROM_WATERMARK_MODE = "processFromWatermark";
     public static final String PROCESS_ALL_MODE = "processAll";
+    public static final String SKIP_ALL_MERGED = "skipAllMerged";
 
     // Segment config
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
