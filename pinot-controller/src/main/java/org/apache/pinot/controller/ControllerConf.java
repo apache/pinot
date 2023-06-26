@@ -105,6 +105,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.validation.frequencyPeriod";
     public static final String REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtime.segment.validation.initialDelayInSeconds";
+    public static final String REALTIME_SPLIT_COMMIT_SEGMENT_TMP_CLEANUP_FREQUENCY_PERIOD =
+        "controller.realtime.split.commit.segment.tmp.cleanup.frequencyPeriod";
+    public static final String REALTIME_SPLIT_COMMIT_SEGMENT_TMP_CLEANUP_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtime.split.commit.segment.tmp.cleanup.initialDelayInSeconds";
     // Deprecated as of 0.8.0
     @Deprecated
     public static final String DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
@@ -216,7 +220,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final String DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS =
         "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
     public static final String ENABLE_TMP_SEGMENT_ASYNC_DELETION =
-        "controller.realtime.split.commit.segment.tmp.deletion.async";
+        "controller.realtime.split.commit.segment.tmp.cleanup.async.enable";
     public static final String SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND =
         "controller.realtime.split.commit.end.timeout.second";
 
@@ -234,6 +238,7 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
     private static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
     private static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+    private static final int DEFAULT_REALTIME_SPLIT_COMMIT_SEGMENT_TMP_CLEANUP_FREQUENCY_IN_SECONDS = 60 * 60;
     private static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     private static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
@@ -586,6 +591,23 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
+   * Returns <code>controller.realtime.segment.validation.frequencyPeriod</code> or
+   * <code>controller.realtime.segment.validation.frequencyInSeconds</code> or the default realtime segment
+   * validation frequncy, in the order of decreasing preference from left to right. This is done in
+   * order to retain the current behavior, wherein the realtime validation tasks were done at
+   * validation controller frequency The default value is the new
+   * DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
+   *
+   * @return supplied config in seconds
+   */
+  public int getRealtimeTmpSegmentCleanupFrequencyInSeconds() {
+    return Optional.ofNullable(getProperty(
+        ControllerPeriodicTasksConf.REALTIME_SPLIT_COMMIT_SEGMENT_TMP_CLEANUP_FREQUENCY_PERIOD))
+        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
+            ControllerPeriodicTasksConf.DEFAULT_REALTIME_SPLIT_COMMIT_SEGMENT_TMP_CLEANUP_FREQUENCY_IN_SECONDS);
+  }
+
+  /**
    * Return <code>controller.broker.resource.validation.frequencyPeriod</code> or
    * <code>controller.broker.resource.validation.frequencyInSeconds</code> or the default broker resource validation
    * frequency, in order of decreasing preference from left to righ. This is done in order
@@ -916,6 +938,11 @@ public class ControllerConf extends PinotConfiguration {
   public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public long getRealtimeTmpSegmentCleanupInitialDelaySeconds() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_SPLIT_COMMIT_SEGMENT_TMP_CLEANUP_INITIAL_DELAY_IN_SECONDS,
+        getPeriodicTaskInitialDelayInSeconds());
   }
 
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {

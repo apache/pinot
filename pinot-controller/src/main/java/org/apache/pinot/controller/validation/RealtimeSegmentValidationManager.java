@@ -130,13 +130,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         && _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
-
-    // Delete tmp segments
-    if (streamConfig.hasLowLevelConsumerType()
-        && _llcRealtimeSegmentManager.getIsSplitCommitEnabled()
-        && _llcRealtimeSegmentManager.isTmpSegmentAsyncDeletionEnabled()) {
-      _llcRealtimeSegmentManager.deleteTmpSegments(tableConfig, segmentsZKMetadata);
-    }
   }
 
   @Override
