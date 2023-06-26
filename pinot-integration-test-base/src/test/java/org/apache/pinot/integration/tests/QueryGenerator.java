@@ -968,6 +968,12 @@ public class QueryGenerator {
       List<String> columnValues = _columnToValueList.get(columnName);
       String leftValue = pickRandom(columnValues);
       String rightValue = pickRandom(columnValues);
+      if (swapBetweenValues(leftValue, rightValue)) {
+        // swapping leftValue and rightValue if leftValue greater than rightValue
+        String tmp = leftValue;
+        leftValue = rightValue;
+        rightValue = tmp;
+      }
       return new StringQueryFragment(
           String.format("%s BETWEEN %s AND %s", columnName, leftValue, rightValue),
           String.format("`%s` BETWEEN %s AND %s", columnName, leftValue, rightValue));
@@ -1067,6 +1073,12 @@ public class QueryGenerator {
       List<String> columnValues = _columnToValueList.get(columnName);
       String leftValue = pickRandom(columnValues);
       String rightValue = pickRandom(columnValues);
+      if (swapBetweenValues(leftValue, rightValue)) {
+        // swapping leftValue and rightValue if leftValue greater than rightValue
+        String tmp = leftValue;
+        leftValue = rightValue;
+        rightValue = tmp;
+      }
 
       List<String> h2ComparisonClauses =
           new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
@@ -1083,5 +1095,18 @@ public class QueryGenerator {
   }
   private static String generateH2QueryConditionPredicate(List<String> conditionList, String separator) {
     return String.format("( %s )", StringUtils.join(conditionList, separator));
+  }
+
+  private static boolean swapBetweenValues(String left, String right) {
+    // check if both the numbers are completely numeric, if yes, parse to int and then compare numerical values
+    // else use string values to compare
+    boolean isStr1Numeric = left.matches("-?\\d+(\\.\\d+)?");
+    boolean isStr2Numeric = right.matches("-?\\d+(\\.\\d+)?");
+    if (isStr1Numeric && isStr2Numeric) {
+      double num1 = Double.parseDouble(left);
+      double num2 = Double.parseDouble(right);
+      return num1 > num2;
+    }
+    return (left.compareTo(right) > 0);
   }
 }
