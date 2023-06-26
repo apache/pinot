@@ -192,28 +192,30 @@ public class PinotQueryResource {
 
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
-
     List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
-    if (tableNames.size() == 0) {
-      return QueryException.getException(QueryException.SQL_PARSING_ERROR,
-          new Exception("Unable to find table name from SQL thus cannot dispatch to broker.")).toString();
-    }
+    String brokerTenant;
+    if (tableNames.size() != 0) {
+      List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
+      if (tableConfigList == null || tableConfigList.size() == 0) {
+        return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR,
+            new Exception("Unable to find table in cluster, table does not exist")).toString();
+      }
 
-    List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
-    if (tableConfigList == null || tableConfigList.size() == 0) {
-      return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR, new Exception(
-          "Unable to find table in cluster, table does not exist")).toString();
-    }
-
-    // When routing a query, there should be at least one common broker tenant for the table. However, the server
-    // tenants can be completely disjoint. The leaf stages which access segments will be processed on the respective
-    // server tenants for each table. The intermediate stages can be processed in either or all of the server tenants
-    // belonging to the tables.
-    String brokerTenant = getCommonBrokerTenant(tableConfigList);
-    if (brokerTenant == null) {
-      return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
-          new Exception(String.format("Unable to dispatch multistage query with multiple tables : %s "
-              + "on different tenant", tableNames))).toString();
+      // When routing a query, there should be at least one common broker tenant for the table. However, the server
+      // tenants can be completely disjoint. The leaf stages which access segments will be processed on the respective
+      // server tenants for each table. The intermediate stages can be processed in either or all of the server tenants
+      // belonging to the tables.
+      brokerTenant = getCommonBrokerTenant(tableConfigList);
+      if (brokerTenant == null) {
+        return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR, new Exception(
+            String.format("Unable to dispatch multistage query with multiple tables : %s " + "on different tenant",
+                tableNames))).toString();
+      }
+    } else {
+      // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
+      List<String> allBrokerList = new ArrayList<>(_pinotHelixResourceManager.getAllBrokerTenantNames());
+      brokerTenant = allBrokerList.get(RANDOM.nextInt(allBrokerList.size()));
+      LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
     List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenant));
 
