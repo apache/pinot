@@ -240,7 +240,7 @@ public class FilterOperatorUtils {
         return basePriority;
       } else {
         // Lower priority for multi-value column
-        return basePriority + 1;
+        return basePriority + 50;
       }
     }
   }
