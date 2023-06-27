@@ -37,8 +37,8 @@ from
           and n2.n_name = 'FRANCE'
         )
       )
-      and l_shipdate between date '1995-01-01'
-      and date '1996-12-31'
+      and l_shipdate between 788898600
+      and 851970600
   ) as shipping
 group by
   supp_nation,

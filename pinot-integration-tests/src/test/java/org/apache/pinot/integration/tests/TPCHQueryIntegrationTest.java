@@ -39,8 +39,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.apache.pinot.util.TestUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -49,11 +47,8 @@ import org.testng.annotations.Test;
 
 
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TPCHQueryIntegrationTest.class);
-  private static final String TPCH_RESOURCES_DIR = "pinot-integration-tests/src/test/resources/tpch";
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
-  private static final String TPCH_QUERY_SET_RESOURCE_NAME = "tpch/tpch_query_set.yaml";
-  private static final int NUM_TPCH_QUERIES = 1;
+  private static final int NUM_TPCH_QUERIES = 24;
 
   static {
     TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();

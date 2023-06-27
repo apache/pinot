@@ -7,7 +7,7 @@ select
 from
   lineitem
 where
-  l_shipdate >= date '1996-01-01'
-  and l_shipdate < date '1996-01-01' + interval '3' month
+  l_shipdate >= 820434600
+  and l_shipdate < 828297000
 group by
   l_suppkey;
