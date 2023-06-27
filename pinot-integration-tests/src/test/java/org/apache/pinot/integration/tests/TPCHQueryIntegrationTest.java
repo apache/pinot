@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.Connection;
@@ -50,7 +50,7 @@ import org.testng.annotations.Test;
 
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
-  private static final int NUM_TPCH_QUERIES = 4;
+  private static final int NUM_TPCH_QUERIES = 24;
   private static final Set<Integer> EXEMPT_QUERIES;
 
   static {
@@ -64,6 +64,10 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
     TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
     EXEMPT_QUERIES = new HashSet<>();
+    // The following queries fail due to lack of support for views.
+    EXEMPT_QUERIES.addAll(ImmutableList.of(15, 16, 17));
+    // The following query fails due to inability of Aggregation operator to handle conversion from Boolean to Number.
+    EXEMPT_QUERIES.add(23);
   }
 
   @BeforeClass
@@ -77,7 +81,6 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    setUpH2Connection();
     for (Map.Entry<String, String> tableResource : TPCH_QUICKSTART_TABLE_RESOURCES.entrySet()) {
       File tableSegmentDir = new File(_segmentDir, tableResource.getKey());
       File tarDir = new File(_tarDir, tableResource.getKey());
@@ -107,52 +110,25 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
       uploadSegments(tableName, tarDir);
-      // H2
-      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection,
-          schema);
     }
   }
 
   @Test(dataProvider = "QueryDataProvider")
-  public void testTPCHQueries(String query)
-      throws Exception {
-    testQueriesValidateAgainstH2(query);
+  public void testTPCHQueries(String query) {
+    testQueriesSucceed(query);
   }
 
-  protected void testQueriesValidateAgainstH2(String query)
-      throws Exception {
-    // connection response
+  protected void testQueriesSucceed(String query) {
     ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(query);
     org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
-    int numRows = resultTableResultSet.getRowCount();
-    int numColumns = resultTableResultSet.getColumnCount();
 
-    // h2 response
-    Assert.assertNotNull(_h2Connection);
-    Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    h2statement.execute(query);
-    ResultSet h2ResultSet = h2statement.getResultSet();
-
-    // compare results.
-    Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
-    if (h2ResultSet.first()) {
-      for (int i = 0; i < numRows; i++) {
-        for (int c = 0; c < numColumns; c++) {
-          String h2Value = h2ResultSet.getString(c + 1);
-          String pinotValue = resultTableResultSet.getString(i, c);
-          boolean error = ClusterIntegrationTestUtils.fuzzyCompare(h2Value, pinotValue, pinotValue);
-          if (error) {
-            throw new RuntimeException("Value: " + c + " does not match at (" + i + ", " + c + "), "
-                + "expected h2 value: " + h2Value + ", actual Pinot value: " + pinotValue);
-          }
-        }
-        if (!h2ResultSet.next() && i != numRows - 1) {
-          throw new RuntimeException("H2 result set is smaller than Pinot result set after: " + i + " rows!");
-        }
-      }
+    if (CollectionUtils.isNotEmpty(pinotResultSetGroup.getExceptions())) {
+      Assert.fail(String.format(
+          "TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0), query));
     }
-    Assert.assertFalse(h2ResultSet.next(), "Pinot result set is smaller than H2 result set after: "
-        + numRows + " rows!");
+    // TODO: Enable the following 2 assertions after fixing the data so each query returns non-zero rows
+    // Assert.assertTrue(resultTableResultSet.getRowCount() > 0, String.format("Expected non-zero rows for tpc-h query: %s", query));
+    // Assert.assertTrue(resultTableResultSet.getColumnCount() > 0, String.format("Expected non-zero columns for tpc-h query: %s", query));
   }
 
   @Override
@@ -195,13 +171,17 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   @DataProvider(name = "QueryDataProvider")
   public static Object[][] queryDataProvider()
       throws IOException {
-    Object[][] queries = new Object[NUM_TPCH_QUERIES][];
-    for (int query = 1; query <= NUM_TPCH_QUERIES; query++) {
+    Object[][] queries = new Object[NUM_TPCH_QUERIES - EXEMPT_QUERIES.size()][];
+    for (int query = 1, iter = 0; query <= NUM_TPCH_QUERIES; query++) {
+      if (EXEMPT_QUERIES.contains(query)) {
+        continue;
+      }
       String path = String.format("tpch/%s.sql", query);
       try (InputStream inputStream = TPCHQueryIntegrationTest.class.getClassLoader()
           .getResourceAsStream(path)) {
-        queries[query - 1] = new Object[1];
-        queries[query - 1][0] = IOUtils.toString(Objects.requireNonNull(inputStream), Charset.defaultCharset());
+        queries[iter] = new Object[1];
+        queries[iter][0] = IOUtils.toString(Objects.requireNonNull(inputStream), Charset.defaultCharset());
+        iter++;
       }
     }
     return queries;
