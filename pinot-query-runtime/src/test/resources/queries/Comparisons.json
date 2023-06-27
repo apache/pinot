@@ -398,11 +398,7 @@
       { "sql": "SELECT val BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val BETWEEN big AND small FROM {tbl}" },
       { "sql": "SELECT val BETWEEN 2 AND 3 FROM {tbl}" },
-      {
-        "ignored": true,
-        "sql": "SELECT val BETWEEN 3 AND 2 FROM {tbl}",
-        "comment": "calcite reduce this query into null literal value which is not supported."
-      },
+      { "sql": "SELECT val BETWEEN 3 AND 2 FROM {tbl}" },
       { "sql": "SELECT 3 BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" },
@@ -411,11 +407,7 @@
         "sql": "SELECT val NOT BETWEEN 2 AND 3 FROM {tbl}",
         "comment": "Somehow it failed with Range is not implemented yet"
       },
-      {
-        "ignored": true,
-        "sql": "SELECT val NOT BETWEEN 3 AND 2 FROM {tbl}",
-        "comment": "calcite reduce this query into null literal value which is not supported."
-      },
+      { "sql": "SELECT val NOT BETWEEN 3 AND 2 FROM {tbl}" },
       { "sql": "SELECT 3 NOT BETWEEN small AND big FROM {tbl}" },
       {
         "ignored": true,

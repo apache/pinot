@@ -177,7 +177,7 @@
           [2, 300, "a", false],
           [2, 400, "a", true],
           [3, 100, "b", true],
-          [0.001, 1, "b", false],
+          [0, 1, "b", false],
           [101, 1.01, "c", false],
           [150, 1.5, "c", true],
           [175, 1.75, "c", true],
@@ -195,7 +195,8 @@
       {
         "psql": "4.2.7",
         "description": "aggregate int column and filter by int column",
-        "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0"
+        "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0",
+        "h2Sql": "SELECT sum(1.0 / int_col) FROM {tbl} WHERE int_col > 0"
       },
       {
         "psql": "4.2.7",

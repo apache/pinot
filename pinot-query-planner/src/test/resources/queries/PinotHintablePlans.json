@@ -6,7 +6,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($0, $6)], joinType=[inner])",
+          "\nLogicalJoin(condition=[=($0, $7)], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[single])",
           "\n    LogicalFilter(condition=[>=($2, 0)])",
           "\n      LogicalTableScan(table=[[a]])",
@@ -55,7 +55,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys) */ * FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0)",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($0, $5)], joinType=[semi])",
+          "\nLogicalJoin(condition=[=($0, $6)], joinType=[semi])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
