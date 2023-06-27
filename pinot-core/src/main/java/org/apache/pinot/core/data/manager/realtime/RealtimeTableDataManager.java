@@ -489,16 +489,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
-    if (immutableSegment instanceof ImmutableSegmentImpl) {
-      if (isUpsertEnabled()) {
-        handleUpsert(immutableSegment);
-        return;
-      }
+    if (isUpsertEnabled()) {
+      handleUpsert(immutableSegment);
+      return;
+    }
 
-      // TODO: Change dedup handling to handle segment replacement
-      if (isDedupEnabled()) {
-        buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
-      }
+    // TODO: Change dedup handling to handle segment replacement
+    if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
+      buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
   }

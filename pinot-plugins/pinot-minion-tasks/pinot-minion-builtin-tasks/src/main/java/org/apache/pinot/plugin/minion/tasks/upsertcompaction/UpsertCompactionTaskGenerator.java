@@ -36,6 +36,7 @@ import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
@@ -115,7 +116,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       double invalidRecordsThresholdPercent =
           Double.parseDouble(compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
               String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
-      List<SegmentZKMetadata> selectedSegments = new ArrayList<>();
+      List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
+      List<String> segmentsForDeletion = new ArrayList<>();
       for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
         JsonNode allValidDocIdMetadata;
         try {
@@ -131,24 +133,30 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           String segmentName = validDocIdMetadata.get("segmentName").asText();
           SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
           double invalidRecordPercent = (invalidRecordCount / segment.getTotalDocs()) * 100;
-          if (invalidRecordPercent > invalidRecordsThresholdPercent) {
-            selectedSegments.add(segment);
+          if (invalidRecordPercent == 100.0) {
+            segmentsForDeletion.add(segment.getSegmentName());
+          } else if (invalidRecordPercent > invalidRecordsThresholdPercent) {
+            segmentsForCompaction.add(segment);
           }
         }
       }
 
+      if (!segmentsForDeletion.isEmpty()) {
+          pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsForDeletion, "0d");
+      }
+
       int numTasks = 0;
       int maxTasks = getMaxTasks(taskType, tableNameWithType, taskConfigs);
-      for (SegmentZKMetadata selectedSegment : selectedSegments) {
+      for (SegmentZKMetadata segment : segmentsForCompaction) {
         if (numTasks == maxTasks) {
           break;
         }
         Map<String, String> configs = new HashMap<>();
         configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
-        configs.put(MinionConstants.SEGMENT_NAME_KEY, selectedSegment.getSegmentName());
-        configs.put(MinionConstants.DOWNLOAD_URL_KEY, selectedSegment.getDownloadUrl());
+        configs.put(MinionConstants.SEGMENT_NAME_KEY, segment.getSegmentName());
+        configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(selectedSegment.getCrc()));
+        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }

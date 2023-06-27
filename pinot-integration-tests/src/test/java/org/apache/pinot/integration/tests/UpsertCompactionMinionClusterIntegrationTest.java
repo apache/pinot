@@ -36,13 +36,15 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
@@ -50,6 +52,9 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
   protected PinotTaskManager _taskManager;
   private static final String PRIMARY_KEY_COL = "clientId";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME);
+  private static List<File> _avroFiles;
+  private TableConfig _tableConfig;
+  private Schema _schema;
 
   @Override
   protected String getSchemaFileName() {
@@ -92,38 +97,36 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     startServers(1);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    _avroFiles = unpackAvroData(_tempDir);
 
-    // Start Kafka and push data into Kafka
     startKafka();
-    pushAvroIntoKafka(avroFiles);
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig tableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, getNumKafkaPartitions());
-    tableConfig.setTaskConfig(getCompactionTaskConfig());
-    addTableConfig(tableConfig);
+    _schema = createSchema();
+    addSchema(_schema);
+    _tableConfig = createUpsertTableConfig(_avroFiles.get(0), PRIMARY_KEY_COL, getNumKafkaPartitions());
+    _tableConfig.setTaskConfig(getCompactionTaskConfig());
+    addTableConfig(_tableConfig);
 
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), TableType.REALTIME, _tarDir);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, _tableConfig, _schema, 0, _segmentDir, _tarDir);
 
     startMinion();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
   }
 
-  @Override
-  protected void waitForAllDocsLoaded(long timeoutMs)
+  @BeforeMethod
+  public void beforeMethod()
+      throws Exception {
+    // Create and upload segments
+    uploadSegments(getTableName(), TableType.REALTIME, _tarDir);
+  }
+
+  protected void waitForAllDocsLoaded(long timeoutMs, long expectedCount)
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // 3 Avro files, each with 100 documents, one copy from streaming source, one copy from batch source
-        return getCurrentCountStarResultWithoutUpsert() == 600;
+        return getCurrentCountStarResultWithoutUpsert() == expectedCount;
       } catch (Exception e) {
         return null;
       }
@@ -146,9 +149,9 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     return 3;
   }
 
-  @AfterClass
-  public void tearDown()
-      throws IOException {
+  @AfterMethod
+  public void afterMethod()
+      throws Exception {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 
     // Test dropping all segments one by one
@@ -166,6 +169,14 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
       }
     }, 60_000L, "Failed to drop the segments");
 
+    stopServer();
+    startServers(1);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     dropRealtimeTable(realtimeTableName);
     stopMinion();
     stopServer();
@@ -177,10 +188,26 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
   }
 
   @Test
-  public void testCompaction() {
-    assertNotEquals(getCurrentCountStarResultWithoutUpsert(), 300);
+  public void testCompaction()
+      throws Exception {
+    waitForAllDocsLoaded(600_000L, 300);
     assertEquals(getSalary(), 2381560);
+
     assertNotNull(_taskManager.scheduleTasks(REALTIME_TABLE_NAME).get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
+    waitForTaskToComplete();
+    assertEquals(getCurrentCountStarResultWithoutUpsert(), 3);
+    assertEquals(getSalary(), 2381560);
+  }
+
+  @Test
+  public void testCompactionDeletesSegments()
+      throws Exception {
+    pushAvroIntoKafka(_avroFiles);
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(600_000L, 600);
+    assertEquals(getSalary(), 2381560);
+
+    assertNull(_taskManager.scheduleTasks(REALTIME_TABLE_NAME).get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     assertEquals(getCurrentCountStarResultWithoutUpsert(), 300);
     assertEquals(getSalary(), 2381560);
