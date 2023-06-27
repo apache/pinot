@@ -395,58 +395,55 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testMultiColumnGroupByOrderBy()
+  public void testGroupByOrderBy()
       throws Exception {
     initializeRows();
-    insertRowWithTwoColumns(null, null);
-    insertRowWithTwoColumns(1, 2);
-    insertRowWithTwoColumns(null, 1);
-    insertRowWithTwoColumns(1, 1);
-    insertRowWithTwoColumns(1, null);
+    insertRow(null);
+    insertRow(1);
+    insertRow(1);
+    insertRow(2);
+    insertRow(3);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
     setUpSegments(tableConfig, schema);
-    String query = String.format(
-        "SELECT count(*), %s, %s FROM testTable GROUP BY %s, %s ORDER BY %s ASC NULLS LAST, %s DESC NULLS FIRST",
-        COLUMN1, COLUMN2, COLUMN1, COLUMN2, COLUMN1, COLUMN2);
+    String query =
+        String.format("SELECT count(*), %s FROM testTable GROUP BY %s ORDER BY %s ASC NULLS LAST", COLUMN1, COLUMN1,
+            COLUMN1);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
-    assertEquals(rows.size(), 5);
-    assertArrayEquals(rows.get(0), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 1, null});
-    assertArrayEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 1, 2});
-    assertArrayEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 1, 1});
-    assertArrayEquals(rows.get(3), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null, null});
-    assertArrayEquals(rows.get(4), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null, 1});
+    assertEquals(rows.size(), 4);
+    assertArrayEquals(rows.get(0), new Object[]{(long) 2 * NUM_OF_SEGMENT_COPIES, 1});
+    assertArrayEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 2});
+    assertArrayEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 3});
+    assertArrayEquals(rows.get(3), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null});
   }
 
   @Test
-  public void testMultiColumnGroupByOrderByWithLimit()
+  public void testGroupByOrderByWithLimit()
       throws Exception {
     initializeRows();
-    insertRowWithTwoColumns(null, null);
-    insertRowWithTwoColumns(1, 2);
-    insertRowWithTwoColumns(null, 1);
-    insertRowWithTwoColumns(1, 1);
-    insertRowWithTwoColumns(1, null);
+    insertRow(null);
+    insertRow(1);
+    insertRow(1);
+    insertRow(2);
+    insertRow(3);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
     setUpSegments(tableConfig, schema);
-    String query = String.format(
-        "SELECT count(*), %s, %s FROM testTable GROUP BY %s, %s ORDER BY %s ASC NULLS LAST, %s DESC NULLS FIRST LIMIT"
-            + " 3", COLUMN1, COLUMN2, COLUMN1, COLUMN2, COLUMN1, COLUMN2);
+    String query =
+        String.format("SELECT count(*), %s FROM testTable GROUP BY %s ORDER BY %s DESC NULLS FIRST LIMIT 3", COLUMN1,
+            COLUMN1, COLUMN1);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 3);
-    assertArrayEquals(rows.get(0), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 1, null});
-    assertArrayEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 1, 2});
-    assertArrayEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 1, 1});
+    assertArrayEquals(rows.get(0), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null});
+    assertArrayEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 3});
+    assertArrayEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 2});
   }
 }
