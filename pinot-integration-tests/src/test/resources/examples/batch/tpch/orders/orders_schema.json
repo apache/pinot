@@ -25,7 +25,7 @@
     },
     {
       "dataType": "STRING",
-      "name": "o_order_priority"
+      "name": "o_orderpriority"
     },
     {
       "dataType": "STRING",
@@ -33,7 +33,7 @@
     },
     {
       "dataType": "STRING",
-      "name": "o_ship_priority"
+      "name": "o_shippriority"
     },
     {
       "dataType": "STRING",

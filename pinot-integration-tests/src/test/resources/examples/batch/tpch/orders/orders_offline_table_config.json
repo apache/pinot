@@ -15,9 +15,9 @@
       "o_custkey",
       "o_orderstatus",
       "o_orderdate",
-      "o_order_priority",
+      "o_orderpriority",
       "o_clerk",
-      "o_ship_priority"
+      "o_shippriority"
     ],
     "noDictionaryColumns": [
       "o_comment"

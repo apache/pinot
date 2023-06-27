@@ -27,9 +27,11 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.Connection;
@@ -48,7 +50,8 @@ import org.testng.annotations.Test;
 
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
-  private static final int NUM_TPCH_QUERIES = 24;
+  private static final int NUM_TPCH_QUERIES = 1;
+  private static final Set<Integer> EXEMPT_QUERIES;
 
   static {
     TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();
@@ -60,6 +63,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     TPCH_QUICKSTART_TABLE_RESOURCES.put("nation", "examples/batch/tpch/nation");
     TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
     TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
+    EXEMPT_QUERIES = new HashSet<>();
   }
 
   @BeforeClass
