@@ -201,7 +201,7 @@ abstract class BaseGapfillProcessor {
       } else {
         FunctionContext functionContext = expressionContext.getFunction();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext);
+            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext.isNullHandlingEnabled());
         columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
         columnNames[i] = functionContext.toString();
       }
@@ -222,8 +222,8 @@ abstract class BaseGapfillProcessor {
     return epoch / sz * sz;
   }
 
-  protected List<Object[]> gapFillAndAggregate(
-      List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
+  protected List<Object[]> gapFillAndAggregate(List<Object[]> rows, DataSchema dataSchema,
+      DataSchema resultTableSchema) {
     throw new UnsupportedOperationException("Not supported");
   }
 }
