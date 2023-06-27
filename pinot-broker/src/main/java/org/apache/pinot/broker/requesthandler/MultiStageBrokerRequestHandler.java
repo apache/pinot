@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.commons.lang3.StringUtils;
@@ -77,7 +76,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final MailboxService _mailboxService;
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
-  private final MultiStageRequestIdGenerator _multistageRequestIdGenerator;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -111,15 +109,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
-
-    _multistageRequestIdGenerator = new MultiStageRequestIdGenerator(brokerIdFromConfig);
   }
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
-    long requestId = _multistageRequestIdGenerator.get();
+    long requestId = _brokerIdGenerator.get();
     requestContext.setRequestId(requestId);
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
@@ -321,35 +317,5 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
-  }
-
-  /**
-   * OpChains in Multistage queries are identified by the requestId and the stage-id. v1 Engine uses an incrementing
-   * long to generate requestId, so the requestIds are numbered [0, 1, 2, ...]. When running with multiple brokers,
-   * it could be that two brokers end up generating the same requestId which could lead to weird query errors. This
-   * requestId generator addresses that by:
-   * <ol>
-   *   <li>
-   *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't arrive at the same
-   *     requestId. This mask becomes the most significant 9 digits (in base-10).
-   *   </li>
-   *   <li>
-   *     Using a auto-incrementing counter for the least significant 9 digits (in base-10).
-   *   </li>
-   * </ol>
-   */
-  static class MultiStageRequestIdGenerator {
-    private static final long OFFSET = 1_000_000_000L;
-    private final long _mask;
-    private final AtomicLong _incrementingId = new AtomicLong(0);
-
-    public MultiStageRequestIdGenerator(String brokerId) {
-      _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) * OFFSET;
-    }
-
-    public long get() {
-      long normalized = (_incrementingId.getAndIncrement() & Long.MAX_VALUE) % OFFSET;
-      return _mask + normalized;
-    }
   }
 }
