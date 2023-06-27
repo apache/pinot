@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.streaming;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -248,6 +247,11 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
       return new ExceptionResultsBlock(new TimeoutException(errorMessage));
     }
 
+    // Set the processing exceptions.
+    if (!_mergedProcessingExceptions.isEmpty()) {
+      return new ExceptionResultsBlock(_mergedProcessingExceptions);
+    }
+
     IndexedTable indexedTable = _indexedTable;
     if (!_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(false);
@@ -259,10 +263,6 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
 
-    // Set the processing exceptions.
-    if (!_mergedProcessingExceptions.isEmpty()) {
-      mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
-    }
     return mergedBlock;
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import java.util.Collection;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
@@ -33,6 +34,12 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
 
   public ExceptionResultsBlock(ProcessingException processingException, Throwable t) {
     addToProcessingExceptions(QueryException.getException(processingException, t));
+  }
+
+  public ExceptionResultsBlock(Collection<ProcessingException> processingExceptions) {
+    for (ProcessingException e : processingExceptions) {
+      addToProcessingExceptions(e);
+    }
   }
 
   public ExceptionResultsBlock(Throwable t) {
