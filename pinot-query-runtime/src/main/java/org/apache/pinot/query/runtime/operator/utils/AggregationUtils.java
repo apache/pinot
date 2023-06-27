@@ -209,9 +209,6 @@ public class AggregationUtils {
       if (currentRes == null) {
         _results.put(key, _merger.init(value, _dataType));
       } else {
-        if (value == null) {
-          value = _dataType.getNullPlaceholder();
-        }
         Object mergedResult = _merger.merge(currentRes, value);
         _results.put(key, mergedResult);
       }
