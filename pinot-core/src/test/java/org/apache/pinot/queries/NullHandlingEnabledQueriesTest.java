@@ -354,7 +354,8 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
     setUpSegments(tableConfig, schema);
     String query =
-        String.format("SELECT count(*), %s, %s FROM testTable GROUP BY %s, %s", COLUMN1, COLUMN2, COLUMN1, COLUMN2);
+        String.format("SELECT count(*), %s, %s FROM testTable GROUP BY %s, %s", COLUMN1, COLUMN2, COLUMN1,
+            COLUMN2);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
