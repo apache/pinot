@@ -531,7 +531,8 @@ public final class TableConfigUtils {
                 ValueAggregatorFactory.getValueAggregator(aft);
                 ValueAggregatorFactory.getAggregatedValueType(aft);
               } catch (IllegalArgumentException | IllegalStateException e) {
-                String err = String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
+                String err = String.format(
+                    "Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
                 throw new IllegalStateException(err);
               }
             }
