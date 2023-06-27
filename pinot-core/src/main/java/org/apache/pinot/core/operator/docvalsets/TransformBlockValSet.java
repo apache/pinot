@@ -59,7 +59,7 @@ public class TransformBlockValSet implements BlockValSet {
       _nullBitmap = _transformFunction.getNullBitmap(_valueBlock);
       _nullBitmapSet = true;
     }
-    return _nullBitmap == null ? null : _nullBitmap.clone();
+    return _nullBitmap;
   }
 
   @Override

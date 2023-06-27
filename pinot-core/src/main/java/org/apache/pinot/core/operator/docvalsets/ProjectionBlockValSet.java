@@ -79,7 +79,7 @@ public class ProjectionBlockValSet implements BlockValSet {
       }
       _nullBitmapSet = true;
     }
-    return _nullBitmap == null ? null : _nullBitmap.clone();
+    return _nullBitmap;
   }
 
   @Override
