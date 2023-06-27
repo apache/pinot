@@ -50,6 +50,15 @@ public class BuiltInTracer implements Tracer {
       }
       TraceContext.logTime(operatorName, duration);
     }
+
+    @Override
+    public void close(Object context) {
+      String operatorName = _operator.getSimpleName();
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("Context collected for {}: {}", operatorName, context);
+      }
+      TraceContext.logInfo(operatorName, context);
+    }
   }
 
   @Override
