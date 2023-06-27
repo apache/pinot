@@ -127,8 +127,11 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
           "TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0), query));
     }
     // TODO: Enable the following 2 assertions after fixing the data so each query returns non-zero rows
-    // Assert.assertTrue(resultTableResultSet.getRowCount() > 0, String.format("Expected non-zero rows for tpc-h query: %s", query));
-    // Assert.assertTrue(resultTableResultSet.getColumnCount() > 0, String.format("Expected non-zero columns for tpc-h query: %s", query));
+    /*
+    Assert.assertTrue(resultTableResultSet.getRowCount() > 0,
+        String.format("Expected non-zero rows for tpc-h query: %s", query));
+    Assert.assertTrue(resultTableResultSet.getColumnCount() > 0,
+        String.format("Expected non-zero columns for tpc-h query: %s", query)); */
   }
 
   @Override
