@@ -20,7 +20,7 @@
       "name": "o_orderstatus"
     },
     {
-      "dataType": "STRING",
+      "dataType": "LONG",
       "name": "o_orderdate"
     },
     {

@@ -19,16 +19,19 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.ResultSetGroup;
@@ -43,13 +46,14 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-import org.yaml.snakeyaml.Yaml;
 
 
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TPCHQueryIntegrationTest.class);
+  private static final String TPCH_RESOURCES_DIR = "pinot-integration-tests/src/test/resources/tpch";
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
   private static final String TPCH_QUERY_SET_RESOURCE_NAME = "tpch/tpch_query_set.yaml";
+  private static final int NUM_TPCH_QUERIES = 1;
 
   static {
     TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();
@@ -190,12 +194,17 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @DataProvider(name = "QueryDataProvider")
-  public static Object[][] queryDataProvider() {
-    Yaml yaml = new Yaml();
-    InputStream inputStream = TPCHQueryIntegrationTest.class.getClassLoader()
-        .getResourceAsStream(TPCH_QUERY_SET_RESOURCE_NAME);
-    Map<String, List<String>> tpchQuerySet = yaml.load(inputStream);
-    List<String> tpchQueryList = tpchQuerySet.get("sqls");
-    return tpchQueryList.stream().map(s -> new Object[]{s}).toArray(Object[][]::new);
+  public static Object[][] queryDataProvider()
+      throws IOException {
+    Object[][] queries = new Object[NUM_TPCH_QUERIES][];
+    for (int query = 1; query <= NUM_TPCH_QUERIES; query++) {
+      String path = String.format("tpch/%s.sql", query);
+      try (InputStream inputStream = TPCHQueryIntegrationTest.class.getClassLoader()
+          .getResourceAsStream(path)) {
+        queries[query - 1] = new Object[1];
+        queries[query - 1][0] = IOUtils.toString(Objects.requireNonNull(inputStream), Charset.defaultCharset());
+      }
+    }
+    return queries;
   }
 }
