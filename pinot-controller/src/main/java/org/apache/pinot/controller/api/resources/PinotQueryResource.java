@@ -69,6 +69,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,9 +140,8 @@ public class PinotQueryResource {
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    } catch (Exception ex) {
-      String errorMessage = String.format("Unable to parse the SQL: '%s'", sqlQuery);
-      throw QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(errorMessage));
+    } catch (SqlCompilationException ex) {
+      throw QueryException.getException(QueryException.SQL_PARSING_ERROR, ex);
     }
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
