@@ -24,8 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +45,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
@@ -54,6 +55,8 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -75,9 +78,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final long _defaultBrokerTimeoutMs;
 
   private final MailboxService _mailboxService;
+  private final OpChainSchedulerService _reducerScheduler;
+
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
-  private final MultiStageRequestIdGenerator _multistageRequestIdGenerator;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -104,22 +108,22 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
     _queryDispatcher = new QueryDispatcher();
 
-    // it is OK to ignore the onDataAvailable callback because the broker top-level operators
-    // always run in-line (they don't have any scheduler)
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, ignored -> {
-    });
+    long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
+        QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
+    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
+        Executors.newCachedThreadPool(new NamedThreadFactory("query_broker_reducer_" + _reducerPort + "_port")));
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, _reducerScheduler::onDataAvailable);
 
     // TODO: move this to a startUp() function.
+    _reducerScheduler.startAsync();
     _mailboxService.start();
-
-    _multistageRequestIdGenerator = new MultiStageRequestIdGenerator(brokerIdFromConfig);
   }
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
-    long requestId = _multistageRequestIdGenerator.get();
+    long requestId = _brokerIdGenerator.get();
     requestContext.setRequestId(requestId);
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
@@ -211,8 +215,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
+      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService,
+          _reducerScheduler,
+          queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
@@ -321,35 +326,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
-  }
-
-  /**
-   * OpChains in Multistage queries are identified by the requestId and the stage-id. v1 Engine uses an incrementing
-   * long to generate requestId, so the requestIds are numbered [0, 1, 2, ...]. When running with multiple brokers,
-   * it could be that two brokers end up generating the same requestId which could lead to weird query errors. This
-   * requestId generator addresses that by:
-   * <ol>
-   *   <li>
-   *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't arrive at the same
-   *     requestId. This mask becomes the most significant 9 digits (in base-10).
-   *   </li>
-   *   <li>
-   *     Using a auto-incrementing counter for the least significant 9 digits (in base-10).
-   *   </li>
-   * </ol>
-   */
-  static class MultiStageRequestIdGenerator {
-    private static final long OFFSET = 1_000_000_000L;
-    private final long _mask;
-    private final AtomicLong _incrementingId = new AtomicLong(0);
-
-    public MultiStageRequestIdGenerator(String brokerId) {
-      _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) * OFFSET;
-    }
-
-    public long get() {
-      long normalized = (_incrementingId.getAndIncrement() & Long.MAX_VALUE) % OFFSET;
-      return _mask + normalized;
-    }
+    _reducerScheduler.stopAsync();
   }
 }

@@ -133,7 +133,8 @@ public class QueriesTestUtils {
   private static void validateRows(List<Object[]> actual, List<Object[]> expected) {
     assertEquals(actual.size(), expected.size());
     for (int i = 0; i < actual.size(); i++) {
-      assertEquals(actual.get(i), expected.get(i));
+      // Generic assertEquals delegates to assertArrayEquals, which can test for equality of array values in rows.
+      assertEquals((Object) actual.get(i), (Object) expected.get(i));
     }
   }
 

@@ -315,6 +315,9 @@ public class SelectionOperatorUtils {
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
             break;
+          case UNKNOWN:
+            dataTableBuilder.setColumn(i, (Object) null);
+            break;
 
           // Multi-value column
           case INT_ARRAY:
@@ -386,6 +389,9 @@ public class SelectionOperatorUtils {
           break;
         case BYTES:
           row[i] = dataTable.getBytes(rowId, i);
+          break;
+        case UNKNOWN:
+          row[i] = null;
           break;
 
         // Multi-value column

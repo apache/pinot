@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
  *
  * The window functions supported today are:
  * Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations [RANGE window type only]
- * Ranking: ROW_NUMBER ranking functions [ROWS window type only]
+ * Ranking: ROW_NUMBER [ROWS window type only], RANK, DENSE_RANK [RANGE window type only] ranking functions
  * Value: [none]
  *
  * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
@@ -82,6 +82,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   // List of window functions which can only be applied as ROWS window frame type
   private static final Set<String> ROWS_ONLY_FUNCTION_NAMES = ImmutableSet.of("ROW_NUMBER");
+  // List of ranking window functions whose output depends on the ordering of input rows and not on the actual values
+  private static final Set<String> RANKING_FUNCTION_NAMES = ImmutableSet.of("RANK", "DENSE_RANK");
 
   private final MultiStageOperator _inputOperator;
   private final List<RexExpression> _groupSet;
@@ -191,7 +193,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
 
     if (ROWS_ONLY_FUNCTION_NAMES.contains(functionName)) {
-      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.ROW
+      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.ROWS
               && _windowFrame.isUpperBoundCurrentRow(),
           String.format("%s must be of ROW frame type and have CURRENT ROW as the upper bound", functionName));
     } else {
@@ -225,12 +227,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
     List<Object[]> rows = new ArrayList<>(_numRows);
     if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
       // All aggregation window functions only support RANGE type today (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
+      // RANK and DENSE_RANK ranking window functions also only support RANGE type today
       for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
         Key partitionKey = e.getKey();
         List<Object[]> rowList = e.getValue();
         for (Object[] existingRow : rowList) {
           Object[] row = new Object[existingRow.length + _aggCalls.size()];
-          Key orderKey = _isPartitionByOnly ? emptyOrderKey
+          Key orderKey = (_isPartitionByOnly && CollectionUtils.isEmpty(_orderSetInfo.getOrderSet())) ? emptyOrderKey
               : AggregationUtils.extractRowKey(existingRow, _orderSetInfo.getOrderSet());
           System.arraycopy(existingRow, 0, row, 0, existingRow.length);
           for (int i = 0; i < _windowAccumulators.length; i++) {
@@ -298,7 +301,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
           _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
           // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
           // we output the rows since the aggregation value depends on the neighboring rows.
-          Key orderKey = _isPartitionByOnly ? emptyOrderKey
+          Key orderKey = (_isPartitionByOnly && CollectionUtils.isEmpty(_orderSetInfo.getOrderSet())) ? emptyOrderKey
               : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
           int aggCallsSize = _aggCalls.size();
           for (int i = 0; i < aggCallsSize; i++) {
@@ -412,14 +415,46 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
   }
 
+  private static class MergeRank implements AggregationUtils.Merger {
+
+    @Override
+    public Long init(Object other, DataSchema.ColumnDataType dataType) {
+      return 1L;
+    }
+
+    @Override
+    public Long merge(Object left, Object right) {
+      // RANK always increase by the number of duplicate entries seen for the given ORDER BY key.
+      return ((Number) left).longValue() + ((Number) right).longValue();
+    }
+  }
+
+  private static class MergeDenseRank implements AggregationUtils.Merger {
+
+    @Override
+    public Long init(Object other, DataSchema.ColumnDataType dataType) {
+      return 1L;
+    }
+
+    @Override
+    public Long merge(Object left, Object right) {
+      long rightValueInLong = ((Number) right).longValue();
+      // DENSE_RANK always increase the rank by 1, irrespective of the number of duplicate ORDER BY keys seen
+      return (rightValueInLong == 0L) ? ((Number) left).longValue() : ((Number) left).longValue() + 1L;
+    }
+  }
+
   private static class WindowAggregateAccumulator extends AggregationUtils.Accumulator {
     private static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> WIN_AGG_MERGERS =
         ImmutableMap.<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>>builder()
             .putAll(AggregationUtils.Accumulator.MERGERS)
             .put("ROW_NUMBER", cdt -> new MergeRowNumber())
+            .put("RANK", cdt -> new MergeRank())
+            .put("DENSE_RANK", cdt -> new MergeDenseRank())
             .build();
 
     private final boolean _isPartitionByOnly;
+    private final boolean _isRankingWindowFunction;
 
     // Fields needed only for RANGE frame type queries (ORDER BY)
     private final Map<Key, OrderKeyResult> _orderByResults = new HashMap<>();
@@ -429,6 +464,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         DataSchema inputSchema, OrderSetInfo orderSetInfo) {
       super(aggCall, merger, functionName, inputSchema);
       _isPartitionByOnly = CollectionUtils.isEmpty(orderSetInfo.getOrderSet()) || orderSetInfo.isPartitionByOnly();
+      _isRankingWindowFunction = RANKING_FUNCTION_NAMES.contains(functionName);
     }
 
     /**
@@ -452,7 +488,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
      * RANGE key and not to the row ordering. This should only be called for RANGE type queries.
      */
     public void accumulateRangeResults(Key key, Key orderKey, Object[] row) {
-      if (_isPartitionByOnly) {
+      // Ranking functions don't use the row value, thus cannot reuse the AggregationUtils accumulate function for them
+      if (_isPartitionByOnly && !_isRankingWindowFunction) {
         accumulate(key, row);
         return;
       }
@@ -464,15 +501,21 @@ public class WindowAggregateOperator extends MultiStageOperator {
           : _orderByResults.get(key).getOrderByResults().get(previousOrderKeyIfPresent);
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
 
+      // The ranking functions do not depend on the actual value of the data, but are calculated based on the
+      // position of the data ordered by the ORDER BY key. Thus they need to be handled differently and require setting
+      // whether the rank has changed or not and if changed then by how much.
       _orderByResults.putIfAbsent(key, new OrderKeyResult());
       if (currentRes == null) {
+        value = _isRankingWindowFunction ? 0 : value;
         _orderByResults.get(key).addOrderByResult(orderKey, _merger.init(value, _dataType));
       } else {
         Object mergedResult;
         if (orderKey.equals(previousOrderKeyIfPresent)) {
+          value = _isRankingWindowFunction ? 0 : value;
           mergedResult = _merger.merge(currentRes, value);
         } else {
           Object previousValue = _orderByResults.get(key).getOrderByResults().get(previousOrderKeyIfPresent);
+          value = _isRankingWindowFunction ? _orderByResults.get(key).getCountOfDuplicateOrderByKeys() : value;
           mergedResult = _merger.merge(previousValue, value);
         }
         _orderByResults.get(key).addOrderByResult(orderKey, mergedResult);
@@ -480,7 +523,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     }
 
     public Object getRangeResultForKeys(Key key, Key orderKey) {
-      if (_isPartitionByOnly) {
+      if (_isPartitionByOnly && !_isRankingWindowFunction) {
         return _results.get(key);
       } else {
         return _orderByResults.get(key).getOrderByResults().get(orderKey);
@@ -494,16 +537,21 @@ public class WindowAggregateOperator extends MultiStageOperator {
     static class OrderKeyResult {
       final Map<Key, Object> _orderByResults;
       Key _previousOrderByKey;
+      // Store the counts of duplicate ORDER BY keys seen for this PARTITION BY key for calculating RANK/DENSE_RANK
+      long _countOfDuplicateOrderByKeys;
 
       OrderKeyResult() {
         _orderByResults = new HashMap<>();
         _previousOrderByKey = null;
+        _countOfDuplicateOrderByKeys = 0;
       }
 
       public void addOrderByResult(Key orderByKey, Object value) {
         // We expect to get the rows in order based on the ORDER BY key so it is safe to blindly assign the
         // current key as the previous key
         _orderByResults.put(orderByKey, value);
+        _countOfDuplicateOrderByKeys = (_previousOrderByKey != null && _previousOrderByKey.equals(orderByKey))
+            ? _countOfDuplicateOrderByKeys + 1 : 1;
         _previousOrderByKey = orderByKey;
       }
 
@@ -513,6 +561,10 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
       public Key getPreviousOrderByKey() {
         return _previousOrderByKey;
+      }
+
+      public long getCountOfDuplicateOrderByKeys() {
+        return _countOfDuplicateOrderByKeys;
       }
     }
   }

@@ -38,10 +38,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -51,6 +54,7 @@ import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.QueryConfig;
@@ -69,6 +73,8 @@ import org.testng.Assert;
 
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
+  protected static final ExecutorService REDUCE_EXECUTOR = Executors.newCachedThreadPool(
+      new NamedThreadFactory("TEST_REDUCER_SCHEDULER_EXECUTOR"));
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";
@@ -79,6 +85,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected int _reducerGrpcPort;
   protected Map<QueryServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
   protected MailboxService _mailboxService;
+  protected OpChainSchedulerService _reducerScheduler;
 
   static {
     SEGMENT_BREAKER_ROW.putValue(SEGMENT_BREAKER_KEY, SEGMENT_BREAKER_STR);
@@ -124,7 +131,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     Preconditions.checkState(reducerStageId != -1);
     ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-        executionStatsAggregatorMap, true);
+        _reducerScheduler, executionStatsAggregatorMap, true);
     return resultTable.getRows();
   }
 

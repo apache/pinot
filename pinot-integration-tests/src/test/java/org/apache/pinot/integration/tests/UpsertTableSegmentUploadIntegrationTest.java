@@ -74,7 +74,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     // Create and upload schema and table config
     Schema schema = createSchema();
     addSchema(schema);
-    TableConfig tableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, getNumKafkaPartitions());
+    TableConfig tableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
     addTableConfig(tableConfig);
 
     // Create and upload segments
@@ -116,7 +116,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
 
   @Override
   protected String getSchemaFileName() {
-    return "upsert_table_test.schema";
+    return "upsert_upload_segment_test.schema";
   }
 
   @Override
@@ -126,7 +126,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
 
   @Override
   protected String getAvroTarFileName() {
-    return "upsert_test.tar.gz";
+    return "upsert_upload_segment_test.tar.gz";
   }
 
   @Override

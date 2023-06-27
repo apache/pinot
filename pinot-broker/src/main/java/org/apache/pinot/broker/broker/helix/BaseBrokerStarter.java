@@ -332,6 +332,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory);
+    registerExtraComponents(_brokerAdminApplication);
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
@@ -392,6 +393,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     _isStarting = false;
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  /**
+   * This method is called after initialization of BrokerAdminApiApplication object
+   * and before calling start to allow custom broker starters to register additional
+   * components.
+   * @param brokerAdminApplication is the application
+   */
+  protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
