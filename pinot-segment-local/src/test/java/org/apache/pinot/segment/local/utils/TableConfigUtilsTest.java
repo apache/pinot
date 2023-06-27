@@ -1755,6 +1755,14 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
     }
+
+    // valid agg
+    HashMap<String, String> validAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
+    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
   }
 
   @Test

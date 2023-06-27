@@ -42,6 +42,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
@@ -523,8 +524,16 @@ public final class TableConfigUtils {
             if (entry.getKey().endsWith(".aggregationType")) {
               Preconditions.checkState(columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
                   String.format("Column \"%s\" not found in schema!", entry.getKey()));
-              Preconditions.checkState(ImmutableSet.of("SUM", "MAX", "MIN").contains(entry.getValue().toUpperCase()),
-                  String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
+              try {
+                // check that it's a valid aggregation function type
+                AggregationFunctionType aft = AggregationFunctionType.valueOf(entry.getValue().toUpperCase());
+                // check that a value aggregator and is available and configured
+                ValueAggregatorFactory.getValueAggregator(aft);
+                ValueAggregatorFactory.getAggregatedValueType(aft);
+              } catch (IllegalArgumentException | IllegalStateException e) {
+                String err = String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
+                throw new IllegalStateException(err);
+              }
             }
           }
         }
