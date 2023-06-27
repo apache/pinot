@@ -31,6 +31,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.Response;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -40,6 +41,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.exception.FatalException;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -135,6 +137,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     throws Exception {
     _eventObserver.notifyProgress(pinotTaskConfig, "Compacting segment: " + indexDir);
     Map<String, String> configs = pinotTaskConfig.getConfigs();
+    String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String taskType = pinotTaskConfig.getTaskType();
     LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
     long startMillis = System.currentTimeMillis();
@@ -143,8 +146,20 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     ImmutableRoaringBitmap validDocIds = getValidDocIds(tableNameWithType, configs);
 
+    if (validDocIds.isEmpty()) {
+      // prevent empty segment generation
+      if (indexDir.exists() && !FileUtils.deleteQuietly(indexDir)) {
+        LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
+      }
+      if (!FileUtils.deleteQuietly(workingDir)) {
+        LOGGER.warn("Failed to delete working directory: {}", workingDir.getAbsolutePath());
+      }
+      LOGGER.info("{} on table: {}, segment: {} got aborted", taskType, tableNameWithType, segmentName);
+      throw new FatalException(
+          taskType + " on table: " + tableNameWithType + ", segment: " + segmentName + " got aborted");
+    }
+
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    String segmentName = segmentMetadata.getName();
     try (CompactedRecordReader compactedRecordReader = new CompactedRecordReader(indexDir, validDocIds)) {
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -153,11 +168,10 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     }
 
     File compactedSegmentFile = new File(workingDir, segmentName);
-
     SegmentConversionResult result = new SegmentConversionResult.Builder()
         .setFile(compactedSegmentFile)
         .setTableNameWithType(tableNameWithType)
-        .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
+        .setSegmentName(segmentName)
         .build();
 
     long endMillis = System.currentTimeMillis();
