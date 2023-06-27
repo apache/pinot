@@ -43,43 +43,44 @@ public class TypeFactory extends JavaTypeFactoryImpl {
     super(typeSystem);
   }
 
-  public RelDataType createRelDataTypeFromSchema(Schema schema) {
+  public RelDataType createRelDataTypeFromSchema(Schema schema, boolean isNullSupportEnabled) {
     Builder builder = new Builder(this);
     for (Map.Entry<String, FieldSpec> e : schema.getFieldSpecMap().entrySet()) {
-      builder.add(e.getKey(), toRelDataType(e.getValue()));
+      builder.add(e.getKey(), toRelDataType(e.getValue(),
+          isNullSupportEnabled || e.getValue().isNullableField()));
     }
     return builder.build();
   }
 
-  private RelDataType toRelDataType(FieldSpec fieldSpec) {
+  private RelDataType toRelDataType(FieldSpec fieldSpec, boolean isNullSupportEnabled) {
     switch (fieldSpec.getDataType()) {
       case INT:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.INTEGER)
-            : createArrayType(createSqlType(SqlTypeName.INTEGER), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.INTEGER)
+                : createArrayType(createSqlType(SqlTypeName.INTEGER), -1), isNullSupportEnabled);
       case LONG:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
-            : createArrayType(createSqlType(SqlTypeName.BIGINT), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
+                : createArrayType(createSqlType(SqlTypeName.BIGINT), -1), isNullSupportEnabled);
       case FLOAT:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.REAL)
-            : createArrayType(createSqlType(SqlTypeName.REAL), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.REAL)
+            : createArrayType(createSqlType(SqlTypeName.REAL), -1), isNullSupportEnabled);
       case DOUBLE:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
-            : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
+                : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1), isNullSupportEnabled);
       case BOOLEAN:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BOOLEAN)
-            : createArrayType(createSqlType(SqlTypeName.BOOLEAN), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BOOLEAN)
+                : createArrayType(createSqlType(SqlTypeName.BOOLEAN), -1), isNullSupportEnabled);
       case TIMESTAMP:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.TIMESTAMP)
-            : createArrayType(createSqlType(SqlTypeName.TIMESTAMP), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.TIMESTAMP)
+                : createArrayType(createSqlType(SqlTypeName.TIMESTAMP), -1), isNullSupportEnabled);
       case STRING:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARCHAR)
-            : createArrayType(createSqlType(SqlTypeName.VARCHAR), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARCHAR)
+                : createArrayType(createSqlType(SqlTypeName.VARCHAR), -1), isNullSupportEnabled);
       case BYTES:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARBINARY)
-            : createArrayType(createSqlType(SqlTypeName.VARBINARY), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARBINARY)
+                : createArrayType(createSqlType(SqlTypeName.VARBINARY), -1), isNullSupportEnabled);
       case BIG_DECIMAL:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
-            : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
+        return createTypeWithNullability(fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
+                : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1), isNullSupportEnabled);
       case JSON:
         return createSqlType(SqlTypeName.VARCHAR);
       case LIST:

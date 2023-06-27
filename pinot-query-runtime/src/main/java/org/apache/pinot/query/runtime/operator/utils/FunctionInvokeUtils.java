@@ -42,4 +42,21 @@ public class FunctionInvokeUtils {
       return inputObj;
     }
   }
+
+  /**
+   * Comparable method utils.
+   * @param left left obj
+   * @param right right obj
+   * @return compare results using the left class method.
+   */
+  @SuppressWarnings("unchecked")
+  public static int compare(Object left, Object right, int nullValue) {
+    if (left == null && right == null) {
+      return 0;
+    } else if (left == null || right == null) {
+      return nullValue;
+    } else {
+      return ((Comparable) left).compareTo(right);
+    }
+  }
 }

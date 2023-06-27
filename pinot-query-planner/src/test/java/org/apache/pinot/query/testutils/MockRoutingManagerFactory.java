@@ -37,6 +37,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -53,6 +54,7 @@ public class MockRoutingManagerFactory {
 
   private final HashMap<String, String> _tableNameMap;
   private final Map<String, Schema> _schemaMap;
+  private final Map<String, Boolean> _nullHandlingMap;
 
   private final Map<String, ServerInstance> _serverInstances;
   private final Map<String, RoutingTable> _routingTableMap;
@@ -64,6 +66,7 @@ public class MockRoutingManagerFactory {
     _hybridTables = new ArrayList<>();
     _serverInstances = new HashMap<>();
     _schemaMap = new HashMap<>();
+    _nullHandlingMap = new HashMap<>();
     _tableNameMap = new HashMap<>();
     _routingTableMap = new HashMap<>();
 
@@ -73,14 +76,17 @@ public class MockRoutingManagerFactory {
     }
   }
 
-  public MockRoutingManagerFactory registerTable(Schema schema, String tableName) {
+  public MockRoutingManagerFactory registerTable(Schema schema, String tableName, boolean enableNullHandling) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
-      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName));
-      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName));
+      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName),
+          enableNullHandling);
+      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName),
+          enableNullHandling);
       _hybridTables.add(tableName);
     } else {
-      registerTableNameWithType(schema, TableNameBuilder.forType(tableType).tableNameWithType(tableName));
+      registerTableNameWithType(schema, TableNameBuilder.forType(tableType).tableNameWithType(tableName),
+          enableNullHandling);
     }
     return this;
   }
@@ -116,6 +122,15 @@ public class MockRoutingManagerFactory {
       String schemaName = invocationOnMock.getArgument(0);
       return _schemaMap.get(schemaName);
     });
+    when(mock.getTableConfig(anyString())).thenAnswer(invocationOnMock -> {
+      String tableNameWithType = invocationOnMock.getArgument(0);
+      String tableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
+          .setSchemaName(_schemaMap.get(tableName).getSchemaName())
+          .setTimeColumnName("ts")
+          .setNullHandlingEnabled(_nullHandlingMap.get(tableName))
+            .build();
+    });
     return mock;
   }
 
@@ -137,11 +152,12 @@ public class MockRoutingManagerFactory {
     return new ServerInstance(instanceConfig);
   }
 
-  private void registerTableNameWithType(Schema schema, String tableNameWithType) {
+  private void registerTableNameWithType(Schema schema, String tableNameWithType, boolean enableNullHandling) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableNameMap.put(tableNameWithType, rawTableName);
     _schemaMap.put(rawTableName, schema);
     _schemaMap.put(tableNameWithType, schema);
+    _nullHandlingMap.put(rawTableName, enableNullHandling);
   }
 
   private static class FakeRoutingManager implements RoutingManager {

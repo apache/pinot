@@ -36,17 +36,19 @@ import org.apache.pinot.spi.data.Schema;
  * {@link RelDataType} of the table to the planner.
  */
 public class PinotTable extends AbstractTable implements ScannableTable {
-  private Schema _schema;
+  private final Schema _schema;
+  private final boolean _enableNullSupport;
 
-  public PinotTable(Schema schema) {
+  public PinotTable(Schema schema, boolean enableNullSupport) {
     _schema = schema;
+    _enableNullSupport = enableNullSupport;
   }
 
   @Override
   public RelDataType getRowType(RelDataTypeFactory relDataTypeFactory) {
     Preconditions.checkState(relDataTypeFactory instanceof TypeFactory);
     TypeFactory typeFactory = (TypeFactory) relDataTypeFactory;
-    return typeFactory.createRelDataTypeFromSchema(_schema);
+    return typeFactory.createRelDataTypeFromSchema(_schema, _enableNullSupport);
   }
 
   @Override

@@ -41,6 +41,9 @@ public class DataTypeConversionFunctions {
 
   @ScalarFunction
   public static Object cast(Object value, String targetTypeLiteral) {
+    if (value == null) {
+      return null;
+    }
     try {
       Class<?> clazz = value.getClass();
       // TODO: Support cast for MV

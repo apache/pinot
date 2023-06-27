@@ -89,11 +89,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       if (testCase._ignored) {
         continue;
       }
+      boolean enableNullHandling = BooleanUtils.toBoolean(
+          testCase._extraProps.getOrDefault("EnableNullHandling", "false"));
 
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
         boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
+        List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
+        List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
+
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
@@ -101,8 +106,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, tableNameWithType);
         factory2.registerTable(pinotSchema, tableNameWithType);
-        List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
-        List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
+        if (enableNullHandling) {
+          factory1.setNullHandlingForTable(tableNameWithType);
+          factory2.setNullHandlingForTable(tableNameWithType);
+        }
 
         // generate segments and dump into server1 and server2
         List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
@@ -194,7 +201,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
     _queryEnvironment =
         QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
-            factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
+            factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
+            factory1.buildNullHandlingTableMap());
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.

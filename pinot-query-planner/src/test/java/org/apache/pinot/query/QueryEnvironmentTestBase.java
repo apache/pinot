@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,11 +56,20 @@ public class QueryEnvironmentTestBase {
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
+        .addMetric("xNullCol", FieldSpec.DataType.INT, 0)
         .setSchemaName("defaultSchemaName");
-    TABLE_SCHEMAS.put("a_REALTIME", SCHEMA_BUILDER.setSchemaName("a").build());
-    TABLE_SCHEMAS.put("b_REALTIME", SCHEMA_BUILDER.setSchemaName("b").build());
-    TABLE_SCHEMAS.put("c_OFFLINE", SCHEMA_BUILDER.setSchemaName("c").build());
-    TABLE_SCHEMAS.put("d", SCHEMA_BUILDER.setSchemaName("d").build());
+    Schema schemaA = SCHEMA_BUILDER.setSchemaName("a").build();
+    schemaA.getFieldSpecFor("xNullCol").setNullableField(true);
+    Schema schemaB = SCHEMA_BUILDER.setSchemaName("b").build();
+    schemaA.getFieldSpecFor("xNullCol").setNullableField(true);
+    Schema schemaC = SCHEMA_BUILDER.setSchemaName("c").build();
+    schemaA.getFieldSpecFor("xNullCol").setNullableField(true);
+    Schema schemaD = SCHEMA_BUILDER.setSchemaName("d").build();
+    schemaA.getFieldSpecFor("xNullCol").setNullableField(true);
+    TABLE_SCHEMAS.put("a_REALTIME", schemaA);
+    TABLE_SCHEMAS.put("b_REALTIME", schemaB);
+    TABLE_SCHEMAS.put("c_OFFLINE", schemaC);
+    TABLE_SCHEMAS.put("d", schemaD);
   }
 
   protected QueryEnvironment _queryEnvironment;
@@ -143,9 +153,15 @@ public class QueryEnvironmentTestBase {
 
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2) {
+    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2, Collections.emptyMap());
+  }
+
+  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
+      Map<String, Boolean> nullHandlingMap) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
-      factory.registerTable(entry.getValue(), entry.getKey());
+      factory.registerTable(entry.getValue(), entry.getKey(), nullHandlingMap.getOrDefault(entry.getKey(), false));
     }
     for (Map.Entry<String, List<String>> entry : segmentMap1.entrySet()) {
       for (String segment : entry.getValue()) {

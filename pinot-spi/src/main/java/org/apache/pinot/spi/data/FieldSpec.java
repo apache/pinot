@@ -48,6 +48,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final int DEFAULT_MAX_LENGTH = 512;
+  public static final boolean DEFAULT_NULLABILITY = false;
 
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
@@ -99,6 +100,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
+  protected boolean _isNullableField = DEFAULT_NULLABILITY;
 
   // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes
   private int _maxLength = DEFAULT_MAX_LENGTH;
@@ -121,14 +123,20 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Object defaultNullValue) {
-    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
+    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, DEFAULT_NULLABILITY, defaultNullValue);
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
+    this(name, dataType, isSingleValueField, maxLength, DEFAULT_NULLABILITY, defaultNullValue);
+  }
+
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength, boolean isNullableField,
+      @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = dataType;
     _isSingleValueField = isSingleValueField;
+    _isNullableField = isNullableField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
   }
@@ -161,6 +169,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
+  }
+
+  public boolean isNullableField() {
+    return _isNullableField;
+  }
+
+  public void setNullableField(boolean isNullableField) {
+    _isNullableField = isNullableField;
   }
 
   public int getMaxLength() {
@@ -379,6 +395,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
+        .isEqual(_isNullableField, that._isNullableField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
         .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
         && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
@@ -389,6 +406,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     int result = EqualityUtils.hashCodeOf(_name);
     result = EqualityUtils.hashCodeOf(result, _dataType);
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
+    result = EqualityUtils.hashCodeOf(result, _isNullableField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);

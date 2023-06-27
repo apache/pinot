@@ -350,7 +350,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     // TODO: ts is built-in, but we should allow user overwrite
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
     builder.setSchemaName(schemaName);
-    return builder.build();
+    Schema schema = builder.build();
+    for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
+      schema.getFieldSpecMap().get(columnAndType._name).setNullableField(columnAndType._nullable);
+    }
+    return schema;
   }
 
   protected List<GenericRow> toRow(List<QueryTestCase.ColumnAndType> columnAndTypes, List<List<Object>> value) {
@@ -522,6 +526,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       String _type;
       @JsonProperty("isSingleValue")
       boolean _isSingleValue = true;
+      @JsonProperty("nullable")
+      boolean _nullable = false;
     }
   }
 }

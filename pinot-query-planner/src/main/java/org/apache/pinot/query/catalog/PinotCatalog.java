@@ -32,6 +32,7 @@ import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -70,7 +71,7 @@ public class PinotCatalog implements Schema {
           + "If you are running this via the a test environment, check to make sure you're "
           + "specifying the correct tables.");
     }
-    return new PinotTable(schema);
+    return new PinotTable(schema, isNullEnabled(_tableCache, tableName));
   }
 
   /**
@@ -126,5 +127,21 @@ public class PinotCatalog implements Schema {
   @Override
   public Schema snapshot(SchemaVersion version) {
     return this;
+  }
+
+  private static boolean isNullEnabled(TableCache tableCache, String rawTableName) {
+    TableConfig tableConfig = tableCache.getTableConfig(
+        TableNameBuilder.forType(org.apache.pinot.spi.config.table.TableType.REALTIME)
+            .tableNameWithType(rawTableName));
+    if (tableConfig == null) {
+      tableConfig = tableCache.getTableConfig(
+          TableNameBuilder.forType(org.apache.pinot.spi.config.table.TableType.OFFLINE)
+              .tableNameWithType(rawTableName));
+    }
+    if (tableConfig != null && tableConfig.getIndexingConfig() != null) {
+      return tableConfig.getIndexingConfig().isNullHandlingEnabled();
+    } else {
+      return false;
+    }
   }
 }

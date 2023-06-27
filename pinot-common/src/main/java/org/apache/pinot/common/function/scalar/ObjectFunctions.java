@@ -37,6 +37,16 @@ public class ObjectFunctions {
     return !isNull(obj);
   }
 
+  @ScalarFunction(nullableParameters = true, names = {"isNotTrue", "is_not_true"})
+  public static boolean isNotTrue(@Nullable Boolean obj) {
+    return !isTrue(obj);
+  }
+
+  @ScalarFunction(nullableParameters = true, names = {"isTrue", "is_true"})
+  public static boolean isTrue(@Nullable Boolean obj) {
+    return obj != null && obj;
+  }
+
   @ScalarFunction(nullableParameters = true, names = {"isDistinctFrom", "is_distinct_from"})
   public static boolean isDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
     if (obj1 == null && obj2 == null) {

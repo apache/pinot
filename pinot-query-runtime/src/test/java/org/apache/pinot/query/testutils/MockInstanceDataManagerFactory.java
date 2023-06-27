@@ -57,6 +57,7 @@ public class MockInstanceDataManagerFactory {
   private final Map<String, List<String>> _tableSegmentNameMap;
   private final Map<String, File> _serverTableDataDirMap;
   private final Map<String, Schema> _schemaMap;
+  private final Map<String, Boolean> _nullHandlingMap;
   private String _serverName;
 
   public MockInstanceDataManagerFactory(String serverName) {
@@ -66,6 +67,7 @@ public class MockInstanceDataManagerFactory {
     _tableSegmentNameMap = new HashMap<>();
     _tableRowsMap = new HashMap<>();
     _schemaMap = new HashMap<>();
+    _nullHandlingMap = new HashMap<>();
   }
 
   public MockInstanceDataManagerFactory registerTable(Schema schema, String tableName) {
@@ -76,6 +78,11 @@ public class MockInstanceDataManagerFactory {
     } else {
       registerTableNameWithType(schema, tableName);
     }
+    return this;
+  }
+
+  public MockInstanceDataManagerFactory setNullHandlingForTable(String tableName) {
+    _nullHandlingMap.put(tableName, true);
     return this;
   }
 
@@ -116,6 +123,10 @@ public class MockInstanceDataManagerFactory {
     return _schemaMap;
   }
 
+  public Map<String, Boolean> buildNullHandlingTableMap() {
+    return _nullHandlingMap;
+  }
+
   public Map<String, List<GenericRow>> buildTableRowsMap() {
     return _tableRowsMap;
   }
@@ -138,7 +149,7 @@ public class MockInstanceDataManagerFactory {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     // TODO: plugin table config constructor
     TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
-        .build();
+        .setNullHandlingEnabled(true).build();
     Schema schema = _schemaMap.get(tableNameWithType);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDir.getPath());

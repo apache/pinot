@@ -195,8 +195,7 @@
       {
         "psql": "4.2.7",
         "description": "aggregate int column and filter by int column",
-        "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0",
-        "h2Sql": "SELECT sum(1.0 / int_col) FROM {tbl} WHERE int_col > 0"
+        "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0"
       },
       {
         "psql": "4.2.7",

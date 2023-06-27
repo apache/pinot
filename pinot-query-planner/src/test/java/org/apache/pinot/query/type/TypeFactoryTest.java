@@ -51,7 +51,7 @@ public class TypeFactoryTest {
         .addMultiValueDimension("STRING_ARRAY_COL", FieldSpec.DataType.STRING)
         .addMultiValueDimension("BYTES_ARRAY_COL", FieldSpec.DataType.BYTES)
         .build();
-    RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
+    RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema, false);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     for (RelDataTypeField field : fieldList) {
       switch (field.getName()) {
