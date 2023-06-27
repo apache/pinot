@@ -6,11 +6,7 @@ select
 from
   (
     select
-      extract(
-        year
-        from
-          o_orderdate
-      ) as o_year,
+      ToDateTime(o_orderdate * 1000, 'yyyy') as o_year,
       l_extendedprice * (1 - l_discount) as volume,
       n2.n_name as nation
     from

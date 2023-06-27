@@ -50,7 +50,7 @@ import org.testng.annotations.Test;
 
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
-  private static final int NUM_TPCH_QUERIES = 1;
+  private static final int NUM_TPCH_QUERIES = 4;
   private static final Set<Integer> EXEMPT_QUERIES;
 
   static {
