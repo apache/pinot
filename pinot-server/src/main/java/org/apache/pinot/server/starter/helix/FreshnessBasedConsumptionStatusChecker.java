@@ -82,8 +82,6 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
       return true;
     }
 
-    _logger.info("priyen inside FreshnessBasedConsumptionStatusChecker");
-
     _logger.info("Segment {} with freshness {}ms has not caught up within "
             + "min freshness {}. At offset {}. Latest offset {}.",
         segmentName, freshnessMs, _minFreshnessMs, currentOffset, latestStreamOffset);

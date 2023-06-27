@@ -463,8 +463,6 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
       throws IOException {
-    System.err.println("indexing row, metadata is null: " + (rowMetadata == null));
-
     boolean canTakeMore;
     int numDocsIndexed = _numDocsIndexed;
 
@@ -511,10 +509,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // Update last indexed time and latest ingestion time
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (rowMetadata != null) {
-      _logger.error("RowMetadata is not null");
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getRecordIngestionTimeMs());
-    } else {
-      _logger.error("RowMetadata is null");
     }
 
     return canTakeMore;
