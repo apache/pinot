@@ -20,10 +20,7 @@ package org.apache.pinot.client;
 
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -39,24 +36,24 @@ public class Connection {
   public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
 
-  private final PinotClientTransport _transport;
+  private final PinotClientTransport<?> _transport;
   private final BrokerSelector _brokerSelector;
   private final boolean _failOnExceptions;
 
-  Connection(List<String> brokerList, PinotClientTransport transport) {
+  Connection(List<String> brokerList, PinotClientTransport<?> transport) {
     this(new Properties(), new SimpleBrokerSelector(brokerList), transport);
   }
 
-  Connection(Properties properties, List<String> brokerList, PinotClientTransport transport) {
+  Connection(Properties properties, List<String> brokerList, PinotClientTransport<?> transport) {
     this(properties, new SimpleBrokerSelector(brokerList), transport);
     LOGGER.info("Created connection to broker list {}", brokerList);
   }
 
-  Connection(BrokerSelector brokerSelector, PinotClientTransport transport) {
+  Connection(BrokerSelector brokerSelector, PinotClientTransport<?> transport) {
     this(new Properties(), brokerSelector, transport);
   }
 
-  Connection(Properties properties, BrokerSelector brokerSelector, PinotClientTransport transport) {
+  Connection(Properties properties, BrokerSelector brokerSelector, PinotClientTransport<?> transport) {
     _brokerSelector = brokerSelector;
     _transport = transport;
 
@@ -150,7 +147,7 @@ public class Connection {
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public Future<ResultSetGroup> executeAsync(String query)
+  public CompletableFuture<ResultSetGroup> executeAsync(String query)
       throws PinotClientException {
     return executeAsync(null, query);
   }
@@ -163,7 +160,7 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   @Deprecated
-  public Future<ResultSetGroup> executeAsync(Request request)
+  public CompletableFuture<ResultSetGroup> executeAsync(Request request)
       throws PinotClientException {
     return executeAsync(null, request.getQuery());
   }
@@ -175,11 +172,14 @@ public class Connection {
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public Future<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
+  public CompletableFuture<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
       throws PinotClientException {
     String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);
-    return new ResultSetGroupFuture(_transport.executeQueryAsync(brokerHostPort, query));
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query for statement: " + query);
+    }
+    return _transport.executeQueryAsync(brokerHostPort, query).thenApply(ResultSetGroup::new);
   }
 
   /**
@@ -220,43 +220,13 @@ public class Connection {
     _brokerSelector.close();
   }
 
-  private static class ResultSetGroupFuture implements Future<ResultSetGroup> {
-    private final Future<BrokerResponse> _responseFuture;
-
-    public ResultSetGroupFuture(Future<BrokerResponse> responseFuture) {
-      _responseFuture = responseFuture;
-    }
-
-    @Override
-    public boolean cancel(boolean mayInterruptIfRunning) {
-      return _responseFuture.cancel(mayInterruptIfRunning);
-    }
-
-    @Override
-    public boolean isCancelled() {
-      return _responseFuture.isCancelled();
-    }
-
-    @Override
-    public boolean isDone() {
-      return _responseFuture.isDone();
-    }
-
-    @Override
-    public ResultSetGroup get()
-        throws InterruptedException, ExecutionException {
-      try {
-        return get(60000L, TimeUnit.MILLISECONDS);
-      } catch (TimeoutException e) {
-        throw new ExecutionException(e);
-      }
-    }
-
-    @Override
-    public ResultSetGroup get(long timeout, TimeUnit unit)
-        throws InterruptedException, ExecutionException, TimeoutException {
-      BrokerResponse response = _responseFuture.get(timeout, unit);
-      return new ResultSetGroup(response);
-    }
+  /**
+   * Provides access to the underlying transport mechanism for this connection.
+   * There may be client metrics useful for monitoring and other observability goals.
+   *
+   * @return pinot client transport.
+   */
+  public PinotClientTransport<?> getTransport() {
+    return _transport;
   }
 }

@@ -101,6 +101,19 @@ public class ConnectionFactoryTest {
     Assert.assertEquals(connection.getBrokerList(), brokers);
   }
 
+  @Test
+  public void testConnectionTransport() {
+    // Create properties
+    Properties properties = new Properties();
+    properties.setProperty("brokerList", "127.0.0.1:1234,localhost:2345");
+
+    // Create the connection
+    Connection connection = ConnectionFactory.fromProperties(properties);
+
+    Assert.assertNotNull(connection.getTransport());
+    Assert.assertNotNull(connection.getTransport().getClientMetrics());
+  }
+
   // For testing DynamicBrokerSelector
 
   /**
