@@ -48,6 +48,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -203,19 +204,36 @@ public class PinotTenantRestletResource {
   @GET
   @Path("/tenants/{tenantName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "List instance for a tenant, or enable/disable/drop a tenant")
+  @ApiOperation(value = "List instance for a tenant")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Error reading tenants list")
   })
-  public String listInstanceOrToggleTenantState(
+  public String listInstance(
+      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
+      @ApiParam(value = "Table type (offline|realtime)") @QueryParam("tableType") String tableType) {
+    return listInstancesForTenant(tenantName, tenantType, tableType);
+  }
+
+  @POST
+  @Path("/tenants/{tenantName}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "enable/disable/drop a tenant")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error applying state to tenant")
+  })
+  public String toggleTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
       @ApiParam(value = "Table type (offline|realtime)") @QueryParam("tableType") String tableType,
       @ApiParam(value = "state") @QueryParam("state") String stateStr)
       throws Exception {
-    if (stateStr == null) {
-      return listInstancesForTenant(tenantName, tenantType, tableType);
+    if (stateStr == null || !EnumUtils.isValidEnumIgnoreCase(StateType.class, stateStr)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Error: State mentioned " + stateStr + " is wrong. Valid States: Enable, Disable, Drop",
+          Response.Status.BAD_REQUEST);
     } else {
       return toggleTenantState(tenantName, stateStr, tenantType);
     }
@@ -287,11 +305,16 @@ public class PinotTenantRestletResource {
       return new SuccessResponse("Dropped tenant " + tenantName + " successfully.").toString();
     }
 
-    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr) ? true : false;
+    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr);
     for (String instance : allInstances) {
       if (enable) {
         instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
-      } else {
+      }
+    }
+
+    boolean disable = StateType.DISABLE.name().equalsIgnoreCase(stateStr);
+    for (String instance : allInstances) {
+      if (disable) {
         instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
     }
