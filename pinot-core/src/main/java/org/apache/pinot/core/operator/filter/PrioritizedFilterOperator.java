@@ -36,6 +36,7 @@ public interface PrioritizedFilterOperator<T extends Block> extends Operator<T> 
   int OR_PRIORITY = 400;
   int SCAN_PRIORITY = 500;
   int EXPRESSION_PRIORITY = 1000;
+  int UNKNOWN_FILTER_PRIORITY = 10000;
 
   /**
    * Priority is a number that is used to compare different filters. Some predicates, like AND, sort their sub

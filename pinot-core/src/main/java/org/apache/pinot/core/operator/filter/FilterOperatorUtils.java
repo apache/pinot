@@ -224,8 +224,7 @@ public class FilterOperatorUtils {
           if (filterOperator instanceof ExpressionFilterOperator) {
             return PrioritizedFilterOperator.EXPRESSION_PRIORITY;
           }
-          throw new IllegalStateException(filterOperator.getClass().getSimpleName()
-              + " should not be reordered, remove it from the list before calling this method");
+          return PrioritizedFilterOperator.UNKNOWN_FILTER_PRIORITY;
         }
       });
     }
