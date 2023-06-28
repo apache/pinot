@@ -66,7 +66,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
         }
         ExpressionContext arg = expressionContext.getFunction().getArguments().get(0);
         for (int j = 0; j < dataSchema.getColumnNames().length; j++) {
-          if (arg.getIdentifierName().equalsIgnoreCase(dataSchema.getColumnName(j))) {
+          if (arg.getIdentifier().equalsIgnoreCase(dataSchema.getColumnName(j))) {
             _sumArgIndexes[i] = j;
             break;
           }

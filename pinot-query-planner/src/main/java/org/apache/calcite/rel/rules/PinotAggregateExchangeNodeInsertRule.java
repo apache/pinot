@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -81,8 +80,6 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE).build();
   private static final RelHint INTERMEDIATE_STAGE_HINT = RelHint.builder(
       PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE).build();
-  private static final RelHint SINGLE_STAGE_AGG_HINT = RelHint.builder(
-      PinotHintStrategyTable.INTERNAL_IS_SINGLE_STAGE_AGG).build();
 
   public PinotAggregateExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalAggregate.class, any()), factory, null);
@@ -98,7 +95,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       ImmutableList<RelHint> hints = agg.getHints();
       return !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE)
           && !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE)
-          && !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_IS_SINGLE_STAGE_AGG);
+          && !PinotHintStrategyTable.containsHintOption(hints, PinotHintOptions.AGGREGATE_HINT_OPTIONS,
+          PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS);
     }
     return false;
   }
@@ -116,20 +114,6 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   public void onMatch(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
     ImmutableList<RelHint> oldHints = oldAggRel.getHints();
-
-    // If the "is_partitioned_by_group_by_keys" aggregate hint option is set, just add an additional hint indicating
-    // the stage. This only applies to GROUP BY aggregations.
-    if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHintOption(oldHints,
-        PinotHintOptions.AGGREGATE_HINT_OPTIONS, PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)) {
-      // 1. attach leaf agg RelHint to original agg.
-      ImmutableList<RelHint> newLeafAggHints =
-          new ImmutableList.Builder<RelHint>().addAll(oldHints).add(SINGLE_STAGE_AGG_HINT).build();
-      Aggregate newLeafAgg =
-          new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
-              oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
-      call.transformTo(newLeafAgg);
-      return;
-    }
 
     // If "skipLeafStageGroupByAggregation" SQLHint is passed, the leaf stage aggregation is skipped. This only
     // applies for Group By Aggregations.
@@ -189,10 +173,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
-    List<RelHint> additionalHints = isLeafStageAggregationPresent ? Collections.singletonList(FINAL_STAGE_HINT)
-        : Arrays.asList(FINAL_STAGE_HINT, SINGLE_STAGE_AGG_HINT);
     ImmutableList<RelHint> newIntermediateAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).addAll(additionalHints).build();
+        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(FINAL_STAGE_HINT).build();
     ImmutableBitSet groupSet = groupByList == null ? ImmutableBitSet.range(nGroups) : ImmutableBitSet.of(groupByList);
     relBuilder.aggregate(
         relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)),

@@ -85,7 +85,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     assert numOrderByExpressions > 0;
     OrderByExpressionContext firstOrderByExpression = orderByExpressions.get(0);
     assert firstOrderByExpression.getExpression().getType() == ExpressionContext.Type.IDENTIFIER;
-    String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifierName();
+    String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
 
     _minMaxValueContexts = new ArrayList<>(_numOperators);
     for (Operator<BaseResultsBlock> operator : _operators) {

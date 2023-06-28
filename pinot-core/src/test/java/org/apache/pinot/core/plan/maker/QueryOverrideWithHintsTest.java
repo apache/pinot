@@ -230,8 +230,8 @@ public class QueryOverrideWithHintsTest {
     pinotQuery.setExpressionOverrideHints(ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn));
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
-    assertEquals(queryContext.getSelectExpressions().get(0).getIdentifierName(), "$ts$MONTH");
-    assertEquals(queryContext.getGroupByExpressions().get(0).getIdentifierName(), "$ts$MONTH");
+    assertEquals(queryContext.getSelectExpressions().get(0).getIdentifier(), "$ts$MONTH");
+    assertEquals(queryContext.getGroupByExpressions().get(0).getIdentifier(), "$ts$MONTH");
   }
 
   @Test

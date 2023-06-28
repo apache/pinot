@@ -153,7 +153,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
         "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier"
             + " if needed.", lhs, lhs.getType());
-    String key = lhs.getIdentifierName();
+    String key = lhs.getIdentifier();
 
     MutableRoaringBitmap matchingDocIds = null;
     if (_version == BaseJsonIndexCreator.VERSION_2) {

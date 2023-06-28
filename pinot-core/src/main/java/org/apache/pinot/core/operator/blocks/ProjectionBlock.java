@@ -54,7 +54,7 @@ public class ProjectionBlock implements ValueBlock {
   @Override
   public BlockValSet getBlockValueSet(ExpressionContext expression) {
     assert expression.getType() == ExpressionContext.Type.IDENTIFIER;
-    return getBlockValueSet(expression.getIdentifierName());
+    return getBlockValueSet(expression.getIdentifier());
   }
 
   @Override

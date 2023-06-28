@@ -51,9 +51,9 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
     // Consider null values only when null handling is enabled and function is not COUNT(*)
     // Note COUNT on any literal gives same result as COUNT(*)
     // So allow for identifiers that are not * and functions, disable for literals and *
-    _nullHandlingEnabled = nullHandlingEnabled && (
-        (expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifierName().equals("*")) || (
-            expression.getType() == ExpressionContext.Type.FUNCTION));
+    _nullHandlingEnabled = nullHandlingEnabled
+            && ((expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*"))
+            || (expression.getType() == ExpressionContext.Type.FUNCTION));
   }
 
   @Override
@@ -187,34 +187,6 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   @Override
   public Long merge(Long intermediateResult1, Long intermediateResult2) {
     return intermediateResult1 + intermediateResult2;
-  }
-
-  @Override
-  public void mergeAndUpdateResultHolder(Long intermediateResult,
-      AggregationResultHolder aggregationResultHolder) {
-    // It's possible for the intermediateResult from multistage engine to be null.
-    if (intermediateResult == null) {
-      return;
-    }
-
-    // For count aggregation function, the aggregation result holder stores a default value of 0.
-    long existingVal = (long) aggregationResultHolder.getDoubleResult();
-    long result = merge(existingVal, intermediateResult);
-    aggregationResultHolder.setValue(result);
-  }
-
-  @Override
-  public void mergeAndUpdateResultHolder(Long intermediateResult,
-      GroupByResultHolder groupByResultHolder, int groupKey) {
-    // It's possible for the intermediateResult from multistage engine to be null.
-    if (intermediateResult == null) {
-      return;
-    }
-
-    // For count aggregation function, the aggregation result holder stores a default value of 0.
-    long existingVal = (long) groupByResultHolder.getDoubleResult(groupKey);
-    long result = merge(existingVal, intermediateResult);
-    groupByResultHolder.setValueForKey(groupKey, result);
   }
 
   @Override

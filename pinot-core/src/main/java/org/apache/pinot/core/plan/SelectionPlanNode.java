@@ -153,7 +153,7 @@ public class SelectionPlanNode implements PlanNode {
         if (!orderByExpression.isAsc() == asc) {
           return false;
         }
-        String column = orderByExpression.getExpression().getIdentifierName();
+        String column = orderByExpression.getExpression().getIdentifier();
         DataSource dataSource = _indexSegment.getDataSource(column);
         // If there are null values, we cannot trust DataSourceMetadata.isSorted
         if (isNullHandlingEnabled) {

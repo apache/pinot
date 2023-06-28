@@ -280,22 +280,6 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   }
 
   @Override
-  public void mergeAndUpdateResultHolder(Double intermediateResult,
-      AggregationResultHolder aggregationResultHolder) {
-    Double existingVal = extractAggregationResult(aggregationResultHolder);
-    Double result = merge(existingVal, intermediateResult);
-    aggregationResultHolder.setValue(result);
-  }
-
-  @Override
-  public void mergeAndUpdateResultHolder(Double intermediateResult,
-      GroupByResultHolder groupByResultHolder, int groupKey) {
-    Double existingVal = extractGroupByResult(groupByResultHolder, groupKey);
-    Double result = merge(existingVal, intermediateResult);
-    groupByResultHolder.setValueForKey(groupKey, result);
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.DOUBLE;
   }

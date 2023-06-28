@@ -100,7 +100,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
    */
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
-    String column = eqPredicate.getLhs().getIdentifierName();
+    String column = eqPredicate.getLhs().getIdentifier();
     DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
         : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
@@ -138,7 +138,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     if (values.size() > _inPredicateThreshold) {
       return false;
     }
-    String column = inPredicate.getLhs().getIdentifierName();
+    String column = inPredicate.getLhs().getIdentifier();
     DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
         : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
@@ -162,7 +162,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
    */
   private boolean pruneRangePredicate(IndexSegment segment, RangePredicate rangePredicate,
       Map<String, DataSource> dataSourceCache) {
-    String column = rangePredicate.getLhs().getIdentifierName();
+    String column = rangePredicate.getLhs().getIdentifier();
     DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
         : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner

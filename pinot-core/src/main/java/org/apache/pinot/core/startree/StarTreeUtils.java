@@ -122,7 +122,7 @@ public class StarTreeUtils {
             return null;
           }
           if (!predicateEvaluator.isAlwaysTrue()) {
-            predicateEvaluatorsMap.computeIfAbsent(predicate.getLhs().getIdentifierName(), k -> new ArrayList<>())
+            predicateEvaluatorsMap.computeIfAbsent(predicate.getLhs().getIdentifier(), k -> new ArrayList<>())
                 .add(new CompositePredicateEvaluator(Collections.singletonList(predicateEvaluator)));
           }
           break;
@@ -198,7 +198,7 @@ public class StarTreeUtils {
         return Pair.of(null, Collections.emptyList());
       }
       if (!predicateEvaluator.isAlwaysFalse()) {
-        String predicateIdentifier = predicate.getLhs().getIdentifierName();
+        String predicateIdentifier = predicate.getLhs().getIdentifier();
         if (identifier == null) {
           identifier = predicateIdentifier;
         } else {
@@ -254,7 +254,7 @@ public class StarTreeUtils {
       // Star-tree does not support non-identifier expression
       return null;
     }
-    String column = lhs.getIdentifierName();
+    String column = lhs.getIdentifier();
     DataSource dataSource = indexSegment.getDataSource(column);
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary == null) {

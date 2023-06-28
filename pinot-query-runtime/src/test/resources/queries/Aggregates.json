@@ -479,6 +479,11 @@
         "psql": "9.21.0",
         "description": "JOIN with  aggregations on string columns and group by on double, bool and int",
         "sql": "SELECT double_col, bool_col, int_col, count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2 GROUP BY double_col, bool_col, int_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "Aggregation on semi join with multiple not in",
+        "sql": "SELECT bool_col, int_col, count(string_col), count(distinct string_col), min(double_col), max(double_col), avg(double_col), count(double_col) from {tbl1} WHERE string_col = 'c' AND int_col NOT IN (SELECT int_col2 FROM {tbl2} WHERE string_col2='a') AND int_col NOT IN (SELECT int_col2 FROM {tbl2} WHERE string_col2='bar') AND int_col NOT IN (SELECT int_col2 FROM {tbl2} WHERE string_col2='orange') GROUP BY bool_col, int_col"
       }
     ]
   },
@@ -778,7 +783,6 @@
         "sql": "SELECT max(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
-        "ignored": true,
         "comment": "avg empty returns [NaN] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
         "description": "Return empty for avg",
         "sql": "SELECT avg(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
@@ -811,7 +815,7 @@
       },
       {
         "ignored": true,
-        "comment": "bool_and empty returns [0 with gets converted to false] instead of [null] when leaf aggregation is performed by Intermediate Stage",
+        "comment": "bool_and empty returns [0 which gets converted to false] instead of [null] when leaf aggregation is performed by Intermediate Stage",
         "description": "Return empty for bool_and with subquery",
         "sql": "SELECT bool_and(bool_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },

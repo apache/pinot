@@ -679,7 +679,7 @@ public class BrokerRequestToQueryContextConverterTest {
     assertTrue(orderByExpressionContext.isDesc());
     assertTrue(orderByExpressionContext.isNullsLast());
     assertEquals(orderByExpressionContext.getExpression().getFunction().getFunctionName(), "datetrunc");
-    assertEquals(orderByExpressionContext.getExpression().getFunction().getArguments().get(0).getIdentifierName(), "A");
+    assertEquals(orderByExpressionContext.getExpression().getFunction().getArguments().get(0).getIdentifier(), "A");
   }
 
   @Test

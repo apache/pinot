@@ -92,7 +92,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     InvocationRecording recording = Tracing.activeRecording();
     if (recording.isEnabled()) {
       recording.setNumDocsMatchingAfterFilter(matches.getCardinality());
-      recording.setColumnName(_predicate.getLhs().getIdentifierName());
+      recording.setColumnName(_predicate.getLhs().getIdentifier());
       recording.setFilter(FilterType.INDEX, "LUCENE_TEXT");
     }
   }

@@ -265,7 +265,7 @@ public class GapfillUtils {
     for (int i = STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL; i < args.size(); i++) {
       if (GapfillUtils.isFill(args.get(i))) {
         ExpressionContext fillExpression = args.get(i);
-        fillExpressions.put(fillExpression.getFunction().getArguments().get(0).getIdentifierName(), fillExpression);
+        fillExpressions.put(fillExpression.getFunction().getArguments().get(0).getIdentifier(), fillExpression);
       }
     }
     return fillExpressions;

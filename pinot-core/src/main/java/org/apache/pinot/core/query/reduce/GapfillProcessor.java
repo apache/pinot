@@ -34,7 +34,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.query.aggregation.function.AggFunctionQueryContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
@@ -86,7 +85,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
-      int index = indexes.get(entityColum.getIdentifierName());
+      int index = indexes.get(entityColum.getIdentifier());
       _isGroupBySelections[index] = true;
     }
 

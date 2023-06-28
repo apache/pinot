@@ -20,11 +20,7 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -54,7 +50,6 @@ import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnionOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -105,80 +100,17 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
     DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
     DataSchema resultSchema = node.getDataSchema();
 
-    // Convert aggCalls to FunctionContext and ExpressionContext that our aggregation functions understand.
-    List<RexExpression.FunctionCall> aggFunctionCalls =
-        node.getAggCalls().stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
-    List<FunctionContext> functionContexts = new ArrayList<>();
-    for (RexExpression.FunctionCall functionCall : aggFunctionCalls) {
-      FunctionContext funcContext = convertRexExpressionsToFunctionContext(functionCall, inputSchema);
-      functionContexts.add(funcContext);
-    }
-
-    // Convert groupSet to ExpressionContext that our aggregation functions understand.
-    List<RexExpression> groupBySetRexExpr = node.getGroupSet();
-    List<ExpressionContext> groupByExprContext = new ArrayList<>();
-    for (RexExpression groupByRexExpr : groupBySetRexExpr) {
-      ExpressionContext exprContext = convertRexExpressionToExpressionContext(groupByRexExpr, inputSchema);
-      groupByExprContext.add(exprContext);
-    }
-
-//    TODO(Sonam): Rename to AggregateOperator when the planner changes are merged.
-//    return new NewAggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema,
-//        functionContexts, groupByExprContext, AggregateNode.isFinalStage(node), AggregateNode
-//        .isSingleStageAggregation(node));
+    // TODO(Sonam): Rename to AggregateOperator when the planner changes are merged.
+//    boolean extractFinalResult = AggregateNode.isFinalStage(node);
+//    boolean isIntermediateStage = AggregateNode.isIntermediateStage(node);
+//    boolean isLeafStage = AggregateNode.isLeafStage(node);
+//    boolean treatIntermediateAsLeaf = node.isTreatIntermediateStageAsLeaf();
+//
+//    return new NewAggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema, inputSchema,
+//        node.getAggCalls(), node.getGroupSet(), isLeafStage, isIntermediateStage, extractFinalResult,
+//        treatIntermediateAsLeaf);
     return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
         node.getAggCalls(), node.getGroupSet(), node.getInputs().get(0).getDataSchema());
-  }
-
-
-  private FunctionContext convertRexExpressionsToFunctionContext(RexExpression.FunctionCall aggFunctionCall,
-      DataSchema inputSchema) {
-    // Extract details from RexExpression aggFunctionCall.
-    String functionName = aggFunctionCall.getFunctionName();
-    List<RexExpression> functionOperands = aggFunctionCall.getFunctionOperands();
-
-    List<ExpressionContext> aggArguments = new ArrayList<>();
-    for (RexExpression operand : functionOperands) {
-      ExpressionContext exprContext = convertRexExpressionToExpressionContext(operand, inputSchema);
-      aggArguments.add(exprContext);
-    }
-
-    if (aggArguments.isEmpty()) {
-      // This can only be true for COUNT aggregation functions.
-      // The literal value here does not matter. We create a dummy literal here just so that the count aggregation
-      // has some column to process.
-      aggArguments.add(ExpressionContext.forLiteralContext(FieldSpec.DataType.LONG, 1L));
-    }
-
-    FunctionContext functionContext = new FunctionContext(FunctionContext.Type.AGGREGATION, functionName,
-        aggArguments);
-    return functionContext;
-  }
-
-  private ExpressionContext convertRexExpressionToExpressionContext(RexExpression rexExpr, DataSchema inputSchema) {
-    ExpressionContext exprContext;
-
-    // This is used only for aggregation arguments and groupby columns. The rexExpression can never be a function type.
-    switch (rexExpr.getKind()) {
-      case INPUT_REF: {
-        RexExpression.InputRef inputRef = (RexExpression.InputRef) rexExpr;
-        int identifierIndex = inputRef.getIndex();
-        DataSchema.ColumnDataType identifierDataType = inputSchema.getColumnDataType(identifierIndex);
-        String columnName = inputSchema.getColumnName(identifierIndex);
-        exprContext = ExpressionContext.forIdentifier(columnName, identifierDataType, identifierIndex);
-        break;
-      }
-      case LITERAL: {
-        RexExpression.Literal literalRexExp = (RexExpression.Literal) rexExpr;
-        Object value = literalRexExp.getValue();
-        exprContext = ExpressionContext.forLiteralContext(literalRexExp.getDataType(), value);
-        break;
-      }
-      default:
-        throw new IllegalStateException("Aggregation Function operands cannot be a function.");
-    }
-
-    return exprContext;
   }
 
   @Override

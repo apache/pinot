@@ -87,7 +87,7 @@ public class AggregateMetricsRule extends AbstractRule {
   private boolean hasNonMetricArguments(List<ExpressionContext> arguments, Set<String> metricNames) {
     for (ExpressionContext arg : arguments) {
       if (arg.getType() == ExpressionContext.Type.IDENTIFIER) {
-        if (!metricNames.contains(arg.getIdentifierName())) {
+        if (!metricNames.contains(arg.getIdentifier())) {
           return true;
         }
       } else if (arg.getType() == ExpressionContext.Type.FUNCTION) {
