@@ -131,9 +131,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           "Converted segment name: %s does not match original segment name: %s",
           segmentConversionResult.getSegmentName(), segmentName);
 
+      File convertedSegmentDir = segmentConversionResult.getFile();
+      if (convertedSegmentDir == null) {
+        return segmentConversionResult;
+      }
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
-      File convertedSegmentDir = segmentConversionResult.getFile();
       File convertedTarredSegmentFile =
           new File(tempDataDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedTarredSegmentFile);

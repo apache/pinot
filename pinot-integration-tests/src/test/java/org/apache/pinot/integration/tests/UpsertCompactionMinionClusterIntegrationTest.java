@@ -58,7 +58,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
 
   @Override
   protected String getSchemaFileName() {
-    return "upsert_table_test.schema";
+    return "upsert_upload_segment_test.schema";
   }
 
   @Override
@@ -68,7 +68,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
 
   @Override
   protected String getAvroTarFileName() {
-    return "upsert_test.tar.gz";
+    return "upsert_upload_segment_test.tar.gz";
   }
 
   @Override
@@ -104,7 +104,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     // Create and upload the schema and table config
     _schema = createSchema();
     addSchema(_schema);
-    _tableConfig = createUpsertTableConfig(_avroFiles.get(0), PRIMARY_KEY_COL, getNumKafkaPartitions());
+    _tableConfig = createUpsertTableConfig(_avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
     _tableConfig.setTaskConfig(getCompactionTaskConfig());
     addTableConfig(_tableConfig);
 

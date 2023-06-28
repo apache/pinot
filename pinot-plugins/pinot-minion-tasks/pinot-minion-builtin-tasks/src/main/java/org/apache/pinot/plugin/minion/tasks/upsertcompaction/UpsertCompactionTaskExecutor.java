@@ -41,7 +41,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.minion.exception.FatalException;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -147,16 +146,18 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     ImmutableRoaringBitmap validDocIds = getValidDocIds(tableNameWithType, configs);
 
     if (validDocIds.isEmpty()) {
-      // prevent empty segment generation
+      // prevents empty segment generation
+      LOGGER.info("validDocIds is empty, skip the task. Table: {}, segment: {}", tableNameWithType, segmentName);
       if (indexDir.exists() && !FileUtils.deleteQuietly(indexDir)) {
         LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
       }
       if (!FileUtils.deleteQuietly(workingDir)) {
         LOGGER.warn("Failed to delete working directory: {}", workingDir.getAbsolutePath());
       }
-      LOGGER.info("{} on table: {}, segment: {} got aborted", taskType, tableNameWithType, segmentName);
-      throw new FatalException(
-          taskType + " on table: " + tableNameWithType + ", segment: " + segmentName + " got aborted");
+      return new SegmentConversionResult.Builder()
+          .setTableNameWithType(tableNameWithType)
+          .setSegmentName(segmentName)
+          .build();
     }
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
