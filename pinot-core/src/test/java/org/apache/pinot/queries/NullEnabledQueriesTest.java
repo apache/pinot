@@ -159,7 +159,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithDictFloatColumn()
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
+    Float baseValue = RANDOM.nextFloat();
     boolean generateNulls = true;
     createRecords(baseValue, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -173,7 +173,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithNoDictFloatColumn()
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
+    Float baseValue = RANDOM.nextFloat();
     boolean generateNulls = true;
     createRecords(baseValue, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
@@ -190,7 +190,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithDictDoubleColumn()
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
+    Double baseValue = RANDOM.nextDouble();
     boolean generateNulls = true;
     createRecords(baseValue, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -204,7 +204,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithNoDictDoubleColumn()
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
+    Double baseValue = RANDOM.nextDouble();
     boolean generateNulls = true;
     createRecords(baseValue, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
@@ -221,7 +221,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithDictFloatColumnNoNullValues()
           throws Exception {
     ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
+    Float baseValue = RANDOM.nextFloat();
     boolean generateNulls = false;
     createRecords(baseValue, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -235,7 +235,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithNoDictFloatColumnNoNullValues()
           throws Exception {
     ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
+    Float baseValue = RANDOM.nextFloat();
     boolean generateNulls = false;
     createRecords(baseValue, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
@@ -252,7 +252,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithDictDoubleColumnNoNullValues()
           throws Exception {
     ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
+    Double baseValue = RANDOM.nextDouble();
     boolean generateNulls = false;
     createRecords(baseValue, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -266,7 +266,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueriesWithNoDictDoubleColumnNoNullValues()
           throws Exception {
     ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
+    Double baseValue = RANDOM.nextDouble();
     boolean generateNulls = false;
     createRecords(baseValue, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
@@ -598,8 +598,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       // 9.500
       //(1 row)
       //
-      String query = String.format("SELECT %s FROM testTable WHERE %s > '%s' LIMIT 50", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 69);
+      String query = String.format("SELECT %s FROM testTable WHERE %s > %s LIMIT 50", COLUMN_NAME, COLUMN_NAME,
+          baseValue instanceof Float ? String.valueOf(baseValue.floatValue() + 69)
+              : String.valueOf(baseValue.doubleValue() + 69));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -620,8 +621,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 68);
+      String query = String.format("SELECT %s FROM testTable WHERE %s = %s", COLUMN_NAME, COLUMN_NAME,
+          baseValue instanceof Float ? String.valueOf(baseValue.floatValue() + 68)
+              : String.valueOf(baseValue.doubleValue() + 68));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -635,8 +637,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 69);
+      String query = String.format("SELECT %s FROM testTable WHERE %s = %s", COLUMN_NAME, COLUMN_NAME,
+          baseValue instanceof Float ? String.valueOf(baseValue.floatValue() + 69)
+              : String.valueOf(baseValue.doubleValue() + 69));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
