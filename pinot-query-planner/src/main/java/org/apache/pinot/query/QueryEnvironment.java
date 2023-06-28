@@ -210,7 +210,6 @@ public class QueryEnvironment {
     return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery)).getExplainPlan();
   }
 
-  @VisibleForTesting
   public List<String> getTableNamesForQuery(String sqlQuery) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
@@ -220,9 +219,6 @@ public class QueryEnvironment {
       RelRoot relRoot = compileQuery(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
-    } catch (CalciteContextException e) {
-      throw new RuntimeException("Error composing query plan for '" + sqlQuery
-          + "': " + e.getMessage() + "'", e);
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }

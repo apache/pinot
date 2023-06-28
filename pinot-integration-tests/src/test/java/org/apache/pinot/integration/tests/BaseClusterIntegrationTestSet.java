@@ -156,7 +156,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE ArrDelay > CarrierDelay "
             + "ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
     testQuery(query);
-    query = "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'DE' AND 'PA' AND DepTime <> "
+    query = "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'PA' AND 'DE' AND DepTime <> "
         + "2202 LIMIT 21";
     testQuery(query);
     query = "SELECT MAX(Quarter), MAX(FlightNum) FROM mytable LIMIT 8";
