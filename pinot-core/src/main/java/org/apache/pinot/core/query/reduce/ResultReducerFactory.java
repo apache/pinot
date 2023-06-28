@@ -18,17 +18,13 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
  * Factory class to construct the right result reducer based on the query context.
  */
-@SuppressWarnings("rawtypes")
 public final class ResultReducerFactory {
   private ResultReducerFactory() {
   }
@@ -40,26 +36,18 @@ public final class ResultReducerFactory {
     if (queryContext.isExplain()) {
       return new ExplainPlanDataTableReducer(queryContext);
     }
-
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    if (aggregationFunctions == null) {
-      // Selection query
+    if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return new SelectionDataTableReducer(queryContext);
-    } else {
-      // Aggregation query
+    }
+    if (QueryContextUtils.isAggregationQuery(queryContext)) {
       if (queryContext.getGroupByExpressions() == null) {
-        // Aggregation only query
-        if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
-          // Distinct query
-          return new DistinctDataTableReducer((DistinctAggregationFunction) aggregationFunctions[0], queryContext);
-        } else {
-          return new AggregationDataTableReducer(queryContext);
-        }
+        return new AggregationDataTableReducer(queryContext);
       } else {
-        // Aggregation group-by query
         return new GroupByDataTableReducer(queryContext);
       }
     }
+    assert QueryContextUtils.isDistinctQuery(queryContext);
+    return new DistinctDataTableReducer(queryContext);
   }
 
   public static StreamingReducer getStreamingReducer(QueryContext queryContext) {

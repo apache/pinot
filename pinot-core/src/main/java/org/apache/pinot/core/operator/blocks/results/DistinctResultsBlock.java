@@ -25,7 +25,6 @@ import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -35,11 +34,9 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  * Results block for distinct queries.
  */
 public class DistinctResultsBlock extends BaseResultsBlock {
-  private final DistinctAggregationFunction _distinctFunction;
   private DistinctTable _distinctTable;
 
-  public DistinctResultsBlock(DistinctAggregationFunction distinctFunction, DistinctTable distinctTable) {
-    _distinctFunction = distinctFunction;
+  public DistinctResultsBlock(DistinctTable distinctTable) {
     _distinctTable = distinctTable;
   }
 

@@ -1062,7 +1062,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     Function distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 1);
 
     Identifier c1 = distinctFunction.getOperands().get(0).getIdentifier();
@@ -1076,7 +1076,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 2);
 
     c1 = distinctFunction.getOperands().get(0).getIdentifier();
@@ -1093,7 +1093,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 3);
 
     final Expression filter = pinotQuery.getFilterExpression();
@@ -1210,7 +1210,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 1);
 
     Function add = distinctFunction.getOperands().get(0).getFunctionCall();
@@ -1229,7 +1229,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 2);
 
     // check for DISTINCT's first operand ADD(....)
@@ -1272,7 +1272,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 4);
 
     // check for DISTINCT's first operand ADD(....)

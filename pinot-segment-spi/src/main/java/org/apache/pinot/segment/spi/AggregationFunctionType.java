@@ -104,7 +104,6 @@ public enum AggregationFunctionType {
   PERCENTILERAWTDIGESTMV("percentileRawTDigestMV"),
   PERCENTILEKLLMV("percentileKLLMV"),
   PERCENTILERAWKLLMV("percentileRawKLLMV"),
-  DISTINCT("distinct"),
 
   // boolean aggregate functions
   BOOLAND("boolAnd"),
