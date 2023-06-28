@@ -126,6 +126,7 @@ public class MultipleTreesBuilder implements Closeable {
     }
   }
 
+  @Nullable
   private StarTreeIndexSeparator getSeparator()
       throws Exception {
     if (!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT)) {
@@ -144,7 +145,8 @@ public class MultipleTreesBuilder implements Closeable {
       try {
         FileUtils.forceDelete(_separatorTempDir);
       } catch (Exception e1) {
-        LOGGER.warn(e1.getMessage(), e1);
+        LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
+                _separatorTempDir.getAbsolutePath());
       }
       throw e;
     }
@@ -235,7 +237,8 @@ public class MultipleTreesBuilder implements Closeable {
       try {
         FileUtils.forceDelete(_separatorTempDir);
       } catch (Exception e) {
-        LOGGER.warn(e.getMessage(), e);
+        LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
+                _separatorTempDir.getAbsolutePath());
       }
     }
     _segment.destroy();

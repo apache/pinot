@@ -110,7 +110,7 @@ public class StarTreeIndexSeparator implements Closeable {
       throws IOException {
     int treeIndex = _builderConfigList.indexOf(builderConfig);
     if (treeIndex == -1) {
-      return treeIndex;
+      return -1;
     }
     separate(starTreeOutputDir, treeIndex);
     return _totalDocsList.get(treeIndex);
