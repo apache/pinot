@@ -147,7 +147,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     Comparable threadBoundaryValue = null;
 
     int operatorId;
-    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+    while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       if (operatorId >= _endOperatorId.get()) {
         _blockingQueue.offer(EMPTY_RESULTS_BLOCK);
         continue;
