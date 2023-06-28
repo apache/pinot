@@ -27,7 +27,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -48,15 +47,15 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
   private final ExecutorService _executorService;
   private final Reader _reader;
-  private boolean _enableKeyValueStitch = false;
+  private boolean _enableKeyValueStitch;
 
   public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     super(clientId, streamConfig);
     PulsarConfig config = new PulsarConfig(streamConfig, clientId);
-    _reader = createReaderForPartition(config.getPulsarTopicName(),
-        partitionGroupConsumptionStatus.getPartitionGroupId(),
-        config.getInitialMessageId());
+    _reader =
+        createReaderForPartition(config.getPulsarTopicName(), partitionGroupConsumptionStatus.getPartitionGroupId(),
+            config.getInitialMessageId());
     LOGGER.info("Created pulsar reader with id {} for topic {} partition {}", _reader, _config.getPulsarTopicName(),
         partitionGroupConsumptionStatus.getPartitionGroupId());
     _executorService = Executors.newSingleThreadExecutor();
@@ -64,19 +63,19 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   }
 
   /**
-   * Fetch records from the Pulsar stream between the start and end KinesisCheckpoint
+   * Fetch records from the Pulsar stream between the start and end StreamPartitionMsgOffset
    * Used {@link org.apache.pulsar.client.api.Reader} to read the messaged from pulsar partitioned topic
    * The reader seeks to the startMsgOffset and starts reading records in a loop until endMsgOffset or timeout is
    * reached.
    */
   @Override
-  public MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, StreamPartitionMsgOffset endMsgOffset,
-      int timeoutMillis) {
+  public PulsarMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset,
+      StreamPartitionMsgOffset endMsgOffset, int timeoutMillis) {
     final MessageId startMessageId = ((MessageIdStreamOffset) startMsgOffset).getMessageId();
     final MessageId endMessageId =
         endMsgOffset == null ? MessageId.latest : ((MessageIdStreamOffset) endMsgOffset).getMessageId();
 
-    List<Message<byte[]>> messagesList = new ArrayList<>();
+    List<PulsarStreamMessage> messagesList = new ArrayList<>();
     Future<PulsarMessageBatch> pulsarResultFuture =
         _executorService.submit(() -> fetchMessages(startMessageId, endMessageId, messagesList));
 
@@ -96,7 +95,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   }
 
   public PulsarMessageBatch fetchMessages(MessageId startMessageId, MessageId endMessageId,
-      List<Message<byte[]>> messagesList) {
+      List<PulsarStreamMessage> messagesList) {
     try {
       _reader.seek(startMessageId);
 
@@ -108,7 +107,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
             break;
           }
         }
-        messagesList.add(nextMessage);
+        messagesList.add(
+            PulsarUtils.buildPulsarStreamMessage(nextMessage, _enableKeyValueStitch, _pulsarMetadataExtractor));
 
         if (Thread.interrupted()) {
           break;
@@ -124,11 +124,11 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     }
   }
 
-  private Iterable<Message<byte[]>> buildOffsetFilteringIterable(final List<Message<byte[]>> messageAndOffsets,
+  private Iterable<PulsarStreamMessage> buildOffsetFilteringIterable(final List<PulsarStreamMessage> messageAndOffsets,
       final MessageId startOffset, final MessageId endOffset) {
     return Iterables.filter(messageAndOffsets, input -> {
       // Filter messages that are either null or have an offset ∉ [startOffset, endOffset]
-      return input != null && input.getData() != null && (input.getMessageId().compareTo(startOffset) >= 0) && (
+      return input != null && input.getValue() != null && (input.getMessageId().compareTo(startOffset) >= 0) && (
           (endOffset == null) || (input.getMessageId().compareTo(endOffset) < 0));
     });
   }

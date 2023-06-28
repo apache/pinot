@@ -46,6 +46,8 @@ public class PulsarConfig {
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
   private final boolean _enableKeyValueStitch;
+  private final boolean _populateMetadata;
+  private final boolean _populateRecordTimeFromEventTime;
 
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
@@ -71,6 +73,10 @@ public class PulsarConfig {
 
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
     _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
+    _populateMetadata = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
+            StreamConfigProperties.METADATA_POPULATE, "false"));
+    _populateRecordTimeFromEventTime = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
+            StreamConfigProperties.METADATA_POPULATE, "false"));
   }
 
   public String getPulsarTopicName() {
@@ -100,8 +106,13 @@ public class PulsarConfig {
   public String getTlsTrustCertsFilePath() {
     return _tlsTrustCertsFilePath;
   }
-
   public boolean getEnableKeyValueStitch() {
     return _enableKeyValueStitch;
   }
+  public boolean isPopulateMetadata() {
+    return _populateMetadata;
+  }
+  public boolean isPopulateRecordTimeFromEventTime() {
+        return _populateRecordTimeFromEventTime;
+    }
 }
