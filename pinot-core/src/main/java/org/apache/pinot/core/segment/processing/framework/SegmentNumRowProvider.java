@@ -22,7 +22,7 @@ package org.apache.pinot.core.segment.processing.framework;
  * Interface to compute rows for a segment, using past segment size
  * and number of rows. This will be used by SegmentProcessorFramework.
  */
-public interface SegmentRowComputer {
+public interface SegmentNumRowProvider {
   int getNumRows();
   void updateSegmentInfo(int numRows, long segmentSize);
 }
