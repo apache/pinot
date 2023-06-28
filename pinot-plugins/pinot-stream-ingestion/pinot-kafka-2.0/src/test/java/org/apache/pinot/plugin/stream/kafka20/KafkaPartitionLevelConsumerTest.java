@@ -304,7 +304,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch3.getMessageCount(); i++) {
         StreamMessage streamMessage = batch3.getStreamMessage(i);
         Assert.assertNotNull(streamMessage.getMetadata());
-        final byte[] msg = (byte[])streamMessage.getValue();
+        final byte[] msg = (byte[]) streamMessage.getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
         Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
