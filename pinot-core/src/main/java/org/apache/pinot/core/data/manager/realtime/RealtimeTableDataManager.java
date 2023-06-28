@@ -205,7 +205,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _tableUpsertMetadataManager);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
+      _tableUpsertMetadataManager =
+          TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics, _helixManager,
+              _preloadExecutor);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
@@ -379,6 +381,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void addSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata segmentZKMetadata)
       throws Exception {
+    if (isUpsertEnabled()) {
+      _logger.debug("Wait for tableUpsertMetadataManager to be ready to add segment: {}", segmentName);
+      _tableUpsertMetadataManager.waitTillReady();
+      _logger.debug("The tableUpsertMetadataManager is ready to add segment: {}", segmentName);
+    }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       _logger.warn("Skipping adding existing segment: {} for table: {} with data manager class: {}", segmentName,

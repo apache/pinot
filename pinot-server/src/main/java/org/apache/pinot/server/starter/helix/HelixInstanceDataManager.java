@@ -99,6 +99,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   // Key is TableNameWithType-SegmentName pair.
   private LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
   private ExecutorService _segmentRefreshExecutor;
+  private ExecutorService _segmentPreloadExecutor;
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
@@ -135,6 +136,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     // used to initialize a segment refresh semaphore to limit the parallelism, so create a pool of same size.
     _segmentRefreshExecutor = Executors.newFixedThreadPool(getMaxParallelRefreshThreads(),
         new ThreadFactoryBuilder().setNameFormat("segment-refresh-thread-%d").build());
+    LOGGER.info("Initialized segment refresh executor thread pool: {}", getMaxParallelRefreshThreads());
+    _segmentPreloadExecutor = Executors.newFixedThreadPool(_instanceDataManagerConfig.getMaxSegmentPreloadThreads(),
+        new ThreadFactoryBuilder().setNameFormat("segment-preload-thread-%d").build());
+    LOGGER.info("Initialized segment preload executor thread pool: {}",
+        _instanceDataManagerConfig.getMaxSegmentPreloadThreads());
     // Initialize the table data manager provider
     TableDataManagerProvider.init(_instanceDataManagerConfig);
     LOGGER.info("Initialized Helix instance data manager");
@@ -190,6 +196,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public synchronized void shutDown() {
     _segmentRefreshExecutor.shutdownNow();
+    _segmentPreloadExecutor.shutdownNow();
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
       tableDataManager.shutDown();
     }
@@ -231,7 +238,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(_instanceDataManagerConfig, tableConfig);
     TableDataManager tableDataManager =
         TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore,
-            _serverMetrics, _helixManager, _errorCache, _isServerReadyToServeQueries);
+            _serverMetrics, _helixManager, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;

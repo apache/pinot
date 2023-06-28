@@ -19,7 +19,10 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
+import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -32,8 +35,8 @@ import org.apache.pinot.spi.data.Schema;
  */
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
-
-  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics);
+  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics,
+      HelixManager helixManager, @Nullable ExecutorService executorService);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
@@ -43,4 +46,9 @@ public interface TableUpsertMetadataManager extends Closeable {
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
+
+  void waitTillReady()
+      throws InterruptedException;
+
+  boolean isReady();
 }

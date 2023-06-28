@@ -77,11 +77,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
   protected int _numOutOfOrderEvents = 0;
+  protected BaseTableUpsertMetadataManager _tableUpsertMetadataManager;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      ServerMetrics serverMetrics) {
+      ServerMetrics serverMetrics, BaseTableUpsertMetadataManager tableUpsertMetadataManager) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -92,6 +93,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _enableSnapshot = enableSnapshot;
     _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
     _serverMetrics = serverMetrics;
+    _tableUpsertMetadataManager = tableUpsertMetadataManager;
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
   }
 
@@ -190,7 +192,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (queryableDocIds == null && _deleteRecordColumn != null) {
         queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
-      addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+      if (_tableUpsertMetadataManager.isPreloadingSegment(segmentName)) {
+        addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
+      } else {
+        addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+      }
     } finally {
       segmentLock.unlock();
     }
@@ -201,6 +207,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
       @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment);
+
+  protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
+    addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+  }
 
   @Override
   public void addRecord(MutableSegment segment, RecordInfo recordInfo) {

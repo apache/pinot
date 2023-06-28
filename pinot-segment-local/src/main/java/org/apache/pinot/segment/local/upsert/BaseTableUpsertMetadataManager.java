@@ -18,22 +18,53 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @ThreadSafe
 public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetadataManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableUpsertMetadataManager.class);
+  private TableConfig _tableConfig;
+  private Schema _schema;
+  private TableDataManager _tableDataManager;
   protected String _tableNameWithType;
   protected List<String> _primaryKeyColumns;
   protected List<String> _comparisonColumns;
@@ -42,10 +73,19 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
   protected ServerMetrics _serverMetrics;
+  private HelixManager _helixManager;
+  private ExecutorService _preloadExecutor;
+  private volatile boolean _isReady = false;
+  private final Lock _isReadyLock = new ReentrantLock();
+  private final Condition _isReadyCon = _isReadyLock.newCondition();
+  private final Set<String> _preloadingSegmentsSet = ConcurrentHashMap.newKeySet();
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
-      ServerMetrics serverMetrics) {
+      ServerMetrics serverMetrics, HelixManager helixManager, @Nullable ExecutorService preloadExecutor) {
+    _tableConfig = tableConfig;
+    _schema = schema;
+    _tableDataManager = tableDataManager;
     _tableNameWithType = tableConfig.getTableName();
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -75,6 +115,145 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _serverMetrics = serverMetrics;
+    _helixManager = helixManager;
+    _preloadExecutor = preloadExecutor;
+    try {
+      if (_enableSnapshot && upsertConfig.isEnablePreload()) {
+        preloadSegments();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Got interrupted to preload segments for table: " + _tableNameWithType, e);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to preload segments for table: " + _tableNameWithType, e);
+    } finally {
+      // Make sure threads waiting for the table upsert metadata manager to be ready are all unblocked.
+      setIsReady();
+    }
+  }
+
+  /**
+   * Get the ideal state and find segments assigned to current instance, then preload those with validDocIds snapshot.
+   * Skip those without the snapshots and those whose crc has changed. Those will be handled by the normal Helix state
+   * transitions, which will proceed after the preloading phase fully completes.
+   */
+  private void preloadSegments()
+      throws ExecutionException, InterruptedException {
+    LOGGER.info("Preload segments for table: {} fast upsert metadata recovery", _tableNameWithType);
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, _tableNameWithType);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
+    String instanceId = getInstanceId();
+    IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
+    List<Future<?>> futures = new ArrayList<>();
+    for (String segmentName : idealState.getPartitionSet()) {
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+      String state = instanceStateMap.get(instanceId);
+      if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)) {
+        LOGGER.info("Skip segment: {} as its ideal state: {} is not ONLINE", segmentName, state);
+        continue;
+      }
+      if (_preloadExecutor == null) {
+        preloadSegment(segmentName, indexLoadingConfig, propertyStore);
+        continue;
+      }
+      Future<?> future = _preloadExecutor.submit(() -> {
+        preloadSegment(segmentName, indexLoadingConfig, propertyStore);
+      });
+      futures.add(future);
+    }
+    try {
+      for (Future<?> f : futures) {
+        f.get();
+      }
+      LOGGER.info("Preloaded segments for table: {} fast upsert metadata recovery", _tableNameWithType);
+    } finally {
+      _preloadingSegmentsSet.clear();
+    }
+  }
+
+  private String getInstanceId() {
+    InstanceDataManagerConfig instanceDataManagerConfig =
+        _tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig();
+    return instanceDataManagerConfig.getInstanceId();
+  }
+
+  @VisibleForTesting
+  protected IndexLoadingConfig createIndexLoadingConfig() {
+    return new IndexLoadingConfig(_tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig(),
+        _tableConfig, _schema);
+  }
+
+  private void preloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    LOGGER.info("Preload segment: {} from table: {}", segmentName, _tableNameWithType);
+    SegmentZKMetadata zkMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(propertyStore, _tableNameWithType, segmentName);
+    Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s", segmentName,
+        _tableNameWithType);
+    File snapshotFile = getValidDocIdsSnapshotFile(segmentName, zkMetadata.getTier());
+    if (!snapshotFile.exists()) {
+      LOGGER.info("Skip segment: {} as no validDocIds snapshot at: {}", segmentName, snapshotFile);
+      return;
+    }
+    preloadSegmentWithSnapshot(segmentName, indexLoadingConfig, zkMetadata);
+  }
+
+  @VisibleForTesting
+  protected void preloadSegmentWithSnapshot(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      SegmentZKMetadata zkMetadata) {
+    // This method might modify the file on disk. Use segment lock to prevent race condition
+    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    try {
+      segmentLock.lock();
+      _preloadingSegmentsSet.add(segmentName);
+      // This method checks segment crc and if it has changed, the segment is not loaded.
+      _tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata);
+      LOGGER.info("Preloaded segment: {} from table: {}", segmentName, _tableNameWithType);
+    } finally {
+      _preloadingSegmentsSet.remove(segmentName);
+      segmentLock.unlock();
+    }
+  }
+
+  private File getValidDocIdsSnapshotFile(String segmentName, String segmentTier) {
+    File indexDir = _tableDataManager.getSegmentDataDir(segmentName, segmentTier, _tableConfig);
+    return new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+  }
+
+  // For concrete subclass to check if any segment is from preloading phase.
+  protected boolean isPreloadingSegment(String segName) {
+    return _preloadingSegmentsSet.contains(segName);
+  }
+
+  @Override
+  public void waitTillReady()
+      throws InterruptedException {
+    if (_isReady) {
+      return;
+    }
+    _isReadyLock.lock();
+    try {
+      while (!_isReady) {
+        _isReadyCon.await();
+      }
+    } finally {
+      _isReadyLock.unlock();
+    }
+  }
+
+  @Override
+  public boolean isReady() {
+    return _isReady;
+  }
+
+  private void setIsReady() {
+    _isReadyLock.lock();
+    try {
+      _isReady = true;
+      _isReadyCon.signalAll();
+    } finally {
+      _isReadyLock.unlock();
+    }
   }
 
   @Override

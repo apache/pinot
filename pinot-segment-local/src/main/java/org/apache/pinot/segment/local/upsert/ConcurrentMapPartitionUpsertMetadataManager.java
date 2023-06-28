@@ -59,9 +59,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      ServerMetrics serverMetrics) {
+      ServerMetrics serverMetrics, BaseTableUpsertMetadataManager tableUpsertMetadataManager) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
-        partialUpsertHandler, enableSnapshot, serverMetrics);
+        partialUpsertHandler, enableSnapshot, serverMetrics, tableUpsertMetadataManager);
   }
 
   @Override
@@ -157,6 +157,20 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     if (numKeys > 0) {
       _logger.warn("Found {} primary keys in the wrong segment when adding segment: {}", numKeys, segmentName);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_IN_WRONG_SEGMENT, numKeys);
+    }
+  }
+
+  @Override
+  protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
+    segment.enableUpsert(this, validDocIds, queryableDocIds);
+    while (recordInfoIterator.hasNext()) {
+      RecordInfo recordInfo = recordInfoIterator.next();
+      int newDocId = recordInfo.getDocId();
+      Comparable newComparisonValue = recordInfo.getComparisonValue();
+      addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
+      _primaryKeyToRecordLocationMap.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+          new RecordLocation(segment, newDocId, newComparisonValue));
     }
   }
 
