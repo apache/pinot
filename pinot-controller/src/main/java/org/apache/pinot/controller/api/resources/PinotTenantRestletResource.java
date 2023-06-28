@@ -224,7 +224,7 @@ public class PinotTenantRestletResource {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Error applying state to tenant")
   })
-  public String toggleTenantState(
+  public SuccessResponse toggleTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
       @ApiParam(value = "Table type (offline|realtime)") @QueryParam("tableType") String tableType,
@@ -278,7 +278,7 @@ public class PinotTenantRestletResource {
     return resourceGetRet.toString();
   }
 
-  private String toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) {
+  private SuccessResponse toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) {
     Set<String> serverInstances = new HashSet<>();
     Set<String> brokerInstances = new HashSet<>();
     ObjectNode instanceResult = JsonUtils.newObjectNode();
@@ -302,24 +302,24 @@ public class PinotTenantRestletResource {
       _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
       _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
       _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
-      return new SuccessResponse("Dropped tenant " + tenantName + " successfully.").toString();
+      return new SuccessResponse("Dropped tenant " + tenantName + " successfully.");
     }
 
-    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr);
-    for (String instance : allInstances) {
-      if (enable) {
+    if (StateType.ENABLE.name().equalsIgnoreCase(stateStr)) {
+      for (String instance : allInstances) {
         instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
       }
+      return new SuccessResponse("Enabled tenant " + tenantName + " successfully.");
     }
 
-    boolean disable = StateType.DISABLE.name().equalsIgnoreCase(stateStr);
-    for (String instance : allInstances) {
-      if (disable) {
+    if (StateType.DISABLE.name().equalsIgnoreCase(stateStr)) {
+      for (String instance : allInstances) {
         instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
+      return new SuccessResponse("Disabled tenant " + tenantName + " successfully.");
     }
 
-    return null;
+    return new SuccessResponse("No-Op done on tenant " + tenantName);
   }
 
   private String listInstancesForTenant(String tenantName, String tenantType, String tableTypeString) {
