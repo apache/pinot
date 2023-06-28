@@ -26,4 +26,7 @@ public interface Scope extends AutoCloseable {
 
   @Override
   void close();
+
+  default void close(Object context) {
+  }
 }

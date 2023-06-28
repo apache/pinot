@@ -31,13 +31,16 @@ public class HttpClientConfigTest {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(HttpClientConfig.MAX_CONNS_CONFIG_NAME, "123");
     pinotConfiguration.setProperty(HttpClientConfig.MAX_CONNS_PER_ROUTE_CONFIG_NAME, "11");
+    pinotConfiguration.setProperty(HttpClientConfig.DISABLE_DEFAULT_USER_AGENT_CONFIG_NAME, "true");
     HttpClientConfig httpClientConfig = HttpClientConfig.newBuilder(pinotConfiguration).build();
     Assert.assertEquals(123, httpClientConfig.getMaxConnTotal());
     Assert.assertEquals(11, httpClientConfig.getMaxConnPerRoute());
+    Assert.assertTrue(httpClientConfig.isDisableDefaultUserAgent());
 
     // Ensure default builder uses negative values
     HttpClientConfig defaultConfig = HttpClientConfig.newBuilder(new PinotConfiguration()).build();
     Assert.assertTrue(defaultConfig.getMaxConnTotal() < 0, "default value should be < 0");
     Assert.assertTrue(defaultConfig.getMaxConnPerRoute() < 0, "default value should be < 0");
+    Assert.assertFalse(defaultConfig.isDisableDefaultUserAgent(), "Default user agent should be enabled by default");
   }
 }

@@ -303,8 +303,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testOrderByNullsFirst()
       throws Exception {
-    String h2Query =
-        "SELECT 1 AS column1 FROM " + getTableName() + " ORDER BY column1 NULLS FIRST";
+    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary NULLS FIRST";
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
@@ -313,10 +312,30 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testOrderByNullsLast()
       throws Exception {
-    String h2Query =
-        "SELECT 1 AS column1 FROM " + getTableName() + " ORDER BY column1 DESC NULLS LAST";
+    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testDistinctOrderByNullsLast()
+      throws Exception {
+    String h2Query = "SELECT distinct salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+
+    testQuery(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testSelectNullLiteral() throws Exception {
+    // Need to also select an identifier column to skip the all literal query optimization which returns without
+    // querying the segment.
+    String sqlQuery = "SELECT NULL, salary FROM mytable OPTION(enableNullHandling=true)";
+
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asText(), "null");
   }
 }

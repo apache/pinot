@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -115,7 +114,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final TableCache _tableCache;
   protected final BrokerMetrics _brokerMetrics;
 
-  protected final AtomicLong _requestIdGenerator = new AtomicLong();
+  protected final BrokerRequestIdGenerator _brokerIdGenerator;
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
 
   protected final String _brokerId;
@@ -134,6 +133,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics) {
     _brokerId = brokerId;
+    _brokerIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _config = config;
     _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
@@ -231,7 +231,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
-    long requestId = _requestIdGenerator.incrementAndGet();
+    long requestId = _brokerIdGenerator.get();
     requestContext.setRequestId(requestId);
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
@@ -262,6 +262,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
 
+    brokerResponse.setRequestId(String.valueOf(requestId));
     return brokerResponse;
   }
 

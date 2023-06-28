@@ -24,12 +24,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -176,6 +178,12 @@ public class MockRoutingManagerFactory {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       return _hybridTables.contains(rawTableName) ? new TimeBoundaryInfo(TIME_BOUNDARY_COLUMN,
           String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
+      return null;
     }
 
     @Override

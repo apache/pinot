@@ -53,11 +53,11 @@ public class WindowNode extends AbstractPlanNode {
 
   /**
    * Enum to denote the type of window frame
-   * ROW - ROW type window frame
+   * ROWS - ROWS type window frame
    * RANGE - RANGE type window frame
    */
   public enum WindowFrameType {
-    ROW,
+    ROWS,
     RANGE
   }
 
@@ -95,7 +95,7 @@ public class WindowNode extends AbstractPlanNode {
     _lowerBound = Integer.MIN_VALUE;
     // Upper bound can only be unbounded following or current row for now
     _upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;
-    _windowFrameType = windowGroup.isRows ? WindowFrameType.ROW : WindowFrameType.RANGE;
+    _windowFrameType = windowGroup.isRows ? WindowFrameType.ROWS : WindowFrameType.RANGE;
 
     // TODO: Constants are used to store constants needed such as the frame literals. For now just save this, need to
     //       extract the constant values into bounds as a part of frame support.

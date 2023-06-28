@@ -44,11 +44,13 @@ public class PinotLogicalSortExchange extends SortExchange {
 
   protected final boolean _isSortOnSender;
   protected final boolean _isSortOnReceiver;
+  protected final PinotRelExchangeType _exchangeType;
 
   private PinotLogicalSortExchange(RelOptCluster cluster, RelTraitSet traitSet,
-      RelNode input, RelDistribution distribution, RelCollation collation,
+      RelNode input, RelDistribution distribution, PinotRelExchangeType exchangeType, RelCollation collation,
       boolean isSortOnSender, boolean isSortOnReceiver) {
     super(cluster, traitSet, input, distribution, collation);
+    _exchangeType = exchangeType;
     _isSortOnSender = isSortOnSender;
     _isSortOnReceiver = isSortOnReceiver;
   }
@@ -58,8 +60,19 @@ public class PinotLogicalSortExchange extends SortExchange {
    */
   public PinotLogicalSortExchange(RelInput input) {
     super(input);
+    _exchangeType = PinotRelExchangeType.STREAMING;
     _isSortOnSender = false;
     _isSortOnReceiver = true;
+  }
+
+  public static PinotLogicalSortExchange create(
+      RelNode input,
+      RelDistribution distribution,
+      RelCollation collation,
+      boolean isSortOnSender,
+      boolean isSortOnReceiver) {
+    return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), collation, isSortOnSender,
+        isSortOnReceiver);
   }
 
   /**
@@ -67,6 +80,7 @@ public class PinotLogicalSortExchange extends SortExchange {
    *
    * @param input     Input relational expression
    * @param distribution Distribution specification
+   * @param exchangeType Exchange type specification
    * @param collation array of sort specifications
    * @param isSortOnSender whether to sort on the sender
    * @param isSortOnReceiver whether to sort on receiver
@@ -74,6 +88,7 @@ public class PinotLogicalSortExchange extends SortExchange {
   public static PinotLogicalSortExchange create(
       RelNode input,
       RelDistribution distribution,
+      PinotRelExchangeType exchangeType,
       RelCollation collation,
       boolean isSortOnSender,
       boolean isSortOnReceiver) {
@@ -82,7 +97,7 @@ public class PinotLogicalSortExchange extends SortExchange {
     distribution = RelDistributionTraitDef.INSTANCE.canonize(distribution);
     RelTraitSet traitSet =
         input.getTraitSet().replace(Convention.NONE).replace(distribution).replace(collation);
-    return new PinotLogicalSortExchange(cluster, traitSet, input, distribution,
+    return new PinotLogicalSortExchange(cluster, traitSet, input, distribution, exchangeType,
         collation, isSortOnSender, isSortOnReceiver);
   }
 
@@ -92,14 +107,18 @@ public class PinotLogicalSortExchange extends SortExchange {
   public SortExchange copy(RelTraitSet traitSet, RelNode newInput,
       RelDistribution newDistribution, RelCollation newCollation) {
     return new PinotLogicalSortExchange(this.getCluster(), traitSet, newInput,
-        newDistribution, newCollation, _isSortOnSender, _isSortOnReceiver);
+        newDistribution, _exchangeType, newCollation, _isSortOnSender, _isSortOnReceiver);
   }
 
   @Override
   public RelWriter explainTerms(RelWriter pw) {
-    return super.explainTerms(pw)
+    RelWriter relWriter = super.explainTerms(pw)
         .item("isSortOnSender", _isSortOnSender)
         .item("isSortOnReceiver", _isSortOnReceiver);
+    if (_exchangeType != PinotRelExchangeType.getDefaultExchangeType()) {
+      relWriter.item("relExchangeType", _exchangeType);
+    }
+    return relWriter;
   }
 
   public boolean isSortOnSender() {
@@ -108,5 +127,9 @@ public class PinotLogicalSortExchange extends SortExchange {
 
   public boolean isSortOnReceiver() {
     return _isSortOnReceiver;
+  }
+
+  public PinotRelExchangeType getExchangeType() {
+    return _exchangeType;
   }
 }

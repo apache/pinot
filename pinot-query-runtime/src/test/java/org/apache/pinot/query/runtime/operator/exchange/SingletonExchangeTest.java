@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.GrpcSendingMailbox;
 import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
@@ -68,8 +67,8 @@ public class SingletonExchangeTest {
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
 
     // When:
-    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock,
-        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
+    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock, (opChainId) -> {
+    }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -78,43 +77,25 @@ public class SingletonExchangeTest {
     Assert.assertEquals(captor.getValue(), _block);
   }
 
-  @Test
-  public void shouldRouteSingletonWithExtraNonLocalMailbox()
-      throws Exception {
-    // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
-
-    // When:
-    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock,
-        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
-
-    // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    // Then:
-    Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
-    Mockito.verify(_mailbox2, Mockito.times(0)).send(captor.capture());
-    Assert.assertEquals(captor.getValue(), _block);
-  }
-
-  @Test(expectedExceptions = IOException.class, expectedExceptionsMessageRegExp = ".*has already been sent.*")
-  public void shouldThrowWhenSingletonWithMultipleLocalMailbox()
-      throws Exception {
-    // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2, _mailbox3);
-
-    // When:
-    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock,
-        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
-  }
-
-  @Test(expectedExceptions = IOException.class, expectedExceptionsMessageRegExp = ".*has not been sent.*")
-  public void shouldThrowWhenSingletonWithNoLocalMailbox()
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldThrowWhenSingletonWithNonLocalMailbox()
       throws Exception {
     // Given:
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox2);
 
     // When:
-    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock,
-        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
+    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock, (opChainId) -> {
+    }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldThrowWhenSingletonWithMultipleMailboxes()
+      throws Exception {
+    // Given:
+    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox3);
+
+    // When:
+    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock, (opChainId) -> {
+    }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
   }
 }

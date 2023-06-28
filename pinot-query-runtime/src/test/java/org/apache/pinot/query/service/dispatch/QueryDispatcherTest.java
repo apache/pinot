@@ -53,8 +53,8 @@ public class QueryDispatcherTest extends QueryTestSet {
   private static final int QUERY_SERVER_COUNT = 2;
   private static final ExecutorService LEAF_WORKER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
       ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryDispatcherTest_LeafWorker"));
-  private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
+  private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE = Executors.newCachedThreadPool(
+      new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -139,7 +139,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     QueryDispatcher dispatcher = new QueryDispatcher();
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     try {
-      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
@@ -162,7 +162,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     try {
       // will throw b/c mailboxService is null
-      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       System.out.println("e = " + e);

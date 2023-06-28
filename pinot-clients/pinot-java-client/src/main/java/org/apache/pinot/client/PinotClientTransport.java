@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.client;
 
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 
 
 /**
  * Interface for plugging different client transports.
  */
-public interface PinotClientTransport {
+public interface PinotClientTransport<METRICS> {
 
   BrokerResponse executeQuery(String brokerAddress, String query)
       throws PinotClientException;
 
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+  CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
       throws PinotClientException;
 
   @Deprecated
@@ -37,9 +37,19 @@ public interface PinotClientTransport {
       throws PinotClientException;
 
   @Deprecated
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+  CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
       throws PinotClientException;
 
   void close()
       throws PinotClientException;
+
+  /**
+   * Access to the client metrics implementation if any.
+   * This may be useful for observability into the client implementation.
+   *
+   * @return underlying client metrics if any
+   */
+  default METRICS getClientMetrics() {
+    throw new UnsupportedOperationException("No useful client metrics available");
+  }
 }

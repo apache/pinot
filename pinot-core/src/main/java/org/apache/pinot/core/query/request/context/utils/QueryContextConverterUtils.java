@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.request.context.utils;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,12 +40,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
 public class QueryContextConverterUtils {
-  private static final String ASC = "asc";
-  private static final String DESC = "desc";
-  private static final String NULLS_LAST = "nullslast";
-  private static final String NULLS_FIRST = "nullsfirst";
-  private static final ImmutableSet<String> ORDER_BY_FUNCTIONS = ImmutableSet.of(ASC, DESC, NULLS_LAST, NULLS_FIRST);
-
   private QueryContextConverterUtils() {
   }
 
@@ -137,7 +130,7 @@ public class QueryContextConverterUtils {
       for (Expression orderBy : orderByList) {
         boolean isAsc = isAsc(orderBy);
         Boolean isNullsLast = isNullsLast(orderBy);
-        Expression orderByFunctionsRemoved = removeOrderByFunctions(orderBy);
+        Expression orderByFunctionsRemoved = CalciteSqlParser.removeOrderByFunctions(orderBy);
         // Deduplicate the order-by expressions
         if (seen.add(orderByFunctionsRemoved)) {
           ExpressionContext expressionContext = RequestContextUtils.getExpression(orderByFunctionsRemoved);
@@ -177,7 +170,7 @@ public class QueryContextConverterUtils {
 
   private static boolean isAsc(Expression expression) {
     while (expression != null && expression.isSetFunctionCall()) {
-      if (expression.getFunctionCall().getOperator().equals(ASC)) {
+      if (expression.getFunctionCall().getOperator().equals(CalciteSqlParser.ASC)) {
         return true;
       }
       expression = expression.getFunctionCall().getOperands().get(0);
@@ -189,20 +182,13 @@ public class QueryContextConverterUtils {
   private static Boolean isNullsLast(Expression expression) {
     while (expression != null && expression.isSetFunctionCall()) {
       String operator = expression.getFunctionCall().getOperator();
-      if (operator.equals(NULLS_LAST)) {
+      if (operator.equals(CalciteSqlParser.NULLS_LAST)) {
         return true;
-      } else if (operator.equals(NULLS_FIRST)) {
+      } else if (operator.equals(CalciteSqlParser.NULLS_FIRST)) {
         return false;
       }
       expression = expression.getFunctionCall().getOperands().get(0);
     }
     return null;
-  }
-
-  private static Expression removeOrderByFunctions(Expression expression) {
-    while (expression.isSetFunctionCall() && ORDER_BY_FUNCTIONS.contains(expression.getFunctionCall().operator)) {
-      expression = expression.getFunctionCall().getOperands().get(0);
-    }
-    return expression;
   }
 }

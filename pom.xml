@@ -148,7 +148,7 @@
     <commons-net.version>3.1</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
-    <snappy-java.version>1.1.8.2</snappy-java.version>
+    <snappy-java.version>1.1.10.1</snappy-java.version>
     <zstd-jni.version>1.5.2-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
@@ -158,6 +158,7 @@
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.13.0</audienceannotations.version>
+    <clp-ffi.version>0.4.3</clp-ffi.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -249,6 +250,23 @@
           </plugins>
         </pluginManagement>
       </build>
+      <dependencyManagement>
+        <!-- The updated version of these plugins don't work on Java 8 -->
+        <dependencies>
+          <dependency>
+            <groupId>nl.jqno.equalsverifier</groupId>
+            <artifactId>equalsverifier</artifactId>
+            <version>3.6</version>
+            <scope>test</scope>
+          </dependency>
+          <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>3.12.4</version>
+            <scope>test</scope>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
     </profile>
     <profile>
       <id>other-jdk-maven-compiler-plugin</id>
@@ -422,7 +440,7 @@
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
-        <version>3.6</version>
+        <version>3.14.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -882,7 +900,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>3.3.0</version>
+        <version>4.0.0</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
@@ -1096,7 +1114,7 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>3.9.0</version>
+        <version>5.3.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1118,7 +1136,12 @@
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
-        <version>3.0.12</version>
+        <version>3.1.15</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.jnr</groupId>
+        <artifactId>jnr-constants</artifactId>
+        <version>0.10.3</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
@@ -1210,6 +1233,45 @@
         <artifactId>test-clock</artifactId>
         <version>1.0.2</version>
         <scope>test</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <!-- Older versions fail with Java >= 16 -->
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>1.18.26</version>
+      </dependency>
+
+      <dependency>
+        <groupId>net.openhft</groupId>
+        <artifactId>posix</artifactId>
+        <version>2.23.2</version>
+      </dependency>
+      <dependency>
+        <groupId>net.openhft</groupId>
+        <artifactId>chronicle-core</artifactId>
+        <version>2.24ea16</version>
+      </dependency>
+      <dependency>
+        <groupId>org.ow2.asm</groupId>
+        <artifactId>asm</artifactId>
+        <version>9.3</version>
+      </dependency>
+      <dependency>
+        <groupId>net.java.dev.jna</groupId>
+        <artifactId>jna</artifactId>
+        <version>5.5.0</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.yscope.clp</groupId>
+        <artifactId>clp-ffi</artifactId>
+        <version>${clp-ffi.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -1343,6 +1405,15 @@
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
+            <argLine>
+              ${argLine}
+              --add-opens=java.base/java.nio=ALL-UNNAMED
+              --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+              --add-opens=java.base/java.lang=ALL-UNNAMED
+              --add-opens=java.base/java.util=ALL-UNNAMED
+              --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
+              --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+            </argLine>
           </configuration>
         </plugin>
         <plugin>

@@ -773,4 +773,18 @@ public class BrokerRequestToQueryContextConverterTest {
     assertTrue(orderByExpressionContext.isDesc());
     assertTrue(orderByExpressionContext.isNullsLast());
   }
+
+  @Test
+  void testDistinctOrderByNullsLast() {
+    String query = "SELECT DISTINCT A FROM testTable ORDER BY A NULLS LAST";
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+    assertNotNull(queryContext.getOrderByExpressions());
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    assertEquals(orderByExpressionContexts.size(), 1);
+    OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
+    assertFalse(orderByExpressionContext.isDesc());
+    assertTrue(orderByExpressionContext.isNullsLast());
+  }
 }

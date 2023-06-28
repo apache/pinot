@@ -71,7 +71,7 @@ public class SegmentMetadataMockUtils {
     return segmentZKMetadata;
   }
 
-  public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String tableName, String segmentName,
+  public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String rawTableName, String segmentName,
       String columnName, int partitionNumber) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     Set<Integer> partitions = Collections.singleton(partitionNumber);
@@ -82,7 +82,7 @@ public class SegmentMetadataMockUtils {
     if (columnName != null) {
       when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
     }
-    when(segmentMetadata.getTableName()).thenReturn(tableName);
+    when(segmentMetadata.getTableName()).thenReturn(rawTableName);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("0");
 

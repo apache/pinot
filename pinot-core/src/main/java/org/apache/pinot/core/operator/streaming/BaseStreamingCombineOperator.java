@@ -19,9 +19,7 @@
 package org.apache.pinot.core.operator.streaming;
 
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
@@ -42,25 +40,18 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
-    extends BaseCombineOperator<BaseResultsBlock> {
+    extends BaseCombineOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseStreamingCombineOperator.class);
 
-  /**
-   * Special results block to indicate that this is the last results block for a child operator in the list
-   */
+  // Use a special results block to indicate that this is the last results block for a child operator in the list
   public static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
-
-  // Use a BlockingQueue to store the intermediate results blocks
-  protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-  protected final ResultsBlockMerger<T> _resultsBlockMerger;
 
   protected int _numOperatorsFinished;
   protected boolean _querySatisfied;
 
   public BaseStreamingCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
-    super(operators, queryContext, executorService);
-    _resultsBlockMerger = resultsBlockMerger;
+    super(resultsBlockMerger, operators, queryContext, executorService);
   }
 
   /**
@@ -115,7 +106,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
   protected void processSegments() {
     int operatorId;
     Object tracker = createQuerySatisfiedTracker();
-    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+    while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator<T> operator = _operators.get(operatorId);
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
@@ -152,6 +143,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
 
   @Override
   protected void onProcessSegmentsException(Throwable t) {
+    _processingException.compareAndSet(null, t);
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 

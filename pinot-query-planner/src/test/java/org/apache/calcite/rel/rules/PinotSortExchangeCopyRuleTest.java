@@ -92,7 +92,7 @@ public class PinotSortExchangeCopyRuleTest {
 
     // Then:
     ArgumentCaptor<RelNode> sortCopyCapture = ArgumentCaptor.forClass(LogicalSort.class);
-    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture(), Mockito.anyMap());
+    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture());
 
     RelNode sortCopy = sortCopyCapture.getValue();
     Assert.assertTrue(sortCopy instanceof LogicalSort);
@@ -120,7 +120,7 @@ public class PinotSortExchangeCopyRuleTest {
 
     // Then:
     ArgumentCaptor<RelNode> sortCopyCapture = ArgumentCaptor.forClass(LogicalSort.class);
-    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture(), Mockito.anyMap());
+    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture());
 
     RelNode sortCopy = sortCopyCapture.getValue();
     Assert.assertTrue(sortCopy instanceof LogicalSort);
@@ -148,7 +148,7 @@ public class PinotSortExchangeCopyRuleTest {
 
     // Then:
     ArgumentCaptor<RelNode> sortCopyCapture = ArgumentCaptor.forClass(LogicalSort.class);
-    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture(), Mockito.anyMap());
+    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture());
 
     RelNode sortCopy = sortCopyCapture.getValue();
     Assert.assertTrue(sortCopy instanceof LogicalSort);
@@ -176,7 +176,7 @@ public class PinotSortExchangeCopyRuleTest {
 
     // Then:
     ArgumentCaptor<RelNode> sortCopyCapture = ArgumentCaptor.forClass(LogicalSort.class);
-    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture(), Mockito.anyMap());
+    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture());
 
     RelNode sortCopy = sortCopyCapture.getValue();
     Assert.assertTrue(sortCopy instanceof LogicalSort);
@@ -203,7 +203,7 @@ public class PinotSortExchangeCopyRuleTest {
 
     // Then:
     ArgumentCaptor<RelNode> sortCopyCapture = ArgumentCaptor.forClass(LogicalSort.class);
-    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture(), Mockito.anyMap());
+    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture());
 
     RelNode sortCopy = sortCopyCapture.getValue();
     Assert.assertTrue(sortCopy instanceof LogicalSort);
@@ -231,7 +231,7 @@ public class PinotSortExchangeCopyRuleTest {
 
     // Then:
     ArgumentCaptor<RelNode> sortCopyCapture = ArgumentCaptor.forClass(LogicalSort.class);
-    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture(), Mockito.anyMap());
+    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture());
 
     RelNode sortCopy = sortCopyCapture.getValue();
     Assert.assertTrue(sortCopy instanceof LogicalSort);
@@ -259,7 +259,7 @@ public class PinotSortExchangeCopyRuleTest {
 
     // Then:
     ArgumentCaptor<RelNode> sortCopyCapture = ArgumentCaptor.forClass(LogicalSort.class);
-    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture(), Mockito.anyMap());
+    Mockito.verify(_call, Mockito.times(1)).transformTo(sortCopyCapture.capture());
 
     RelNode sortCopy = sortCopyCapture.getValue();
     Assert.assertTrue(sortCopy instanceof LogicalSort);

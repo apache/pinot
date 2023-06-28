@@ -171,6 +171,12 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
     Assert.assertNotNull(jsonResponse.get("columns").get(0).get("indexSizeMap"));
     Assert.assertNotNull(jsonResponse.get("columns").get(1).get("indexSizeMap"));
+    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("h3-index").asText(), "NO");
+    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("fst-index").asText(), "NO");
+    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("text-index").asText(), "NO");
+    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("h3-index").asText(), "NO");
+    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("fst-index").asText(), "NO");
+    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("text-index").asText(), "NO");
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
@@ -306,7 +312,7 @@ public class TablesResourceTest extends BaseResourceTest {
     for (int docId: docIds) {
       validDocIds.add(docId);
     }
-    segment.enableUpsert(upsertMetadataManager, validDocIds);
+    segment.enableUpsert(upsertMetadataManager, validDocIds, null);
 
     // Download the snapshot in byte[] format.
     Response response = _webTarget.path(snapshotPath).request().get(Response.class);

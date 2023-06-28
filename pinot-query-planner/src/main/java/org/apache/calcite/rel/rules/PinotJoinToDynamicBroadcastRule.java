@@ -26,13 +26,15 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
-import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.zookeeper.common.StringUtils;
 
@@ -140,7 +142,7 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
         : join.getLeft();
     RelNode right = join.getRight() instanceof HepRelVertex ? ((HepRelVertex) join.getRight()).getCurrentRel()
         : join.getRight();
-    return left instanceof LogicalExchange && right instanceof LogicalExchange
+    return left instanceof Exchange && right instanceof Exchange
         && PinotRuleUtils.noExchangeInSubtree(left.getInput(0))
         && (join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty());
   }
@@ -148,23 +150,28 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Join join = call.rel(0);
-    LogicalExchange left = (LogicalExchange) (join.getLeft() instanceof HepRelVertex
+    PinotLogicalExchange left = (PinotLogicalExchange) (join.getLeft() instanceof HepRelVertex
         ? ((HepRelVertex) join.getLeft()).getCurrentRel() : join.getLeft());
-    LogicalExchange right = (LogicalExchange) (join.getRight() instanceof HepRelVertex
+    PinotLogicalExchange right = (PinotLogicalExchange) (join.getRight() instanceof HepRelVertex
         ? ((HepRelVertex) join.getRight()).getCurrentRel() : join.getRight());
 
     boolean isColocatedJoin = PinotHintStrategyTable.containsHintOption(join.getHints(),
         PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
-    LogicalExchange dynamicBroadcastExchange = isColocatedJoin
-        ? LogicalExchange.create(right.getInput(), RelDistributions.SINGLETON)
-        : LogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED);
+    PinotLogicalExchange dynamicBroadcastExchange = isColocatedJoin
+        ? PinotLogicalExchange.create(right.getInput(), RelDistributions.SINGLETON,
+            PinotRelExchangeType.PIPELINE_BREAKER)
+        : PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
+            PinotRelExchangeType.PIPELINE_BREAKER);
     Join dynamicFilterJoin =
         new LogicalJoin(join.getCluster(), join.getTraitSet(), left.getInput(), dynamicBroadcastExchange,
             join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
             ImmutableList.copyOf(join.getSystemFieldList()));
     // adding pass-through exchange after join b/c currently leaf-stage doesn't support chaining operator(s) after JOIN
-    LogicalExchange passThroughAfterJoinExchange =
-        LogicalExchange.create(dynamicFilterJoin, RelDistributions.SINGLETON);
+    // TODO: support pass-through for singleton again when non-colocated.
+    // TODO: this is b/c #10886 alters the singleton exchange and it no longer works if join is not colocated.
+    PinotLogicalExchange passThroughAfterJoinExchange = isColocatedJoin
+        ? PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.SINGLETON)
+        : PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.hash(join.analyzeCondition().leftKeys));
     call.transformTo(passThroughAfterJoinExchange);
   }
 }

@@ -358,6 +358,9 @@ public class AggregationFunctionFactory {
           case ARGMIN:
             throw new IllegalArgumentException(
                 "Aggregation function: " + function + " is only supported in selection without alias.");
+          case FUNNELCOUNT:
+            return new FunnelCountAggregationFunction(arguments);
+
           default:
             throw new IllegalArgumentException();
         }

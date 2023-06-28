@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
@@ -35,11 +35,11 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-public class PipelineBreakerOperator extends MultiStageOperator {
+class PipelineBreakerOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
   private final Deque<Map.Entry<Integer, Operator<TransferableBlock>>> _workerEntries;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
-  private final CountDownLatch _workerDoneLatch;
+  private final ImmutableSet<Integer> _expectedKeySet;
   private TransferableBlock _errorBlock;
 
 
@@ -47,20 +47,16 @@ public class PipelineBreakerOperator extends MultiStageOperator {
       Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap) {
     super(context);
     _resultMap = new HashMap<>();
+    _expectedKeySet = ImmutableSet.copyOf(pipelineWorkerMap.keySet());
     _workerEntries = new ArrayDeque<>();
     _workerEntries.addAll(pipelineWorkerMap.entrySet());
-    _workerDoneLatch = new CountDownLatch(1);
+    for (int workerKey : _expectedKeySet) {
+      _resultMap.put(workerKey, new ArrayList<>());
+    }
   }
 
-  public Map<Integer, List<TransferableBlock>> getResult()
-      throws Exception {
-    boolean isWorkerDone =
-        _workerDoneLatch.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-    if (isWorkerDone && _errorBlock == null) {
-      return _resultMap;
-    } else {
-      throw new RuntimeException("Unable to construct pipeline breaker results due to timeout.");
-    }
+  public Map<Integer, List<TransferableBlock>> getResultMap() {
+    return _resultMap;
   }
 
   @Nullable
@@ -73,7 +69,7 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     if (System.currentTimeMillis() > _context.getDeadlineMs()) {
       _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-      _workerDoneLatch.countDown();
+      constructErrorResponse(_errorBlock);
       return _errorBlock;
     }
 
@@ -86,33 +82,39 @@ public class PipelineBreakerOperator extends MultiStageOperator {
       Map.Entry<Integer, Operator<TransferableBlock>> worker = _workerEntries.remove();
       TransferableBlock block = worker.getValue().nextBlock();
 
-      // Release the mailbox when the block is end-of-stream
-      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
+      // Release the mailbox worker when the block is end-of-stream
+      if (block != null && !block.isNoOpBlock() && block.isSuccessfulEndOfStreamBlock()) {
         continue;
       }
 
       // Add the worker back to the queue if the block is not end-of-stream
       _workerEntries.add(worker);
-      if (block != null) {
+      if (block != null && !block.isNoOpBlock()) {
         if (block.isErrorBlock()) {
           _errorBlock = block;
-          _workerDoneLatch.countDown();
+          constructErrorResponse(block);
           return _errorBlock;
         }
-        List<TransferableBlock> blockList = _resultMap.computeIfAbsent(worker.getKey(), (k) -> new ArrayList<>());
-        // TODO: only data block is handled, we also need to handle metadata block from upstream in the future.
         if (!block.isEndOfStreamBlock()) {
-          blockList.add(block);
+          _resultMap.get(worker.getKey()).add(block);
         }
+        return block;
       }
     }
 
     if (_workerEntries.isEmpty()) {
-      // NOTIFY results are ready.
-      _workerDoneLatch.countDown();
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
       return TransferableBlockUtils.getNoOpTransferableBlock();
+    }
+  }
+
+  /**
+   * Setting all result map to error if any of the pipeline breaker returns an ERROR.
+   */
+  private void constructErrorResponse(TransferableBlock errorBlock) {
+    for (int key : _expectedKeySet) {
+      _resultMap.put(key, Collections.singletonList(errorBlock));
     }
   }
 }

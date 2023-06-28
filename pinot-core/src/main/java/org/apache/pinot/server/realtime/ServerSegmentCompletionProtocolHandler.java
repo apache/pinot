@@ -29,6 +29,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -52,6 +53,7 @@ public class ServerSegmentCompletionProtocolHandler {
   private static final String HTTP_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
 
   private static SSLContext _sslContext;
+  private static HttpClientConfig _httpClientConfig = HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG;
   private static Integer _controllerHttpsPort;
   private static int _segmentUploadRequestTimeoutMs;
   private static AuthProvider _authProvider;
@@ -76,10 +78,12 @@ public class ServerSegmentCompletionProtocolHandler {
         .getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
 
     _authProvider = AuthProviderUtils.extractAuthProvider(uploaderConfig, CONFIG_OF_SEGMENT_UPLOADER_AUTH);
+
+    _httpClientConfig = HttpClientConfig.newBuilder(uploaderConfig).build();
   }
 
   public ServerSegmentCompletionProtocolHandler(ServerMetrics serverMetrics, String tableNameWithType) {
-    _fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext);
+    _fileUploadDownloadClient = new FileUploadDownloadClient(_httpClientConfig, _sslContext);
     _serverMetrics = serverMetrics;
     _rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
   }

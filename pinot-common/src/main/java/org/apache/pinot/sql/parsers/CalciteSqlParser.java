@@ -20,6 +20,7 @@ package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -80,6 +81,11 @@ public class CalciteSqlParser {
   private CalciteSqlParser() {
   }
 
+  public static final String ASC = "asc";
+  public static final String DESC = "desc";
+  public static final String NULLS_LAST = "nullslast";
+  public static final String NULLS_FIRST = "nullsfirst";
+  public static final ImmutableSet<String> ORDER_BY_FUNCTIONS = ImmutableSet.of(ASC, DESC, NULLS_LAST, NULLS_FIRST);
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
@@ -174,6 +180,8 @@ public class CalciteSqlParser {
         SqlNode firstOperand = ((SqlBasicCall) sqlNode).getOperandList().get(0);
         if (firstOperand instanceof SqlSelect) {
           tableNames.addAll(extractTableNamesFromNode(firstOperand));
+        } else if (firstOperand instanceof SqlBasicCall) {
+          tableNames.addAll(extractTableNamesFromNode(((SqlBasicCall) firstOperand).getOperandList().get(0)));
         } else {
           tableNames.addAll(((SqlIdentifier) firstOperand).names);
         }
@@ -316,7 +324,7 @@ public class CalciteSqlParser {
           List<Expression> distinctExpressions = getAliasLeftExpressionsFromDistinctExpression(function);
           for (Expression orderByExpression : orderByList) {
             // NOTE: Order-by is always a Function with the ordering of the Expression
-            if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0))) {
+            if (!distinctExpressions.contains(removeOrderByFunctions(orderByExpression))) {
               throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
             }
           }
@@ -641,18 +649,18 @@ public class CalciteSqlParser {
     Expression expression;
     if (node.getKind() == SqlKind.NULLS_LAST) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression("nullslast");
+      expression = RequestUtils.getFunctionExpression(NULLS_LAST);
       expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
     } else if (node.getKind() == SqlKind.NULLS_FIRST) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression("nullsfirst");
+      expression = RequestUtils.getFunctionExpression(NULLS_FIRST);
       expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
     } else if (node.getKind() == SqlKind.DESCENDING) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression("desc");
+      expression = RequestUtils.getFunctionExpression(DESC);
       expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), false));
     } else if (createAscExpression) {
-      expression = RequestUtils.getFunctionExpression("asc");
+      expression = RequestUtils.getFunctionExpression(ASC);
       expression.getFunctionCall().addToOperands(toExpression(node));
     } else {
       return toExpression(node);
@@ -992,5 +1000,12 @@ public class CalciteSqlParser {
       return false;
     }
     return false;
+  }
+
+  public static Expression removeOrderByFunctions(Expression expression) {
+    while (expression.isSetFunctionCall() && ORDER_BY_FUNCTIONS.contains(expression.getFunctionCall().operator)) {
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return expression;
   }
 }

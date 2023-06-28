@@ -104,10 +104,14 @@ public class HelixBrokerStarterTest extends ControllerTest {
     }
 
     TestUtils.waitForCondition(aVoid -> {
+      // should wait for both realtime and offline table external view to be live.
       ExternalView offlineTableExternalView =
           _helixAdmin.getResourceExternalView(getHelixClusterName(), OFFLINE_TABLE_NAME);
+      ExternalView realtimeTableExternalView =
+          _helixAdmin.getResourceExternalView(getHelixClusterName(), REALTIME_TABLE_NAME);
       return offlineTableExternalView != null
-          && offlineTableExternalView.getPartitionSet().size() == NUM_OFFLINE_SEGMENTS;
+          && offlineTableExternalView.getPartitionSet().size() == NUM_OFFLINE_SEGMENTS
+          && realtimeTableExternalView != null;
     }, 30_000L, "Failed to find all OFFLINE segments in the ExternalView");
   }
 

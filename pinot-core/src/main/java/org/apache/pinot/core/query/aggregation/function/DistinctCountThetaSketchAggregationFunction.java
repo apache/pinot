@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.datasketches.Util;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.AnotB;
 import org.apache.datasketches.theta.Intersection;
@@ -34,6 +33,7 @@ import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
+import org.apache.datasketches.thetacommon.ThetaUtil;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -1305,7 +1305,7 @@ public class DistinctCountThetaSketchAggregationFunction
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
     private static final String NOMINAL_ENTRIES_KEY = "nominalEntries";
 
-    private int _nominalEntries = Util.DEFAULT_NOMINAL_ENTRIES;
+    private int _nominalEntries = ThetaUtil.DEFAULT_NOMINAL_ENTRIES;
 
     Parameters(String parametersString) {
       StringUtils.deleteWhitespace(parametersString);

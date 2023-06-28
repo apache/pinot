@@ -34,9 +34,9 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Window;
-import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalWindow;
+import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -52,7 +52,9 @@ import org.apache.calcite.tools.RelBuilderFactory;
  * Special rule for Pinot, this rule is fixed to always insert an exchange or sort exchange below the WINDOW node.
  * TODO:
  *     1. Add support for more than one window group
- *     2. Add support for functions other than aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
+ *     2. Add support for functions other than:
+ *        a. Aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
+ *        b. Ranking functions (ROW_NUMBER, RANK, DENSE_RANK)
  *     3. Add support for custom frames
  */
 public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
@@ -62,7 +64,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   // Supported window functions
   // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
   private static final Set<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND = ImmutableSet.of(SqlKind.SUM, SqlKind.SUM0,
-      SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.OTHER_FUNCTION);
+      SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.RANK, SqlKind.DENSE_RANK,
+      SqlKind.OTHER_FUNCTION);
 
   public PinotWindowExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalWindow.class, any()), factory, null);
@@ -92,7 +95,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     Window.Group windowGroup = window.groups.get(0);
     if (windowGroup.keys.isEmpty() && windowGroup.orderKeys.getKeys().isEmpty()) {
       // Empty OVER()
-      // Add a single LogicalExchange for empty OVER() since no sort is required
+      // Add a single Exchange for empty OVER() since no sort is required
 
       if (PinotRuleUtils.isProject(windowInput)) {
         // Check for empty LogicalProject below LogicalWindow. If present modify it to be a Literal only project and add
@@ -105,7 +108,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         }
       }
 
-      LogicalExchange exchange = LogicalExchange.create(windowInput, RelDistributions.hash(Collections.emptyList()));
+      PinotLogicalExchange exchange = PinotLogicalExchange.create(windowInput,
+          RelDistributions.hash(Collections.emptyList()));
       call.transformTo(
           LogicalWindow.create(window.getTraitSet(), exchange, window.constants, window.getRowType(), window.groups));
     } else if (windowGroup.keys.isEmpty() && !windowGroup.orderKeys.getKeys().isEmpty()) {
@@ -126,8 +130,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
 
       if (isPartitionByOnly) {
         // Only PARTITION BY or PARTITION BY and ORDER BY on the same key(s)
-        // Add a LogicalExchange hashed on the partition by keys
-        LogicalExchange exchange = LogicalExchange.create(windowInput,
+        // Add an Exchange hashed on the partition by keys
+        PinotLogicalExchange exchange = PinotLogicalExchange.create(windowInput,
             RelDistributions.hash(windowGroup.keys.toList()));
         call.transformTo(LogicalWindow.create(window.getTraitSet(), exchange, window.constants, window.getRowType(),
             window.groups));
@@ -217,7 +221,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
    *
    * This function modifies the empty LogicalProject below the LogicalWindow to add a literal and adds a LogicalProject
    * above LogicalWindow to remove the additional literal column from being projected any further. This also handles
-   * the addition of the LogicalExchange under the LogicalWindow.
+   * the addition of the Exchange under the LogicalWindow.
    *
    * TODO: Explore an option to handle empty LogicalProject by actually projecting empty rows for each entry. This way
    *       there will no longer be a need to add a literal to the empty LogicalProject, but just traverse the number of
@@ -240,9 +244,9 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     outputBuilder.addAll(window.getRowType().getFieldList());
 
     // This scenario is only possible for empty OVER() which uses functions that have no arguments such as COUNT(*) or
-    // ROW_NUMBER(). Add a LogicalExchange with empty hash distribution list
-    LogicalExchange exchange =
-        LogicalExchange.create(projectBelowWindow, RelDistributions.hash(Collections.emptyList()));
+    // ROW_NUMBER(). Add an Exchange with empty hash distribution list
+    PinotLogicalExchange exchange =
+        PinotLogicalExchange.create(projectBelowWindow, RelDistributions.hash(Collections.emptyList()));
     Window newWindow = new LogicalWindow(window.getCluster(), window.getTraitSet(), exchange,
         window.getConstants(), outputBuilder.build(), window.groups);
 

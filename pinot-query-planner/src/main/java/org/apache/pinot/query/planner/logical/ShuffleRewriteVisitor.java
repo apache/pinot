@@ -136,7 +136,7 @@ public class ShuffleRewriteVisitor implements PlanNodeVisitor<Set<Integer>, Void
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
 
     if (canSkipShuffle(oldPartitionKeys, selector)) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      node.setDistributionType(RelDistribution.Type.SINGLETON);
       return oldPartitionKeys;
     } else if (selector == null) {
       return new HashSet<>();
@@ -151,7 +151,7 @@ public class ShuffleRewriteVisitor implements PlanNodeVisitor<Set<Integer>, Void
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
 
     if (canSkipShuffle(oldPartitionKeys, selector)) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      node.setDistributionType(RelDistribution.Type.SINGLETON);
       return oldPartitionKeys;
     } else {
       // reset the context partitionKeys since we've determined that

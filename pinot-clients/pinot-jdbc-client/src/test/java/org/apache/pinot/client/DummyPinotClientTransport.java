@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.client;
 
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 
 
 public class DummyPinotClientTransport implements PinotClientTransport {
@@ -32,7 +32,7 @@ public class DummyPinotClientTransport implements PinotClientTransport {
   }
 
   @Override
-  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+  public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
       throws PinotClientException {
     _lastQuery = query;
     return null;
@@ -46,7 +46,7 @@ public class DummyPinotClientTransport implements PinotClientTransport {
   }
 
   @Override
-  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+  public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
       throws PinotClientException {
     _lastQuery = request.getQuery();
     return null;

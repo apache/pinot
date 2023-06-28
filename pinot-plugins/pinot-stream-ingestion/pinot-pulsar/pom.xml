@@ -38,7 +38,7 @@
     <phase.prop>package</phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
     <pulsar.version>2.11.0</pulsar.version>
-    <jetty-server.version>9.4.45.v20220203</jetty-server.version>
+    <jetty-server.version>9.4.51.v20230217</jetty-server.version>
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.35</jersey-container-grizzly2-http.version>

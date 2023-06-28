@@ -28,13 +28,16 @@ public class HttpClientConfig {
 
   protected static final String MAX_CONNS_CONFIG_NAME = "http.client.maxConnTotal";
   protected static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.maxConnPerRoute";
+  protected static final String DISABLE_DEFAULT_USER_AGENT_CONFIG_NAME = "http.client.disableDefaultUserAgent";
 
   private final int _maxConnTotal;
   private final int _maxConnPerRoute;
+  private final boolean _disableDefaultUserAgent;
 
-  private HttpClientConfig(int maxConnTotal, int maxConnPerRoute) {
+  private HttpClientConfig(int maxConnTotal, int maxConnPerRoute, boolean disableDefaultUserAgent) {
     _maxConnTotal = maxConnTotal;
     _maxConnPerRoute = maxConnPerRoute;
+    _disableDefaultUserAgent = disableDefaultUserAgent;
   }
 
   public int getMaxConnTotal() {
@@ -43,6 +46,10 @@ public class HttpClientConfig {
 
   public int getMaxConnPerRoute() {
     return _maxConnPerRoute;
+  }
+
+  public boolean isDisableDefaultUserAgent() {
+    return _disableDefaultUserAgent;
   }
 
   /**
@@ -61,6 +68,8 @@ public class HttpClientConfig {
     if (StringUtils.isNotEmpty(maxConnsPerRoute)) {
       builder.withMaxConnsPerRoute(Integer.parseInt(maxConnsPerRoute));
     }
+    boolean disableDefaultUserAgent = pinotConfiguration.getProperty(DISABLE_DEFAULT_USER_AGENT_CONFIG_NAME, false);
+    builder.withDisableDefaultUserAgent(disableDefaultUserAgent);
     return builder;
   }
 
@@ -71,6 +80,7 @@ public class HttpClientConfig {
   public static class Builder {
     private int _maxConns = -1;
     private int _maxConnsPerRoute = -1;
+    private boolean _disableDefaultUserAgent = false;
 
     private Builder() {
     }
@@ -85,8 +95,13 @@ public class HttpClientConfig {
       return this;
     }
 
+    public Builder withDisableDefaultUserAgent(boolean disableDefaultUserAgent) {
+      _disableDefaultUserAgent = disableDefaultUserAgent;
+      return this;
+    }
+
     public HttpClientConfig build() {
-      return new HttpClientConfig(_maxConns, _maxConnsPerRoute);
+      return new HttpClientConfig(_maxConns, _maxConnsPerRoute, _disableDefaultUserAgent);
     }
   }
 }

@@ -26,7 +26,6 @@ import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
-import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 
@@ -71,7 +70,7 @@ public class PinotRuleUtils {
     if (relNode instanceof HepRelVertex) {
       relNode = ((HepRelVertex) relNode).getCurrentRel();
     }
-    if (relNode instanceof LogicalExchange) {
+    if (relNode instanceof Exchange) {
       return false;
     }
     for (RelNode child : relNode.getInputs()) {

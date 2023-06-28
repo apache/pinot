@@ -55,6 +55,9 @@ public class SegmentMetadataFetcher {
   private static final String NULL_VALUE_VECTOR_READER = "null-value-vector-reader";
   private static final String RANGE_INDEX = "range-index";
   private static final String JSON_INDEX = "json-index";
+  private static final String H3_INDEX = "h3-index";
+  private static final String FST_INDEX = "fst-index";
+  private static final String TEXT_INDEX = "text-index";
 
   private static final String INDEX_NOT_AVAILABLE = "NO";
   private static final String INDEX_AVAILABLE = "YES";
@@ -150,6 +153,24 @@ public class SegmentMetadataFetcher {
       indexStatus.put(JSON_INDEX, INDEX_NOT_AVAILABLE);
     } else {
       indexStatus.put(JSON_INDEX, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getH3Index())) {
+      indexStatus.put(H3_INDEX, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(H3_INDEX, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getFSTIndex())) {
+      indexStatus.put(FST_INDEX, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(FST_INDEX, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getTextIndex())) {
+      indexStatus.put(TEXT_INDEX, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(TEXT_INDEX, INDEX_AVAILABLE);
     }
 
     return indexStatus;

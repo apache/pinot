@@ -169,6 +169,8 @@ public class RoundRobinScheduler implements OpChainScheduler {
     } finally {
       _lock.unlock();
     }
+    // invoke opChain deregister callback
+    operatorChain.getOpChainFinishCallback().accept(operatorChain.getId());
   }
 
   @Override

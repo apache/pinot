@@ -37,6 +37,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected String _tableNameWithType;
   protected List<String> _primaryKeyColumns;
   protected List<String> _comparisonColumns;
+  protected String _deleteRecordColumn;
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
@@ -60,6 +61,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       _comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
     }
 
+    _deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
     _hashFunction = upsertConfig.getHashFunction();
 
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
@@ -72,7 +74,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     }
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
-
     _serverMetrics = serverMetrics;
   }
 
