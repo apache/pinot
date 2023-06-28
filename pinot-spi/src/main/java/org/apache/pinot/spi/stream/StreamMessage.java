@@ -51,6 +51,10 @@ public class StreamMessage<T> {
     _length = length;
   }
 
+  public StreamMessage(T value, int length) {
+    this(value, length, null);
+  }
+  
   public StreamMessage(T value, int length, @Nullable StreamMessageMetadata metadata) {
     this(null, value, metadata, length);
   }
