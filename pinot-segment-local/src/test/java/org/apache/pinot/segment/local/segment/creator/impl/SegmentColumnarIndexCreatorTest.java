@@ -43,6 +43,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.MAX_VALUE;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.MIN_VALUE;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
+
+
 public class SegmentColumnarIndexCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentColumnarIndexCreatorTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
@@ -55,6 +60,29 @@ public class SegmentColumnarIndexCreatorTest {
   public void setUp()
       throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
+  }
+
+  @Test
+  public void testGetValidPropertyValue()
+      throws Exception {
+    // Leading/trailing whitespace
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue(" a"), "a");
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a\t"), "a");
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("\na"), "a");
+
+    // Whitespace in the middle
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a\t b"), "a\t b");
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a \nb"), "a \nb");
+
+    // List separator
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a,b,c"), "abc");
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue(",a b"), "a b");
+
+    // Empty string
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue(""), "");
+
+    // Escape character for variable substitution
+    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("$${"), "$${");
   }
 
   @Test
@@ -174,21 +202,52 @@ public class SegmentColumnarIndexCreatorTest {
   }
 
   @Test
-  public void testAddMinMaxValueInvalid() {
+  public void testAddMinMaxValue() {
     PropertiesConfiguration props = new PropertiesConfiguration();
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "foo");
     Assert.assertFalse(Boolean.parseBoolean(
-        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+        String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
 
     props = new PropertiesConfiguration();
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", ",bar", "foo");
-    Assert.assertTrue(Boolean.parseBoolean(
-        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    Assert.assertFalse(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "bar");
 
     props = new PropertiesConfiguration();
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ");
-    Assert.assertTrue(Boolean.parseBoolean(
-        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    Assert.assertFalse(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+
+    // test for values with leading or ending whitespace.
+    props = new PropertiesConfiguration();
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "a\t", "\na");
+    Assert.assertFalse(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "a");
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))), "a");
+
+    // test for values with 'v'.
+    props = new PropertiesConfiguration();
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "aa,bb", "aa,bb,");
+    Assert.assertFalse(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "aabb");
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))), "aabb");
+
+    // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT
+    props = new PropertiesConfiguration();
+    String longMinValue = RandomStringUtils.
+        randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    String longMaxValue = RandomStringUtils.
+        randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", longMinValue, longMaxValue);
+    Assert.assertFalse(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))),
+        longMinValue.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))),
+        longMaxValue.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
   }
 
   @AfterClass
