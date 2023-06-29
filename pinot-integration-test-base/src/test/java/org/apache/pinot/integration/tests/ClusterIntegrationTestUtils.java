@@ -99,15 +99,13 @@ public class ClusterIntegrationTestUtils {
   /**
    * Set up an H2 table with records from the given Avro files inserted.
    *
-   * @param avroFiles    Avro files that contains the records to be inserted
-   * @param tableName    Name of the table to be created
+   * @param avroFiles Avro files that contains the records to be inserted
+   * @param tableName Name of the table to be created
    * @param h2Connection H2 connection
-   * @param schema
    * @throws Exception
    */
   @SuppressWarnings("SqlNoDataSourceInspection")
-  public static void setUpH2TableWithAvro(List<File> avroFiles, String tableName, Connection h2Connection,
-      org.apache.pinot.spi.data.Schema schema)
+  public static void setUpH2TableWithAvro(List<File> avroFiles, String tableName, Connection h2Connection)
       throws Exception {
     int numFields;
 
@@ -121,12 +119,6 @@ public class ClusterIntegrationTestUtils {
       for (Schema.Field field : fields) {
         String fieldName = field.name();
         Schema.Type fieldType = field.schema().getType();
-        FieldSpec pinotFieldSpec = schema.getFieldSpecFor(fieldName);
-        // Max length from Pinot schema should be propagated to H2 as well
-        int maxLength = FieldSpec.DEFAULT_MAX_LENGTH;
-        if (pinotFieldSpec.getMaxLength() != FieldSpec.DEFAULT_MAX_LENGTH) {
-          maxLength = pinotFieldSpec.getMaxLength();
-        }
         switch (fieldType) {
           case UNION:
             // For UNION field type, we support the following underlying types:
@@ -136,19 +128,14 @@ public class ClusterIntegrationTestUtils {
             if (typesInUnion.size() == 1) {
               Schema.Type type = typesInUnion.get(0).getType();
               Assert.assertTrue(isSingleValueAvroFieldType(type));
-              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, false, maxLength));
+              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, false));
               break;
             }
             if (typesInUnion.size() == 2) {
               Schema.Type type = typesInUnion.get(0).getType();
-              Schema.Type nullType = typesInUnion.get(1).getType();
-              if (!isSingleValueAvroFieldType(type)) {
-                type = typesInUnion.get(1).getType();
-                nullType = typesInUnion.get(0).getType();
-              }
               Assert.assertTrue(isSingleValueAvroFieldType(type));
-              Assert.assertEquals(nullType, Schema.Type.NULL);
-              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true, maxLength));
+              Assert.assertEquals(typesInUnion.get(1).getType(), Schema.Type.NULL);
+              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true));
               break;
             }
             Assert.fail(
@@ -158,11 +145,11 @@ public class ClusterIntegrationTestUtils {
             Schema.Type type = field.schema().getElementType().getType();
             Assert.assertTrue(isSingleValueAvroFieldType(type));
             // create Array data type based column.
-            h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true, maxLength));
+            h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true, true));
             break;
           default:
             if (isSingleValueAvroFieldType(fieldType)) {
-              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, fieldType, false, maxLength));
+              h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, fieldType, false));
             } else {
               Assert.fail(String.format("Unsupported Avro field: %s with underlying types: %s", fieldName, fieldType));
             }
@@ -228,15 +215,13 @@ public class ClusterIntegrationTestUtils {
   /**
    * Helper method to build H2 field name and type.
    *
-   * @param fieldName     Field name
+   * @param fieldName Field name
    * @param avroFieldType Avro field type
-   * @param nullable      Whether the column is nullable
-   * @param maxLength
+   * @param nullable Whether the column is nullable
    * @return H2 field name and type
    */
-  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable,
-      int maxLength) {
-    return buildH2FieldNameAndType(fieldName, avroFieldType, nullable, false, maxLength);
+  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable) {
+    return buildH2FieldNameAndType(fieldName, avroFieldType, nullable, false);
   }
 
   /**
@@ -248,8 +233,8 @@ public class ClusterIntegrationTestUtils {
    * @param arrayType Whether the column is array data type or not
    * @return H2 field name and type
    */
-  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType,
-      boolean nullable, boolean arrayType, int maxLength) {
+  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable,
+      boolean arrayType) {
     String avroFieldTypeName = avroFieldType.getName();
     String h2FieldType;
     switch (avroFieldTypeName) {
@@ -257,7 +242,7 @@ public class ClusterIntegrationTestUtils {
         h2FieldType = "bigint";
         break;
       case "string":
-        h2FieldType = String.format("varchar(%s)", maxLength);
+        h2FieldType = "varchar(128)";
         break;
       default:
         h2FieldType = avroFieldTypeName;

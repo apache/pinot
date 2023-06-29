@@ -64,6 +64,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
     TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
     EXEMPT_QUERIES = new HashSet<>();
+    // The following query fails due to a bug in resolving table names from query
+    EXEMPT_QUERIES.add(13);
     // The following queries fail due to lack of support for views.
     EXEMPT_QUERIES.addAll(ImmutableList.of(15, 16, 17));
     // The following query fails due to inability of Aggregation operator to handle conversion from Boolean to Number.

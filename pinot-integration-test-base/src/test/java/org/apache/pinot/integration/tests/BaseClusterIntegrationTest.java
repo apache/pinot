@@ -548,7 +548,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void setUpH2Connection(List<File> avroFiles)
       throws Exception {
     setUpH2Connection();
-    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getTableName(), _h2Connection, getSchema());
+    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getTableName(), _h2Connection);
   }
 
   /**
