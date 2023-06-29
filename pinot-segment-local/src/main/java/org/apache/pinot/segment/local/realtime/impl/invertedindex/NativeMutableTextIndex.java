@@ -83,6 +83,11 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   }
 
   @Override
+  public void add(String[] document) {
+    throw new UnsupportedOperationException("Mutable native text indexes are not supported for multi-valued columns");
+  }
+
+  @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     throw new UnsupportedOperationException();
   }
