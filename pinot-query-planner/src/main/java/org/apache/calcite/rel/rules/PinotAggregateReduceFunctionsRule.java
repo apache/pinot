@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
@@ -49,7 +50,18 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
- * Note: This class copies the logic for reducing SUM and AVG from {@link AggregateReduceFunctionsRule}
+ * Note: This class copies the logic for reducing SUM and AVG from {@link AggregateReduceFunctionsRule} with some
+ * changes to use our Pinot defined operand type checkers and return types. This is necessary otherwise the v1
+ * aggregations won't work in the v2 engine due to type issues. Once we fix the return types for the v1 aggregation
+ * functions the logic for AVG and SUM can be removed. We also had to resort to using an AVG_REDUCE scalar function
+ * due to null handling issues with DIVIDE (returning null on count = 0 via a CASE statement was also not possible
+ * as the types of the columns were all non-null and Calcite marks nullable and non-nullable columns as incompatible).
+ *
+ * We added additional logic to handle typecasting MIN / MAX functions for EVERY / SOME aggregation functions in Calcite
+ * which internally uses MIN / MAX with boolean return types. This was necessary because the v1 aggregations for
+ * MIN / MAX always return DOUBLE and this caused type issues for certain queries that utilize Calcite's EVERY / SOME
+ * aggregation functions.
+ *
  * Planner rule that reduces aggregate functions in
  * {@link org.apache.calcite.rel.core.Aggregate}s to simpler forms.
  *
@@ -66,24 +78,19 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  *
  * @see CoreRules#AGGREGATE_REDUCE_FUNCTIONS
  */
-public class PinotAvgSumAggregateReduceFunctionsRule
+public class PinotAggregateReduceFunctionsRule
     extends RelOptRule {
 
-  public static final PinotAvgSumAggregateReduceFunctionsRule INSTANCE =
-      new PinotAvgSumAggregateReduceFunctionsRule(PinotRuleUtils.PINOT_REL_FACTORY);
+  public static final PinotAggregateReduceFunctionsRule INSTANCE =
+      new PinotAggregateReduceFunctionsRule(PinotRuleUtils.PINOT_REL_FACTORY);
   //~ Static fields/initializers ---------------------------------------------
 
-  protected PinotAvgSumAggregateReduceFunctionsRule(RelBuilderFactory factory) {
+  protected PinotAggregateReduceFunctionsRule(RelBuilderFactory factory) {
     super(operand(Aggregate.class, any()), factory, null);
   }
 
-  private static boolean isValid(SqlKind function) {
-    return SqlKind.AVG_AGG_FUNCTIONS.contains(function)
-        || function == SqlKind.SUM;
-  }
-
   private final Set<SqlKind> _functionsToReduce = ImmutableSet.<SqlKind>builder().addAll(SqlKind.AVG_AGG_FUNCTIONS)
-      .add(SqlKind.SUM).build();;
+      .add(SqlKind.SUM).add(SqlKind.MAX).add(SqlKind.MIN).build();
 
   //~ Constructors -----------------------------------------------------------
 
@@ -119,9 +126,8 @@ public class PinotAvgSumAggregateReduceFunctionsRule
   }
 
   /**
-   * Reduces calls to functions AVG, SUM, STDDEV_POP, STDDEV_SAMP, VAR_POP,
-   * VAR_SAMP, COVAR_POP, COVAR_SAMP, REGR_SXX, REGR_SYY if the function is
-   * present in {@link PinotAvgSumAggregateReduceFunctionsRule#_functionsToReduce}
+   * Reduces calls to functions AVG, SUM, MIN, MAX if the function is
+   * present in {@link PinotAggregateReduceFunctionsRule#_functionsToReduce}
    *
    * <p>It handles newly generated common subexpressions since this was done
    * at the sql2rel stage.
@@ -187,8 +193,13 @@ public class PinotAvgSumAggregateReduceFunctionsRule
           // case COUNT(x) when 0 then null else SUM0(x) end
           return reduceSum(oldAggRel, oldCall, newCalls, aggCallMapping);
         case AVG:
-          // replace original AVG(x) with SUM(x) / COUNT(x)
+          // replace original AVG(x) with SUM(x) / COUNT(x) via an AVG_REDUCE scalar function for null handling
           return reduceAvg(oldAggRel, oldCall, newCalls, aggCallMapping, inputExprs);
+        case MIN:
+        case MAX:
+          // typecast to oldCall type (BOOLEAN) if needed to handle EVERY / SOME aggregations. This is essentially a
+          // no-op typecasting for normal MIN / MAX aggregations.
+          return reduceMinMax(oldAggRel, oldCall, newCalls, aggCallMapping);
         default:
           throw Util.unexpected(kind);
       }
@@ -266,11 +277,15 @@ public class PinotAvgSumAggregateReduceFunctionsRule
         oldCall.getType(), numeratorRef.getType().isNullable());
     numeratorRef = rexBuilder.ensureType(avgType, numeratorRef, true);
 
+    // TODO: Find a way to correctly use the DIVIDE binary operator instead of reduce function with a COUNT = 0
+    //       check. Today this does not work due to all types being declared as "NOT NULL", but returning null violates
+    //       this
+    // Special casing AVG to use a scalar function for reducing the results.
     AggregationFunctionType type =
         AggregationFunctionType.getAggregationFunctionType(oldCall.getAggregation().getName());
-    SqlFunction function = new SqlFunction(type.getReduceFunctionName(), SqlKind.OTHER_FUNCTION,
-        type.getSqlReduceReturnTypeInference(), null, type.getSqlReduceOperandTypeChecker(),
-        SqlFunctionCategory.USER_DEFINED_FUNCTION);
+    SqlFunction function = new SqlFunction(type.getReduceFunctionName().toUpperCase(Locale.ROOT),
+        SqlKind.OTHER_FUNCTION, type.getSqlReduceReturnTypeInference(), null,
+        type.getSqlReduceOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
     List<RexNode> functionArgs = Arrays.asList(numeratorRef, denominatorRef);
 
     // Use our own reducer instead of divide for null/0 count handling
@@ -337,6 +352,44 @@ public class PinotAvgSumAggregateReduceFunctionsRule
             countRef, rexBuilder.makeExactLiteral(BigDecimal.ZERO)),
         rexBuilder.makeNullLiteral(sumZeroRef.getType()),
         sumZeroRef);
+  }
+
+  private static RexNode reduceMinMax(
+      Aggregate oldAggRel,
+      AggregateCall oldCall,
+      List<AggregateCall> newCalls,
+      Map<AggregateCall, RexNode> aggCallMapping) {
+    final int nGroups = oldAggRel.getGroupCount();
+    final RexBuilder rexBuilder = oldAggRel.getCluster().getRexBuilder();
+    String functionName = oldCall.getAggregation().getName();
+
+    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
+    SqlAggFunction aggFunc = new PinotSqlAggFunction(functionType.getName().toUpperCase(),
+        functionType.getSqlIdentifier(), functionType.getSqlKind(), functionType.getSqlReturnTypeInference(),
+        functionType.getSqlOperandTypeInference(), functionType.getSqlOperandTypeChecker(),
+        functionType.getSqlFunctionCategory());
+
+    final AggregateCall newCall =
+        AggregateCall.create(aggFunc,
+            oldCall.isDistinct(),
+            oldCall.isApproximate(),
+            oldCall.ignoreNulls(),
+            oldCall.getArgList(),
+            oldCall.filterArg,
+            oldCall.distinctKeys,
+            oldCall.collation,
+            oldAggRel.getGroupCount(),
+            oldAggRel.getInput(),
+            null,
+            null);
+
+    RexNode ref =
+        rexBuilder.addAggCall(newCall,
+            nGroups,
+            newCalls,
+            aggCallMapping,
+            oldAggRel.getInput()::fieldIsNullable);
+    return rexBuilder.makeCast(oldCall.getType(), ref);
   }
 
   /**

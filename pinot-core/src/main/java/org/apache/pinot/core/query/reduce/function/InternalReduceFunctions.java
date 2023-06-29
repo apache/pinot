@@ -19,8 +19,6 @@
 
 package org.apache.pinot.core.query.reduce.function;
 
-import java.util.Set;
-import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -32,57 +30,6 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 public class InternalReduceFunctions {
 
   private InternalReduceFunctions() {
-  }
-
-  @ScalarFunction
-  public static Double skewnessReduce(PinotFourthMoment fourthMoment) {
-    if (fourthMoment == null) {
-      return null;
-    }
-    return fourthMoment.skew();
-  }
-
-  @ScalarFunction
-  public static Double kurtosisReduce(PinotFourthMoment fourthMoment) {
-    if (fourthMoment == null) {
-      return null;
-    }
-    return fourthMoment.kurtosis();
-  }
-
-  @ScalarFunction
-  public static Integer countDistinctReduce(Set<?> values) {
-    return values.size();
-  }
-
-  @ScalarFunction
-  public static Double maxReduce(Double intermediateResult) {
-    return intermediateResult;
-  }
-
-  @ScalarFunction
-  public static Double sumReduce(Double intermediateResult) {
-    return intermediateResult;
-  }
-
-  @ScalarFunction
-  public static Double minReduce(Double intermediateResult) {
-    return intermediateResult;
-  }
-
-  @ScalarFunction
-  public static Long countReduce(Long intermediateResult) {
-    return intermediateResult;
-  }
-
-  @ScalarFunction
-  public static Integer boolAndReduce(Integer intermediateResult) {
-    return intermediateResult;
-  }
-
-  @ScalarFunction
-  public static Integer boolOrReduce(Integer intermediateResult) {
-    return intermediateResult;
   }
 
   @ScalarFunction

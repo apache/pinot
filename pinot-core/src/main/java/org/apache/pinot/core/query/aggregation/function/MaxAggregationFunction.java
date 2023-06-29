@@ -29,7 +29,6 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.reduce.function.InternalReduceFunctions;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -308,6 +307,6 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractFinalResult(Double intermediateResult) {
-    return InternalReduceFunctions.maxReduce(intermediateResult);
+    return intermediateResult;
   }
 }

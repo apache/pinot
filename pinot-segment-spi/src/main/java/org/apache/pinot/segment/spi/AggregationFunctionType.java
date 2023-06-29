@@ -50,19 +50,16 @@ public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count", true, null, SqlKind.COUNT, ReturnTypes.BIGINT, null,
       CalciteSystemProperty.STRICT.value() ? OperandTypes.ANY : OperandTypes.ONE_OR_MORE, SqlFunctionCategory.NUMERIC,
-      null, ReturnTypes.BIGINT, "COUNT_REDUCE", ReturnTypes.BIGINT, OperandTypes.NUMERIC),
+      null, ReturnTypes.BIGINT, null, null, null),
   MIN("min", false, null, SqlKind.MIN, ReturnTypes.DOUBLE, null, OperandTypes.COMPARABLE_ORDERED,
-      SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, "MIN_REDUCE",
-      ReturnTypes.DOUBLE, OperandTypes.NUMERIC),
+      SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, null, null, null),
   MAX("max", false, null, SqlKind.MAX, ReturnTypes.DOUBLE, null, OperandTypes.COMPARABLE_ORDERED,
-      SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, "MAX_REDUCE",
-      ReturnTypes.DOUBLE, OperandTypes.NUMERIC),
+      SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, null, null, null),
   // In multistage SUM is reduced via the PinotAvgSumAggregateReduceFunctionsRule, need not set up anything for reduce
   SUM("sum", false, null, SqlKind.SUM, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
       SqlFunctionCategory.NUMERIC, null, ReturnTypes.DOUBLE, null, null, null),
   SUM0("$sum0", false, null, SqlKind.SUM0, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
-      SqlFunctionCategory.NUMERIC, null, ReturnTypes.DOUBLE, "SUM_REDUCE",
-      ReturnTypes.DOUBLE, OperandTypes.NUMERIC),
+      SqlFunctionCategory.NUMERIC, null, ReturnTypes.DOUBLE, null, null, null),
   SUMPRECISION("sumPrecision"),
   AVG("avg", true, null, SqlKind.AVG, ReturnTypes.AVG_AGG_FUNCTION, null, OperandTypes.NUMERIC,
       SqlFunctionCategory.NUMERIC, null, null, "AVG_REDUCE", ReturnTypes.AVG_AGG_FUNCTION,
@@ -72,8 +69,7 @@ public enum AggregationFunctionType {
   LASTWITHTIME("lastWithTime"),
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BIGINT, null, OperandTypes.ANY,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.explicit(SqlTypeName.OTHER),
-      "COUNT_DISTINCT_REDUCE", ReturnTypes.INTEGER, OperandTypes.BINARY),
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.explicit(SqlTypeName.OTHER), null, null, null),
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
@@ -101,11 +97,11 @@ public enum AggregationFunctionType {
   STDDEVPOP("stdDevPop"),
   STDDEVSAMP("stdDevSamp"),
   SKEWNESS("skewness", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment", ReturnTypes.explicit(SqlTypeName.OTHER),
-      "SKEWNESS_REDUCE", ReturnTypes.DOUBLE, OperandTypes.BINARY),
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment", ReturnTypes.explicit(SqlTypeName.OTHER), null, null,
+      null),
   KURTOSIS("kurtosis", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment", ReturnTypes.explicit(SqlTypeName.OTHER),
-      "KURTOSIS_REDUCE", ReturnTypes.DOUBLE, OperandTypes.BINARY),
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment", ReturnTypes.explicit(SqlTypeName.OTHER), null, null,
+      null),
   FOURTHMOMENT("fourthMoment"),
 
   // DataSketches Tuple Sketch support
@@ -143,11 +139,9 @@ public enum AggregationFunctionType {
 
   // boolean aggregate functions
   BOOLAND("bool_And", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null, OperandTypes.BOOLEAN,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, "BOOL_AND_REDUCE",
-      ReturnTypes.INTEGER, OperandTypes.INTEGER),
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, null, null, null),
   BOOLOR("bool_Or", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null, OperandTypes.BOOLEAN,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, "BOOL_OR_REDUCE",
-      ReturnTypes.INTEGER, OperandTypes.INTEGER),
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, null, null, null),
 
   // argMin and argMax
   ARGMIN("argMin"),
@@ -181,8 +175,8 @@ public enum AggregationFunctionType {
   private final String _intermediateFunctionName;
   private final SqlReturnTypeInference _sqlIntermediateReturnTypeInference;
 
-  // Fields for the Calcite aggregation reduce step in multistage. The aggregation reduce is typically a scalar
-  // function to 'extractFinalResult' and typecast it to the final expected type for the user.
+  // Fields for the Calcite aggregation reduce step in multistage. The aggregation reduce is only used for special
+  // functions like AVG which is split into SUM / COUNT. This is needed for proper null handling if COUNT is 0.
   private final String _reduceFunctionName;
   private final SqlReturnTypeInference _sqlReduceReturnTypeInference;
   private final SqlOperandTypeChecker _sqlReduceOperandTypeChecker;

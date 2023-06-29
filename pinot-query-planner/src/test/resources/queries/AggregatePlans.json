@@ -6,13 +6,14 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[CAST(AVG_REDUCE(CAST(SUM_REDUCE($0)):DECIMAL(1000, 0) NOT NULL, COUNT_REDUCE($1))):DECIMAL(1000, 0)])",
+          "\nLogicalProject(avg=[CAST(AVG_REDUCE(CAST($0):DECIMAL(1000, 0) NOT NULL, $1)):DECIMAL(1000, 0)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
-          "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n      PinotLogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n          LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -21,13 +22,14 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg, SUM(a.col4) as sum, MAX(a.col4) as max FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[CAST(AVG_REDUCE(CAST(SUM_REDUCE($0)):DECIMAL(1000, 0) NOT NULL, COUNT_REDUCE($1))):DECIMAL(1000, 0)], sum=[SUM_REDUCE($0)], max=[MAX_REDUCE($2)])",
+          "\nLogicalProject(avg=[CAST(AVG_REDUCE(CAST($0):DECIMAL(1000, 0) NOT NULL, $1)):DECIMAL(1000, 0)], sum=[$0], max=[$2])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)])",
-          "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], agg#2=[MAX($2)])",
-          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)])",
+          "\n      PinotLogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], agg#2=[MAX($2)])",
+          "\n          LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -36,13 +38,14 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[CAST(AVG_REDUCE(SUM_REDUCE($0), COUNT_REDUCE($1))):DOUBLE], count=[COUNT_REDUCE($1)])",
+          "\nLogicalProject(avg=[CAST(AVG_REDUCE($0, $1)):DOUBLE], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
-          "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n      PinotLogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -51,7 +54,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT KURTOSIS(a.col3) as kurtosis, DISTINCTCOUNT(a.col1) as dcount, MIN(a.col6), BOOL_AND(a.col5) FROM a WHERE a.col3 >= 0 AND a.col2 = 'iron maiden'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(kurtosis=[KURTOSIS_REDUCE($0)], dcount=[CAST(COUNT_DISTINCT_REDUCE($1)):BIGINT NOT NULL], EXPR$2=[MIN_REDUCE($2)], EXPR$3=[<>(BOOL_AND_REDUCE($3), 0)])",
+          "\nLogicalAggregate(group=[{}], agg#0=[KURTOSIS($0)], agg#1=[DISTINCTCOUNT($1)], agg#2=[MIN($2)], agg#3=[BOOL_AND($3)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)], agg#1=[DISTINCTCOUNT($1)], agg#2=[MIN($2)], agg#3=[BOOL_AND($3)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($2)], agg#1=[DISTINCTCOUNT($0)], agg#2=[MIN($4)], agg#3=[BOOL_AND($3)])",
@@ -66,7 +69,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[SUM_REDUCE($0)], EXPR$1=[COUNT_REDUCE($1)])",
+          "\nLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
@@ -79,11 +82,12 @@
         "sql": "EXPLAIN PLAN FOR SELECT DISTINCTCOUNT(a.col3), COUNT(DISTINCT a.col3), COUNT(a.col3), COUNT(*), DISTINCTCOUNT(a.col5) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CAST(COUNT_DISTINCT_REDUCE($0)):BIGINT NOT NULL], EXPR$1=[CAST(COUNT_DISTINCT_REDUCE($1)):BIGINT NOT NULL], EXPR$2=[COUNT_REDUCE($2)], EXPR$3=[COUNT_REDUCE($2)], EXPR$4=[CAST(COUNT_DISTINCT_REDUCE($3)):BIGINT NOT NULL])",
+          "\nLogicalProject(EXPR$0=[$0], EXPR$1=[$1], EXPR$2=[$2], EXPR$3=[$2], EXPR$4=[$3])",
           "\n  LogicalAggregate(group=[{}], agg#0=[DISTINCTCOUNT($0)], agg#1=[DISTINCTCOUNT(DISTINCT $1)], agg#2=[COUNT($2)], agg#3=[DISTINCTCOUNT($3)])",
-          "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[DISTINCTCOUNT($2)], agg#1=[DISTINCTCOUNT(DISTINCT $2)], agg#2=[COUNT()], agg#3=[DISTINCTCOUNT($4)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[DISTINCTCOUNT($0)], agg#1=[DISTINCTCOUNT(DISTINCT $1)], agg#2=[COUNT($2)], agg#3=[DISTINCTCOUNT($3)])",
+          "\n      PinotLogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[DISTINCTCOUNT($2)], agg#1=[DISTINCTCOUNT(DISTINCT $2)], agg#2=[COUNT()], agg#3=[DISTINCTCOUNT($4)])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -92,7 +96,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[SUM_REDUCE($0)], EXPR$1=[COUNT_REDUCE($1)])",
+          "\nLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
@@ -107,13 +111,14 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(ADD(a.col3, a.col6)), AVG(MOD(a.col6, a.col3)), MIN(ABS(a.col6)) FROM a WHERE a.col3 >= 0 AND a.col2 = 'hooloovoo'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[SUM_REDUCE($0)], EXPR$1=[CAST(AVG_REDUCE(SUM_REDUCE($1), COUNT_REDUCE($2))):DOUBLE], EXPR$2=[MIN_REDUCE($3)])",
+          "\nLogicalProject(EXPR$0=[$0], EXPR$1=[CAST(AVG_REDUCE($1, $2)):DOUBLE], EXPR$2=[$3])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[MIN($3)])",
-          "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT()], agg#3=[MIN($2)])",
-          "\n        LogicalProject($f0=[ADD($2, $5)], $f1=[MOD($5, $2)], $f2=[ABS($5)])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'hooloovoo'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[MIN($3)])",
+          "\n      PinotLogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT()], agg#3=[MIN($2)])",
+          "\n          LogicalProject($f0=[ADD($2, $5)], $f1=[MOD($5, $2)], $f2=[ABS($5)])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'hooloovoo'))])",
+          "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -125,13 +130,14 @@
           "\nLogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC])",
-          "\n      LogicalProject(EXPR$0=[SUM_REDUCE($0)], EXPR$1=[CAST(AVG_REDUCE(SUM_REDUCE($1), COUNT_REDUCE($2))):DOUBLE], EXPR$2=[KURTOSIS_REDUCE($3)])",
-          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[FOURTHMOMENT($3)])",
-          "\n          PinotLogicalExchange(distribution=[hash])",
-          "\n            LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT()], agg#3=[FOURTHMOMENT($2)])",
-          "\n              LogicalProject(col6=[$5], col3=[$2], $f2=[ABS($5)])",
-          "\n                LogicalFilter(condition=[AND(>=($2, 0), =($1, 'zaphoid beeblebrox'))])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n      LogicalProject(EXPR$0=[$0], EXPR$1=[CAST(AVG_REDUCE($1, $2)):DOUBLE], EXPR$2=[$3])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[KURTOSIS($3)])",
+          "\n          LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[FOURTHMOMENT($3)])",
+          "\n            PinotLogicalExchange(distribution=[hash])",
+          "\n              LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0($1)], agg#2=[COUNT()], agg#3=[FOURTHMOMENT($2)])",
+          "\n                LogicalProject(col6=[$5], col3=[$2], $f2=[ABS($5)])",
+          "\n                  LogicalFilter(condition=[AND(>=($2, 0), =($1, 'zaphoid beeblebrox'))])",
+          "\n                    LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -140,7 +146,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SKEWNESS(ADD(a.col3, a.col6)), DISTINCTCOUNT(ABS(a.col6)) FROM a WHERE a.col3 >= 0 AND REVERSE(a.col2) = 'oovoolooh'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[SKEWNESS_REDUCE($0)], EXPR$1=[CAST(COUNT_DISTINCT_REDUCE($1)):BIGINT NOT NULL])",
+          "\nLogicalAggregate(group=[{}], agg#0=[SKEWNESS($0)], agg#1=[DISTINCTCOUNT($1)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)], agg#1=[DISTINCTCOUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)], agg#1=[DISTINCTCOUNT($1)])",
@@ -155,13 +161,14 @@
         "sql": "EXPLAIN PLAN FOR SELECT SKEWNESS(a.col3), AVG(a.col3), BOOL_OR(a.col5), SUM(a.col3), AVG(a.col6), MAX(a.col6) FROM a WHERE a.col3 >= 0 AND a.col2 = 'rolling stones'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[SKEWNESS_REDUCE($0)], EXPR$1=[CAST(AVG_REDUCE(SUM_REDUCE($1), COUNT_REDUCE($2))):DOUBLE], EXPR$2=[<>(BOOL_OR_REDUCE($3), 0)], EXPR$3=[SUM_REDUCE($1)], EXPR$4=[CAST(AVG_REDUCE(SUM_REDUCE($4), COUNT_REDUCE($2))):DOUBLE], EXPR$5=[MAX_REDUCE($5)])",
-          "\n  LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[BOOL_OR($3)], agg#4=[$SUM0($4)], agg#5=[MAX($5)])",
-          "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($1)], agg#1=[$SUM0($1)], agg#2=[COUNT()], agg#3=[BOOL_OR($2)], agg#4=[$SUM0($3)], agg#5=[MAX($3)])",
-          "\n        LogicalProject(col2=[$1], col3=[$2], col5=[$4], col6=[$5])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'rolling stones'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\nLogicalProject(EXPR$0=[$0], EXPR$1=[CAST(AVG_REDUCE($1, $2)):DOUBLE], EXPR$2=[$3], EXPR$3=[$1], EXPR$4=[CAST(AVG_REDUCE($4, $2)):DOUBLE], EXPR$5=[$5])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[SKEWNESS($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[BOOL_OR($3)], agg#4=[$SUM0($4)], agg#5=[MAX($5)])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)], agg#1=[$SUM0($1)], agg#2=[COUNT($2)], agg#3=[BOOL_OR($3)], agg#4=[$SUM0($4)], agg#5=[MAX($5)])",
+          "\n      PinotLogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($1)], agg#1=[$SUM0($1)], agg#2=[COUNT()], agg#3=[BOOL_OR($2)], agg#4=[$SUM0($3)], agg#5=[MAX($3)])",
+          "\n          LogicalProject(col2=[$1], col3=[$2], col5=[$4], col6=[$5])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'rolling stones'))])",
+          "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -172,10 +179,10 @@
           "Execution Plan",
           "\nLogicalSort(fetch=[100])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
-          "\n    LogicalProject(EXPR$0=[SKEWNESS_REDUCE($0)], EXPR$1=[KURTOSIS_REDUCE($0)])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[SKEWNESS($0)], agg#1=[KURTOSIS($1)])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)], agg#1=[FOURTHMOMENT($1)])",
           "\n        PinotLogicalExchange(distribution=[hash])",
-          "\n          LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($2)])",
+          "\n          LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($2)], agg#1=[FOURTHMOMENT($2)])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -185,7 +192,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(sum=[SUM_REDUCE($0)], count=[COUNT_REDUCE($1)])",
+          "\nLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
@@ -200,13 +207,14 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[CAST(AVG_REDUCE(SUM_REDUCE($0), COUNT_REDUCE($1))):DOUBLE], count=[COUNT_REDUCE($1)])",
+          "\nLogicalProject(avg=[CAST(AVG_REDUCE($0, $1)):DOUBLE], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
-          "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n      PinotLogicalExchange(distribution=[hash])",
+          "\n        LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -215,7 +223,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'queen'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(sum=[SUM_REDUCE($0)], count=[COUNT_REDUCE($1)])",
+          "\nLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
@@ -230,7 +238,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ KURTOSIS(a.col3) as kurtosis, SKEWNESS(a.col6) as skewness, COUNT(DISTINCT a.col6), COUNT(DISTINCT a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'metallica'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(kurtosis=[KURTOSIS_REDUCE($0)], skewness=[SKEWNESS_REDUCE($1)], EXPR$2=[CAST(COUNT_DISTINCT_REDUCE($2)):BIGINT NOT NULL], EXPR$3=[CAST(COUNT_DISTINCT_REDUCE($3)):BIGINT NOT NULL])",
+          "\nLogicalAggregate(group=[{}], agg#0=[KURTOSIS($0)], agg#1=[SKEWNESS($1)], agg#2=[DISTINCTCOUNT(DISTINCT $2)], agg#3=[DISTINCTCOUNT(DISTINCT $3)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($0)], agg#1=[FOURTHMOMENT($1)], agg#2=[DISTINCTCOUNT(DISTINCT $2)], agg#3=[DISTINCTCOUNT(DISTINCT $3)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[FOURTHMOMENT($1)], agg#1=[FOURTHMOMENT($2)], agg#2=[DISTINCTCOUNT(DISTINCT $2)], agg#3=[DISTINCTCOUNT(DISTINCT $1)])",

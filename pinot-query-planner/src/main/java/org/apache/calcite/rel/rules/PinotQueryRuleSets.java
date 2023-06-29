@@ -86,9 +86,7 @@ public class PinotQueryRuleSets {
           CoreRules.AGGREGATE_UNION_AGGREGATE,
 
           // reduce aggregate functions like AVG, STDDEV_POP etc.
-          // do not switch the order of the below rules
-          PinotAvgSumAggregateReduceFunctionsRule.INSTANCE,
-          PinotReduceAggregateFunctionsRule.INSTANCE
+          PinotAggregateReduceFunctionsRule.INSTANCE
           );
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
