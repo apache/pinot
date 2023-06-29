@@ -338,6 +338,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get the tablecache object.
+   *
+   * @return TableCache object
+   */
+  public TableCache getTableCache() {
+    return _tableCache;
+  }
+
+  /**
    * Get the Helix cluster name.
    *
    * @return Helix cluster name
