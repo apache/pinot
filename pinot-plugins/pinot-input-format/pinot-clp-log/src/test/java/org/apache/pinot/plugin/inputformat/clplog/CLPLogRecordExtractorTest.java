@@ -29,11 +29,11 @@ import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractor.DICTIONARY_VARS_COLUMN_SUFFIX;
-import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractor.ENCODED_VARS_COLUMN_SUFFIX;
-import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractor.LOGTYPE_COLUMN_SUFFIX;
 import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.FIELDS_FOR_CLP_ENCODING_CONFIG_KEY;
 import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.FIELDS_FOR_CLP_ENCODING_SEPARATOR;
+import static org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter.DICTIONARY_VARS_COLUMN_SUFFIX;
+import static org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter.ENCODED_VARS_COLUMN_SUFFIX;
+import static org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter.LOGTYPE_COLUMN_SUFFIX;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNull;

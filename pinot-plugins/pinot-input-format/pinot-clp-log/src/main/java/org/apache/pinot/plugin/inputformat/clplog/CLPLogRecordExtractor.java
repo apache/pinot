@@ -33,6 +33,10 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter.DICTIONARY_VARS_COLUMN_SUFFIX;
+import static org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter.ENCODED_VARS_COLUMN_SUFFIX;
+import static org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter.LOGTYPE_COLUMN_SUFFIX;
+
 
 /**
  * A record extractor for log events. For configuration options, see {@link CLPLogRecordExtractorConfig}. This is an
@@ -62,10 +66,6 @@ import org.slf4j.LoggerFactory;
  * This class' implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}.
  */
 public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
-  public static final String LOGTYPE_COLUMN_SUFFIX = "_logtype";
-  public static final String DICTIONARY_VARS_COLUMN_SUFFIX = "_dictionaryVars";
-  public static final String ENCODED_VARS_COLUMN_SUFFIX = "_encodedVars";
-
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractor.class);
 
   private Set<String> _fields;
