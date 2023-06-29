@@ -328,7 +328,7 @@ public final class IngestionUtils {
     String delimiter = complexTypeConfig.getDelimiter() == null ? ComplexTypeTransformer.DEFAULT_DELIMITER
         : complexTypeConfig.getDelimiter();
     for (String field : fieldsToRead) {
-      result.add(StringUtils.split(field, delimiter)[0]);
+      result.add(StringUtils.splitByWholeSeparator(field, delimiter)[0]);
     }
     return result;
   }
