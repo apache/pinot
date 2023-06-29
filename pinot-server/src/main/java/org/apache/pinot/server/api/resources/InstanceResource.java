@@ -45,6 +45,9 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.server.api.AdminApiApplication;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+/**
+ * This resource API can be used to retrieve the tenant tags for the current server instance
+ */
 @Api(value = "instance-tags", description = "Instance tags", tags = "instance-tags",
     authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
