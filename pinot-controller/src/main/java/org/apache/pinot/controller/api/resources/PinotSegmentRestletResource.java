@@ -870,7 +870,7 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/select")
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Delete select segments. An optional 'excludeReplacedSegments' parameter is used to get the"
+  @ApiOperation(value = "Delete selected segments. An optional 'excludeReplacedSegments' parameter is used to get the"
       + " list of segments which has not yet been replaced (determined by segment lineage entries) and can be queried"
       + " from the table. The value is false by default.",
       // TODO: more and more filters can be added later on, like excludeErrorSegments, excludeConsumingSegments, etc.
