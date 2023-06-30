@@ -63,4 +63,14 @@ public interface AccessControl {
                                 String targetType, String permission) {
     return true;
   }
+
+  /**
+   * If an API is neither annotated with RBACAuthorization nor ManualAuthorization,
+   * this method will be called to check the authorization.
+   * If the return is false, then API will be terminated by the filter.
+   * @return true to allow
+   */
+  default boolean defaultAuthorization(RequesterIdentity requesterIdentity) {
+    return true;
+  }
 }

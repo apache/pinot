@@ -83,13 +83,13 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
     HttpRequesterIdentity httpRequestIdentity = HttpRequesterIdentity.fromRequest(request);
 
-    handleRBACAuthorization(endpointMethod, uriInfo, accessControl, httpRequestIdentity);
-
     // default authorization handling
     if (!accessControl.hasAccess(httpRequestIdentity)) {
       throw new WebApplicationException("Failed access check for " + httpRequestIdentity.getEndpointUrl(),
           Response.Status.FORBIDDEN);
     }
+
+    handleRBACAuthorization(endpointMethod, uriInfo, accessControl, httpRequestIdentity);
   }
 
   private void handleRBACAuthorization(Method endpointMethod, UriInfo uriInfo, AccessControl accessControl,
@@ -106,6 +106,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       } else {
         throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       }
+    } else if (!accessControl.defaultAuthorization(httpRequestIdentity)) {
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
   }
 
