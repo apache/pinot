@@ -152,31 +152,40 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
         continue;
       }
 
-      // Register the aggregation function with Calcite
-      PinotSqlAggFunction aggFunction = new PinotSqlAggFunction(
-          aggregationFunctionType.getName().toUpperCase(Locale.ROOT),
-          aggregationFunctionType.getSqlIdentifier(),
-          aggregationFunctionType.getSqlKind(),
-          aggregationFunctionType.getSqlReturnTypeInference(),
-          aggregationFunctionType.getSqlOperandTypeInference(),
-          aggregationFunctionType.getSqlOperandTypeChecker(),
-          aggregationFunctionType.getSqlFunctionCategory());
-      if (notRegistered(aggFunction)) {
-        register(aggFunction);
+      // Register the aggregation function with Calcite along with all alternative names
+      List<PinotSqlAggFunction> sqlAggFunctions = new ArrayList<>();
+      PinotSqlAggFunction aggFunction = generatePinotSqlAggFunction(aggregationFunctionType.getName(),
+          aggregationFunctionType, false);
+      sqlAggFunctions.add(aggFunction);
+      List<String> alternativeFunctionNames = aggregationFunctionType.getAlternativeNames();
+      if (alternativeFunctionNames == null || alternativeFunctionNames.size() == 0) {
+        // If no alternative function names are specified, generate one which converts camel case to have underscores
+        // as delimiters instead. E.g. boolAnd -> BOOL_AND
+        String alternativeFunctionName =
+            convertCamelCaseToUseUnderscores(aggregationFunctionType.getName());
+        PinotSqlAggFunction function = generatePinotSqlAggFunction(alternativeFunctionName, aggregationFunctionType,
+            false);
+        sqlAggFunctions.add(function);
+      } else {
+        for (String alternativeFunctionName : alternativeFunctionNames) {
+          PinotSqlAggFunction function = generatePinotSqlAggFunction(alternativeFunctionName, aggregationFunctionType,
+              false);
+          sqlAggFunctions.add(function);
+        }
+      }
+      for (PinotSqlAggFunction sqlAggFunction : sqlAggFunctions) {
+        if (notRegistered(sqlAggFunction)) {
+          register(sqlAggFunction);
+        }
       }
 
       if (!StringUtils.isEmpty(aggregationFunctionType.getIntermediateFunctionName())
           && !StringUtils.equals(aggregationFunctionType.getIntermediateFunctionName(),
           aggregationFunctionType.getName())) {
         // Register the intermediate function with Calcite if the name differs from the main function name
-        PinotSqlAggFunction intermediateAggFunction = new PinotSqlAggFunction(
-            aggregationFunctionType.getIntermediateFunctionName().toUpperCase(Locale.ROOT),
-            aggregationFunctionType.getSqlIdentifier(),
-            aggregationFunctionType.getSqlKind(),
-            aggregationFunctionType.getSqlIntermediateReturnTypeInference(),
-            aggregationFunctionType.getSqlOperandTypeInference(),
-            aggregationFunctionType.getSqlOperandTypeChecker(),
-            aggregationFunctionType.getSqlFunctionCategory());
+        PinotSqlAggFunction intermediateAggFunction =
+            generatePinotSqlAggFunction(aggregationFunctionType.getIntermediateFunctionName(), aggregationFunctionType,
+            true);
         if (notRegistered(intermediateAggFunction)) {
           register(intermediateAggFunction);
         }
@@ -196,6 +205,26 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
         }
       }
     }
+  }
+
+  private static String convertCamelCaseToUseUnderscores(String functionName) {
+    // Skip functions that have numbers for now and return their name as is
+    return functionName.matches(".*\\d.*")
+        ? functionName
+        : functionName.replaceAll("(.)(\\p{Upper}+|\\d+)", "$1_$2");
+  }
+
+  private static PinotSqlAggFunction generatePinotSqlAggFunction(String functionName,
+      AggregationFunctionType aggregationFunctionType, boolean isIntermediateStageFunction) {
+    return new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT),
+        aggregationFunctionType.getSqlIdentifier(),
+        aggregationFunctionType.getSqlKind(),
+        isIntermediateStageFunction
+            ? aggregationFunctionType.getSqlIntermediateReturnTypeInference()
+            : aggregationFunctionType.getSqlReturnTypeInference(),
+        aggregationFunctionType.getSqlOperandTypeInference(),
+        aggregationFunctionType.getSqlOperandTypeChecker(),
+        aggregationFunctionType.getSqlFunctionCategory());
   }
 
   private boolean notRegistered(SqlFunction op) {

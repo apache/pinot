@@ -27,8 +27,22 @@ import org.apache.pinot.spi.utils.BooleanUtils;
  * Default hint strategy set for Pinot query.
  */
 public class PinotHintStrategyTable {
+  /** Hint to denote that the aggregation node is the final aggregation stage which extracts the final result.
+   *  Maps to {@code AggregateOperator::Mode.EXTRACT_RESULT}
+   */
   public static final String INTERNAL_AGG_FINAL_STAGE = "aggFinalStage";
+  /** Hint to denote that the aggregation node is an intermediate aggregation stage. This stage can perform one of two
+   *  operations depending on the value of the 'isAggLeafStageSkipped' hint:
+   *  isAggLeafStageSkipped = true:  Perform aggregations on the actual raw input data.
+   *                                 Maps to {@code AggregateOperator::Mode.AGGREGATE}
+   *  isAggLeafStageSkipped = false: Merge intermediate results.
+   *                                 Maps to {@code AggregateOperator::Mode.MERGE}
+   */
   public static final String INTERNAL_AGG_INTERMEDIATE_STAGE = "aggIntermediateStage";
+  /** Hint to denote that the aggregation node is a leaf stage aggregation which performs aggregations on the actual
+   *  raw input data.
+   *  Maps to {@code AggregateOperator::Mode.AGGREGATE}
+   */
   public static final String INTERNAL_AGG_LEAF_STAGE = "aggLeafStage";
   // Hint to denote that aggregation is optimized to skip the leaf level
   public static final String INTERNAL_AGG_IS_LEAF_STAGE_SKIPPED = "isAggLeafStageSkipped";

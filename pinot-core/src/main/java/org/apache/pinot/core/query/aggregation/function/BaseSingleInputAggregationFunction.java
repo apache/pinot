@@ -40,7 +40,7 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().replace("_", "").toLowerCase() + "(" + _expression + ")";
+    return getType().getName().toLowerCase() + "(" + _expression + ")";
   }
 
   @Override

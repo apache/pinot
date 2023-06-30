@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -48,28 +50,29 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
-  COUNT("count", true, null, SqlKind.COUNT, ReturnTypes.BIGINT, null,
+  COUNT("count", Collections.emptyList(), true, null, SqlKind.COUNT, ReturnTypes.BIGINT, null,
       CalciteSystemProperty.STRICT.value() ? OperandTypes.ANY : OperandTypes.ONE_OR_MORE, SqlFunctionCategory.NUMERIC,
       null, ReturnTypes.BIGINT, null, null, null),
-  MIN("min", false, null, SqlKind.MIN, ReturnTypes.DOUBLE, null, OperandTypes.COMPARABLE_ORDERED,
-      SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, null, null, null),
-  MAX("max", false, null, SqlKind.MAX, ReturnTypes.DOUBLE, null, OperandTypes.COMPARABLE_ORDERED,
-      SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, null, null, null),
+  MIN("min", Collections.emptyList(), false, null, SqlKind.MIN, ReturnTypes.DOUBLE, null,
+      OperandTypes.COMPARABLE_ORDERED, SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, null, null, null),
+  MAX("max", Collections.emptyList(), false, null, SqlKind.MAX, ReturnTypes.DOUBLE, null,
+      OperandTypes.COMPARABLE_ORDERED, SqlFunctionCategory.SYSTEM, null, ReturnTypes.DOUBLE, null, null, null),
   // In multistage SUM is reduced via the PinotAvgSumAggregateReduceFunctionsRule, need not set up anything for reduce
-  SUM("sum", false, null, SqlKind.SUM, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
+  SUM("sum", Collections.emptyList(), false, null, SqlKind.SUM, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
       SqlFunctionCategory.NUMERIC, null, ReturnTypes.DOUBLE, null, null, null),
-  SUM0("$sum0", false, null, SqlKind.SUM0, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
+  SUM0("$sum0", Collections.emptyList(), false, null, SqlKind.SUM0, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
       SqlFunctionCategory.NUMERIC, null, ReturnTypes.DOUBLE, null, null, null),
   SUMPRECISION("sumPrecision"),
-  AVG("avg", true, null, SqlKind.AVG, ReturnTypes.AVG_AGG_FUNCTION, null, OperandTypes.NUMERIC,
-      SqlFunctionCategory.NUMERIC, null, null, "AVG_REDUCE", ReturnTypes.AVG_AGG_FUNCTION,
+  AVG("avg", Collections.emptyList(), true, null, SqlKind.AVG, ReturnTypes.AVG_AGG_FUNCTION, null,
+      OperandTypes.NUMERIC, SqlFunctionCategory.NUMERIC, null, null, "AVG_REDUCE", ReturnTypes.AVG_AGG_FUNCTION,
       OperandTypes.NUMERIC_NUMERIC),
   MODE("mode"),
   FIRSTWITHTIME("firstWithTime"),
   LASTWITHTIME("lastWithTime"),
   MINMAXRANGE("minMaxRange"),
-  DISTINCTCOUNT("distinctCount", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BIGINT, null, OperandTypes.ANY,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.explicit(SqlTypeName.OTHER), null, null, null),
+  DISTINCTCOUNT("distinctCount", Collections.emptyList(), false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BIGINT,
+      null, OperandTypes.ANY, SqlFunctionCategory.USER_DEFINED_FUNCTION, null,
+      ReturnTypes.explicit(SqlTypeName.OTHER), null, null, null),
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
@@ -96,12 +99,12 @@ public enum AggregationFunctionType {
   VARSAMP("varSamp"),
   STDDEVPOP("stdDevPop"),
   STDDEVSAMP("stdDevSamp"),
-  SKEWNESS("skewness", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment", ReturnTypes.explicit(SqlTypeName.OTHER), null, null,
-      null),
-  KURTOSIS("kurtosis", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.DOUBLE, null, OperandTypes.NUMERIC,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment", ReturnTypes.explicit(SqlTypeName.OTHER), null, null,
-      null),
+  SKEWNESS("skewness", Collections.emptyList(), false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.DOUBLE, null,
+      OperandTypes.NUMERIC, SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment",
+      ReturnTypes.explicit(SqlTypeName.OTHER), null, null, null),
+  KURTOSIS("kurtosis", Collections.emptyList(), false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.DOUBLE, null,
+      OperandTypes.NUMERIC, SqlFunctionCategory.USER_DEFINED_FUNCTION, "fourthMoment",
+      ReturnTypes.explicit(SqlTypeName.OTHER), null, null, null),
   FOURTHMOMENT("fourthMoment"),
 
   // DataSketches Tuple Sketch support
@@ -138,10 +141,10 @@ public enum AggregationFunctionType {
   PERCENTILERAWKLLMV("percentileRawKLLMV"),
 
   // boolean aggregate functions
-  BOOLAND("bool_And", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null, OperandTypes.BOOLEAN,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, null, null, null),
-  BOOLOR("bool_Or", false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null, OperandTypes.BOOLEAN,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, null, null, null),
+  BOOLAND("boolAnd", Collections.emptyList(), false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null,
+      OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.BOOLEAN, null, null, null),
+  BOOLOR("boolOr", Collections.emptyList(), false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null,
+      OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.BOOLEAN, null, null, null),
 
   // argMin and argMax
   ARGMIN("argMin"),
@@ -158,6 +161,7 @@ public enum AggregationFunctionType {
       func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());
 
   private final String _name;
+  private final List<String> _alternativeNames;
   private final boolean _isNativeCalciteAggregationFunctionType;
 
   // Fields for registering the aggregation function with Calcite in multistage. These are typically used for the
@@ -185,19 +189,20 @@ public enum AggregationFunctionType {
    * Constructor to use for aggregation functions which are only supported in v1 engine today
    */
   AggregationFunctionType(String name) {
-    this(name, false, null, null, null, null, null, null, null, null, null, null, null);
+    this(name, Collections.emptyList(), false, null, null, null, null, null, null, null, null, null, null, null);
   }
 
   /**
    * Constructor to use for aggregation functions which are supported in both v1 and multistage engines
    */
-  AggregationFunctionType(String name, boolean isNativeCalciteAggregationFunctionType,
+  AggregationFunctionType(String name, List<String> alternativeNames, boolean isNativeCalciteAggregationFunctionType,
       SqlIdentifier sqlIdentifier, SqlKind sqlKind, SqlReturnTypeInference sqlReturnTypeInference,
       SqlOperandTypeInference sqlOperandTypeInference, SqlOperandTypeChecker sqlOperandTypeChecker,
       SqlFunctionCategory sqlFunctionCategory, String intermediateFunctionName,
       SqlReturnTypeInference sqlIntermediateReturnTypeInference, String reduceFunctionName,
       SqlReturnTypeInference sqlReduceReturnTypeInference, SqlOperandTypeChecker sqlReduceOperandTypeChecker) {
     _name = name;
+    _alternativeNames = alternativeNames;
     _isNativeCalciteAggregationFunctionType = isNativeCalciteAggregationFunctionType;
     _sqlIdentifier = sqlIdentifier;
     _sqlKind = sqlKind;
@@ -214,6 +219,10 @@ public enum AggregationFunctionType {
 
   public String getName() {
     return _name;
+  }
+
+  public List<String> getAlternativeNames() {
+    return _alternativeNames;
   }
 
   public boolean isNativeCalciteAggregationFunctionType() {

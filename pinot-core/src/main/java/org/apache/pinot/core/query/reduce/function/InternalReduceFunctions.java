@@ -32,7 +32,7 @@ public class InternalReduceFunctions {
   private InternalReduceFunctions() {
   }
 
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true)
   public static Double avgReduce(Double intermediateResultSum, Long intermediateResultCount) {
     if (intermediateResultCount == null || intermediateResultCount == 0L || intermediateResultSum == null) {
       return null;
