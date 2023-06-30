@@ -244,7 +244,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     } finally {
       finishOperation();
       if (_enableSnapshot) {
-        _snapshotLock.readLock().lock();
+        _snapshotLock.readLock().unlock();
       }
     }
   }
