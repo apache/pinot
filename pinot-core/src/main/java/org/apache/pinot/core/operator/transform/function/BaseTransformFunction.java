@@ -23,8 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -188,56 +186,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _intValuesSV;
   }
 
-  @Override
-  public Pair<int[], RoaringBitmap> transformToIntValuesSVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initIntValuesSV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        _intValuesSV = transformToIntValuesSV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case LONG:
-        Pair<long[], RoaringBitmap> longResult = transformToLongValuesSVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _intValuesSV, length);
-        break;
-      case FLOAT:
-        Pair<float[], RoaringBitmap> floatResult = transformToFloatValuesSVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _intValuesSV, length);
-        break;
-      case DOUBLE:
-        Pair<double[], RoaringBitmap> doubleResult = transformToDoubleValuesSVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _intValuesSV, length);
-        break;
-      case BIG_DECIMAL:
-        Pair<BigDecimal[], RoaringBitmap> bigDecimalResult = transformToBigDecimalValuesSVWithNull(valueBlock);
-        bitmap = bigDecimalResult.getRight();
-        ArrayCopyUtils.copy(bigDecimalResult.getLeft(), _intValuesSV, length);
-        break;
-      case STRING:
-        Pair<String[], RoaringBitmap> stringResult = transformToStringValuesSVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _intValuesSV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read SV %s as INT", resultDataType));
-    }
-    return ImmutablePair.of(_intValuesSV, bitmap);
-  }
-
   protected void initLongValuesSV(int length) {
     if (_longValuesSV == null || _longValuesSV.length < length) {
       _longValuesSV = new long[length];
@@ -286,56 +234,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _longValuesSV;
-  }
-
-  @Override
-  public Pair<long[], RoaringBitmap> transformToLongValuesSVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initLongValuesSV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[], RoaringBitmap> intResults = transformToIntValuesSVWithNull(valueBlock);
-        bitmap = intResults.getRight();
-        ArrayCopyUtils.copy(intResults.getLeft(), _longValuesSV, length);
-        break;
-      case LONG:
-        _longValuesSV = transformToLongValuesSV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case FLOAT:
-        Pair<float[], RoaringBitmap> floatResult = transformToFloatValuesSVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _longValuesSV, length);
-        break;
-      case DOUBLE:
-        Pair<double[], RoaringBitmap> doubleResult = transformToDoubleValuesSVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _longValuesSV, length);
-        break;
-      case BIG_DECIMAL:
-        Pair<BigDecimal[], RoaringBitmap> bigDecimalResult = transformToBigDecimalValuesSVWithNull(valueBlock);
-        bitmap = bigDecimalResult.getRight();
-        ArrayCopyUtils.copy(bigDecimalResult.getLeft(), _longValuesSV, length);
-        break;
-      case STRING:
-        Pair<String[], RoaringBitmap> stringResult = transformToStringValuesSVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _longValuesSV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _longValuesSV[i] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read SV %s as LONG", resultDataType));
-    }
-    return ImmutablePair.of(_longValuesSV, bitmap);
   }
 
   protected void initFloatValuesSV(int length) {
@@ -388,56 +286,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _floatValuesSV;
   }
 
-  @Override
-  public Pair<float[], RoaringBitmap> transformToFloatValuesSVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initFloatValuesSV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[], RoaringBitmap> intResult = transformToIntValuesSVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _floatValuesSV, length);
-        break;
-      case LONG:
-        Pair<long[], RoaringBitmap> longResult = transformToLongValuesSVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _floatValuesSV, length);
-        break;
-      case FLOAT:
-        _floatValuesSV = transformToFloatValuesSV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case DOUBLE:
-        Pair<double[], RoaringBitmap> doubleResult = transformToDoubleValuesSVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _floatValuesSV, length);
-        break;
-      case BIG_DECIMAL:
-        Pair<BigDecimal[], RoaringBitmap> bigDecimalResult = transformToBigDecimalValuesSVWithNull(valueBlock);
-        bitmap = bigDecimalResult.getRight();
-        ArrayCopyUtils.copy(bigDecimalResult.getLeft(), _floatValuesSV, length);
-        break;
-      case STRING:
-        Pair<String[], RoaringBitmap> stringResult = transformToStringValuesSVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _floatValuesSV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _floatValuesSV[i] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read SV %s as FLOAT", resultDataType));
-    }
-    return ImmutablePair.of(_floatValuesSV, bitmap);
-  }
-
   protected void initDoubleValuesSV(int length) {
     if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
       _doubleValuesSV = new double[length];
@@ -486,56 +334,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _doubleValuesSV;
-  }
-
-  @Override
-  public Pair<double[], RoaringBitmap> transformToDoubleValuesSVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initDoubleValuesSV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[], RoaringBitmap> intResult = transformToIntValuesSVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _doubleValuesSV, length);
-        break;
-      case LONG:
-        Pair<long[], RoaringBitmap> longResult = transformToLongValuesSVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _doubleValuesSV, length);
-        break;
-      case FLOAT:
-        Pair<float[], RoaringBitmap> floatResult = transformToFloatValuesSVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _doubleValuesSV, length);
-        break;
-      case DOUBLE:
-        _doubleValuesSV = transformToDoubleValuesSV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case BIG_DECIMAL:
-        Pair<BigDecimal[], RoaringBitmap> bigDecimalResult = transformToBigDecimalValuesSVWithNull(valueBlock);
-        bitmap = bigDecimalResult.getRight();
-        ArrayCopyUtils.copy(bigDecimalResult.getLeft(), _doubleValuesSV, length);
-        break;
-      case STRING:
-        Pair<String[], RoaringBitmap> stringResult = transformToStringValuesSVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _doubleValuesSV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _doubleValuesSV[i] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read SV %s as DOUBLE", resultDataType));
-    }
-    return ImmutablePair.of(_doubleValuesSV, bitmap);
   }
 
   protected void initBigDecimalValuesSV(int length) {
@@ -592,61 +390,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _bigDecimalValuesSV;
   }
 
-  @Override
-  public Pair<BigDecimal[], RoaringBitmap> transformToBigDecimalValuesSVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initBigDecimalValuesSV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[], RoaringBitmap> intResult = transformToIntValuesSVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _bigDecimalValuesSV, length);
-        break;
-      case LONG:
-        Pair<long[], RoaringBitmap> longResult = transformToLongValuesSVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _bigDecimalValuesSV, length);
-        break;
-      case FLOAT:
-        Pair<float[], RoaringBitmap> floatResult = transformToFloatValuesSVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _bigDecimalValuesSV, length);
-        break;
-      case DOUBLE:
-        Pair<double[], RoaringBitmap> doubleResult = transformToDoubleValuesSVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _bigDecimalValuesSV, length);
-        break;
-      case BIG_DECIMAL:
-        _bigDecimalValuesSV = transformToBigDecimalValuesSV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case STRING:
-        Pair<String[], RoaringBitmap> stringResult = transformToStringValuesSVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _bigDecimalValuesSV, length);
-        break;
-      case BYTES:
-        Pair<byte[][], RoaringBitmap> byteResult = transformToBytesValuesSVWithNull(valueBlock);
-        bitmap = byteResult.getRight();
-        ArrayCopyUtils.copy(byteResult.getLeft(), _bigDecimalValuesSV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _bigDecimalValuesSV[i] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read SV %s as BIG_DECIMAL", resultDataType));
-    }
-    return ImmutablePair.of(_bigDecimalValuesSV, bitmap);
-  }
-
   protected void initStringValuesSV(int length) {
     if (_stringValuesSV == null || _stringValuesSV.length < length) {
       _stringValuesSV = new String[length];
@@ -701,61 +444,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _stringValuesSV;
   }
 
-  @Override
-  public Pair<String[], RoaringBitmap> transformToStringValuesSVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initStringValuesSV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[], RoaringBitmap> intResult = transformToIntValuesSVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _stringValuesSV, length);
-        break;
-      case LONG:
-        Pair<long[], RoaringBitmap> longResult = transformToLongValuesSVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _stringValuesSV, length);
-        break;
-      case FLOAT:
-        Pair<float[], RoaringBitmap> floatResult = transformToFloatValuesSVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _stringValuesSV, length);
-        break;
-      case DOUBLE:
-        Pair<double[], RoaringBitmap> doubleResult = transformToDoubleValuesSVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _stringValuesSV, length);
-        break;
-      case BIG_DECIMAL:
-        Pair<BigDecimal[], RoaringBitmap> bigDecimalResult = transformToBigDecimalValuesSVWithNull(valueBlock);
-        bitmap = bigDecimalResult.getRight();
-        ArrayCopyUtils.copy(bigDecimalResult.getLeft(), _stringValuesSV, length);
-        break;
-      case STRING:
-        _stringValuesSV = transformToStringValuesSV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case BYTES:
-        Pair<byte[][], RoaringBitmap> byteResult = transformToBytesValuesSVWithNull(valueBlock);
-        bitmap = byteResult.getRight();
-        ArrayCopyUtils.copy(byteResult.getLeft(), _stringValuesSV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _stringValuesSV[i] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read SV %s as STRING", resultDataType));
-    }
-    return ImmutablePair.of(_stringValuesSV, bitmap);
-  }
-
   protected void initBytesValuesSV(int length) {
     if (_bytesValuesSV == null || _bytesValuesSV.length < length) {
       _bytesValuesSV = new byte[length][];
@@ -792,41 +480,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _bytesValuesSV;
-  }
-
-  @Override
-  public Pair<byte[][], RoaringBitmap> transformToBytesValuesSVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initBytesValuesSV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case BIG_DECIMAL:
-        Pair<BigDecimal[], RoaringBitmap> bigDecimalResult = transformToBigDecimalValuesSVWithNull(valueBlock);
-        bitmap = bigDecimalResult.getRight();
-        ArrayCopyUtils.copy(bigDecimalResult.getLeft(), _bytesValuesSV, length);
-        break;
-      case STRING:
-        Pair<String[], RoaringBitmap> stringResult = transformToStringValuesSVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _bytesValuesSV, length);
-        break;
-      case BYTES:
-        _bytesValuesSV = transformToBytesValuesSV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case UNKNOWN:
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        for (int i = 0; i < length; i++) {
-          _bytesValuesSV[i] = (byte[]) DataSchema.ColumnDataType.BYTES.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read SV %s as BYTES", resultDataType));
-    }
-    return ImmutablePair.of(_bytesValuesSV, bitmap);
   }
 
   protected void initIntValuesMV(int length) {
@@ -881,51 +534,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _intValuesMV;
   }
 
-  @Override
-  public Pair<int[][], RoaringBitmap> transformToIntValuesMVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initIntValuesMV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        _intValuesMV = transformToIntValuesMV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case LONG:
-        Pair<long[][], RoaringBitmap> longResult = transformToLongValuesMVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _intValuesMV, length);
-        break;
-      case FLOAT:
-        Pair<float[][], RoaringBitmap> floatResult = transformToFloatValuesMVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _intValuesMV, length);
-        break;
-      case DOUBLE:
-        Pair<double[][], RoaringBitmap> doubleResult = transformToDoubleValuesMVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _intValuesMV, length);
-        break;
-      case STRING:
-        Pair<String[][], RoaringBitmap> stringResult = transformToStringValuesMVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _intValuesMV, length);
-        break;
-      case UNKNOWN:
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        for (int i = 0; i < length; i++) {
-          _intValuesMV[i] = (int[]) DataSchema.ColumnDataType.INT_ARRAY.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read MV %s as INT", resultDataType));
-    }
-    return ImmutablePair.of(_intValuesMV, bitmap);
-  }
-
   protected void initLongValuesMV(int length) {
     if (_longValuesMV == null || _longValuesMV.length < length) {
       _longValuesMV = new long[length][];
@@ -976,47 +584,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _longValuesMV;
-  }
-
-  @Override
-  public Pair<long[][], RoaringBitmap> transformToLongValuesMVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initLongValuesMV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[][], RoaringBitmap> intResult = transformToIntValuesMVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _longValuesMV, length);
-        break;
-      case FLOAT:
-        Pair<float[][], RoaringBitmap> floatResult = transformToFloatValuesMVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _longValuesMV, length);
-        break;
-      case DOUBLE:
-        Pair<double[][], RoaringBitmap> doubleResult = transformToDoubleValuesMVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _longValuesMV, length);
-        break;
-      case STRING:
-        Pair<String[][], RoaringBitmap> stringResult = transformToStringValuesMVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _longValuesMV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _longValuesMV[i] = (long[]) DataSchema.ColumnDataType.LONG_ARRAY.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read MV %s as LONG", resultDataType));
-    }
-    return ImmutablePair.of(_longValuesMV, bitmap);
   }
 
   protected void initFloatValuesMV(int length) {
@@ -1071,51 +638,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _floatValuesMV;
   }
 
-  @Override
-  public Pair<float[][], RoaringBitmap> transformToFloatValuesMVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initFloatValuesMV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[][], RoaringBitmap> intResult = transformToIntValuesMVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _floatValuesMV, length);
-        break;
-      case LONG:
-        Pair<long[][], RoaringBitmap> longResult = transformToLongValuesMVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _floatValuesMV, length);
-        break;
-      case FLOAT:
-        _floatValuesMV = transformToFloatValuesMV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case DOUBLE:
-        Pair<double[][], RoaringBitmap> doubleResult = transformToDoubleValuesMVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _floatValuesMV, length);
-        break;
-      case STRING:
-        Pair<String[][], RoaringBitmap> stringResult = transformToStringValuesMVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _floatValuesMV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _floatValuesMV[i] = (float[]) DataSchema.ColumnDataType.FLOAT_ARRAY.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read MV %s as FLOAT", resultDataType));
-    }
-    return ImmutablePair.of(_floatValuesMV, bitmap);
-  }
-
   protected void initDoubleValuesMV(int length) {
     if (_doubleValuesMV == null || _doubleValuesMV.length < length) {
       _doubleValuesMV = new double[length][];
@@ -1166,51 +688,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _doubleValuesMV;
-  }
-
-  @Override
-  public Pair<double[][], RoaringBitmap> transformToDoubleValuesMVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initDoubleValuesMV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType.getStoredType()) {
-      case INT:
-        Pair<int[][], RoaringBitmap> intResult = transformToIntValuesMVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _doubleValuesMV, length);
-        break;
-      case LONG:
-        Pair<long[][], RoaringBitmap> longResult = transformToLongValuesMVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _doubleValuesMV, length);
-        break;
-      case FLOAT:
-        Pair<float[][], RoaringBitmap> floatResult = transformToFloatValuesMVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _doubleValuesMV, length);
-        break;
-      case DOUBLE:
-        _doubleValuesMV = transformToDoubleValuesMV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case STRING:
-        Pair<String[][], RoaringBitmap> stringResult = transformToStringValuesMVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _doubleValuesMV, length);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _doubleValuesMV[i] = (double[]) DataSchema.ColumnDataType.DOUBLE_ARRAY.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read MV %s as DOUBLE", resultDataType));
-    }
-    return ImmutablePair.of(_doubleValuesMV, bitmap);
   }
 
   protected void initStringValuesMV(int length) {
@@ -1265,51 +742,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _stringValuesMV;
   }
 
-  @Override
-  public Pair<String[][], RoaringBitmap> transformToStringValuesMVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initStringValuesMV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType) {
-      case INT:
-        Pair<int[][], RoaringBitmap> intResult = transformToIntValuesMVWithNull(valueBlock);
-        bitmap = intResult.getRight();
-        ArrayCopyUtils.copy(intResult.getLeft(), _stringValuesMV, length);
-        break;
-      case LONG:
-        Pair<long[][], RoaringBitmap> longResult = transformToLongValuesMVWithNull(valueBlock);
-        bitmap = longResult.getRight();
-        ArrayCopyUtils.copy(longResult.getLeft(), _stringValuesMV, length);
-        break;
-      case FLOAT:
-        Pair<float[][], RoaringBitmap> floatResult = transformToFloatValuesMVWithNull(valueBlock);
-        bitmap = floatResult.getRight();
-        ArrayCopyUtils.copy(floatResult.getLeft(), _stringValuesMV, length);
-        break;
-      case DOUBLE:
-        Pair<double[][], RoaringBitmap> doubleResult = transformToDoubleValuesMVWithNull(valueBlock);
-        bitmap = doubleResult.getRight();
-        ArrayCopyUtils.copy(doubleResult.getLeft(), _stringValuesMV, length);
-        break;
-      case STRING:
-        _stringValuesMV = transformToStringValuesMV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _stringValuesMV[i] = (String[]) DataSchema.ColumnDataType.STRING_ARRAY.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read MV %s as STRING", resultDataType));
-    }
-    return ImmutablePair.of(_stringValuesMV, bitmap);
-  }
-
   protected void initBytesValuesMV(int length) {
     if (_bytesValuesMV == null || _bytesValuesMV.length < length) {
       _bytesValuesMV = new byte[length][][];
@@ -1336,36 +768,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
       ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
     }
     return _bytesValuesMV;
-  }
-
-  @Override
-  public Pair<byte[][][], RoaringBitmap> transformToBytesValuesMVWithNull(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initBytesValuesMV(length);
-    RoaringBitmap bitmap;
-    DataType resultDataType = getResultMetadata().getDataType();
-    switch (resultDataType) {
-      case STRING:
-        Pair<String[][], RoaringBitmap> stringResult = transformToStringValuesMVWithNull(valueBlock);
-        bitmap = stringResult.getRight();
-        ArrayCopyUtils.copy(stringResult.getLeft(), _bytesValuesMV, length);
-        break;
-      case BYTES:
-        _bytesValuesMV = transformToBytesValuesMV(valueBlock);
-        bitmap = getNullBitmap(valueBlock);
-        break;
-      case UNKNOWN:
-        bitmap = new RoaringBitmap();
-        bitmap.add(0L, length);
-        // Copy the values to ensure behaviour consistency with non null-handling.
-        for (int i = 0; i < length; i++) {
-          _bytesValuesMV[i] = (byte[][]) DataSchema.ColumnDataType.BYTES_ARRAY.getNullPlaceholder();
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format("Cannot read MV %s as bytes", resultDataType));
-    }
-    return ImmutablePair.of(_bytesValuesMV, bitmap);
   }
 
   @Nullable
