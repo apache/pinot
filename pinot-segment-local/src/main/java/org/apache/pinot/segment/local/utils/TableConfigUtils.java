@@ -526,7 +526,7 @@ public final class TableConfigUtils {
                   String.format("Column \"%s\" not found in schema!", entry.getKey()));
               try {
                 // check that it's a valid aggregation function type
-                AggregationFunctionType aft = AggregationFunctionType.valueOf(entry.getValue().toUpperCase());
+                AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
                 // check that a value aggregator and is available and configured
                 ValueAggregatorFactory.getValueAggregator(aft);
                 ValueAggregatorFactory.getAggregatedValueType(aft);
