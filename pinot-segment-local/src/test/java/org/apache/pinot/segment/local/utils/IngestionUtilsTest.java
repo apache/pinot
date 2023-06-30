@@ -233,4 +233,20 @@ public class IngestionUtilsTest {
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("s1")));
   }
+
+  @Test
+  public void testComplexTypeConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ComplexTypeConfig complexTypeConfig = new ComplexTypeConfig(null, "__",
+        ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, null);
+    Schema schema = new Schema();
+
+    ingestionConfig.setComplexTypeConfig(complexTypeConfig);
+    schema.addField(new DimensionFieldSpec("a_b__c_d", FieldSpec.DataType.STRING, true));
+    schema.addField(new DimensionFieldSpec("f_d", FieldSpec.DataType.STRING, false));
+    schema.addField(new DimensionFieldSpec("ab__cd", FieldSpec.DataType.STRING, true));
+    Set<String> fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
+    Assert.assertEquals(fields.size(), 3);
+    Assert.assertTrue(fields.containsAll(Sets.newHashSet("a_b", "f_d", "ab")));
+  }
 }
