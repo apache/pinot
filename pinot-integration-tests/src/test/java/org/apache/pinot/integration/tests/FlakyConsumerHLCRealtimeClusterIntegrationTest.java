@@ -28,11 +28,13 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.testng.annotations.Test;
 
 
 /**
  * Integration test that simulates a flaky Kafka consumer.
  */
+@Test(enabled = false)
 public class FlakyConsumerHLCRealtimeClusterIntegrationTest extends HLCRealtimeClusterIntegrationTest {
 
   @Override
@@ -40,6 +42,7 @@ public class FlakyConsumerHLCRealtimeClusterIntegrationTest extends HLCRealtimeC
     return FlakyStreamFactory.class.getName();
   }
 
+  @Deprecated(since = "Pinot no longer support high level consumer model since v0.12.*")
   public static class FlakyStreamLevelConsumer implements StreamLevelConsumer {
     private StreamLevelConsumer _streamLevelConsumer;
     private Random _random = new Random();

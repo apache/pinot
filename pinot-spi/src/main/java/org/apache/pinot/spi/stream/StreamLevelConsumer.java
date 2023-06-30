@@ -26,6 +26,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /**
  * Interface for a consumer that consumes at stream level and is unaware of any partitions of the stream
  */
+@Deprecated(since = "Pinot no longer support high level consumer model since v0.12.*")
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface StreamLevelConsumer {

@@ -26,6 +26,7 @@ import org.apache.pinot.spi.stream.StreamLevelConsumer;
  * Test implementation of {@link StreamLevelConsumer}
  * This is currently a no-op
  */
+@Deprecated(since = "Pinot no longer support high level consumer model since v0.12.*")
 public class FakeStreamLevelConsumer implements StreamLevelConsumer {
   @Override
   public void start()
