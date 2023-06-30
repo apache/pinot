@@ -42,7 +42,6 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
@@ -84,6 +83,8 @@ import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+
 
 /**
  * Utils related to table config operations
@@ -104,7 +105,7 @@ public final class TableConfigUtils {
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
-      EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+      EnumSet.of(AggregationFunctionType.SUM, MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.COUNT);
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -484,6 +485,14 @@ public final class TableConfigUtils {
     }
   }
 
+  public final static Set<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS = Set.of(
+     MIN, MAX, SUM,
+      DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL,
+      DISTINCTCOUNTTHETASKETCH, DISTINCTCOUNTRAWTHETASKETCH,
+      DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+      SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH
+  );
+
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
@@ -527,10 +536,11 @@ public final class TableConfigUtils {
               try {
                 // check that it's a valid aggregation function type
                 AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
-                // check that a value aggregator and is available and configured
-                ValueAggregatorFactory.getValueAggregator(aft);
-                ValueAggregatorFactory.getAggregatedValueType(aft);
-              } catch (IllegalArgumentException | IllegalStateException e) {
+                // check that a value aggregator is available
+                if (!AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
+                  throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
+                }
+              } catch (IllegalArgumentException e) {
                 String err = String.format(
                     "Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
                 throw new IllegalStateException(err);
