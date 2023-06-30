@@ -103,16 +103,17 @@ public class CLPDecodeRewriter implements QueryRewriter {
     String functionName = function.getOperator();
     if (functionName.equals(_CLPDECODE_LOWERCASE_TRANSFORM_NAME)) {
       rewriteCLPDecodeFunction(expression);
-    } else {
-      // Function isn't a CLP function that needs rewriting, but the arguments might be, so we recursively process them.
-      for (Expression op : function.getOperands()) {
-        tryRewritingExpression(op);
-      }
+      return;
+    }
+
+    // Function isn't a CLP function that needs rewriting, but the arguments might be, so we recursively process them.
+    for (Expression op : function.getOperands()) {
+      tryRewritingExpression(op);
     }
   }
 
   /**
-   * Rewrites the given instance of clpDecode as described in the class docstring
+   * Rewrites the given instance of clpDecode as described in the class' Javadoc
    * @param expression clpDecode function expression
    */
   private void rewriteCLPDecodeFunction(Expression expression) {
