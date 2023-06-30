@@ -164,7 +164,7 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     } catch (IOException e) {
       // Expected 500 Bad Request
       assertTrue(e.getMessage().contains("Error: State mentioned random is wrong. "
-          + "Valid States: Enable, Disable, Drop"));
+          + "Valid States: Enable, Disable"));
     }
   }
 
