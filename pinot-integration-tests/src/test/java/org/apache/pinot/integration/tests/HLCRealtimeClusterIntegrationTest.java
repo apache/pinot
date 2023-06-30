@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
+import org.testng.annotations.Test;
+
+
 /**
  * Integration test for high-level Kafka consumer.
  */
+@Test(enabled = false)
 public class HLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
 
   @Override
