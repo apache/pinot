@@ -87,10 +87,6 @@ public class MultipleTreesBuilder implements Closeable {
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _separator = getSeparator();
-    if (_separator != null) {
-      StarTreeBuilderUtils.removeStarTrees(indexDir);
-      _metadataProperties.reload();
-    }
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
   }
 
@@ -112,10 +108,6 @@ public class MultipleTreesBuilder implements Closeable {
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _separator = getSeparator();
-    if (_separator != null) {
-      StarTreeBuilderUtils.removeStarTrees(indexDir);
-      _metadataProperties.refresh();
-    }
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
       _builderConfigs = StarTreeBuilderUtils
@@ -135,10 +127,11 @@ public class MultipleTreesBuilder implements Closeable {
     try {
       _separatorTempDir = new File(_segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(_separatorTempDir);
-      FileUtils.copyFileToDirectory(
+      FileUtils.moveFileToDirectory(
           new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME), _separatorTempDir, false);
-      FileUtils.copyFileToDirectory(
+      FileUtils.moveFileToDirectory(
           new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME), _separatorTempDir, false);
+      _metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
       return new StarTreeIndexSeparator(new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
           new File(_separatorTempDir, StarTreeV2Constants.INDEX_FILE_NAME), _metadataProperties);
     } catch (Exception e) {
