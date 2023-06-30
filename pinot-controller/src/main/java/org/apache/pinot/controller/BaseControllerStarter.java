@@ -84,7 +84,6 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
@@ -167,7 +166,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
   protected PeriodicTaskScheduler _periodicTaskScheduler;
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
-  protected PinotRealtimeSegmentManager _realtimeSegmentsManager;
   protected PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   protected SegmentCompletionManager _segmentCompletionManager;
   protected LeadControllerManager _leadControllerManager;
@@ -511,7 +509,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     if (existingHlcTables.size() > 0) {
       LOGGER.error("High Level Consumer (HLC) based realtime tables are no longer supported. Please delete the "
           + "following HLC tables before proceeding: \n");
-      existingHlcTables.forEach(s -> LOGGER.info("{}\n", s));
+      existingHlcTables.forEach(s -> LOGGER.error("{}\n", s));
       throw new RuntimeException("Unable to start controller due to existing HLC tables!");
     }
 
@@ -769,11 +767,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
       LOGGER.info("Stopping Jersey admin API");
       _adminApp.stop();
-
-      if (_realtimeSegmentsManager != null) {
-        LOGGER.info("Stopping realtime segment manager");
-        _realtimeSegmentsManager.stop();
-      }
 
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
