@@ -37,6 +37,8 @@ import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.RBACAuthUtils;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.glassfish.grizzly.http.server.Request;
 
 /**
@@ -81,9 +83,29 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
     HttpRequesterIdentity httpRequestIdentity = HttpRequesterIdentity.fromRequest(request);
 
+    handleRBACAuthorization(endpointMethod, uriInfo, accessControl, httpRequestIdentity);
+
+    // default authorization handling
     if (!accessControl.hasAccess(httpRequestIdentity)) {
       throw new WebApplicationException("Failed access check for " + httpRequestIdentity.getEndpointUrl(),
           Response.Status.FORBIDDEN);
+    }
+  }
+
+  private void handleRBACAuthorization(Method endpointMethod, UriInfo uriInfo, AccessControl accessControl,
+                                       HttpRequesterIdentity httpRequestIdentity) {
+    if (endpointMethod.isAnnotationPresent(RBACAuthorization.class)) {
+      RBACAuthorization rbacAuthorization = endpointMethod.getAnnotation(RBACAuthorization.class);
+      String targetId = RBACAuthUtils.getTargetId(rbacAuthorization.targetId(), uriInfo.getPathParameters(),
+              uriInfo.getQueryParameters());
+      if (targetId != null) {
+        if (!accessControl.hasRBACAccess(httpRequestIdentity, targetId, rbacAuthorization.targetType(),
+                rbacAuthorization.permission())) {
+          throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+        }
+      } else {
+        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+      }
     }
   }
 

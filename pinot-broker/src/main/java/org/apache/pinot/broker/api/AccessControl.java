@@ -58,4 +58,9 @@ public interface AccessControl {
    * @return {@code true} if authorized, {@code false} otherwise
    */
   boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
+
+  default boolean hasRBACAccess(RequesterIdentity requesterIdentity, String targetId,
+                                String targetType, String permission) {
+    return true;
+  }
 }

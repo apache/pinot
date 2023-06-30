@@ -36,9 +36,15 @@ import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.RBACAuthUtils;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.glassfish.grizzly.http.server.Request;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,6 +53,8 @@ import org.glassfish.grizzly.http.server.Request;
  */
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticationFilter.class);
   private static final Set<String> UNPROTECTED_PATHS =
       new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "health"));
   private static final String KEY_TABLE_NAME = "tableName";
@@ -98,6 +106,26 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     String tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     AccessType accessType = extractAccessType(endpointMethod);
     AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
+
+    handleRBACAuthorization(endpointMethod, uriInfo, accessControl);
+  }
+
+  private void handleRBACAuthorization(Method endpointMethod, UriInfo uriInfo, AccessControl accessControl) {
+    if (endpointMethod.isAnnotationPresent(RBACAuthorization.class)) {
+      RBACAuthorization rbacAuthorization = endpointMethod.getAnnotation(RBACAuthorization.class);
+      String targetId = RBACAuthUtils.getTargetId(rbacAuthorization.targetId(), uriInfo.getPathParameters(),
+              uriInfo.getQueryParameters());
+      if (targetId != null) {
+        if (!accessControl.hasRBACAccess(_httpHeaders, targetId, rbacAuthorization.targetType(),
+                rbacAuthorization.permission())) {
+          throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+        }
+      } else {
+        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+      }
+    } else if (!accessControl.defaultAuthorization(_httpHeaders)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
   }
 
   @VisibleForTesting

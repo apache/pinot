@@ -42,6 +42,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
@@ -381,7 +382,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
       BrokerRequest serverBrokerRequest =
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
-      boolean hasTableAccess = _accessControlFactory.create().hasAccess(requesterIdentity, serverBrokerRequest);
+      AccessControl accessControl = _accessControlFactory.create();
+      boolean hasTableAccess = accessControl.hasAccess(requesterIdentity, serverBrokerRequest) &&
+              accessControl.hasRBACAccess(requesterIdentity, tableName, "table", "read");
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
