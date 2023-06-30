@@ -145,10 +145,11 @@ public final class TableConfigUtils {
       Preconditions.checkNotNull(streamType, "stream.type cannot be null for REALTIME table");
 
       Preconditions.checkState(StreamConfig.ConsumerType.LOWLEVEL.name()
-          .equalsIgnoreCase(streamConfigsMap.get(StreamConfigProperties.constructStreamProperty(streamType,
-              StreamConfigProperties.STREAM_CONSUMER_TYPES))),
+              .equalsIgnoreCase(streamConfigsMap.getOrDefault(StreamConfigProperties.constructStreamProperty(streamType,
+                  StreamConfigProperties.STREAM_CONSUMER_TYPES), StreamConfig.ConsumerType.LOWLEVEL.name())),
           "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
     }
+
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
