@@ -31,6 +31,8 @@ import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+
 
 /**
  * Class that executes all aggregation functions (without group-bys) for the multistage AggregateOperator.
@@ -77,6 +79,18 @@ public class MultistageAggregationExecutor {
   }
 
   /**
+   * @return an empty agg result block for non-group-by aggregation.
+   */
+  public Object[] constructEmptyAggResultRow() {
+    Object[] row = new Object[_aggFunctions.length];
+    for (int i = 0; i < _aggFunctions.length; i++) {
+      AggregationFunction aggFunction = _aggFunctions[i];
+      row[i] = aggFunction.extractAggregationResult(aggFunction.createAggregationResultHolder());
+    }
+    return row;
+  }
+
+  /**
    * Fetches the result.
    */
   public List<Object[]> getResult() {
@@ -86,9 +100,11 @@ public class MultistageAggregationExecutor {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
       if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
-        row[i] = _mergeResultHolder[i];
+        Object value = _mergeResultHolder[i];
+        row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
       } else if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
-        row[i] = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
+        Object value = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
+        row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
       } else {
         assert _mode.equals(NewAggregateOperator.Mode.EXTRACT_RESULT);
         Comparable result = aggFunction.extractFinalResult(_finalResultHolder[i]);
@@ -99,16 +115,16 @@ public class MultistageAggregationExecutor {
     return rows;
   }
 
-  /**
-   * @return an empty agg result block for non-group-by aggregation.
-   */
-  public Object[] constructEmptyAggResultRow() {
-    Object[] row = new Object[_aggFunctions.length];
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      AggregationFunction aggFunction = _aggFunctions[i];
-      row[i] = aggFunction.extractAggregationResult(aggFunction.createAggregationResultHolder());
+  private Object convertObjectToReturnType(AggregationFunctionType aggType, Object value) {
+    // For bool_and and bool_or aggregation functions, the return type for aggregate and merge modes are set as
+    // boolean. However, the v1 bool_and and bool_or function uses Integer as the intermediate type.
+    boolean boolAndOrAgg =
+        aggType.equals(AggregationFunctionType.BOOLAND) || aggType.equals(AggregationFunctionType.BOOLOR);
+    if (boolAndOrAgg && value instanceof Integer) {
+      Boolean boolVal = ((Number) value).intValue() > 0 ? true : false;
+      return boolVal;
     }
-    return row;
+    return value;
   }
 
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
@@ -124,9 +140,8 @@ public class MultistageAggregationExecutor {
     List<Object[]> container = block.getContainer();
 
     for (int i = 0; i < _aggFunctions.length; i++) {
-      List<ExpressionContext> expressions = _aggFunctions[i].getInputExpressions();
       for (Object[] row : container) {
-        Object intermediateResultToMerge = extractValueFromRow(row, expressions);
+        Object intermediateResultToMerge = extractValueFromRow(_aggFunctions[i], row);
         Object mergedIntermediateResult = _mergeResultHolder[i];
 
         // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
@@ -148,8 +163,7 @@ public class MultistageAggregationExecutor {
     assert container.size() == 1;
     Object[] row = container.get(0);
     for (int i = 0; i < _aggFunctions.length; i++) {
-      List<ExpressionContext> expressions = _aggFunctions[i].getInputExpressions();
-      _finalResultHolder[i] = extractValueFromRow(row, expressions);
+      _finalResultHolder[i] = extractValueFromRow(_aggFunctions[i], row);
     }
   }
 
@@ -175,10 +189,11 @@ public class MultistageAggregationExecutor {
         new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
   }
 
-  Object extractValueFromRow(Object[] row, List<ExpressionContext> expressions) {
+  Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row) {
     // TODO: Add support to handle aggregation functions where:
     //       1. The identifier need not be the first argument
     //       2. There are more than one identifiers.
+    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
     Preconditions.checkState(expressions.size() == 1);
     ExpressionContext expr = expressions.get(0);
     ExpressionContext.Type exprType = expr.getType();
@@ -191,7 +206,10 @@ public class MultistageAggregationExecutor {
 
       // Boolean aggregation functions like BOOL_AND and BOOL_OR have return types set to Boolean. However, their
       // intermediateResultType is Integer. To handle this case convert Boolean objects to Integer objects.
-      if (value instanceof Boolean) {
+      boolean boolAndOrAgg =
+          aggregationFunction.getType().equals(AggregationFunctionType.BOOLAND) || aggregationFunction.getType()
+              .equals(AggregationFunctionType.BOOLOR);
+      if (boolAndOrAgg && value instanceof Boolean) {
         Integer intVal = ((Boolean) value).booleanValue() ? 1 : 0;
         return intVal;
       }

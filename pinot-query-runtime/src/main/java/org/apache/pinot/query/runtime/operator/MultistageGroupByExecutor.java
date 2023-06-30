@@ -34,6 +34,7 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
@@ -118,9 +119,11 @@ public class MultistageGroupByExecutor {
         int index = i + _groupSet.size();
         int groupId = _groupKeyToIdMap.get(e.getKey());
         if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
-          row[index] = _mergeResultHolder.get(groupId)[i];
+          Object value = _mergeResultHolder.get(groupId)[i];
+          row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
         } else if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
-          row[index] = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
+          Object value = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
+          row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
         }
       }
 
@@ -148,6 +151,18 @@ public class MultistageGroupByExecutor {
     return rows;
   }
 
+  private Object convertObjectToReturnType(AggregationFunctionType aggType, Object value) {
+    // For bool_and and bool_or aggregation functions, the return type for aggregate and merge modes are set as
+    // boolean. However, the v1 bool_and and bool_or function uses Integer as the intermediate type.
+    boolean boolAndOrAgg =
+        aggType.equals(AggregationFunctionType.BOOLAND) || aggType.equals(AggregationFunctionType.BOOLOR);
+    if (boolAndOrAgg && value instanceof Integer) {
+      Boolean boolVal = ((Number) value).intValue() > 0 ? true : false;
+      return boolVal;
+    }
+    return value;
+  }
+
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
     int[] intKeys = generateGroupByKeys(block.getContainer());
 
@@ -166,15 +181,13 @@ public class MultistageGroupByExecutor {
     int[] intKeys = generateGroupByKeys(container);
 
     for (int i = 0; i < _aggFunctions.length; i++) {
-      List<ExpressionContext> expressions = _aggFunctions[i].getInputExpressions();
-
       for (int j = 0; j < container.size(); j++) {
         Object[] row = container.get(j);
         int rowKey = intKeys[j];
         if (!_mergeResultHolder.containsKey(rowKey)) {
           _mergeResultHolder.put(rowKey, new Object[_aggFunctions.length]);
         }
-        Object intermediateResultToMerge = extractValueFromRow(row, expressions);
+        Object intermediateResultToMerge = extractValueFromRow(_aggFunctions[i], row);
         Object mergedIntermediateResult = _mergeResultHolder.get(rowKey)[i];
 
         // Not all V1 aggregation functions have null-handling. So handle null values and call merge only if necessary.
@@ -195,7 +208,15 @@ public class MultistageGroupByExecutor {
     List<Object[]> container = block.getContainer();
     for (Object[] row : container) {
       assert row.length == _groupSet.size() + _aggFunctions.length;
-      _finalResultHolder.add(row);
+      Object[] resultRow = new Object[row.length];
+      System.arraycopy(row, 0, resultRow, 0, _groupSet.size());
+
+      for (int i = 0; i < _aggFunctions.length; i++) {
+        int index = _groupSet.size() + i;
+        resultRow[index] = extractValueFromRow(_aggFunctions[i], row);
+      }
+
+      _finalResultHolder.add(resultRow);
     }
   }
 
@@ -253,10 +274,11 @@ public class MultistageGroupByExecutor {
         new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
   }
 
-  Object extractValueFromRow(Object[] row, List<ExpressionContext> expressions) {
+  Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row) {
     // TODO: Add support to handle aggregation functions where:
     //       1. The identifier need not be the first argument
     //       2. There are more than one identifiers.
+    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
     Preconditions.checkState(expressions.size() == 1);
     ExpressionContext expr = expressions.get(0);
     ExpressionContext.Type exprType = expr.getType();
@@ -268,10 +290,14 @@ public class MultistageGroupByExecutor {
 
       // Boolean aggregation functions like BOOL_AND and BOOL_OR have return types set to Boolean. However, their
       // intermediateResultType is Integer. To handle this case convert Boolean objects to Integer objects.
-      if (value instanceof Boolean) {
+      boolean boolAndOrAgg =
+          aggregationFunction.getType().equals(AggregationFunctionType.BOOLAND) || aggregationFunction.getType()
+              .equals(AggregationFunctionType.BOOLOR);
+      if (boolAndOrAgg && value instanceof Boolean) {
         Integer intVal = ((Boolean) value).booleanValue() ? 1 : 0;
         return intVal;
       }
+
       return value;
     }
 
