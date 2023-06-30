@@ -83,7 +83,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   // TODO Refactor class name to match interface name
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   // Allow at most 512 characters for the metadata property
-  static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
+  private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
   private SegmentGeneratorConfig _config;
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
@@ -570,20 +570,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
       String maxValue) {
     if (isValidPropertyValue(minValue)) {
-      if (minValue.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
-        properties.setProperty(getKeyFor(column, MIN_VALUE), getTrimmedPropertyValue(minValue));
-      } else {
-        properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
-      }
+      properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
     } else {
       properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
     if (isValidPropertyValue(maxValue)) {
-      if (maxValue.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
-        properties.setProperty(getKeyFor(column, MAX_VALUE), getTrimmedPropertyValue(maxValue));
-      } else {
-        properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
-      }
+      properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
     } else {
       properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
@@ -604,14 +596,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (length == 0) {
       return true;
     }
+    if (length > METADATA_PROPERTY_LENGTH_LIMIT) {
+      return false;
+    }
     if (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1))) {
       return false;
     }
     return value.indexOf(',') == -1;
-  }
-
-  static String getTrimmedPropertyValue(String value) {
-    return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {

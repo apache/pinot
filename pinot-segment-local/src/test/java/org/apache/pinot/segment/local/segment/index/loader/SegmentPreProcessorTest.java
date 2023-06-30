@@ -1755,13 +1755,8 @@ public class SegmentPreProcessorTest {
     }
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
     segmentMetadata.getColumnMetadataMap().forEach((k, v) -> {
-      if (v.hasDictionary() || v.getFieldSpec().isSingleValueField()) {
-        assertNotNull(v.getMinValue(), "checking column: " + k);
-        assertNotNull(v.getMaxValue(), "checking column: " + k);
-      } else {
-        assertNull(v.getMinValue(), "checking column: " + k);
-        assertNull(v.getMaxValue(), "checking column: " + k);
-      }
+      assertNotNull(v.getMinValue(), "checking column: " + k);
+      assertNotNull(v.getMaxValue(), "checking column: " + k);
     });
   }
 
