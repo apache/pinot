@@ -20,9 +20,11 @@ package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
@@ -97,7 +99,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private MailboxContent toMailboxContent(TransferableBlock block)
       throws IOException {
-    return MailboxContent.newBuilder().setMailboxId(_id).setPayload(ByteString.copyFrom(block.getDataBlock().toBytes()))
+    DataBlock dataBlock = block.getDataBlock();
+    byte[] bytes = dataBlock.toBytes();
+    ByteString byteString = UnsafeByteOperations.unsafeWrap(bytes);
+    return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString)
         .build();
   }
 }
