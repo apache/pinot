@@ -31,7 +31,17 @@ public interface MutableTextIndex extends TextIndexReader, MutableIndex {
 
   @Override
   default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
-    add((String[]) values);
+    if (values instanceof String[]) {
+      add((String[]) values);
+      return;
+    }
+
+    int length = values.length;
+    String[] strings = new String[length];
+    for (int i = 0; i < length; i++) {
+      strings[i] = (String) values[i];
+    }
+    add(strings);
   }
 
   /**
@@ -42,7 +52,7 @@ public interface MutableTextIndex extends TextIndexReader, MutableIndex {
 
   /**
    * Index the multi-value document
-   * @param document the document as an array of Strings
+   * @param documents the documents as an array of strings
    */
-  void add(String[] document);
+  void add(String[] documents);
 }

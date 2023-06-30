@@ -28,47 +28,45 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
+
 public class LuceneMutableTextIndexTest {
-    private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
-    private static final String TEXT_COLUMN_NAME = "testColumnName";
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
+  private static final String TEXT_COLUMN_NAME = "testColumnName";
 
-    private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
+  private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
 
-    private String[][] getTextData() {
-        return new String[][]{{"realtime stream processing"}, {"publish subscribe",
-                "columnar processing for data warehouses", "concurrency"}};
+  private String[][] getTextData() {
+    return new String[][]{
+        {"realtime stream processing"}, {"publish subscribe", "columnar processing for data warehouses", "concurrency"}
+    };
+  }
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    _realtimeLuceneTextIndex = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null);
+    String[][] documents = getTextData();
+    for (String[] row : documents) {
+      _realtimeLuceneTextIndex.add(row);
     }
 
-    @BeforeClass
-    public void setUp()
-            throws Exception {
-        _realtimeLuceneTextIndex = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null,
-                null);
-        String[][] documents = getTextData();
-        for (String[] row : documents) {
-            _realtimeLuceneTextIndex.add(row);
-        }
-
-        SearcherManager searcherManager = _realtimeLuceneTextIndex.getSearcherManager();
-        try {
-            searcherManager.maybeRefresh();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    SearcherManager searcherManager = _realtimeLuceneTextIndex.getSearcherManager();
+    try {
+      searcherManager.maybeRefresh();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
+  }
 
-    @AfterClass
-    public void tearDown() {
-        _realtimeLuceneTextIndex.close();
-    }
+  @AfterClass
+  public void tearDown() {
+    _realtimeLuceneTextIndex.close();
+  }
 
-    @Test
-    public void testQueries() {
-        assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"),
-                ImmutableRoaringBitmap.bitmapOf(0));
-        assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"),
-                ImmutableRoaringBitmap.bitmapOf(1));
-        assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"),
-                ImmutableRoaringBitmap.bitmapOf());
-    }
+  @Test
+  public void testQueries() {
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());
+  }
 }

@@ -97,8 +97,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
    * Adds a new document, made up of multiple values.
    */
   @Override
-  public void add(String[] document) {
-    _indexCreator.add(document, document.length);
+  public void add(String[] documents) {
+    _indexCreator.add(documents, documents.length);
   }
 
   @Override
