@@ -44,7 +44,7 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
 
-
+// TODO(Sonam): Ensure test passes when the switch to AggregateOperator is made.
 public class AggregateOperatorTest {
 
   private AutoCloseable _mocks;

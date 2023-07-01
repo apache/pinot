@@ -43,6 +43,7 @@ public class AggregationFunctionFactory {
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
+      // TODO(Sonam): Replace $ removal with a util function
       String upperCaseFunctionName = StringUtils.remove(function.getFunctionName(), '_').toUpperCase();
       List<ExpressionContext> arguments = function.getArguments();
       ExpressionContext firstArgument = arguments.get(0);
@@ -188,6 +189,8 @@ public class AggregationFunctionFactory {
           case MAX:
             return new MaxAggregationFunction(firstArgument, nullHandlingEnabled);
           case SUM:
+          // TODO(Sonam): Uncomment SUM0 when merging planner changes
+          // case SUM0:
             return new SumAggregationFunction(firstArgument, nullHandlingEnabled);
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);

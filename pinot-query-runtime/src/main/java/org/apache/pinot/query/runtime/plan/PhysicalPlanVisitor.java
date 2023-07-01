@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -96,6 +97,18 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   @Override
   public MultiStageOperator visitAggregate(AggregateNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
+    DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
+    DataSchema resultSchema = node.getDataSchema();
+
+    // TODO(Sonam): Rename to AggregateOperator when the planner changes are merged.
+//    boolean extractFinalResult = AggregateNode.isFinalStage(node);
+//    boolean isIntermediateStage = AggregateNode.isIntermediateStage(node);
+//    boolean isLeafStage = AggregateNode.isLeafStage(node);
+//    boolean treatIntermediateAsLeaf = node.isTreatIntermediateStageAsLeaf();
+//
+//    return new NewAggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema, inputSchema,
+//        node.getAggCalls(), node.getGroupSet(), isLeafStage, isIntermediateStage, extractFinalResult,
+//        treatIntermediateAsLeaf);
     return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
         node.getAggCalls(), node.getGroupSet(), node.getInputs().get(0).getDataSchema());
   }
