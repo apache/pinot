@@ -249,6 +249,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         // find a way to split metrics in case of multiple table
         String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
         entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
+
+        // Track number of queries with number of groups limit reached
+        if (brokerResponse.isNumGroupsLimitReached()) {
+          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
+              1);
+        }
       } else {
         entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
       }
