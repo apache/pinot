@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -30,7 +31,9 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeTransforms;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -62,8 +65,12 @@ public enum AggregationFunctionType {
   AVG("avg"),
   MODE("mode"),
 
-  FIRSTWITHTIME("firstWithTime"),
-  LASTWITHTIME("lastWithTime"),
+  FIRSTWITHTIME("firstWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER)),
+      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  LASTWITHTIME("lastWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER)),
+      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
   MINMAXRANGE("minMaxRange"),
   /**
    * for all distinct count family functions:
@@ -75,7 +82,7 @@ public enum AggregationFunctionType {
       ReturnTypes.explicit(SqlTypeName.OTHER)),
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
-  DISTINCTCOUNTHLL("distinctCountHLL", Collections.emptyList(), SqlKind.OTHER_FUNCTION,
+  DISTINCTCOUNTHLL("distinctCountHLL", ImmutableList.of("DISTINCT_COUNT_HLL"), SqlKind.OTHER_FUNCTION,
       SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),

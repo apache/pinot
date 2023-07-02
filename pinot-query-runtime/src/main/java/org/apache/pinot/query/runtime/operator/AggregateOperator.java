@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -37,6 +38,7 @@ import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -72,6 +74,7 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultiStageOperator _inputOperator;
   private final DataSchema _resultSchema;
   private final DataSchema _inputSchema;
+  private final AggType _aggType;
 
   // Map that maintains the mapping between columnName and the column ordinal index. It is used to fetch the required
   // column value from row-based container and fetch the input datatype for the column.
@@ -98,6 +101,7 @@ public class AggregateOperator extends MultiStageOperator {
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _inputSchema = inputSchema;
+    _aggType = aggType;
 
     _upstreamErrorBlock = null;
     _readyToConstruct = false;
@@ -222,6 +226,11 @@ public class AggregateOperator extends MultiStageOperator {
       aggArguments.add(exprContext);
     }
 
+    // add additional arguments for aggFunctionCall
+    if (_aggType.isInputIntermediateFormat()) {
+      functionNameRewrite(aggArguments, aggFunctionCall);
+    }
+
     if (aggArguments.isEmpty()) {
       // This can only be true for COUNT aggregation functions.
       // The literal value here does not matter. We create a dummy literal here just so that the count aggregation
@@ -232,6 +241,14 @@ public class AggregateOperator extends MultiStageOperator {
 
     FunctionContext functionContext = new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, aggArguments);
     return functionContext;
+  }
+
+  private void functionNameRewrite(List<ExpressionContext> aggArguments, RexExpression.FunctionCall aggFunctionCall) {
+    String functionName = aggFunctionCall.getFunctionName();
+    if (functionName.equals("FIRSTWITHTIME") || functionName.equals("LASTWITHTIME")) {
+      aggArguments.add(ExpressionContext.forIdentifier("ts"));
+      aggArguments.add(ExpressionContext.forLiteralContext(Literal.stringValue("DOUBLE")));
+    }
   }
 
   private List<ExpressionContext> getGroupSet(List<RexExpression> groupBySetRexExpr) {
@@ -299,7 +316,6 @@ public class AggregateOperator extends MultiStageOperator {
   static Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row,
       Map<String, Integer> colNameToIndexMap) {
     List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
-    Preconditions.checkState(expressions.size() == 1, "Only support single expression, got: %s", expressions.size());
     ExpressionContext expr = expressions.get(0);
     ExpressionContext.Type exprType = expr.getType();
     if (exprType == ExpressionContext.Type.IDENTIFIER) {
