@@ -128,7 +128,7 @@
     <jackson.version>2.12.7</jackson.version>
     <zookeeper.version>3.6.3</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
-    <jersey.version>2.35</jersey.version>
+    <jersey.version>2.39</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.6</swagger.version>
