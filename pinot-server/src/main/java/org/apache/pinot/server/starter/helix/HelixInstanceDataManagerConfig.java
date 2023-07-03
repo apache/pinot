@@ -244,7 +244,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   public int getMaxSegmentPreloadThreads() {
-    return _instanceDataManagerConfiguration.getProperty(MAX_SEGMENT_PRELOAD_THREADS, 1);
+    return _instanceDataManagerConfiguration.getProperty(MAX_SEGMENT_PRELOAD_THREADS, 0);
   }
 
   public int getMaxParallelSegmentBuilds() {

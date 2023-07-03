@@ -40,7 +40,7 @@ public class TableUpsertMetadataManagerFactory {
 
   public static TableUpsertMetadataManager create(TableConfig tableConfig, Schema schema,
       TableDataManager tableDataManager, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable ExecutorService preloadExecutor) {
+      @Nullable ExecutorService segmentPreloadExecutor) {
     String tableNameWithType = tableConfig.getTableName();
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     Preconditions.checkArgument(upsertConfig != null, "Must provide upsert config for table: %s", tableNameWithType);
@@ -63,7 +63,7 @@ public class TableUpsertMetadataManagerFactory {
       metadataManager = new ConcurrentMapTableUpsertMetadataManager();
     }
 
-    metadataManager.init(tableConfig, schema, tableDataManager, serverMetrics, helixManager, preloadExecutor);
+    metadataManager.init(tableConfig, schema, tableDataManager, serverMetrics, helixManager, segmentPreloadExecutor);
     return metadataManager;
   }
 }

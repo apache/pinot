@@ -50,7 +50,7 @@ public interface TableDataManager {
    */
   void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable ExecutorService preloadExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
       TableDataManagerParams tableDataManagerParams);
 
@@ -130,14 +130,20 @@ public interface TableDataManager {
    */
   void removeSegment(String segmentName);
 
-  default boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata) {
-    return false;
-  }
+  /**
+   * Try to load a segment from an existing segment directory managed by the server. The segment loading may fail
+   * because the directory may not exist any more, or the segment data has a different crc now, or the existing segment
+   * data got corrupted etc.
+   *
+   * @return true if the segment is loaded successfully from the existing segment directory; false otherwise.
+   */
+  boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      SegmentZKMetadata zkMetadata);
 
-  default File getSegmentDataDir(String segmentName, @Nullable String segmentTier, TableConfig tableConfig) {
-    return null;
-  }
+  /**
+   * Get the segment data directory, considering the segment tier if provided.
+   */
+  File getSegmentDataDir(String segmentName, @Nullable String segmentTier, TableConfig tableConfig);
 
   /**
    * Returns true if the segment was deleted in the last few minutes.

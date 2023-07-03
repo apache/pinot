@@ -25,14 +25,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
@@ -74,15 +70,12 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected boolean _enableSnapshot;
   protected ServerMetrics _serverMetrics;
   private HelixManager _helixManager;
-  private ExecutorService _preloadExecutor;
-  private volatile boolean _isReady = false;
-  private final Lock _isReadyLock = new ReentrantLock();
-  private final Condition _isReadyCon = _isReadyLock.newCondition();
-  private final Set<String> _preloadingSegmentsSet = ConcurrentHashMap.newKeySet();
+  private ExecutorService _segmentPreloadExecutor;
+  private volatile boolean _isPreloading = false;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
-      ServerMetrics serverMetrics, HelixManager helixManager, @Nullable ExecutorService preloadExecutor) {
+      ServerMetrics serverMetrics, HelixManager helixManager, @Nullable ExecutorService segmentPreloadExecutor) {
     _tableConfig = tableConfig;
     _schema = schema;
     _tableDataManager = tableDataManager;
@@ -116,9 +109,16 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
-    _preloadExecutor = preloadExecutor;
+    _segmentPreloadExecutor = segmentPreloadExecutor;
     try {
       if (_enableSnapshot && upsertConfig.isEnablePreload()) {
+        // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
+        // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
+        // The thread doing the segment preloading here must complete before the other helix threads start to handle
+        // segment state transitions. This is ensured implicitly because segment preloading happens here when creating
+        // this TableUpsertMetadataManager, which happens when creating the TableDataManager, which happens as the
+        // lambda of ConcurrentHashMap.computeIfAbsent() method, which ensures the waiting logic to happen.
+        _isPreloading = true;
         preloadSegments();
       }
     } catch (InterruptedException e) {
@@ -127,8 +127,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     } catch (Exception e) {
       throw new RuntimeException("Failed to preload segments for table: " + _tableNameWithType, e);
     } finally {
-      // Make sure threads waiting for the table upsert metadata manager to be ready are all unblocked.
-      setIsReady();
+      _isPreloading = false;
     }
   }
 
@@ -152,23 +151,18 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         LOGGER.info("Skip segment: {} as its ideal state: {} is not ONLINE", segmentName, state);
         continue;
       }
-      if (_preloadExecutor == null) {
+      if (_segmentPreloadExecutor == null) {
         preloadSegment(segmentName, indexLoadingConfig, propertyStore);
         continue;
       }
-      Future<?> future = _preloadExecutor.submit(() -> {
+      futures.add(_segmentPreloadExecutor.submit(() -> {
         preloadSegment(segmentName, indexLoadingConfig, propertyStore);
-      });
-      futures.add(future);
+      }));
     }
-    try {
-      for (Future<?> f : futures) {
-        f.get();
-      }
-      LOGGER.info("Preloaded segments for table: {} fast upsert metadata recovery", _tableNameWithType);
-    } finally {
-      _preloadingSegmentsSet.clear();
+    for (Future<?> f : futures) {
+      f.get();
     }
+    LOGGER.info("Preloaded segments for table: {} fast upsert metadata recovery", _tableNameWithType);
   }
 
   private String getInstanceId() {
@@ -205,12 +199,10 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
     try {
       segmentLock.lock();
-      _preloadingSegmentsSet.add(segmentName);
       // This method checks segment crc and if it has changed, the segment is not loaded.
       _tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata);
       LOGGER.info("Preloaded segment: {} from table: {}", segmentName, _tableNameWithType);
     } finally {
-      _preloadingSegmentsSet.remove(segmentName);
       segmentLock.unlock();
     }
   }
@@ -220,40 +212,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     return new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
-  // For concrete subclass to check if any segment is from preloading phase.
-  protected boolean isPreloadingSegment(String segName) {
-    return _preloadingSegmentsSet.contains(segName);
-  }
-
   @Override
-  public void waitTillReady()
-      throws InterruptedException {
-    if (_isReady) {
-      return;
-    }
-    _isReadyLock.lock();
-    try {
-      while (!_isReady) {
-        _isReadyCon.await();
-      }
-    } finally {
-      _isReadyLock.unlock();
-    }
-  }
-
-  @Override
-  public boolean isReady() {
-    return _isReady;
-  }
-
-  private void setIsReady() {
-    _isReadyLock.lock();
-    try {
-      _isReady = true;
-      _isReadyCon.signalAll();
-    } finally {
-      _isReadyLock.unlock();
-    }
+  public boolean isPreloading() {
+    return _isPreloading;
   }
 
   @Override

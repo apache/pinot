@@ -36,7 +36,7 @@ import org.apache.pinot.spi.data.Schema;
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
   void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics,
-      HelixManager helixManager, @Nullable ExecutorService executorService);
+      HelixManager helixManager, @Nullable ExecutorService segmentPreloadExecutor);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
@@ -47,8 +47,5 @@ public interface TableUpsertMetadataManager extends Closeable {
    */
   void stop();
 
-  void waitTillReady()
-      throws InterruptedException;
-
-  boolean isReady();
+  boolean isPreloading();
 }

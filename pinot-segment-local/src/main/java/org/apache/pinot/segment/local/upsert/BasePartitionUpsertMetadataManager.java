@@ -192,7 +192,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (queryableDocIds == null && _deleteRecordColumn != null) {
         queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
-      if (_tableUpsertMetadataManager.isPreloadingSegment(segmentName)) {
+      if (_tableUpsertMetadataManager.isPreloading()) {
         addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
       } else {
         addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);

@@ -134,13 +134,20 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     SegmentBuildTimeLeaseExtender.initExecutor();
     // Initialize a fixed thread pool to reload/refresh segments in parallel. The getMaxParallelRefreshThreads() is
     // used to initialize a segment refresh semaphore to limit the parallelism, so create a pool of same size.
-    _segmentRefreshExecutor = Executors.newFixedThreadPool(getMaxParallelRefreshThreads(),
+    int poolSize = getMaxParallelRefreshThreads();
+    Preconditions.checkArgument(poolSize > 0,
+        "SegmentRefreshExecutor requires a positive pool size but got: " + poolSize);
+    _segmentRefreshExecutor = Executors.newFixedThreadPool(poolSize,
         new ThreadFactoryBuilder().setNameFormat("segment-refresh-thread-%d").build());
-    LOGGER.info("Initialized segment refresh executor thread pool: {}", getMaxParallelRefreshThreads());
-    _segmentPreloadExecutor = Executors.newFixedThreadPool(_instanceDataManagerConfig.getMaxSegmentPreloadThreads(),
-        new ThreadFactoryBuilder().setNameFormat("segment-preload-thread-%d").build());
-    LOGGER.info("Initialized segment preload executor thread pool: {}",
-        _instanceDataManagerConfig.getMaxSegmentPreloadThreads());
+    LOGGER.info("Created SegmentRefreshExecutor with pool size: {}", poolSize);
+    poolSize = _instanceDataManagerConfig.getMaxSegmentPreloadThreads();
+    if (poolSize > 0) {
+      _segmentPreloadExecutor = Executors.newFixedThreadPool(poolSize,
+          new ThreadFactoryBuilder().setNameFormat("segment-preload-thread-%d").build());
+      LOGGER.info("Created SegmentPreloadExecutor with pool size: {}", poolSize);
+    } else {
+      LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", poolSize);
+    }
     // Initialize the table data manager provider
     TableDataManagerProvider.init(_instanceDataManagerConfig);
     LOGGER.info("Initialized Helix instance data manager");
@@ -196,7 +203,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public synchronized void shutDown() {
     _segmentRefreshExecutor.shutdownNow();
-    _segmentPreloadExecutor.shutdownNow();
+    if (_segmentPreloadExecutor != null) {
+      _segmentPreloadExecutor.shutdownNow();
+    }
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
       tableDataManager.shutDown();
     }

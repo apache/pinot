@@ -100,7 +100,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
-  protected ExecutorService _preloadExecutor;
+  protected ExecutorService _segmentPreloadExecutor;
   protected AuthProvider _authProvider;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
@@ -116,7 +116,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable ExecutorService preloadExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
       TableDataManagerParams tableDataManagerParams) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
@@ -126,7 +126,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
-    _preloadExecutor = preloadExecutor;
+    _segmentPreloadExecutor = segmentPreloadExecutor;
 
     _authProvider =
         AuthProviderUtils.extractAuthProvider(toPinotConfiguration(_tableDataManagerConfig.getAuthConfig()), null);
