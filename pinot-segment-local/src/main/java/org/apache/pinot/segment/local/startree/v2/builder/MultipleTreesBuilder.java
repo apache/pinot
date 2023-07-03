@@ -64,7 +64,7 @@ public class MultipleTreesBuilder implements Closeable {
   private final File _segmentDirectory;
   private final PropertiesConfiguration _metadataProperties;
   private final ImmutableSegment _segment;
-  private final StarTreeIndexSeparator _separator;
+  private StarTreeIndexSeparator _separator;
   private File _separatorTempDir;
 
   public enum BuildMode {
@@ -107,7 +107,7 @@ public class MultipleTreesBuilder implements Closeable {
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    _separator = getSeparator();
+    Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
       _builderConfigs = StarTreeBuilderUtils
