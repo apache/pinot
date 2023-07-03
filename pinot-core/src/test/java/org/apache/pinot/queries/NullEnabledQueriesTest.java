@@ -102,7 +102,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     _records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       GenericRow record = new GenericRow();
-      double value = baseValue.doubleValue() + i;
+      double value = baseValue instanceof Float ? baseValue.floatValue() + i : baseValue.doubleValue() + i;
       if (i % 2 == 0) {
         record.putValue(COLUMN_NAME, value);
         _sumPrecision = _sumPrecision.add(BigDecimal.valueOf(value));
@@ -523,7 +523,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     }
     {
       String query = String.format(
-          "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC LIMIT 1000", COLUMN_NAME,
+          "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC NULLS LAST LIMIT 1000", COLUMN_NAME,
           COLUMN_NAME, COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
@@ -598,8 +598,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       // 9.500
       //(1 row)
       //
-      String query = String.format("SELECT %s FROM testTable WHERE %s > '%s' LIMIT 50", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 69);
+      String query = String.format("SELECT %s FROM testTable WHERE %s > %s LIMIT 50", COLUMN_NAME, COLUMN_NAME,
+          baseValue instanceof Float ? baseValue.floatValue() + 69 : baseValue.doubleValue() + 69);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -620,8 +620,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 68);
+      String query = String.format("SELECT %s FROM testTable WHERE %s = %s", COLUMN_NAME, COLUMN_NAME,
+          baseValue instanceof Float ? baseValue.floatValue() + 68 : baseValue.doubleValue() + 68);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -635,8 +635,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 69);
+      String query = String.format("SELECT %s FROM testTable WHERE %s = %s", COLUMN_NAME, COLUMN_NAME,
+          baseValue instanceof Float ? baseValue.floatValue() + 69 : baseValue.doubleValue() + 69);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();

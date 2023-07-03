@@ -93,6 +93,14 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     _indexCreator.add(document);
   }
 
+  /**
+   * Adds a new document, made up of multiple values.
+   */
+  @Override
+  public void add(String[] documents) {
+    _indexCreator.add(documents, documents.length);
+  }
+
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     throw new UnsupportedOperationException();

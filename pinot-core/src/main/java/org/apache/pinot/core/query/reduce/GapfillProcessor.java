@@ -280,7 +280,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
       if (expressionContext.getType() == ExpressionContext.Type.FUNCTION) {
         FunctionContext functionContext = expressionContext.getFunction();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext);
+            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext.isNullHandlingEnabled());
         GroupByResultHolder groupByResultHolder =
             aggregationFunction.createGroupByResultHolder(groupKeyIndexes.size(), groupKeyIndexes.size());
         if (aggregationFunction instanceof CountAggregationFunction) {

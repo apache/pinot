@@ -19,7 +19,9 @@
 package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -206,6 +208,20 @@ public class QueryEnvironment {
   @VisibleForTesting
   public String explainQuery(String sqlQuery) {
     return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery)).getExplainPlan();
+  }
+
+  public List<String> getTableNamesForQuery(String sqlQuery) {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
+      SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
+      if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
+          sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+      }
+      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
+      Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
+      return new ArrayList<>(tableNames);
+    } catch (Throwable t) {
+      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
+    }
   }
 
   /**

@@ -145,8 +145,7 @@ public class CalciteRexExpressionParser {
 
   private static Expression convertDistinctAndSelectListToFunctionExpression(RexExpression.FunctionCall rexCall,
       PinotQuery pinotQuery) {
-    String functionName = AggregationFunctionType.DISTINCT.getName();
-    Expression functionExpression = getFunctionExpression(functionName);
+    Expression functionExpression = getFunctionExpression("distinct");
     for (RexExpression node : rexCall.getFunctionOperands()) {
       Expression columnExpression = toExpression(node, pinotQuery);
       if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()

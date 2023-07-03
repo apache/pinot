@@ -29,7 +29,9 @@ public enum MinionMeter implements AbstractMetrics.Meter {
   NUMBER_TASKS_COMPLETED("tasks", false),
   NUMBER_TASKS_CANCELLED("tasks", false),
   NUMBER_TASKS_FAILED("tasks", false),
-  NUMBER_TASKS_FATAL_FAILED("tasks", false);
+  NUMBER_TASKS_FATAL_FAILED("tasks", false),
+  SEGMENT_UPLOAD_FAIL_COUNT("segments", false),
+  SEGMENT_DOWNLOAD_FAIL_COUNT("segments", false);
 
   private final String _meterName;
   private final String _unit;

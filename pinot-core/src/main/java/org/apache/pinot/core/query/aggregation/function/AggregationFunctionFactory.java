@@ -24,7 +24,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -41,13 +40,10 @@ public class AggregationFunctionFactory {
   /**
    * Given the function information, returns a new instance of the corresponding aggregation function.
    * <p>NOTE: Underscores in the function name are ignored.
-   * <p>NOTE: We pass the query context to this method because DISTINCT is currently modeled as an aggregation function
-   *          and requires the order-by and limit information from the query.
-   * <p>TODO: Consider modeling DISTINCT as unique selection instead of aggregation so that early-termination, limit and
-   *          offset can be applied easier
    */
-  public static AggregationFunction getAggregationFunction(FunctionContext function, QueryContext queryContext) {
+  public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
+      // TODO(Sonam): Replace $ removal with a util function
       String upperCaseFunctionName = StringUtils.remove(function.getFunctionName(), '_').toUpperCase();
       List<ExpressionContext> arguments = function.getArguments();
       ExpressionContext firstArgument = arguments.get(0);
@@ -187,17 +183,19 @@ public class AggregationFunctionFactory {
       } else {
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
-            return new CountAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new CountAggregationFunction(firstArgument, nullHandlingEnabled);
           case MIN:
-            return new MinAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new MinAggregationFunction(firstArgument, nullHandlingEnabled);
           case MAX:
-            return new MaxAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new MaxAggregationFunction(firstArgument, nullHandlingEnabled);
           case SUM:
-            return new SumAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+          // TODO(Sonam): Uncomment SUM0 when merging planner changes
+          // case SUM0:
+            return new SumAggregationFunction(firstArgument, nullHandlingEnabled);
           case SUMPRECISION:
-            return new SumPrecisionAggregationFunction(arguments, queryContext.isNullHandlingEnabled());
+            return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
-            return new AvgAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new AvgAggregationFunction(firstArgument, nullHandlingEnabled);
           case MODE:
             return new ModeAggregationFunction(arguments);
           case FIRSTWITHTIME:
@@ -308,9 +306,6 @@ public class AggregationFunctionFactory {
             return new DistinctSumMVAggregationFunction(firstArgument);
           case DISTINCTAVGMV:
             return new DistinctAvgMVAggregationFunction(firstArgument);
-          case DISTINCT:
-            return new DistinctAggregationFunction(arguments, queryContext.getOrderByExpressions(),
-                queryContext.getLimit());
           case STUNION:
             return new StUnionAggregationFunction(firstArgument);
           case HISTOGRAM:
@@ -320,9 +315,9 @@ public class AggregationFunctionFactory {
           case COVARSAMP:
             return new CovarianceAggregationFunction(arguments, true);
           case BOOLAND:
-            return new BooleanAndAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new BooleanAndAggregationFunction(firstArgument, nullHandlingEnabled);
           case BOOLOR:
-            return new BooleanOrAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new BooleanOrAggregationFunction(firstArgument, nullHandlingEnabled);
           case VARPOP:
             return new VarianceAggregationFunction(firstArgument, false, false);
           case VARSAMP:
@@ -358,6 +353,9 @@ public class AggregationFunctionFactory {
           case ARGMIN:
             throw new IllegalArgumentException(
                 "Aggregation function: " + function + " is only supported in selection without alias.");
+          case FUNNELCOUNT:
+            return new FunnelCountAggregationFunction(arguments);
+
           default:
             throw new IllegalArgumentException();
         }

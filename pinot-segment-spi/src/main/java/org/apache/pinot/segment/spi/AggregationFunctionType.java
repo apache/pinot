@@ -104,7 +104,6 @@ public enum AggregationFunctionType {
   PERCENTILERAWTDIGESTMV("percentileRawTDigestMV"),
   PERCENTILEKLLMV("percentileKLLMV"),
   PERCENTILERAWKLLMV("percentileRawKLLMV"),
-  DISTINCT("distinct"),
 
   // boolean aggregate functions
   BOOLAND("boolAnd"),
@@ -116,7 +115,10 @@ public enum AggregationFunctionType {
   PARENTARGMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + ARGMIN.getName()),
   PARENTARGMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + ARGMAX.getName()),
   CHILDARGMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + ARGMIN.getName()),
-  CHILDARGMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + ARGMAX.getName());
+  CHILDARGMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + ARGMAX.getName()),
+
+  // funnel aggregate functions
+  FUNNELCOUNT("funnelCount");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
       func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());

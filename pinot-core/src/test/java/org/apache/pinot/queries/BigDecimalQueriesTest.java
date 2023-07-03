@@ -211,7 +211,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s", BIG_DECIMAL_COLUMN,
+      String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT 4000", BIG_DECIMAL_COLUMN,
           BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
@@ -219,7 +219,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 10);
       int i = 0;
       for (int index = 0; index < rows.size() - 1; index++) {
         Object[] row = rows.get(index);
@@ -260,8 +259,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         i++;
         index++;
       }
-      // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
-      assertNull(rows.get(rows.size() - 1)[0]);
     }
     {
       // This test case was added to validate path-code for distinct w/o order by. See:
@@ -314,7 +311,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     }
     {
       String query = String.format(
-          "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC LIMIT 1000",
+          "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC NULLS LAST LIMIT 1000",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();

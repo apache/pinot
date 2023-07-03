@@ -24,17 +24,17 @@ FROM ${JDK_IMAGE}:${JAVA_VERSION}-al2-jdk
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN yum update -y && \
-    yum groupinstall 'Development Tools' -y && \
-    yum install -y procps vim less wget curl git python sysstat perf && \
-    yum clean all
+  yum groupinstall 'Development Tools' -y && \
+  yum install -y procps vim less wget curl git python sysstat perf libtasn1 && \
+  yum clean all
 
 RUN case `uname -m` in \
-    x86_64) arch=x64; ;; \
-    aarch64) arch=arm64; ;; \
-    *) echo "platform=$(uname -m) un-supported, exit ..."; exit 1; ;; \
+  x86_64) arch=x64; ;; \
+  aarch64) arch=arm64; ;; \
+  *) echo "platform=$(uname -m) un-supported, exit ..."; exit 1; ;; \
   esac \
   && mkdir -p /usr/local/lib/async-profiler \
-  && curl -L https://github.com/jvm-profiling-tools/async-profiler/releases/download/v2.5.1/async-profiler-2.5.1-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
+  && curl -L https://github.com/jvm-profiling-tools/async-profiler/releases/download/v2.9/async-profiler-2.9-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
   && ln -s /usr/local/lib/async-profiler/profiler.sh /usr/local/bin/async-profiler
 
 CMD ["bash"]

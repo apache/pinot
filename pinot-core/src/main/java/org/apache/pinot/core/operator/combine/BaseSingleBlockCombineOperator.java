@@ -19,12 +19,8 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
@@ -46,20 +42,12 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
-    extends BaseCombineOperator<BaseResultsBlock> {
+    extends BaseCombineOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
-
-  // Use an AtomicInteger to track the next operator to execute
-  protected final AtomicInteger _nextOperatorId = new AtomicInteger();
-  // Use a BlockingQueue to store the intermediate results blocks
-  protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-  protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
-  protected final ResultsBlockMerger<T> _resultsBlockMerger;
 
   protected BaseSingleBlockCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
-    super(operators, queryContext, executorService);
-    _resultsBlockMerger = resultsBlockMerger;
+    super(resultsBlockMerger, operators, queryContext, executorService);
   }
 
   @Override
@@ -92,7 +80,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   @Override
   protected void processSegments() {
     int operatorId;
-    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+    while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
       T resultsBlock;
       try {
@@ -116,6 +104,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
 
   @Override
   protected void onProcessSegmentsException(Throwable t) {
+    _processingException.compareAndSet(null, t);
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
