@@ -392,8 +392,8 @@ public class PinotInstanceRestletResource {
     }
   }
 
-  @POST
-  @Path("/instances/safetyCheck/dropInstance")
+  @GET
+  @Path("/instances/dropInstance/validate")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check if it's safe to drop the given instances. If not list all the reasons why its not safe.")
   @ApiResponses(value = {
