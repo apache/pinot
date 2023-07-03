@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -136,13 +138,17 @@ public class SchemaUtilsTest {
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
     tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+            .setStreamConfigs(Map.of(StreamConfigProperties.STREAM_TYPE, "foo"))
+            .setTimeColumnName(TIME_COLUMN).build();
     SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
 
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(Map.of(StreamConfigProperties.STREAM_TYPE, "foo"))
+        .setTimeColumnName(TIME_COLUMN)
         .setIngestionConfig(ingestionConfig).build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
