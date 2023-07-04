@@ -226,9 +226,9 @@ public class StarTreeBuilderUtils {
 
   /**
    * Returns {@code true} if the given star-tree builder configs do not match the star-tree metadata, in which case the
-   * existing star-trees need to be removed, {@code false} otherwise.
+   * relevant star-trees need to be added/removed, {@code false} otherwise.
    */
-  public static boolean shouldRemoveExistingStarTrees(List<StarTreeV2BuilderConfig> builderConfigs,
+  public static boolean shouldModifyExistingStarTrees(List<StarTreeV2BuilderConfig> builderConfigs,
       List<StarTreeV2Metadata> metadataList) {
     int numStarTrees = builderConfigs.size();
     if (metadataList.size() != numStarTrees) {

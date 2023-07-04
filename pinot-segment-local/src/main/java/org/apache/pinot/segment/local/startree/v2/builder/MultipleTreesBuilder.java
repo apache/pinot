@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -63,6 +64,8 @@ public class MultipleTreesBuilder implements Closeable {
   private final File _segmentDirectory;
   private final PropertiesConfiguration _metadataProperties;
   private final ImmutableSegment _segment;
+  private StarTreeIndexSeparator _separator;
+  private File _separatorTempDir;
 
   public enum BuildMode {
     ON_HEAP, OFF_HEAP
@@ -83,7 +86,7 @@ public class MultipleTreesBuilder implements Closeable {
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
+    _separator = getSeparator();
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
   }
 
@@ -115,6 +118,36 @@ public class MultipleTreesBuilder implements Closeable {
     }
   }
 
+  @Nullable
+  private StarTreeIndexSeparator getSeparator()
+      throws Exception {
+    if (!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT)) {
+      return null;
+    }
+    try {
+      _separatorTempDir = new File(_segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
+      FileUtils.forceMkdir(_separatorTempDir);
+      FileUtils.moveFileToDirectory(
+          new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME), _separatorTempDir, false);
+      FileUtils.moveFileToDirectory(
+          new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME), _separatorTempDir, false);
+      StarTreeIndexSeparator separator = new StarTreeIndexSeparator(
+              new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
+              new File(_separatorTempDir, StarTreeV2Constants.INDEX_FILE_NAME), _metadataProperties);
+      _metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
+      SegmentMetadataUtils.savePropertiesConfiguration(_metadataProperties);
+      return separator;
+    } catch (Exception e) {
+      try {
+        FileUtils.forceDelete(_separatorTempDir);
+      } catch (Exception e1) {
+        LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
+                _separatorTempDir.getAbsolutePath());
+      }
+      throw e;
+    }
+  }
+
   /**
    * Builds the star-trees.
    */
@@ -122,6 +155,7 @@ public class MultipleTreesBuilder implements Closeable {
       throws Exception {
     long startTime = System.currentTimeMillis();
     int numStarTrees = _builderConfigs.size();
+    int reusedStarTrees = 0;
     LOGGER.info("Starting building {} star-trees with configs: {} using {} builder", numStarTrees, _builderConfigs,
         _buildMode);
 
@@ -136,9 +170,15 @@ public class MultipleTreesBuilder implements Closeable {
       for (int i = 0; i < numStarTrees; i++) {
         StarTreeV2BuilderConfig builderConfig = _builderConfigs.get(i);
         Configuration metadataProperties = _metadataProperties.subset(MetadataKey.getStarTreePrefix(i));
-        try (SingleTreeBuilder singleTreeBuilder = getSingleTreeBuilder(builderConfig, starTreeIndexDir, _segment,
-            metadataProperties, _buildMode)) {
-          singleTreeBuilder.build();
+        if (_separator != null && handleExistingStarTreeAddition(starTreeIndexDir, metadataProperties, builderConfig)) {
+          // Used existing tree
+          LOGGER.info("Reused existing star-tree: {}", builderConfig.toString());
+          reusedStarTrees++;
+        } else {
+          try (SingleTreeBuilder singleTreeBuilder = getSingleTreeBuilder(builderConfig, starTreeIndexDir, _segment,
+              metadataProperties, _buildMode)) {
+            singleTreeBuilder.build();
+          }
         }
         indexMaps.add(indexCombiner.combine(builderConfig, starTreeIndexDir));
       }
@@ -150,7 +190,31 @@ public class MultipleTreesBuilder implements Closeable {
       FileUtils.forceDelete(starTreeIndexDir);
     }
 
-    LOGGER.info("Finished building {} star-trees in {}ms", numStarTrees, System.currentTimeMillis() - startTime);
+    LOGGER.info("Finished building {} star-trees ({} reused) in {}ms", numStarTrees, reusedStarTrees,
+        System.currentTimeMillis() - startTime);
+  }
+
+  /**
+   * Helper utility to move the individual star-tree files to the {@param starTreeIndexDir} from where it will be picked
+   * by the combiner to merge them into the single star-tree index file. The method also takes care of updating the
+   * {@param metadataProperties} for the star-tree.
+   * Returns {@code false} if the star-tree is not present in the existing star-trees, otherwise returns {@code true}
+   * upon successful transfer completion
+   */
+  private boolean handleExistingStarTreeAddition(File starTreeIndexDir, Configuration metadataProperties,
+      StarTreeV2BuilderConfig builderConfig)
+      throws IOException {
+    int totalDocs = _separator.separate(starTreeIndexDir, builderConfig);
+    if (totalDocs == -1) {
+      return false;
+    }
+    metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
+    metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, builderConfig.getDimensionsSplitOrder());
+    metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, builderConfig.getFunctionColumnPairs());
+    metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, builderConfig.getMaxLeafRecords());
+    metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
+        builderConfig.getSkipStarNodeCreationForDimensions());
+    return true;
   }
 
   private static SingleTreeBuilder getSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir,
@@ -165,6 +229,14 @@ public class MultipleTreesBuilder implements Closeable {
 
   @Override
   public void close() {
+    if (_separatorTempDir != null) {
+      try {
+        FileUtils.forceDelete(_separatorTempDir);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
+                _separatorTempDir.getAbsolutePath());
+      }
+    }
     _segment.destroy();
   }
 }

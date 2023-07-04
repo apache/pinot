@@ -32,6 +32,7 @@ public class StarTreeV2Constants {
   // File names before combining
   public static final String STAR_TREE_TEMP_DIR = "star_tree_tmp";
   public static final String STAR_TREE_INDEX_FILE_NAME = "star_tree.index";
+  public static final String EXISTING_STAR_TREE_TEMP_DIR = "existing_star_tree_tmp";
 
   // NOTE: because of bit compression, we cannot store -1 for star in forward index. Because star value should never be
   // accessed, we can simply put 0 as the place holder
