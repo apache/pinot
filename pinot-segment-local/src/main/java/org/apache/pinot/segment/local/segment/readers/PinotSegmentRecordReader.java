@@ -51,6 +51,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   private Map<String, PinotSegmentColumnReader> _columnReaderMap;
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
+  private List<String> _comparisonColumns;
 
   private int _nextDocId = 0;
 
@@ -154,6 +155,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     _indexSegment = indexSegment;
     _destroySegmentOnClose = destroySegmentOnClose;
     _numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    _comparisonColumns = indexSegment.getComparisonColumnNames();
 
     if (_numDocs > 0) {
       _columnReaderMap = new HashMap<>();
@@ -221,6 +223,10 @@ public class PinotSegmentRecordReader implements RecordReader {
       PinotSegmentColumnReader columnReader = entry.getValue();
       if (!columnReader.isNull(docId)) {
         buffer.putValue(column, columnReader.getValue(docId));
+      } else if (_comparisonColumns != null && _comparisonColumns.contains(column)) {
+        if (columnReader.getValue(docId) != null) {
+          buffer.putValue(column, columnReader.getValue(docId));
+        }
       } else if (!_skipDefaultNullValues) {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }

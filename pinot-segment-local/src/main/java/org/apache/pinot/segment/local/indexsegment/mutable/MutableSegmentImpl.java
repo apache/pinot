@@ -1232,6 +1232,11 @@ public class MutableSegmentImpl implements MutableSegment {
     return columnNameToAggregator;
   }
 
+  @Override
+  public List<String> getComparisonColumnNames() {
+    return _upsertComparisonColumns;
+  }
+
   private class IndexContainer implements Closeable {
     final FieldSpec _fieldSpec;
     final PartitionFunction _partitionFunction;

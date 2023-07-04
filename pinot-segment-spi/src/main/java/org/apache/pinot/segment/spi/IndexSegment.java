@@ -134,4 +134,13 @@ public interface IndexSegment {
    * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
   void destroy();
+
+  /**
+   * Returns the number of rows already indexed into the segment.
+   *
+   * @return The number of rows indexed
+   */
+  default List<String> getComparisonColumnNames() {
+    return null;
+  }
 }
