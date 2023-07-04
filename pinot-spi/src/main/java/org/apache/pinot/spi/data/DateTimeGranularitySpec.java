@@ -30,9 +30,9 @@ import org.apache.pinot.spi.utils.StringUtil;
  */
 public class DateTimeGranularitySpec {
   // 'size:timeUnit'
-  private static final char SEPARATOR = ':';
-  private static final int SIZE_POSITION = 0;
-  private static final int TIME_UNIT_POSITION = 1;
+  private static final char SEPARATOR = '|';
+  private static final int TIME_UNIT_POSITION = 0;
+  private static final int SIZE_POSITION = 1;
   private static final int NUM_TOKENS = 2;
 
   private final int _size;
@@ -45,7 +45,7 @@ public class DateTimeGranularitySpec {
     Preconditions.checkArgument(StringUtils.isNotEmpty(granularity), "Must provide granularity");
     String[] granularityTokens = StringUtil.split(granularity, SEPARATOR, 2);
     Preconditions.checkArgument(granularityTokens.length >= NUM_TOKENS,
-        "Invalid granularity: %s, must be of format 'size:timeUnit", granularity);
+        "Invalid granularity: %s, must be of format 'timeUnit|size", granularity);
     try {
       _size = Integer.parseInt(granularityTokens[SIZE_POSITION]);
     } catch (Exception e) {
@@ -83,9 +83,9 @@ public class DateTimeGranularitySpec {
   /**
    * Converts a granularity to millis.
    * <ul>
-   *   <li>1) granularityToMillis(1:HOURS) = 3600000 (60*60*1000)</li>
-   *   <li>2) granularityToMillis(1:MILLISECONDS) = 1</li>
-   *   <li>3) granularityToMillis(15:MINUTES) = 900000 (15*60*1000)</li>
+   *   <li>1) granularityToMillis(HOURS|1) = 3600000 (60*60*1000)</li>
+   *   <li>2) granularityToMillis(MILLISECONDS|1) = 1</li>
+   *   <li>3) granularityToMillis(MINUTES|15) = 900000 (15*60*1000)</li>
    * </ul>
    */
   public long granularityToMillis() {
