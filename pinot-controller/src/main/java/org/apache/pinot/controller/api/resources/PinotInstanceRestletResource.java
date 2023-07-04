@@ -400,19 +400,15 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public List<OperationSafetyCheckResponse> instanceDropSafetyCheck(
+  public List<OperationValidationResponse> instanceDropSafetyCheck(
       @ApiParam(value = "Instance names", required = true,
           example = "Broker_my.broker.com_30000")
       @QueryParam("instanceNames") List<String> instanceNames) {
     LOGGER.info("Performing safety check on drop operation request received for instances: {}", instanceNames);
     try {
-      return instanceNames.stream().map(instance -> {
-        List<String> issues = _pinotHelixResourceManager.instanceDropSafetyCheck(instance);
-        return new OperationSafetyCheckResponse()
-            .setInstanceName(instance)
-            .setSafe(issues.isEmpty())
-            .setIssues(issues);
-      }).collect(Collectors.toList());
+      return instanceNames.stream()
+              .map(instance -> _pinotHelixResourceManager.instanceDropSafetyCheck(instance))
+              .collect(Collectors.toList());
     } catch (ClientErrorException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
     } catch (Exception e) {

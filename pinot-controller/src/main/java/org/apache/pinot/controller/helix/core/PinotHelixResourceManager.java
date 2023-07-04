@@ -134,6 +134,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
+import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
@@ -3113,9 +3114,9 @@ public class PinotHelixResourceManager {
    * </ul>
    */
   public PinotResourceManagerResponse dropInstance(String instanceName) {
-    List<String> issues = instanceDropSafetyCheck(instanceName);
-    if (!issues.isEmpty()) {
-      return PinotResourceManagerResponse.failure(issues.get(0));
+    OperationValidationResponse check = instanceDropSafetyCheck(instanceName);
+    if (!check.isSafe()) {
+      return PinotResourceManagerResponse.failure(check.getIssueMessage(0));
     }
 
     // Remove '/INSTANCES/<instanceName>'
@@ -3141,25 +3142,25 @@ public class PinotHelixResourceManager {
    * Utility to perform a safety check of the operation to drop an instance.
    * If the resource is not safe to drop the utility lists all the possible reasons.
    * @param instanceName Pinot instance name
-   * @return List of reasons why the operation is unsafe. Empty list if the operation is safe.
+   * @return {@link OperationValidationResponse}
    */
-  public List<String> instanceDropSafetyCheck(String instanceName) {
-    List<String> issues = new ArrayList<>();
+  public OperationValidationResponse instanceDropSafetyCheck(String instanceName) {
+    OperationValidationResponse response = new OperationValidationResponse().setInstanceName(instanceName);
     // Check if the instance is live
     if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
-      issues.add(String.format("Instance %s is still live", instanceName));
+      response.putIssue(OperationValidationResponse.ErrorCode.IS_ALIVE, instanceName);
     }
     // Check if any ideal state includes the instance
     getAllResources().forEach(resource -> {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
       for (String partition : idealState.getPartitionSet()) {
         if (idealState.getInstanceSet(partition).contains(instanceName)) {
-          issues.add(String.format("Instance %s exists in ideal state for %s", instanceName, resource));
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
           break;
         }
       }
     });
-    return issues;
+    return response.setSafe(response.getIssues().isEmpty());
   }
 
   /**
