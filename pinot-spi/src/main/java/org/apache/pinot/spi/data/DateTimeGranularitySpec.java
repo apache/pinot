@@ -50,27 +50,25 @@ public class DateTimeGranularitySpec {
   public DateTimeGranularitySpec(String granularity) {
     Preconditions.checkArgument(StringUtils.isNotEmpty(granularity), "Must provide granularity");
 
+    char separator;
     int sizePosition;
     int timeUnitPosition;
-    String[] granularityTokens;
 
     if (Character.isDigit(granularity.charAt(0))) {
-      // Colon format
-      granularityTokens = StringUtil.split(granularity, COLON_SEPARATOR, 2);
-      Preconditions.checkArgument(granularityTokens.length >= NUM_TOKENS,
-              "Invalid granularity: %s, must be of format 'size:timeUnit", granularity);
-
+      // Colon format: 'size:timeUnit'
+      separator = COLON_SEPARATOR;
       sizePosition = COLON_FORMAT_SIZE_POSITION;
       timeUnitPosition = COLON_FORMAT_TIME_UNIT_POSITION;
     } else {
-      // Pipe format
-      granularityTokens = StringUtil.split(granularity, PIPE_SEPARATOR, 2);
-      Preconditions.checkArgument(granularityTokens.length >= NUM_TOKENS,
-              "Invalid granularity: %s, must be of format 'timeUnit|size", granularity);
-
+      // Pipe format: 'timeUnit|size'
+      separator = PIPE_SEPARATOR;
       sizePosition = PIPE_FORMAT_SIZE_POSITION;
       timeUnitPosition = PIPE_FORMAT_TIME_UNIT_POSITION;
     }
+
+    String[] granularityTokens = StringUtil.split(granularity, separator, 2);
+    Preconditions.checkArgument(granularityTokens.length >= NUM_TOKENS,
+            "Invalid granularity: %s, must be of format 'timeUnit|size' or 'size:timeUnit'", granularity);
 
     try {
       _size = Integer.parseInt(granularityTokens[sizePosition]);
@@ -79,6 +77,7 @@ public class DateTimeGranularitySpec {
           String.format("Invalid size: %s in granularity: %s", granularityTokens[sizePosition], granularity));
     }
     Preconditions.checkArgument(_size > 0, "Invalid size: %s in granularity: %s, must be positive", _size, granularity);
+
     try {
       _timeUnit = TimeUnit.valueOf(granularityTokens[timeUnitPosition]);
     } catch (Exception e) {
@@ -108,10 +107,19 @@ public class DateTimeGranularitySpec {
 
   /**
    * Converts a granularity to millis.
+   *
+   * Using new format:
    * <ul>
    *   <li>1) granularityToMillis(HOURS|1) = 3600000 (60*60*1000)</li>
    *   <li>2) granularityToMillis(MILLISECONDS|1) = 1</li>
    *   <li>3) granularityToMillis(MINUTES|15) = 900000 (15*60*1000)</li>
+   * </ul>
+   *
+   * Using old format:
+   * <ul>
+   *   <li>1) granularityToMillis(1:HOURS) = 3600000 (60*60*1000)</li>
+   *   <li>2) granularityToMillis(1:MILLISECONDS) = 1</li>
+   *   <li>3) granularityToMillis(15:MINUTES) = 900000 (15*60*1000)</li>
    * </ul>
    */
   public long granularityToMillis() {
