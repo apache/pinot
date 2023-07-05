@@ -535,7 +535,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     SegmentDataManager oldSegmentManager = registerSegment(segmentName, newSegmentManager);
     if (oldSegmentManager == null) {
-      partitionUpsertMetadataManager.addSegment(immutableSegment);
+      if (_tableUpsertMetadataManager.isPreloading()) {
+        partitionUpsertMetadataManager.preloadSegment(immutableSegment);
+      } else {
+        partitionUpsertMetadataManager.addSegment(immutableSegment);
+      }
       _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
     } else {
       IndexSegment oldSegment = oldSegmentManager.getSegment();
