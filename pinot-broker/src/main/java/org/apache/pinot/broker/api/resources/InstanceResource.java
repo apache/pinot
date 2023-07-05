@@ -26,6 +26,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -40,8 +41,9 @@ import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+
 /**
- * This resource API can be used to retrieve the tenant tags for the current broker instance
+ * This resource API can be used to retrieve instance level information like instance tags
  */
 @Api(value = "instance-tags", description = "Instance tags", tags = "instance-tags",
     authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
@@ -66,6 +68,9 @@ public class InstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   public List<String> getInstanceTags() {
     InstanceConfig config = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-    return config.getTags();
+    if (config != null && config.getTags() != null) {
+      return config.getTags();
+    }
+    return Collections.emptyList();
   }
 }

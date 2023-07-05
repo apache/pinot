@@ -30,10 +30,8 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.management.monitor.Monitor;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -45,8 +43,9 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.server.api.AdminApiApplication;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+
 /**
- * This resource API can be used to retrieve the tenant tags for the current server instance
+ * This resource API can be used to retrieve instance level information like instance tags
  */
 @Api(value = "instance-tags", description = "Instance tags", tags = "instance-tags",
     authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
@@ -73,10 +72,5 @@ public class InstanceResource {
     public List<String> getInstanceTags() {
         InstanceConfig config = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
         return config.getTags();
-    }
-    public void callEndpoint(long period) {
-        _executorService.schedule((Runnable) getInstanceTags(),period,
-            TimeUnit.MILLISECONDS);
-        InstanceConfig config = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
     }
 }
