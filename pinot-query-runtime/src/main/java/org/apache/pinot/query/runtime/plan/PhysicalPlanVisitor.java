@@ -100,14 +100,8 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
     DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
     DataSchema resultSchema = node.getDataSchema();
 
-    boolean extractFinalResult = AggregateNode.isFinalStage(node);
-    boolean isIntermediateStage = AggregateNode.isIntermediateStage(node);
-    boolean isLeafStage = AggregateNode.isLeafStage(node);
-    boolean treatIntermediateAsLeaf = node.isTreatIntermediateStageAsLeaf();
-
     return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema, inputSchema,
-        node.getAggCalls(), node.getGroupSet(), isLeafStage, isIntermediateStage, extractFinalResult,
-        treatIntermediateAsLeaf);
+        node.getAggCalls(), node.getGroupSet(), node.getAggType());
   }
 
   @Override

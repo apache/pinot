@@ -29,12 +29,29 @@ public class PinotHintOptions {
   public static final String AGGREGATE_HINT_OPTIONS = "aggOptions";
   public static final String JOIN_HINT_OPTIONS = "joinOptions";
 
+  /**
+   * Hint to denote that the aggregation node is the final aggregation stage which extracts the final result.
+   */
+  public static final String INTERNAL_AGG_OPTIONS = "aggOptionsInternal";
+
   private PinotHintOptions() {
     // do not instantiate.
   }
 
+  public static class InternalAggregateOptions {
+    public static final String AGG_TYPE = "agg_type";
+    public enum AggType {
+      DIRECT,
+      LEAF,
+      INTERMEDIATE,
+      FINAL,
+      REDUCE // NOT SUPPORTED
+    }
+  }
+
   public static class AggregateOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
+    public static final String SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION = "is_skip_leaf_stage_group_by";
   }
 
   public static class JoinHintOptions {

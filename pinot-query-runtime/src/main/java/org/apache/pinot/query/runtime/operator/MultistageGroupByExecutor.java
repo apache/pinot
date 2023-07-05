@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -41,7 +42,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * Class that executes the group by aggregations for the multistage AggregateOperator.
  */
 public class MultistageGroupByExecutor {
-  private final AggregateOperator.Mode _mode;
+  private final PinotHintOptions.InternalAggregateOptions.AggType _aggType;
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // between column name to their index which is used in v2 engine.
   private final Map<String, Integer> _colNameToIndexMap;
@@ -64,8 +65,8 @@ public class MultistageGroupByExecutor {
   private final Map<Key, Object[]> _groupByKeyHolder;
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      AggregateOperator.Mode mode, Map<String, Integer> colNameToIndexMap) {
-    _mode = mode;
+      PinotHintOptions.InternalAggregateOptions.AggType aggType, Map<String, Integer> colNameToIndexMap) {
+    _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
     _aggFunctions = aggFunctions;
@@ -88,11 +89,12 @@ public class MultistageGroupByExecutor {
    * Performs group-by aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
+    if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.DIRECT)
+        || _aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.LEAF)) {
       processAggregate(block, inputDataSchema);
-    } else if (_mode.equals(AggregateOperator.Mode.MERGE)) {
+    } else if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.INTERMEDIATE)) {
       processMerge(block);
-    } else if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
+    } else if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.FINAL)) {
       collectResult(block);
     }
   }
@@ -103,7 +105,7 @@ public class MultistageGroupByExecutor {
   public List<Object[]> getResult() {
     List<Object[]> rows = new ArrayList<>();
 
-    if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
+    if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.FINAL)) {
       return extractFinalGroupByResult();
     }
 
@@ -118,10 +120,11 @@ public class MultistageGroupByExecutor {
       for (int i = 0; i < _aggFunctions.length; i++) {
         int index = i + _groupSet.size();
         int groupId = _groupKeyToIdMap.get(e.getKey());
-        if (_mode.equals(AggregateOperator.Mode.MERGE)) {
+        if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.INTERMEDIATE)) {
           Object value = _mergeResultHolder.get(groupId)[i];
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-        } else if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
+        } else if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.DIRECT)
+            || _aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.LEAF)) {
           Object value = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
         }

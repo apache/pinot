@@ -21,7 +21,6 @@ package org.apache.calcite.rel.rules;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +36,7 @@ import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.rel.hint.PinotHintOptions.InternalAggregateOptions.AggType;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
@@ -87,17 +87,6 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   public static final PinotAggregateExchangeNodeInsertRule INSTANCE =
       new PinotAggregateExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
-  private static final RelHint FINAL_STAGE_HINT = RelHint.builder(
-      PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE).build();
-  private static final RelHint INTERMEDIATE_STAGE_HINT = RelHint.builder(
-      PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE).build();
-  private static final RelHint LEAF_STAGE_HINT = RelHint.builder(
-      PinotHintStrategyTable.INTERNAL_AGG_LEAF_STAGE).build();
-  // Used to identify scenarios where we skip the leaf level aggregation (lowest) in which case the intermediate
-  // level aggregation should perform an aggregation instead of a merge
-  private static final RelHint LEAF_STAGE_SKIPPED_AGG_HINT = RelHint.builder(
-      PinotHintStrategyTable.INTERNAL_AGG_IS_LEAF_STAGE_SKIPPED).build();
-
   public PinotAggregateExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalAggregate.class, any()), factory, null);
   }
@@ -110,10 +99,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     if (call.rel(0) instanceof Aggregate) {
       Aggregate agg = call.rel(0);
       ImmutableList<RelHint> hints = agg.getHints();
-      return !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE)
-          && !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE)
-          && !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_LEAF_STAGE)
-          && !PinotHintStrategyTable.containsHint(hints, PinotHintStrategyTable.INTERNAL_AGG_IS_LEAF_STAGE_SKIPPED);
+      return !PinotHintStrategyTable.containsHint(hints, PinotHintOptions.INTERNAL_AGG_OPTIONS);
     }
     return false;
   }
@@ -136,34 +122,29 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHintOption(oldHints,
         PinotHintOptions.AGGREGATE_HINT_OPTIONS, PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)) {
       // 1. attach intermediate agg and skip leaf stage RelHints to original agg.
-      List<RelHint> additionalHints = Arrays.asList(INTERMEDIATE_STAGE_HINT, LEAF_STAGE_SKIPPED_AGG_HINT);
       ImmutableList<RelHint> newLeafAggHints =
-          new ImmutableList.Builder<RelHint>().addAll(oldHints).addAll(additionalHints).build();
-      Aggregate newLeafAgg =
+          new ImmutableList.Builder<RelHint>().addAll(oldHints).add(createAggHint(AggType.DIRECT)).build();
+      Aggregate newAgg =
           new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
               oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
-      // 2. attach final agg stage if aggregations are present.
-      RelNode transformToAgg = newLeafAgg;
-      if (oldAggRel.getAggCallList() != null && oldAggRel.getAggCallList().size() > 0) {
-        transformToAgg = makeNewFinalAgg(call, oldAggRel, newLeafAgg);
-      }
-      call.transformTo(transformToAgg);
+      call.transformTo(newAgg);
       return;
     }
 
-    // If "skipLeafStageGroupByAggregation" SQLHint is passed, the leaf stage aggregation is skipped. This only
-    // applies for Group By Aggregations.
-    if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHint(oldHints,
-        PinotHintStrategyTable.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)) {
+    // If "is_skip_leaf_stage_group_by" SQLHint option is passed, the leaf stage aggregation is skipped.
+    if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHintOption(oldHints,
+        PinotHintOptions.AGGREGATE_HINT_OPTIONS,
+        PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)) {
       // This is not the default path. Use this group by optimization to skip leaf stage aggregation when aggregating
       // at leaf level could be wasted effort. eg: when cardinality of group by column is very high.
-      createPlanWithoutLeafAggregation(call);
+      Aggregate newAgg = (Aggregate) createPlanWithoutLeafAggregation(call);
+      call.transformTo(newAgg);
       return;
     }
 
     // 1. attach leaf agg RelHint to original agg. Perform any aggregation call conversions necessary
     ImmutableList<RelHint> newLeafAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(oldHints).add(LEAF_STAGE_HINT).build();
+        new ImmutableList.Builder<RelHint>().addAll(oldHints).add(createAggHint(AggType.LEAF)).build();
     Aggregate newLeafAgg =
         new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
             oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), convertLeafAggCalls(oldAggRel));
@@ -178,7 +159,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     }
 
     // 3. attach intermediate agg stage.
-    RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, exchange, true, null, null);
+    RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, exchange, AggType.INTERMEDIATE, null, null);
 
     // 4. attach final agg stage if aggregations are present.
     RelNode transformToAgg = newAggNode;
@@ -200,7 +181,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   }
 
   private RelNode makeNewIntermediateAgg(RelOptRuleCall ruleCall, Aggregate oldAggRel, PinotLogicalExchange exchange,
-      boolean isLeafStageAggregationPresent, @Nullable List<Integer> argList, @Nullable List<Integer> groupByList) {
+      AggType aggType, @Nullable List<Integer> argList, @Nullable List<Integer> groupByList) {
 
     // add the exchange as the input node to the relation builder.
     RelBuilder relBuilder = ruleCall.builder();
@@ -221,17 +202,15 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     for (int oldCallIndex = 0; oldCallIndex < oldCalls.size(); oldCallIndex++) {
       AggregateCall oldCall = oldCalls.get(oldCallIndex);
       convertIntermediateAggCall(rexBuilder, oldAggRel, oldCallIndex, oldCall, newCalls, aggCallMapping,
-          isLeafStageAggregationPresent, argList, exchange);
+          aggType, argList, exchange);
     }
 
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
     // if the aggregation isn't split between intermediate and final stages, indicate that this is a single stage
     // aggregation so that the execution engine knows whether to aggregate or merge
-    List<RelHint> additionalHints = isLeafStageAggregationPresent ? Collections.singletonList(INTERMEDIATE_STAGE_HINT)
-        : Arrays.asList(INTERMEDIATE_STAGE_HINT, LEAF_STAGE_SKIPPED_AGG_HINT);
     ImmutableList<RelHint> newIntermediateAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).addAll(additionalHints).build();
+        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(createAggHint(aggType)).build();
     ImmutableBitSet groupSet = groupByList == null ? ImmutableBitSet.range(nGroups) : ImmutableBitSet.of(groupByList);
     relBuilder.aggregate(
         relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)),
@@ -248,12 +227,12 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    */
   private static void convertIntermediateAggCall(RexBuilder rexBuilder, Aggregate oldAggRel, int oldCallIndex,
       AggregateCall oldCall, List<AggregateCall> newCalls, Map<AggregateCall, RexNode> aggCallMapping,
-      boolean isLeafStageAggregationPresent, List<Integer> argList, PinotLogicalExchange exchange) {
+      AggType aggType, List<Integer> argList, PinotLogicalExchange exchange) {
     final int nGroups = oldAggRel.getGroupCount();
     final SqlAggFunction oldAggregation = oldCall.getAggregation();
 
     List<Integer> newArgList;
-    if (isLeafStageAggregationPresent) {
+    if (AggType.INTERMEDIATE.equals(aggType) || AggType.FINAL.equals(aggType)) {
       // Make sure COUNT in the intermediate stage takes an argument
       List<Integer> oldArgList = (oldAggregation.getKind() == SqlKind.COUNT && !oldCall.isDistinct())
           ? Collections.singletonList(oldCallIndex)
@@ -295,9 +274,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
-    List<RelHint> additionalHints = Collections.singletonList(FINAL_STAGE_HINT);
     ImmutableList<RelHint> newIntermediateAggHints =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).addAll(additionalHints).build();
+        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(createAggHint(AggType.FINAL)).build();
     ImmutableBitSet groupSet = ImmutableBitSet.range(nGroups);
     relBuilder.aggregate(
         relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)),
@@ -376,7 +354,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
                 + "Only splittable aggregation functions are supported!", aggKind, functionName));
   }
 
-  private void createPlanWithoutLeafAggregation(RelOptRuleCall call) {
+  private RelNode createPlanWithoutLeafAggregation(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
     RelNode childRel = ((HepRelVertex) oldAggRel.getInput()).getCurrentRel();
     LogicalProject project;
@@ -403,15 +381,14 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // 3. Create an intermediate stage aggregation.
     RelNode newAggNode =
-        makeNewIntermediateAgg(call, oldAggRel, exchange, false, newAggArgColumns, newAggGroupByColumns);
+        makeNewIntermediateAgg(call, oldAggRel, exchange, AggType.DIRECT, newAggArgColumns, newAggGroupByColumns);
 
     // 4. Create the final agg stage node on top of the intermediate agg if aggregations are present.
     RelNode transformToAgg = newAggNode;
     if (oldAggRel.getAggCallList() != null && oldAggRel.getAggCallList().size() > 0) {
       transformToAgg = makeNewFinalAgg(call, oldAggRel, newAggNode);
     }
-
-    call.transformTo(transformToAgg);
+    return transformToAgg;
   }
 
   private LogicalProject createLogicalProjectForAggregate(Aggregate oldAggRel, List<Integer> newAggArgColumns,
@@ -468,5 +445,11 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     }
 
     return newAggArgColumns;
+  }
+
+  private static RelHint createAggHint(AggType aggType) {
+    return RelHint.builder(PinotHintOptions.INTERNAL_AGG_OPTIONS)
+        .hintOption(PinotHintOptions.InternalAggregateOptions.AGG_TYPE, aggType.name())
+        .build();
   }
 }

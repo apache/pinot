@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -50,7 +51,8 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && node.isIntermediateStage());
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0
+        && node.getAggType().equals(PinotHintOptions.InternalAggregateOptions.AggType.INTERMEDIATE));
     return null;
   }
 
