@@ -205,9 +205,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _tableUpsertMetadataManager);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      _tableUpsertMetadataManager =
-          TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics, _helixManager,
-              _segmentPreloadExecutor);
+      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig);
+      _tableUpsertMetadataManager.init(tableConfig, schema, this, _serverMetrics, _helixManager,
+          _segmentPreloadExecutor);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data

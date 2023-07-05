@@ -115,9 +115,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
         // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
         // The thread doing the segment preloading here must complete before the other helix threads start to handle
-        // segment state transitions. This is ensured implicitly because segment preloading happens here when creating
-        // this TableUpsertMetadataManager, which happens when creating the TableDataManager, which happens as the
-        // lambda of ConcurrentHashMap.computeIfAbsent() method, which ensures the waiting logic to happen.
+        // segment state transitions. This is ensured implicitly because segment preloading happens here when
+        // initializing this TableUpsertMetadataManager, which happens when initializing the TableDataManager, which
+        // happens as the lambda of ConcurrentHashMap.computeIfAbsent() method, which ensures the waiting logic.
         _isPreloading = true;
         preloadSegments();
       }
@@ -133,7 +133,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
   /**
    * Get the ideal state and find segments assigned to current instance, then preload those with validDocIds snapshot.
-   * Skip those without the snapshots and those whose crc has changed. Those will be handled by the normal Helix state
+   * Skip those without the snapshots and those whose crc has changed, as they will be handled by normal Helix state
    * transitions, which will proceed after the preloading phase fully completes.
    */
   private void preloadSegments()
