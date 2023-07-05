@@ -34,7 +34,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
   private int _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
-  private int _log2MByteSize = 180;
+  private int _log2mByteSize = 180;
   // Byte size won't change once we get the initial aggregated value
   private int _maxByteSize;
 
@@ -47,12 +47,12 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
       return;
     }
 
-    String log2mLiteral = arguments.get(1).getLiteral().getStringValue();
-    Preconditions.checkState(StringUtils.isNumeric(log2mLiteral), "log2m argument must be a numeric literal");
-
-    _log2m = Integer.parseInt(log2mLiteral);
     try {
-      _log2MByteSize = (new HyperLogLog(_log2m)).getBytes().length;
+      String log2mLit = arguments.get(1).getLiteral().getStringValue();
+      Preconditions.checkState(StringUtils.isNumeric(log2mLit), "log2m argument must be a numeric literal");
+
+      _log2m = Integer.parseInt(log2mLit);
+      _log2mByteSize = (new HyperLogLog(_log2m)).getBytes().length;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -78,7 +78,7 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
     } else {
       initialValue = new HyperLogLog(_log2m);
       initialValue.offer(rawValue);
-      _maxByteSize = Math.max(_maxByteSize, _log2MByteSize);
+      _maxByteSize = Math.max(_maxByteSize, _log2mByteSize);
     }
     return initialValue;
   }

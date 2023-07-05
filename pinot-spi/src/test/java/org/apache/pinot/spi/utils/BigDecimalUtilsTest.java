@@ -20,6 +20,8 @@ package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -85,6 +87,40 @@ public class BigDecimalUtilsTest {
       BigDecimal bd = BigDecimalUtils.generateMaximumNumberWithPrecision(precision);
       assertEquals(bd.precision(), precision);
       assertEquals(bd.add(new BigDecimal("1")).precision(), precision + 1);
+    }
+  }
+
+  @Test
+  public void testBigDecimalWithMaximumPrecisionSizeInBytes() {
+    Assert.assertEquals(BigDecimalUtils.byteSizeForFixedPrecision(18), 10);
+    Assert.assertEquals(BigDecimalUtils.byteSizeForFixedPrecision(32), 16);
+    Assert.assertEquals(BigDecimalUtils.byteSizeForFixedPrecision(38), 18);
+  }
+
+  @Test
+  public void testBigDecimalSerializationWithSize() {
+    ArrayList<BigDecimal> bigDecimals = new ArrayList<>();
+    bigDecimals.add(new BigDecimal("1000.123456"));
+    bigDecimals.add(new BigDecimal("1237663"));
+    bigDecimals.add(new BigDecimal("0.114141622"));
+
+    for (BigDecimal bigDecimal : bigDecimals) {
+      int bytesNeeded = BigDecimalUtils.byteSize(bigDecimal);
+
+      // Serialize big decimal equal to the target size
+      byte[] bytes = BigDecimalUtils.serializeWithSize(bigDecimal, bytesNeeded);
+      BigDecimal bigDecimalDeserialized = BigDecimalUtils.deserialize(bytes);
+      Assert.assertEquals(bigDecimalDeserialized, bigDecimal);
+
+      // Serialize big decimal smaller than the target size
+      bytes = BigDecimalUtils.serializeWithSize(bigDecimal, bytesNeeded + 2);
+      bigDecimalDeserialized = BigDecimalUtils.deserialize(bytes);
+      Assert.assertEquals(bigDecimalDeserialized, bigDecimal);
+
+      // Raise exception when trying to serialize a big decimal larger than target size
+      Assert.assertThrows(IllegalArgumentException.class, () -> {
+        BigDecimalUtils.serializeWithSize(bigDecimal, bytesNeeded - 4);
+      });
     }
   }
 }

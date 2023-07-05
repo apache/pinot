@@ -27,8 +27,6 @@ import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -46,8 +44,6 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -376,40 +372,6 @@ public class ObjectSerDeUtilsTest {
       Double2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Double2LongMap);
 
       assertEquals(actual, expected, ERROR_MESSAGE);
-    }
-  }
-
-  @Test
-  public void testBigDecimalWithMaximumPrecisionSizeInBytes() {
-    Assert.assertEquals(BigDecimalUtils.byteSizeForFixedPrecision(18), 10);
-    Assert.assertEquals(BigDecimalUtils.byteSizeForFixedPrecision(32), 16);
-    Assert.assertEquals(BigDecimalUtils.byteSizeForFixedPrecision(38), 18);
-  }
-
-  @Test
-  public void testBigDecimalSerializationWithSize() {
-    ArrayList<BigDecimal> bigDecimals = new ArrayList<>();
-    bigDecimals.add(new BigDecimal("1000.123456"));
-    bigDecimals.add(new BigDecimal("1237663"));
-    bigDecimals.add(new BigDecimal("0.114141622"));
-
-    for (BigDecimal bigDecimal : bigDecimals) {
-      int bytesNeeded = BigDecimalUtils.byteSize(bigDecimal);
-
-      // Serialize big decimal equal to the target size
-      byte[] bytes = BigDecimalUtils.serializeWithSize(bigDecimal, bytesNeeded);
-      BigDecimal bigDecimalDeserialized = BigDecimalUtils.deserialize(bytes);
-      Assert.assertEquals(bigDecimalDeserialized, bigDecimal);
-
-      // Serialize big decimal smaller than the target size
-      bytes = BigDecimalUtils.serializeWithSize(bigDecimal, bytesNeeded + 2);
-      bigDecimalDeserialized = BigDecimalUtils.deserialize(bytes);
-      Assert.assertEquals(bigDecimalDeserialized, bigDecimal);
-
-      // Raise exception when trying to serialize a big decimal larger than target size
-      Assert.assertThrows(IllegalArgumentException.class, () -> {
-        BigDecimalUtils.serializeWithSize(bigDecimal, bytesNeeded - 4);
-      });
     }
   }
 }
