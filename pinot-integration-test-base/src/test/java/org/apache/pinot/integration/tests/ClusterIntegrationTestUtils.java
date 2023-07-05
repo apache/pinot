@@ -770,6 +770,7 @@ public class ClusterIntegrationTestUtils {
             return;
           }
 
+          h2Value = convertBooleanToLowerCase(h2Value);
           String brokerValue = brokerResponseRows.get(0).get(c).asText();
           String connectionValue = resultTableResultSet.getString(0, c);
 

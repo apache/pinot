@@ -30,6 +30,10 @@
       "dataType": "STRING"
     },
     {
+      "name": "Cancelled",
+      "dataType": "BOOLEAN"
+    },
+    {
       "name": "Carrier",
       "dataType": "STRING"
     },
@@ -155,7 +159,7 @@
     },
     {
       "name": "Diverted",
-      "dataType": "INT"
+      "dataType": "BOOLEAN"
     },
     {
       "name": "FirstDepTime",
@@ -283,10 +287,6 @@
     {
       "name": "ArrDelayMinutes",
       "dataType": "DOUBLE"
-    },
-    {
-      "name": "Cancelled",
-      "dataType": "INT"
     },
     {
       "name": "CarrierDelay",

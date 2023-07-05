@@ -69,12 +69,18 @@ public class MultistageAggregationExecutor {
    * Performs aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
-      processAggregate(block, inputDataSchema);
-    } else if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
-      processMerge(block);
-    } else if (_mode.equals(NewAggregateOperator.Mode.EXTRACT_RESULT)) {
-      collectResult(block);
+    switch (_mode) {
+      case AGGREGATE:
+        processAggregate(block, inputDataSchema);
+        break;
+      case MERGE:
+        processMerge(block);
+        break;
+      case EXTRACT_RESULT:
+        collectResult(block);
+        break;
+      default:
+        throw new IllegalStateException();
     }
   }
 
@@ -94,37 +100,28 @@ public class MultistageAggregationExecutor {
    * Fetches the result.
    */
   public List<Object[]> getResult() {
-    List<Object[]> rows = new ArrayList<>();
-    Object[] row = new Object[_aggFunctions.length];
-
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      AggregationFunction aggFunction = _aggFunctions[i];
-      if (_mode.equals(NewAggregateOperator.Mode.MERGE)) {
-        Object value = _mergeResultHolder[i];
-        row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-      } else if (_mode.equals(NewAggregateOperator.Mode.AGGREGATE)) {
-        Object value = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
-        row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-      } else {
-        assert _mode.equals(NewAggregateOperator.Mode.EXTRACT_RESULT);
-        Comparable result = aggFunction.extractFinalResult(_finalResultHolder[i]);
-        row[i] = result == null ? null : aggFunction.getFinalResultColumnType().convert(result);
-      }
+    Object[] row;
+    switch (_mode) {
+      case AGGREGATE:
+        row = new Object[_aggFunctions.length];
+        for (int i = 0; i < _aggFunctions.length; i++) {
+          row[i] = _aggFunctions[i].extractAggregationResult(_aggregateResultHolder[i]);
+        }
+        break;
+      case MERGE:
+        row = _mergeResultHolder;
+        break;
+      case EXTRACT_RESULT:
+        row = new Object[_aggFunctions.length];
+        for (int i = 0; i < _aggFunctions.length; i++) {
+          Comparable result = _aggFunctions[i].extractFinalResult(_finalResultHolder[i]);
+          row[i] = result == null ? null : _aggFunctions[i].getFinalResultColumnType().convert(result);
+        }
+        break;
+      default:
+        throw new IllegalStateException();
     }
-    rows.add(row);
-    return rows;
-  }
-
-  private Object convertObjectToReturnType(AggregationFunctionType aggType, Object value) {
-    // For bool_and and bool_or aggregation functions, the return type for aggregate and merge modes are set as
-    // boolean. However, the v1 bool_and and bool_or function uses Integer as the intermediate type.
-    boolean boolAndOrAgg =
-        aggType.equals(AggregationFunctionType.BOOLAND) || aggType.equals(AggregationFunctionType.BOOLOR);
-    if (boolAndOrAgg && value instanceof Integer) {
-      Boolean boolVal = ((Number) value).intValue() > 0 ? true : false;
-      return boolVal;
-    }
-    return value;
+    return Collections.singletonList(row);
   }
 
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
@@ -189,35 +186,18 @@ public class MultistageAggregationExecutor {
         new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
   }
 
-  Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row) {
+  private Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row) {
     // TODO: Add support to handle aggregation functions where:
     //       1. The identifier need not be the first argument
     //       2. There are more than one identifiers.
     List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
-    Preconditions.checkState(expressions.size() == 1);
+    Preconditions.checkState(expressions.size() == 1, "Only support single expression, got: %s", expressions.size());
     ExpressionContext expr = expressions.get(0);
     ExpressionContext.Type exprType = expr.getType();
-
-    if (exprType.equals(ExpressionContext.Type.IDENTIFIER)) {
-      String colName = expr.getIdentifier();
-      int colIndex = _colNameToIndexMap.get(colName);
-
-      Object value = row[colIndex];
-
-      // Boolean aggregation functions like BOOL_AND and BOOL_OR have return types set to Boolean. However, their
-      // intermediateResultType is Integer. To handle this case convert Boolean objects to Integer objects.
-      boolean boolAndOrAgg =
-          aggregationFunction.getType().equals(AggregationFunctionType.BOOLAND) || aggregationFunction.getType()
-              .equals(AggregationFunctionType.BOOLOR);
-      if (boolAndOrAgg && value instanceof Boolean) {
-        Integer intVal = ((Boolean) value).booleanValue() ? 1 : 0;
-        return intVal;
-      }
-
-      return value;
+    if (exprType == ExpressionContext.Type.IDENTIFIER) {
+      return row[_colNameToIndexMap.get(expr.getIdentifier())];
     }
-
-    Preconditions.checkState(exprType.equals(ExpressionContext.Type.LITERAL), "Invalid expression type");
+    Preconditions.checkState(exprType == ExpressionContext.Type.LITERAL, "Unsupported expression type: %s", exprType);
     return expr.getLiteral().getValue();
   }
 }

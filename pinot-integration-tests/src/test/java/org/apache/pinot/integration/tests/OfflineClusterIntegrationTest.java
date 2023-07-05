@@ -140,7 +140,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
   private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
-  private static final int DISK_SIZE_IN_BYTES = 20797324;
+  private static final int DISK_SIZE_IN_BYTES = 20797336;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -2749,5 +2749,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertFalse(rows.get(0).get(0).asBoolean());
+  }
+
+  @Test
+  public void testBooleanAggregation()
+      throws Exception {
+    testQuery("SELECT BOOL_AND(Cancelled) FROM mytable");
+    testQuery("SELECT BOOL_OR(Diverted) FROM mytable");
   }
 }
