@@ -50,7 +50,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && AggregateNode.isFinalStage(node));
+    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0 && node.isIntermediateStage());
     return null;
   }
 
