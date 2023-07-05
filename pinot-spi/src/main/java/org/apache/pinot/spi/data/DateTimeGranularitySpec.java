@@ -29,12 +29,12 @@ import org.apache.pinot.spi.utils.StringUtil;
  * Class to represent granularity from {@link DateTimeFieldSpec}
  */
 public class DateTimeGranularitySpec {
-  // Colon format:
+  // Colon format: 'size:timeUnit'
   private static final char COLON_SEPARATOR = ':';
   private static final int COLON_FORMAT_SIZE_POSITION = 0;
   private static final int COLON_FORMAT_TIME_UNIT_POSITION = 1;
 
-  // Pipe format:
+  // Pipe format: 'timeUnit|size'
   private static final char PIPE_SEPARATOR = '|';
   private static final int PIPE_FORMAT_TIME_UNIT_POSITION = 0;
   private static final int PIPE_FORMAT_SIZE_POSITION = 1;
