@@ -20,7 +20,6 @@ package org.apache.pinot.core.common.datablock;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -28,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -56,29 +56,40 @@ public class DataBlockBuilder {
   private int _numColumns;
 
   private final Object2IntOpenHashMap<String> _dictionary = new Object2IntOpenHashMap<>();
-  private final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
-  private final DataOutputStream _fixedSizeDataOutputStream = new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
-  private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
+  private final UnsynchronizedByteArrayOutputStream _fixedSizeDataByteArrayOutputStream;
+  private final DataOutputStream _fixedSizeDataOutputStream;
+  private final UnsynchronizedByteArrayOutputStream _variableSizeDataByteArrayOutputStream
+      = new UnsynchronizedByteArrayOutputStream(8192);
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
 
-  private DataBlockBuilder(DataSchema dataSchema, DataBlock.Type blockType) {
+  private DataBlockBuilder(DataSchema dataSchema, DataBlock.Type blockType, int numRows) {
     _dataSchema = dataSchema;
     _columnDataTypes = dataSchema.getColumnDataTypes();
     _blockType = blockType;
     _numColumns = dataSchema.size();
-    if (_blockType == DataBlock.Type.COLUMNAR) {
-      _cumulativeColumnOffsetSizeInBytes = new int[_numColumns];
-      _columnSizeInBytes = new int[_numColumns];
-      DataBlockUtils.computeColumnSizeInBytes(_dataSchema, _columnSizeInBytes);
-      int cumulativeColumnOffset = 0;
-      for (int i = 0; i < _numColumns; i++) {
-        _cumulativeColumnOffsetSizeInBytes[i] = cumulativeColumnOffset;
-        cumulativeColumnOffset += _columnSizeInBytes[i] * _numRows;
-      }
-    } else if (_blockType == DataBlock.Type.ROW) {
+    if (_blockType == DataBlock.Type.ROW) {
       _columnOffsets = new int[_numColumns];
       _rowSizeInBytes = DataBlockUtils.computeColumnOffsets(dataSchema, _columnOffsets);
+
+      int nullBytes = _numColumns * 8; // we need 2 ints per column to store the roaring bitmaps offsets
+      int expectedFixedSizeStreamSize = (_rowSizeInBytes + nullBytes) * numRows;
+      _fixedSizeDataByteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(expectedFixedSizeStreamSize);
+      _fixedSizeDataOutputStream = new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
+    } else {
+      _fixedSizeDataByteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(8192);
+      _fixedSizeDataOutputStream = new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
+
+      if (_blockType == DataBlock.Type.COLUMNAR) {
+        _cumulativeColumnOffsetSizeInBytes = new int[_numColumns];
+        _columnSizeInBytes = new int[_numColumns];
+        DataBlockUtils.computeColumnSizeInBytes(_dataSchema, _columnSizeInBytes);
+        int cumulativeColumnOffset = 0;
+        for (int i = 0; i < _numColumns; i++) {
+          _cumulativeColumnOffsetSizeInBytes[i] = cumulativeColumnOffset;
+          cumulativeColumnOffset += _columnSizeInBytes[i] * _numRows;
+        }
+      }
     }
   }
 
@@ -96,7 +107,7 @@ public class DataBlockBuilder {
 
   public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema)
       throws IOException {
-    DataBlockBuilder rowBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.ROW);
+    DataBlockBuilder rowBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.ROW, rows.size());
     // TODO: consolidate these null utils into data table utils.
     // Selection / Agg / Distinct all have similar code.
     int numColumns = rowBuilder._numColumns;
@@ -109,9 +120,10 @@ public class DataBlockBuilder {
       nullPlaceholders[colId] = columnDataTypes[colId].convert(storedColumnDataTypes[colId].getNullPlaceholder());
     }
     rowBuilder._numRows = rows.size();
+    ByteBuffer byteBuffer = ByteBuffer.allocate(rowBuilder._rowSizeInBytes);
     for (int rowId = 0; rowId < rows.size(); rowId++) {
+      byteBuffer.clear();
       Object[] row = rows.get(rowId);
-      ByteBuffer byteBuffer = ByteBuffer.allocate(rowBuilder._rowSizeInBytes);
       for (int colId = 0; colId < rowBuilder._numColumns; colId++) {
         Object value = row[colId];
         if (value == null) {
@@ -237,7 +249,8 @@ public class DataBlockBuilder {
 
   public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
       throws IOException {
-    DataBlockBuilder columnarBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.COLUMNAR);
+    int numRows = columns.isEmpty() ? 0 : columns.get(0).length;
+    DataBlockBuilder columnarBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.COLUMNAR, numRows);
 
     // TODO: consolidate these null utils into data table utils.
     // Selection / Agg / Distinct all have similar code.
