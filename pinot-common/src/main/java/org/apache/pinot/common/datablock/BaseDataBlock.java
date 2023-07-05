@@ -388,7 +388,7 @@ public abstract class BaseDataBlock implements DataBlock {
   protected byte[] serializeStringDictionary()
       throws IOException {
     if (_stringDictionary.length == 0) {
-      return new byte[]{0, 0, 0, 0};
+      return new byte[4];
     }
     UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(1024);
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -537,7 +537,7 @@ public abstract class BaseDataBlock implements DataBlock {
   private byte[] serializeExceptions()
       throws IOException {
     if (_errCodeToExceptionMap.isEmpty()) {
-      return new byte[]{0, 0, 0, 0};
+      return new byte[4];
     }
     UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(1024);
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
