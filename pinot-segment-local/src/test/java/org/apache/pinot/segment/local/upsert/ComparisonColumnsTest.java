@@ -24,9 +24,9 @@ import org.testng.annotations.Test;
 
 
 public class ComparisonColumnsTest {
-  private void nullFill(Comparable[]... comparables) {
+  private void minIntFill(Comparable[]... comparables) {
     for (Comparable[] comps : comparables) {
-      Arrays.fill(comps, null);
+      Arrays.fill(comps, Integer.MIN_VALUE);
     }
   }
 
@@ -44,31 +44,31 @@ public class ComparisonColumnsTest {
     Assert.assertEquals(comparisonResult, -1);
 
     // persist same col with equal value
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[0] = 2;
     persistedComparables[0] = 2;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 0);
 
     // persist same col with larger value
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[0] = 2;
     persistedComparables[0] = 1;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 1);
-    Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{2, null, null});
+    Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{2, Integer.MIN_VALUE, Integer.MIN_VALUE});
 
     // persist doc with col which was previously null, even though its value is smaller than the previous non-null col
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     toBeIngested = new ComparisonColumns(newComparables, newComparables.length - 1);
     newComparables[newComparables.length - 1] = 1;
     persistedComparables[0] = 2;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, 1);
-    Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{2, null, 1});
+    Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{2, Integer.MIN_VALUE, 1});
 
     // persist new doc where existing doc has multiple non-null comparison values
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     toBeIngested = new ComparisonColumns(newComparables, 1);
     newComparables[1] = 2;
     Arrays.fill(persistedComparables, 1);
@@ -77,7 +77,7 @@ public class ComparisonColumnsTest {
     Assert.assertEquals(toBeIngested.getValues(), new Comparable[]{1, 2, 1});
 
     // reject new doc where existing doc has multiple non-null comparison values
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[1] = 0;
     Arrays.fill(persistedComparables, 1);
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
@@ -106,7 +106,7 @@ public class ComparisonColumnsTest {
     Assert.assertEquals(comparisonResult, -1);
 
     // persist same col with equal value
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[0] = 2;
     persistedComparables[0] = 2;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
@@ -115,7 +115,7 @@ public class ComparisonColumnsTest {
     Assert.assertEquals(toBeIngested.getValues(), newComparables);
 
     // persist same col with larger value
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[0] = 2;
     persistedComparables[0] = 1;
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
@@ -124,7 +124,7 @@ public class ComparisonColumnsTest {
     // reject doc where existing doc has more than one, but not all, non-null comparison values, but _this_ doc has 2
     // null columns. The presence of null columns in one of the docs implies that it must have come before the doc
     // with non-null columns.
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[1] = 1;
     persistedComparables[0] = 1;
     persistedComparables[2] = 1;
@@ -132,7 +132,7 @@ public class ComparisonColumnsTest {
     Assert.assertEquals(comparisonResult, -1);
 
     // persist doc where existing doc has more than one, but not all, non-null comparison values, but _this_ doc has
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[0] = 1;
     newComparables[2] = 2;
     persistedComparables[0] = 1;
@@ -142,7 +142,7 @@ public class ComparisonColumnsTest {
 
     // persist doc with non-null value where existing doc had null value in same column previously (but multiple
     // non-null in other columns)
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[0] = 1;
     newComparables[1] = 1;
     newComparables[2] = 1;
@@ -154,14 +154,14 @@ public class ComparisonColumnsTest {
     // reject doc where existing doc has all non-null comparison values, but _this_ doc has 2 null values.
     // The presence of null columns in one of the docs implies that it must have come before the doc with non-null
     // columns.
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     newComparables[1] = 1;
     Arrays.fill(persistedComparables, 1);
     comparisonResult = toBeIngested.compareTo(alreadyPersisted);
     Assert.assertEquals(comparisonResult, -1);
 
     // Persist doc where existing doc has all non-null comparison values, but _this_ doc has a larger value.
-    nullFill(newComparables, persistedComparables);
+    minIntFill(newComparables, persistedComparables);
     Arrays.fill(newComparables, 1);
     Arrays.fill(persistedComparables, 1);
     newComparables[1] = 2;

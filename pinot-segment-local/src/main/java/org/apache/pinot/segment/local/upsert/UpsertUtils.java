@@ -193,10 +193,7 @@ public class UpsertUtils {
 
       for (int i = 0; i < _comparisonColumnReaders.length; i++) {
         PinotSegmentColumnReader columnReader = _comparisonColumnReaders[i];
-        Comparable comparisonValue = null;
-        if (!columnReader.isNull(docId)) {
-          comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
-        }
+        Comparable comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
         comparisonColumns[i] = comparisonValue;
       }
 

@@ -52,18 +52,9 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
         continue;
       }
 
-      // Always keep the record with non-null value, or that with the greater comparisonResult
-      if (comparisonValue == null) {
-        // implies comparisonValue == null && otherComparisonValue != null
-        return -1;
-      } else if (otherComparisonValue == null) {
-        // implies comparisonValue != null && otherComparisonValue == null
-        return 1;
-      } else {
-        int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
-        if (comparisonResult != 0) {
-          return comparisonResult;
-        }
+      int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
+      if (comparisonResult != 0) {
+        return comparisonResult;
       }
     }
     return 0;
@@ -78,18 +69,10 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
     // _comparisonColumns should only at most one non-null comparison value for newly ingested data. If not, it is
     // the user's responsibility. There is no attempt to guarantee behavior in the case where there are multiple
     // non-null values
-    int comparisonResult;
-
     Comparable comparisonValue = _values[_comparableIndex];
     Comparable otherComparisonValue = other.getValues()[_comparableIndex];
 
-    if (otherComparisonValue == null) {
-      // Keep this record because the existing record has no value for the same comparison column, therefore the
-      // (lack of) existing value could not possibly cause the new value to be rejected.
-      comparisonResult = 1;
-    } else {
-      comparisonResult = comparisonValue.compareTo(otherComparisonValue);
-    }
+    int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
 
     if (comparisonResult >= 0) {
       // TODO(egalpin):  This method currently may have side-effects on _values. Depending on the comparison result,

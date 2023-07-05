@@ -550,12 +550,12 @@ public class MutableSegmentImpl implements MutableSegment {
             "Documents must have exactly 1 non-null comparison column value");
 
         comparableIndex = i;
-
-        Object comparisonValue = row.getValue(columnName);
-        Preconditions.checkState(comparisonValue instanceof Comparable,
-            "Upsert comparison column: %s must be comparable", columnName);
-        comparisonValues[i] = (Comparable) comparisonValue;
       }
+
+      Object comparisonValue = row.getValue(columnName);
+      Preconditions.checkState(comparisonValue instanceof Comparable,
+          "Upsert comparison column: %s must be comparable", columnName);
+      comparisonValues[i] = (Comparable) comparisonValue;
     }
     Preconditions.checkState(comparableIndex != -1, "Documents must have exactly 1 non-null comparison column value");
     return new ComparisonColumns(comparisonValues, comparableIndex);
