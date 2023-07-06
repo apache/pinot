@@ -165,7 +165,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       compilationStartTimeNs = System.nanoTime();
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
+          queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {

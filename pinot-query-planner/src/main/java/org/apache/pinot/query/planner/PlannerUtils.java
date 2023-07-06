@@ -44,7 +44,7 @@ public class PlannerUtils {
     return planFragmentId == 1;
   }
 
-  public static String explainPlan(RelNode relRoot, SqlExplainFormat format, SqlExplainLevel explainLevel, boolean showPhysicalPlan) {
+  public static String explainPlan(RelNode relRoot, SqlExplainFormat format, SqlExplainLevel explainLevel) {
     return RelOptUtil.dumpPlan("Execution Plan", relRoot, format, explainLevel);
   }
 }

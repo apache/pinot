@@ -51,8 +51,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryPlanExplain(String query, String digest)
       throws Exception {
     try {
-      String explainedPlan = _queryEnvironment.explainQuery(query);
-      Assert.assertEquals(explainedPlan, digest);
+      long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+      String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
+      Assert.assertEquals(stripPhysicalPlan(explainedPlan), digest);
     } catch (RuntimeException e) {
       Assert.fail("failed to explain query: " + query, e);
     }

@@ -61,6 +61,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.SubPlan;
@@ -169,11 +170,11 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      SubPlan subPlanRoot = toSubPlan(relRoot);
+
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
-      DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(subPlanRoot, plannerContext, requestId);
+      DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
       return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
@@ -195,7 +196,7 @@ public class QueryEnvironment {
    * @param sqlNodeAndOptions parsed SQL query.
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
-  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
@@ -204,8 +205,16 @@ public class QueryEnvironment {
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
       boolean showPhysicalPlan = explain.withImplementation();
-      Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-      return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level, showPhysicalPlan), tableNames);
+      String logicalPlan = PlannerUtils.explainPlan(relRoot.rel, format, level);
+      if (showPhysicalPlan) {
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
+        String physicalPlan = ExplainPlanPlanVisitor.explain(dispatchableSubPlan);
+        String completePlan = String.format("%s\nPhysical Plan\n %s", logicalPlan, physicalPlan);
+        return new QueryPlannerResult(dispatchableSubPlan, completePlan, dispatchableSubPlan.getTableNames());
+      } else {
+        Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
+        return new QueryPlannerResult(null, logicalPlan, tableNames);
+      }
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -217,10 +226,8 @@ public class QueryEnvironment {
   }
 
   @VisibleForTesting
-  public String explainQuery(String sqlQuery) {
-
-
-    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery)).getExplainPlan();
+  public String explainQuery(String sqlQuery, long requestId) {
+    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), requestId).getExplainPlan();
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
@@ -340,13 +347,13 @@ public class QueryEnvironment {
     SubPlan subPlan = pinotLogicalQueryPlanner.makePlan(queryPlan);
     return subPlan;
   }
+  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
+    SubPlan subPlanRoot = toSubPlan(relRoot);
 
-  private DispatchableSubPlan toDispatchableSubPlan(SubPlan subPlan, PlannerContext plannerContext, long requestId) {
     // 6. construct a dispatchable query plan.
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
-    DispatchableSubPlan dispatchableSubPlan = pinotDispatchPlanner.createDispatchableSubPlan(subPlan);
-    return dispatchableSubPlan;
+    return pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
   }
 
   // --------------------------------------------------------------------------

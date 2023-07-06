@@ -47,8 +47,9 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "testResourceQueryPlannerTestCaseProviderHappyPath")
   public void testQueryExplainPlansAndQueryPlanConversion(String testCaseName, String query, String output) {
     try {
-      String explainedPlan = _queryEnvironment.explainQuery(query);
-      Assert.assertEquals(explainedPlan, output,
+      long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+      String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
+      Assert.assertEquals(stripPhysicalPlan(explainedPlan), output,
           String.format("Test case %s for query %s doesn't match expected output: %s", testCaseName, query, output));
       String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR ", "");
       DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(queryWithoutExplainPlan);
@@ -63,7 +64,8 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "testResourceQueryPlannerTestCaseProviderExceptions")
   public void testQueryExplainPlansWithExceptions(String testCaseName, String query, String expectedException) {
     try {
-      _queryEnvironment.explainQuery(query);
+      long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+      _queryEnvironment.explainQuery(query, requestId);
       Assert.fail("Query compilation should have failed with exception message pattern: " + expectedException);
     } catch (Exception e) {
       if (expectedException == null) {
