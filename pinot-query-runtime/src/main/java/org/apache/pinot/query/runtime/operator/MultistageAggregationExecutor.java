@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,6 +30,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -39,7 +39,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * Class that executes all aggregation functions (without group-bys) for the multistage AggregateOperator.
  */
 public class MultistageAggregationExecutor {
-  private final PinotHintOptions.InternalAggregateOptions.AggType _aggType;
+  private final AggType _aggType;
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // from column name to their index.
   private final Map<String, Integer> _colNameToIndexMap;
@@ -52,7 +52,7 @@ public class MultistageAggregationExecutor {
   private final Object[] _finalResultHolder;
 
   public MultistageAggregationExecutor(AggregationFunction[] aggFunctions,
-      PinotHintOptions.InternalAggregateOptions.AggType aggType, Map<String, Integer> colNameToIndexMap) {
+      AggType aggType, Map<String, Integer> colNameToIndexMap) {
     _aggFunctions = aggFunctions;
     _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
@@ -70,12 +70,11 @@ public class MultistageAggregationExecutor {
    * Performs aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.DIRECT)
-        || _aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.LEAF)) {
+    if (_aggType.equals(AggType.DIRECT) || _aggType.equals(AggType.LEAF)) {
       processAggregate(block, inputDataSchema);
-    } else if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.INTERMEDIATE)) {
+    } else if (_aggType.equals(AggType.INTERMEDIATE)) {
       processMerge(block);
-    } else if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.FINAL)) {
+    } else if (_aggType.equals(AggType.FINAL)) {
       collectResult(block);
     }
   }
@@ -101,15 +100,14 @@ public class MultistageAggregationExecutor {
 
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
-      if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.INTERMEDIATE)) {
+      if (_aggType.equals(AggType.INTERMEDIATE)) {
         Object value = _mergeResultHolder[i];
         row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-      } else if (_aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.DIRECT)
-          || _aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.LEAF)) {
+      } else if (_aggType.equals(AggType.DIRECT) || _aggType.equals(AggType.LEAF)) {
         Object value = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
         row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
       } else {
-        assert _aggType.equals(PinotHintOptions.InternalAggregateOptions.AggType.FINAL);
+        assert _aggType.equals(AggType.FINAL);
         Comparable result = aggFunction.extractFinalResult(_finalResultHolder[i]);
         row[i] = result == null ? null : aggFunction.getFinalResultColumnType().convert(result);
       }

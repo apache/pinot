@@ -40,12 +40,6 @@ public class PinotHintOptions {
 
   public static class InternalAggregateOptions {
     public static final String AGG_TYPE = "agg_type";
-    public enum AggType {
-      DIRECT,
-      LEAF,
-      INTERMEDIATE,
-      FINAL;
-    }
   }
 
   public static class AggregateOptions {

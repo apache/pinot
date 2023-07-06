@@ -37,9 +37,7 @@ public class AggregateNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _groupSet;
   @ProtoProperties
-  private PinotHintOptions.InternalAggregateOptions.AggType _aggType;
-  @ProtoProperties
-  private boolean _treatIntermediateStageAsLeaf;
+  private AggType _aggType;
 
   public AggregateNode(int planFragmentId) {
     super(planFragmentId);
@@ -52,7 +50,7 @@ public class AggregateNode extends AbstractPlanNode {
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = groupSet;
     _relHints = relHints;
-    _aggType = PinotHintOptions.InternalAggregateOptions.AggType.valueOf(PinotHintStrategyTable.getHintOption(
+    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(
         relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
   }
 
@@ -72,7 +70,7 @@ public class AggregateNode extends AbstractPlanNode {
     return _relHints;
   }
 
-  public PinotHintOptions.InternalAggregateOptions.AggType getAggType() {
+  public AggType getAggType() {
     return _aggType;
   }
 
@@ -84,5 +82,12 @@ public class AggregateNode extends AbstractPlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitAggregate(this, context);
+  }
+
+  public enum AggType {
+    DIRECT,
+    LEAF,
+    INTERMEDIATE,
+    FINAL;
   }
 }

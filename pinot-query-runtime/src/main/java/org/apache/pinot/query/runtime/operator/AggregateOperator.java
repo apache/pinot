@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -34,6 +33,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -89,7 +89,7 @@ public class AggregateOperator extends MultiStageOperator {
   @VisibleForTesting
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
-      PinotHintOptions.InternalAggregateOptions.AggType aggType) {
+      AggType aggType) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;

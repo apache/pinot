@@ -36,7 +36,7 @@ import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.hint.PinotHintOptions;
-import org.apache.calcite.rel.hint.PinotHintOptions.InternalAggregateOptions.AggType;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
