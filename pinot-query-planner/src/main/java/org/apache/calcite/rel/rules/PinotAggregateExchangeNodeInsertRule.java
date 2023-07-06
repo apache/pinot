@@ -36,7 +36,6 @@ import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
@@ -54,6 +53,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.ImmutableIntList;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -232,7 +232,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     final SqlAggFunction oldAggregation = oldCall.getAggregation();
 
     List<Integer> newArgList;
-    if (AggType.INTERMEDIATE.equals(aggType) || AggType.FINAL.equals(aggType)) {
+    if (aggType.isInputIntermediateFormat()) {
       // Make sure COUNT in the intermediate stage takes an argument
       List<Integer> oldArgList = (oldAggregation.getKind() == SqlKind.COUNT && !oldCall.isDistinct())
           ? Collections.singletonList(oldCallIndex)

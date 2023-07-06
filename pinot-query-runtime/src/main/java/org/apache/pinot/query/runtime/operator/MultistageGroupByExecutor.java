@@ -89,11 +89,11 @@ public class MultistageGroupByExecutor {
    * Performs group-by aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_aggType.equals(AggType.DIRECT) || _aggType.equals(AggType.LEAF)) {
+    if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block, inputDataSchema);
-    } else if (_aggType.equals(AggType.INTERMEDIATE)) {
+    } else if (_aggType.isOutputIntermediateFormat()) {
       processMerge(block);
-    } else if (_aggType.equals(AggType.FINAL)) {
+    } else {
       collectResult(block);
     }
   }
@@ -122,7 +122,7 @@ public class MultistageGroupByExecutor {
         if (_aggType.equals(AggType.INTERMEDIATE)) {
           Object value = _mergeResultHolder.get(groupId)[i];
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-        } else if (_aggType.equals(AggType.DIRECT) || _aggType.equals(AggType.LEAF)) {
+        } else {
           Object value = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
         }
@@ -152,11 +152,11 @@ public class MultistageGroupByExecutor {
     return rows;
   }
 
-  private Object convertObjectToReturnType(AggregationFunctionType aggType, Object value) {
+  private Object convertObjectToReturnType(AggregationFunctionType aggFuncType, Object value) {
     // For bool_and and bool_or aggregation functions, the return type for aggregate and merge modes are set as
     // boolean. However, the v1 bool_and and bool_or function uses Integer as the intermediate type.
     boolean boolAndOrAgg =
-        aggType.equals(AggregationFunctionType.BOOLAND) || aggType.equals(AggregationFunctionType.BOOLOR);
+        aggFuncType.equals(AggregationFunctionType.BOOLAND) || aggFuncType.equals(AggregationFunctionType.BOOLOR);
     if (boolAndOrAgg && value instanceof Integer) {
       Boolean boolVal = ((Number) value).intValue() > 0 ? true : false;
       return boolVal;

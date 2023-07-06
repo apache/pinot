@@ -76,7 +76,7 @@ public class AggregateNode extends AbstractPlanNode {
 
   @Override
   public String explain() {
-    return "AGGREGATE" + _aggType;
+    return "AGGREGATE_" + _aggType;
   }
 
   @Override
@@ -84,10 +84,34 @@ public class AggregateNode extends AbstractPlanNode {
     return visitor.visitAggregate(this, context);
   }
 
+  /**
+   * Aggregation Types: Pinot aggregation functions can perform operation on input data which
+   *   (1) directly accumulate from raw input, or
+   *   (2) merging multiple intermediate data format;
+   * in terms of output format, it can also
+   *   (1) produce a mergeable intermediate data format, or
+   *   (2) extract result as final result format.
+   */
   public enum AggType {
-    DIRECT,
-    LEAF,
-    INTERMEDIATE,
-    FINAL;
+    DIRECT(false, false),
+    LEAF(false, true),
+    INTERMEDIATE(true, true),
+    FINAL(true, false);
+
+    private final boolean _isInputIntermediateFormat;
+    private final boolean _isOutputIntermediateFormat;
+
+    AggType(boolean isInputIntermediateFormat, boolean isOutputIntermediateFormat) {
+      _isInputIntermediateFormat = isInputIntermediateFormat;
+      _isOutputIntermediateFormat = isOutputIntermediateFormat;
+    }
+
+    public boolean isInputIntermediateFormat() {
+      return _isInputIntermediateFormat;
+    }
+
+    public boolean isOutputIntermediateFormat() {
+      return _isOutputIntermediateFormat;
+    }
   }
 }
