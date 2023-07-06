@@ -19,10 +19,12 @@
 package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -86,6 +88,10 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
+import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND;
+import static org.apache.pinot.controller.ControllerConf.ENABLE_SPLIT_COMMIT;
+import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -983,7 +989,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Change 1st segment status to be DONE, but with default peer download url.
     // Verify later the download url is fixed after upload success.
     segmentsZKMetadata.get(0).setStatus(Status.DONE);
-    segmentsZKMetadata.get(0).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    segmentsZKMetadata.get(0).setDownloadUrl(METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 1st segment
     String instance0 = "instance0";
     externalView.setState(segmentsZKMetadata.get(0).getSegmentName(), instance0, "ONLINE");
@@ -1012,7 +1018,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
     segmentsZKMetadata.get(1).setStatus(Status.DONE);
-    segmentsZKMetadata.get(1).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    segmentsZKMetadata.get(1).setDownloadUrl(METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 2nd segment
     String instance1 = "instance1";
     externalView.setState(segmentsZKMetadata.get(1).getSegmentName(), instance1, "ONLINE");
@@ -1036,7 +1042,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Verify later the download url isn't fixed because no ONLINE replica found in any server.
     segmentsZKMetadata.get(2).setStatus(Status.DONE);
     segmentsZKMetadata.get(2).setDownloadUrl(
-        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+        METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 3rd segment
     String instance2 = "instance2";
     externalView.setState(segmentsZKMetadata.get(2).getSegmentName(), instance2, "OFFLINE");
@@ -1065,15 +1071,53 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
-        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+        METADATA_URI_FOR_PEER_DOWNLOAD);
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(2), null).getDownloadUrl(),
-        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+        METADATA_URI_FOR_PEER_DOWNLOAD);
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+  }
+
+  @Test
+  public void testDeleteTmpSegmentFiles() throws Exception{
+    // turn on knobs for async deletion of tmp files
+    ControllerConf config = new ControllerConf();
+    config.setDataDir(TEMP_DIR.toString());
+    config.setProperty(ENABLE_SPLIT_COMMIT, true);
+    config.setProperty(SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND, -1);
+    config.setProperty(ENABLE_TMP_SEGMENT_ASYNC_DELETION, true);
+
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String segmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+    File segmentFile = new File(tableDir, segmentFileName);
+    FileUtils.write(segmentFile, "temporary file contents", Charset.defaultCharset());
+
+    SegmentZKMetadata segZKMeta = mock(SegmentZKMetadata.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
+        .thenReturn(Collections.singletonList(segZKMeta));
+    when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
+        .thenReturn(new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build());
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(
+        helixResourceManager,config);
+
+    // case 1: the segmentMetadata download uri is identical to the uri of the tmp segment
+    when(segZKMeta.getStatus()).thenReturn(Status.DONE);
+    when(segZKMeta.getDownloadUrl()).thenReturn(SCHEME + tableDir + "/" + segmentFileName);
+    segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
+    assertTrue(segmentFile.exists());
+
+    // case 2: download url is empty, indicates the
+    when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
+    segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
+    assertFalse(segmentFile.exists());
   }
 
   //////////////////////////////////////////////////////////////////////////////////

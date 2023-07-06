@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.controller.validation;
 
-import java.util.List;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -27,10 +25,6 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,27 +47,7 @@ public class RealtimeTempSegmentCleaner extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void processTable(String tableNameWithType) {
-    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      return;
-    }
-
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    if (tableConfig == null) {
-      LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-      return;
-    }
-
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
-
-    // Delete tmp segments
-    if (streamConfig.hasLowLevelConsumerType()
-        && _llcRealtimeSegmentManager.getIsSplitCommitEnabled()
-        && _llcRealtimeSegmentManager.isTmpSegmentAsyncDeletionEnabled()) {
-      String realtimeTableName = tableConfig.getTableName();
-      List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
-      _llcRealtimeSegmentManager.deleteTmpSegments(tableConfig, segmentsZKMetadata);
-    }
+    _llcRealtimeSegmentManager.deleteTmpSegments(tableNameWithType);
   }
 
   @Override
