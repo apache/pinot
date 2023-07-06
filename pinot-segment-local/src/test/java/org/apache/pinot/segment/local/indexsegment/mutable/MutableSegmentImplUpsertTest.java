@@ -139,7 +139,8 @@ public class MutableSegmentImplUpsertTest {
       // Confirm that both comparison column values have made it into the persisted upserted doc
       Assert.assertEquals(1567205397L, _mutableSegmentImpl.getValue(2, "secondsSinceEpoch"));
       Assert.assertEquals(1567205395L, _mutableSegmentImpl.getValue(2, "otherComparisonColumn"));
-      Assert.assertTrue(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(2));
+      Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(2));
+      Assert.assertFalse(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(2));
 
       // bb
       Assert.assertFalse(bitmap.contains(4));
@@ -149,6 +150,7 @@ public class MutableSegmentImplUpsertTest {
       Assert.assertEquals(1567205396L, _mutableSegmentImpl.getValue(5, "secondsSinceEpoch"));
       Assert.assertEquals(Long.MIN_VALUE, _mutableSegmentImpl.getValue(5, "otherComparisonColumn"));
       Assert.assertTrue(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(5));
+      Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(5));
     }
   }
 }
