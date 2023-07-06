@@ -46,18 +46,31 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
        - if all values between the two sets of Comparables are equal (compareTo == 0), keep _values as-is and return 0
        */
     for (int i = 0; i < _values.length; i++) {
-      Comparable comparisonValue = _values[i];
-      Comparable otherComparisonValue = other.getValues()[i];
-      if (comparisonValue == null && otherComparisonValue == null) {
-        continue;
-      }
-
-      int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
+      int comparisonResult = compareToIndex(other, i);
       if (comparisonResult != 0) {
         return comparisonResult;
       }
     }
+
     return 0;
+  }
+
+  private int compareToIndex(ComparisonColumns other, int comparableIndex) {
+    Comparable otherComparisonValue = other.getValues()[comparableIndex];
+    return _values[comparableIndex].compareTo(otherComparisonValue);
+  }
+
+  private void mergeComparisonValues(ComparisonColumns other) {
+    // TODO(egalpin):  This method currently may have side-effects on _values. Depending on the result of compareTo,
+    //  entities from {@param other} may be merged into _values. This really should not be done implicitly as part
+    //  of compareTo, but has been implemented this way to minimize the changes required within all subclasses of
+    //  {@link BasePartitionUpsertMetadataManager}. Ideally, this merge should only be triggered explicitly by
+    //  implementations of {@link BasePartitionUpsertMetadataManager}.
+    for (int i = 0; i < _values.length; i++) {
+      if (i != _comparableIndex) {
+        _values[i] = other._values[i];
+      }
+    }
   }
 
   @Override
@@ -66,26 +79,11 @@ public class ComparisonColumns implements Comparable<ComparisonColumns> {
       return compareToSealed(other);
     }
 
-    // _comparisonColumns should only at most one non-null comparison value for newly ingested data. If not, it is
-    // the user's responsibility. There is no attempt to guarantee behavior in the case where there are multiple
-    // non-null values
-    Comparable comparisonValue = _values[_comparableIndex];
-    Comparable otherComparisonValue = other.getValues()[_comparableIndex];
-
-    int comparisonResult = comparisonValue.compareTo(otherComparisonValue);
-
+    int comparisonResult = compareToIndex(other, _comparableIndex);
     if (comparisonResult >= 0) {
-      // TODO(egalpin):  This method currently may have side-effects on _values. Depending on the comparison result,
-      //  entities from {@param other} may be merged into _values. This really should not be done implicitly as part
-      //  of compareTo, but has been implemented this way to minimize the changes required within all subclasses of
-      //  {@link BasePartitionUpsertMetadataManager}. Ideally, this merge should only be triggered explicitly by
-      //  implementations of {@link BasePartitionUpsertMetadataManager}.
-      for (int i = 0; i < _values.length; i++) {
-        if (i != _comparableIndex) {
-          _values[i] = other._values[i];
-        }
-      }
+      mergeComparisonValues(other);
     }
+
     return comparisonResult;
   }
 }
