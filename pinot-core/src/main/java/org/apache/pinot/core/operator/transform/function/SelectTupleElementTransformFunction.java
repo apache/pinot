@@ -137,7 +137,7 @@ public abstract class SelectTupleElementTransformFunction
   }
 
   @Override
-  protected int[] transformToIntValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected int[] transformToIntValuesSVUsingValue(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initIntValuesSV(numDocs);
     int[] values = _arguments.get(0).transformToIntValuesSV(valueBlock);
@@ -152,7 +152,7 @@ public abstract class SelectTupleElementTransformFunction
   }
 
   @Override
-  protected int[] transformToIntValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected int[] transformToIntValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initIntValuesSV(numDocs);
     int[] curValues = _arguments.get(0).transformToIntValuesSV(valueBlock);
@@ -184,7 +184,7 @@ public abstract class SelectTupleElementTransformFunction
   abstract protected int binaryFunction(int a, int b);
 
   @Override
-  protected long[] transformToLongValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected long[] transformToLongValuesSVUsingValue(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initLongValuesSV(numDocs);
     long[] values = _arguments.get(0).transformToLongValuesSV(valueBlock);
@@ -199,7 +199,7 @@ public abstract class SelectTupleElementTransformFunction
   }
 
   @Override
-  protected long[] transformToLongValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected long[] transformToLongValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initLongValuesSV(numDocs);
     long[] curValues = _arguments.get(0).transformToLongValuesSV(valueBlock);
@@ -231,7 +231,7 @@ public abstract class SelectTupleElementTransformFunction
   abstract protected long binaryFunction(long a, long b);
 
   @Override
-  protected float[] transformToFloatValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected float[] transformToFloatValuesSVUsingValue(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesSV(numDocs);
     float[] values = _arguments.get(0).transformToFloatValuesSV(valueBlock);
@@ -246,7 +246,7 @@ public abstract class SelectTupleElementTransformFunction
   }
 
   @Override
-  protected float[] transformToFloatValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected float[] transformToFloatValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesSV(numDocs);
     float[] curValues = _arguments.get(0).transformToFloatValuesSV(valueBlock);
@@ -278,7 +278,7 @@ public abstract class SelectTupleElementTransformFunction
   abstract protected float binaryFunction(float a, float b);
 
   @Override
-  protected double[] transformToDoubleValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected double[] transformToDoubleValuesSVUsingValue(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesSV(numDocs);
     double[] values = _arguments.get(0).transformToDoubleValuesSV(valueBlock);
@@ -293,7 +293,7 @@ public abstract class SelectTupleElementTransformFunction
   }
 
   @Override
-  protected double[] transformToDoubleValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected double[] transformToDoubleValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesSV(numDocs);
     double[] curValues = _arguments.get(0).transformToDoubleValuesSV(valueBlock);
@@ -325,7 +325,7 @@ public abstract class SelectTupleElementTransformFunction
   abstract protected double binaryFunction(double a, double b);
 
   @Override
-  protected BigDecimal[] transformToBigDecimalValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValue(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initBigDecimalValuesSV(numDocs);
     BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(valueBlock);
@@ -340,7 +340,7 @@ public abstract class SelectTupleElementTransformFunction
   }
 
   @Override
-  protected BigDecimal[] transformToBigDecimalValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initBigDecimalValuesSV(numDocs);
     BigDecimal[] curValues = _arguments.get(0).transformToBigDecimalValuesSV(valueBlock);
@@ -372,7 +372,7 @@ public abstract class SelectTupleElementTransformFunction
   abstract protected BigDecimal binaryFunction(BigDecimal a, BigDecimal b);
 
   @Override
-  protected String[] transformToStringValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected String[] transformToStringValuesSVUsingValue(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initStringValuesSV(numDocs);
     String[] values = _arguments.get(0).transformToStringValuesSV(valueBlock);
@@ -387,7 +387,7 @@ public abstract class SelectTupleElementTransformFunction
   }
 
   @Override
-  protected String[] transformToStringValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected String[] transformToStringValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initStringValuesSV(numDocs);
     String[] curValues = _arguments.get(0).transformToStringValuesSV(valueBlock);

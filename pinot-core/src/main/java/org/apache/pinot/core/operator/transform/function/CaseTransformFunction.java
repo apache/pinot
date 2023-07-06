@@ -311,7 +311,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected int[] transformToIntValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected int[] transformToIntValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initIntValuesSV(numDocs);
@@ -346,7 +346,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected int[] transformToIntValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected int[] transformToIntValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -396,7 +396,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected long[] transformToLongValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected long[] transformToLongValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initLongValuesSV(numDocs);
@@ -431,7 +431,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected long[] transformToLongValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected long[] transformToLongValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -481,7 +481,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected float[] transformToFloatValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected float[] transformToFloatValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesSV(numDocs);
@@ -516,7 +516,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected float[] transformToFloatValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected float[] transformToFloatValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -566,7 +566,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected double[] transformToDoubleValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected double[] transformToDoubleValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesSV(numDocs);
@@ -601,7 +601,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected double[] transformToDoubleValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected double[] transformToDoubleValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -652,7 +652,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected BigDecimal[] transformToBigDecimalValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initBigDecimalValuesSV(numDocs);
@@ -687,7 +687,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected BigDecimal[] transformToBigDecimalValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -738,7 +738,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected String[] transformToStringValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected String[] transformToStringValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initStringValuesSV(numDocs);
@@ -773,7 +773,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected String[] transformToStringValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected String[] transformToStringValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -824,7 +824,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected byte[][] transformToBytesValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected byte[][] transformToBytesValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initBytesValuesSV(numDocs);
@@ -859,7 +859,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   @Override
-  protected byte[][] transformToBytesValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected byte[][] transformToBytesValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();

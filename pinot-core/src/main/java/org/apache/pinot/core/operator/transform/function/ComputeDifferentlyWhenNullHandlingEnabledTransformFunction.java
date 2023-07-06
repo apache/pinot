@@ -37,17 +37,17 @@ public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction
       return super.transformToIntValuesSV(valueBlock);
     }
     if (_nullHandlingEnabled) {
-      return transformToIntValuesSVNullHandlingEnabled(valueBlock);
+      return transformToIntValuesSVUsingValueAndNull(valueBlock);
     } else {
-      return transformToIntValuesSVNullHandlingDisabled(valueBlock);
+      return transformToIntValuesSVUsingValue(valueBlock);
     }
   }
 
-  protected int[] transformToIntValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected int[] transformToIntValuesSVUsingValue(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  protected int[] transformToIntValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected int[] transformToIntValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
@@ -57,17 +57,17 @@ public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction
       return super.transformToLongValuesSV(valueBlock);
     }
     if (_nullHandlingEnabled) {
-      return transformToLongValuesSVNullHandlingEnabled(valueBlock);
+      return transformToLongValuesSVUsingValueAndNull(valueBlock);
     } else {
-      return transformToLongValuesSVNullHandlingDisabled(valueBlock);
+      return transformToLongValuesSVUsingValue(valueBlock);
     }
   }
 
-  protected long[] transformToLongValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected long[] transformToLongValuesSVUsingValue(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  protected long[] transformToLongValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected long[] transformToLongValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
@@ -77,17 +77,17 @@ public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction
       return super.transformToFloatValuesSV(valueBlock);
     }
     if (_nullHandlingEnabled) {
-      return transformToFloatValuesSVNullHandlingEnabled(valueBlock);
+      return transformToFloatValuesSVUsingValueAndNull(valueBlock);
     } else {
-      return transformToFloatValuesSVNullHandlingDisabled(valueBlock);
+      return transformToFloatValuesSVUsingValue(valueBlock);
     }
   }
 
-  protected float[] transformToFloatValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected float[] transformToFloatValuesSVUsingValue(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  protected float[] transformToFloatValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected float[] transformToFloatValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
@@ -97,17 +97,17 @@ public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction
       return super.transformToDoubleValuesSV(valueBlock);
     }
     if (_nullHandlingEnabled) {
-      return transformToDoubleValuesSVNullHandlingEnabled(valueBlock);
+      return transformToDoubleValuesSVUsingValueAndNull(valueBlock);
     } else {
-      return transformToDoubleValuesSVNullHandlingDisabled(valueBlock);
+      return transformToDoubleValuesSVUsingValue(valueBlock);
     }
   }
 
-  protected double[] transformToDoubleValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected double[] transformToDoubleValuesSVUsingValue(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  protected double[] transformToDoubleValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected double[] transformToDoubleValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
@@ -117,17 +117,17 @@ public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction
       return super.transformToBigDecimalValuesSV(valueBlock);
     }
     if (_nullHandlingEnabled) {
-      return transformToBigDecimalValuesSVNullHandlingEnabled(valueBlock);
+      return transformToBigDecimalValuesSVUsingValueAndNull(valueBlock);
     } else {
-      return transformToBigDecimalValuesSVNullHandlingDisabled(valueBlock);
+      return transformToBigDecimalValuesSVUsingValue(valueBlock);
     }
   }
 
-  protected BigDecimal[] transformToBigDecimalValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValue(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  protected BigDecimal[] transformToBigDecimalValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
@@ -137,17 +137,17 @@ public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction
       return super.transformToStringValuesSV(valueBlock);
     }
     if (_nullHandlingEnabled) {
-      return transformToStringValuesSVNullHandlingEnabled(valueBlock);
+      return transformToStringValuesSVUsingValueAndNull(valueBlock);
     } else {
-      return transformToStringValuesSVNullHandlingDisabled(valueBlock);
+      return transformToStringValuesSVUsingValue(valueBlock);
     }
   }
 
-  protected String[] transformToStringValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected String[] transformToStringValuesSVUsingValue(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  protected String[] transformToStringValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected String[] transformToStringValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
@@ -157,17 +157,17 @@ public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction
       return super.transformToBytesValuesSV(valueBlock);
     }
     if (_nullHandlingEnabled) {
-      return transformToBytesValuesSVNullHandlingEnabled(valueBlock);
+      return transformToBytesValuesSVUsingValueAndNull(valueBlock);
     } else {
-      return transformToBytesValuesSVNullHandlingDisabled(valueBlock);
+      return transformToBytesValuesSVUsingValue(valueBlock);
     }
   }
 
-  protected byte[][] transformToBytesValuesSVNullHandlingDisabled(ValueBlock valueBlock) {
+  protected byte[][] transformToBytesValuesSVUsingValue(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  protected byte[][] transformToBytesValuesSVNullHandlingEnabled(ValueBlock valueBlock) {
+  protected byte[][] transformToBytesValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
