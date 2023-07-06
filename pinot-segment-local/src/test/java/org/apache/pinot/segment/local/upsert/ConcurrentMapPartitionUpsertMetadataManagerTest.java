@@ -584,6 +584,58 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testPreloadSegment() {
+    verifyPreloadSegment(HashFunction.NONE);
+    verifyPreloadSegment(HashFunction.MD5);
+    verifyPreloadSegment(HashFunction.MURMUR3);
+  }
+
+  private void verifyPreloadSegment(HashFunction hashFunction) {
+    String comparisonColumn = "timeCol";
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, mock(ServerMetrics.class));
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // Add the first segment
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
+    int numRecords = 3;
+    int[] primaryKeys = new int[]{0, 1, 2};
+    int[] timestamps = new int[]{100, 120, 100};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegment(1, validDocIds1, null, getPrimaryKeyList(numRecords, primaryKeys));
+    // Preloading segment adds the segment without checking for upsert.
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        getRecordInfoList(numRecords, primaryKeys, timestamps, null).iterator(), true);
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
+
+    // Add the 2nd segment
+    // segment2: 0 -> {0, 1}, 1 -> {1, 2}
+    numRecords = 2;
+    primaryKeys = new int[]{0, 1};
+    timestamps = new int[]{1, 2};
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment2 =
+        mockImmutableSegment(2, validDocIds2, null, getPrimaryKeyList(numRecords, primaryKeys));
+    upsertMetadataManager.addSegment(segment2, validDocIds2, null,
+        getRecordInfoList(numRecords, primaryKeys, timestamps, null).iterator(), true);
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
+    // segment2: 0 -> {0, 1}, 1 -> {1, 2}
+    // segment2 was preloaded, so new locations got put in tracking map w/o checking on comparison values.
+    checkRecordLocation(recordLocationMap, 0, segment2, 0, 1, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment2, 1, 2, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
+  }
+
+  @Test
   public void testAddRecordWithDeleteColumn()
       throws IOException {
     verifyAddRecordWithDeleteColumn(HashFunction.NONE);

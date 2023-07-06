@@ -245,7 +245,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     addSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, false);
   }
 
-  private void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
+  @VisibleForTesting
+  public void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
       boolean isPreloading) {
     String segmentName = segment.getSegmentName();
