@@ -1107,16 +1107,19 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(
         helixResourceManager, config);
 
+    long deletedTmpSegCount;
     // case 1: the segmentMetadata download uri is identical to the uri of the tmp segment. Should not delete
     when(segZKMeta.getStatus()).thenReturn(Status.DONE);
     when(segZKMeta.getDownloadUrl()).thenReturn(SCHEME + tableDir + "/" + segmentFileName);
-    segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
+    deletedTmpSegCount = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
     assertTrue(segmentFile.exists());
+    assertEquals(0L, deletedTmpSegCount);
 
     // case 2: download url is empty, indicating the tmp segment is absolutely orphan. Delete the file
     when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
-    segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
+    deletedTmpSegCount = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
     assertFalse(segmentFile.exists());
+    assertEquals(1L, deletedTmpSegCount);
   }
 
   //////////////////////////////////////////////////////////////////////////////////

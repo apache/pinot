@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.validation;
 
+import java.util.List;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -25,6 +26,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +49,17 @@ public class RealtimeTempSegmentCleaner extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void processTable(String tableNameWithType) {
-    _llcRealtimeSegmentManager.deleteTmpSegments(tableNameWithType);
+    long tmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(tableNameWithType);
+    _validationMetrics.updateTmpSegCountGauge(tableNameWithType, tmpSegments);
+  }
+
+  @Override
+  protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+    for (String tableNameWithType : tableNamesWithType) {
+      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+        _validationMetrics.cleanupTmpSegCountGauge(tableNameWithType);
+      }
+    }
   }
 
   @Override

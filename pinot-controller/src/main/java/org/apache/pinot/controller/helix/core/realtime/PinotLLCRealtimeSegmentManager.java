@@ -1473,23 +1473,23 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  public void deleteTmpSegments(String tableNameWithType) {
+  public long deleteTmpSegments(String tableNameWithType) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      return;
+      return 0L;
     }
 
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       LOGGER.warn("Failed to find table config for table: {}, skipping deletion of tmp segments", tableNameWithType);
-      return;
+      return 0L;
     }
 
     if (!isLowLevelConsumer(tableNameWithType, tableConfig)
         || !getIsSplitCommitEnabled()
         || !isTmpSegmentAsyncDeletionEnabled()) {
-      return;
+      return 0L;
     }
 
     // Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
@@ -1502,6 +1502,7 @@ public class PinotLLCRealtimeSegmentManager {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
+    long orphanTmpSegments = 0;
     try {
       for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
         // prepend scheme
@@ -1509,10 +1510,13 @@ public class PinotLLCRealtimeSegmentManager {
         if (isTmpAndCanDelete(uri, deepURIs, pinotFS)) {
           LOGGER.info("Deleting temporary segment file: {}", uri);
           Preconditions.checkState(pinotFS.delete(uri, true), "Failed to delete file: %s", uri);
+          orphanTmpSegments++;
         }
       }
+      return orphanTmpSegments;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deleting temporary files for table: {}", rawTableName, e);
+      return orphanTmpSegments;
     }
   }
 
