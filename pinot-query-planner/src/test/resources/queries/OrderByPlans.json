@@ -69,7 +69,7 @@
       },
       {
         "description": "Order by and group by with hint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -101,7 +101,7 @@
       },
       {
         "description": "Order by and group by with alias with SqlHint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",

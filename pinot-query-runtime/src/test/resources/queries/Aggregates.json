@@ -903,45 +903,45 @@
       {
         "psql": "4.2.7",
         "description": "aggregation without groupby. hint is a no-op.",
-        "sql": "SELECT /*+ skipLeafStageGroupByAggregation */ avg(double_col) FROM {tbl}"
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ avg(double_col) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
         "description": "count, sum group by order by",
-        "sql": "select /*+ skipLeafStageGroupByAggregation */ string_col, count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
       },
       {
         "psql": "4.2.7",
         "description": "count, sum group by order by. Multiple aggregations on single column.",
-        "sql": "select /*+ skipLeafStageGroupByAggregation */ string_col, max(int_col), min(double_col), count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, max(int_col), min(double_col), count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
       },
       {
         "psql": "9.21.0",
         "description": "aggregate boolean column",
-        "sql": "SELECT /*+ skipLeafStageGroupByAggregation */ bool_and(bool_col), bool_or(bool_col) FROM {tbl} GROUP BY string_col"
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_and(bool_col), bool_or(bool_col) FROM {tbl} GROUP BY string_col"
       },
       {
         "psql": "9.21.0",
         "description": "aggregate boolean column no group by",
-        "sql": "SELECT /*+ skipLeafStageGroupByAggregation */ bool_and(bool_col), bool_or(bool_col) FROM {tbl}"
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_and(bool_col), bool_or(bool_col) FROM {tbl}"
       },
       {
         "ignored": true,
         "comment": "sum empty returns [0] instead of [null] at the moment",
         "description": "sum empty input after filter with subquery",
-        "sql": "SELECT /*+ skipLeafStageGroupByAggregation */ sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
         "description": "count empty input after filter with sub-query",
-        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT /*+ skipLeafStageGroupByAggregation */ string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
         "description": "count empty input after filter with sub-query",
-        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ( SELECT /*+ skipLeafStageGroupByAggregation */ string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ( SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
         "description": "group by optimization with filter",
-        "sql": "SELECT /*+ skipLeafStageGroupByAggregation */ double_col, sum(int_col) FROM {tbl} WHERE int_col > 3 AND double_col > 1.0 GROUP BY double_col"
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ double_col, sum(int_col) FROM {tbl} WHERE int_col > 3 AND double_col > 1.0 GROUP BY double_col"
       }
     ]
   },

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
@@ -36,21 +37,7 @@ public class AggregateNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _groupSet;
   @ProtoProperties
-  private AggregationStage _aggregationStage;
-  @ProtoProperties
-  private boolean _treatIntermediateStageAsLeaf;
-
-  /**
-   * Enum to denote the aggregation stage being performed. Hints are used to populate these values
-   * LEAF - leaf aggregation level which performs the aggregations on the raw values directly
-   * INTERMEDIATE - intermediate aggregation level which merges results from lower aggregation levels
-   * FINAL - final aggregation level which extracts the final result
-   */
-  public enum AggregationStage {
-    LEAF,
-    INTERMEDIATE,
-    FINAL
-  }
+  private AggType _aggType;
 
   public AggregateNode(int planFragmentId) {
     super(planFragmentId);
@@ -59,48 +46,16 @@ public class AggregateNode extends AbstractPlanNode {
   public AggregateNode(int planFragmentId, DataSchema dataSchema, List<AggregateCall> aggCalls,
       List<RexExpression> groupSet, List<RelHint> relHints) {
     super(planFragmentId, dataSchema);
+    Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: {}", relHints);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = groupSet;
     _relHints = relHints;
-    Preconditions.checkState(areHintsValid(relHints),
-        "Unable to compile aggregation with combination of hints for final, intermediate and leaf agg type");
-    _aggregationStage = getAggregationStage(relHints);
-    _treatIntermediateStageAsLeaf = isIntermediateStage(this) && PinotHintStrategyTable
-        .containsHint(relHints, PinotHintStrategyTable.INTERNAL_AGG_IS_LEAF_STAGE_SKIPPED);
+    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(
+        relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
   }
 
   private boolean areHintsValid(List<RelHint> relHints) {
-    int hasFinalHint = PinotHintStrategyTable.containsHint(relHints,
-        PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE) ? 1 : 0;
-    int hasIntermediateHint = PinotHintStrategyTable.containsHint(relHints,
-        PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE) ? 1 : 0;
-    int hasLeafHint = PinotHintStrategyTable.containsHint(relHints,
-        PinotHintStrategyTable.INTERNAL_AGG_LEAF_STAGE) ? 1 : 0;
-    return (hasFinalHint + hasIntermediateHint + hasLeafHint) == 1;
-  }
-
-  private AggregationStage getAggregationStage(List<RelHint> relHints) {
-    if (PinotHintStrategyTable.containsHint(relHints,
-        PinotHintStrategyTable.INTERNAL_AGG_FINAL_STAGE)) {
-      return AggregationStage.FINAL;
-    }
-    if (PinotHintStrategyTable.containsHint(relHints,
-        PinotHintStrategyTable.INTERNAL_AGG_INTERMEDIATE_STAGE)) {
-      return AggregationStage.INTERMEDIATE;
-    }
-    return AggregationStage.LEAF;
-  }
-
-  public static boolean isFinalStage(AggregateNode aggNode) {
-    return aggNode.getAggregationStage() == AggregationStage.FINAL;
-  }
-
-  public static boolean isIntermediateStage(AggregateNode aggNode) {
-    return aggNode.getAggregationStage() == AggregationStage.INTERMEDIATE;
-  }
-
-  public static boolean isLeafStage(AggregateNode aggNode) {
-    return aggNode.getAggregationStage() == AggregationStage.LEAF;
+    return PinotHintStrategyTable.containsHint(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS);
   }
 
   public List<RexExpression> getAggCalls() {
@@ -115,33 +70,48 @@ public class AggregateNode extends AbstractPlanNode {
     return _relHints;
   }
 
-  public AggregationStage getAggregationStage() {
-    return _aggregationStage;
-  }
-
-  public boolean isTreatIntermediateStageAsLeaf() {
-    return _treatIntermediateStageAsLeaf;
-  }
-
-  public boolean isFinalStage() {
-    return _aggregationStage == AggregationStage.FINAL;
-  }
-
-  public boolean isIntermediateStage() {
-    return _aggregationStage == AggregationStage.INTERMEDIATE;
-  }
-
-  public boolean isLeafStage() {
-    return _aggregationStage == AggregationStage.LEAF;
+  public AggType getAggType() {
+    return _aggType;
   }
 
   @Override
   public String explain() {
-    return "AGGREGATE";
+    return "AGGREGATE_" + _aggType;
   }
 
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitAggregate(this, context);
+  }
+
+  /**
+   * Aggregation Types: Pinot aggregation functions can perform operation on input data which
+   *   (1) directly accumulate from raw input, or
+   *   (2) merging multiple intermediate data format;
+   * in terms of output format, it can also
+   *   (1) produce a mergeable intermediate data format, or
+   *   (2) extract result as final result format.
+   */
+  public enum AggType {
+    DIRECT(false, false),
+    LEAF(false, true),
+    INTERMEDIATE(true, true),
+    FINAL(true, false);
+
+    private final boolean _isInputIntermediateFormat;
+    private final boolean _isOutputIntermediateFormat;
+
+    AggType(boolean isInputIntermediateFormat, boolean isOutputIntermediateFormat) {
+      _isInputIntermediateFormat = isInputIntermediateFormat;
+      _isOutputIntermediateFormat = isOutputIntermediateFormat;
+    }
+
+    public boolean isInputIntermediateFormat() {
+      return _isInputIntermediateFormat;
+    }
+
+    public boolean isOutputIntermediateFormat() {
+      return _isOutputIntermediateFormat;
+    }
   }
 }

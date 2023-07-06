@@ -218,7 +218,7 @@
       },
       {
         "description": "SQL hint based group by optimization with select and aggregate column",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -231,7 +231,7 @@
       },
       {
         "description": "SQL hint based group by optimization with select and AVG aggregation",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, AVG(a.col3) FROM a GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, AVG(a.col3) FROM a GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[AVG_REDUCE($1, $2)])",
@@ -245,7 +245,7 @@
       },
       {
         "description": "SQL hint based group by optimization with select and multiple aggregations one 1 column",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3), AVG(a.col3), MAX(a.col3), MIN(a.col3) FROM a GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3), AVG(a.col3), MAX(a.col3), MIN(a.col3) FROM a GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1], EXPR$2=[AVG_REDUCE($1, $2)], EXPR$3=[$3], EXPR$4=[$4])",
@@ -259,7 +259,7 @@
       },
       {
         "description": "SQL hint based group by optimization with filter",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -273,7 +273,7 @@
       },
       {
         "description": "SQL hint based group by optimization with filter",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3), MAX(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3), MAX(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[MAX($2)])",
@@ -287,7 +287,7 @@
       },
       {
         "description": "SQL hint based group by optimization count(*) with filter",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1",
         "notes": "TODO: Needs follow up. Project should only keep a.col1 since the other columns are pushed to the filter, but it currently keeps them all",
         "output": [
           "Execution Plan",
@@ -302,7 +302,7 @@
       },
       {
         "description": "SQL hint based group by optimization on 2 columns with filter",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col2=[$1], col1=[$0], EXPR$2=[$2])",
@@ -317,7 +317,7 @@
       },
       {
         "description": "SQL hint based group by optimization with having clause",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, COUNT(*), SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, COUNT(*), SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1], EXPR$2=[$2])",
@@ -333,7 +333,7 @@
       },
       {
         "description": "SQL hint based group by optimization with having clause but no count",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 HAVING MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 HAVING MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1])",
@@ -349,7 +349,7 @@
       },
       {
         "description": "SQL hint based group by optimization with having clause and select alias",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1 as value1, COUNT(*) AS count, SUM(a.col3) as SUM FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 as value1, COUNT(*) AS count, SUM(a.col3) as SUM FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
         "output": [
           "Execution Plan",
           "\nLogicalProject(value1=[$0], count=[$1], SUM=[$2])",
@@ -365,7 +365,7 @@
       },
       {
         "description": "SQL hint based group by optimization with select and aggregates with filters and select alias",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ ts, KURTOSIS(a.col3) as kurtosis, SKEWNESS(a.col6) as skewness, COUNT(DISTINCT a.col6), COUNT(DISTINCT a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'metallica' GROUP BY ts",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ts, KURTOSIS(a.col3) as kurtosis, SKEWNESS(a.col6) as skewness, COUNT(DISTINCT a.col6), COUNT(DISTINCT a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'metallica' GROUP BY ts",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[KURTOSIS($1)], agg#1=[SKEWNESS($2)], agg#2=[DISTINCTCOUNT(DISTINCT $3)], agg#3=[DISTINCTCOUNT(DISTINCT $4)])",
