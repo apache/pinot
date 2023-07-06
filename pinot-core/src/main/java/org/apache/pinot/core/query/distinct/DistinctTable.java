@@ -93,10 +93,12 @@ public class DistinctTable {
       int numOrderByExpressions = orderByExpressions.size();
       int[] orderByExpressionIndices = new int[numOrderByExpressions];
       int[] comparisonFactors = new int[numOrderByExpressions];
+      int[] nullComparisonFactors = new int[numOrderByExpressions];
       for (int i = 0; i < numOrderByExpressions; i++) {
         OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
+        nullComparisonFactors[i] = orderByExpression.isNullsLast() ? -1 : 1;
       }
       if (_nullHandlingEnabled) {
         _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
@@ -110,9 +112,9 @@ public class DistinctTable {
               if (value2 == null) {
                 continue;
               }
-              return comparisonFactors[i];
+              return nullComparisonFactors[i];
             } else if (value2 == null) {
-              return -comparisonFactors[i];
+              return -nullComparisonFactors[i];
             }
             int result = value1.compareTo(value2) * comparisonFactors[i];
             if (result != 0) {

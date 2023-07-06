@@ -62,6 +62,26 @@
       {
         "description": "Colocated JOIN with partition column and group by non-partitioned column",
         "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), aggOptions(is_partitioned_by_group_by_keys='false') */ {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast', is_colocated_by_join_keys='true') */ {tbl1}.num, {tbl1}.name FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} WHERE {tbl2}.val IN ('xxx', 'yyy'))"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column and group by partition column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast', is_colocated_by_join_keys='true'), aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, COUNT({tbl1}.name) FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} WHERE {tbl2}.val IN ('xxx', 'yyy')) GROUP BY {tbl1}.num, {tbl1}.name"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column and group by non-partitioned column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast', is_colocated_by_join_keys='true') */ {tbl1}.name, COUNT(*) FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} WHERE {tbl2}.val IN ('xxx', 'yyy')) GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Dynamic broadcast SEMI-JOIN with empty right table result",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} WHERE {tbl2}.val = 'non-exist') GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast', is_colocated_by_join_keys='true') */ {tbl1}.name, COUNT(*) FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
       }
     ]
   }

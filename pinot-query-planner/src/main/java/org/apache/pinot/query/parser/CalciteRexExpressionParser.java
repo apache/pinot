@@ -23,7 +23,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -99,31 +101,46 @@ public class CalciteRexExpressionParser {
     return selectExpr;
   }
 
-  public static List<Expression> convertOrderByList(List<RexExpression> rexInputRefs,
-      List<RelFieldCollation.Direction> directions, PinotQuery pinotQuery) {
-    List<Expression> orderByExpr = new ArrayList<>();
-
-    for (int i = 0; i < rexInputRefs.size(); i++) {
-      orderByExpr.add(convertOrderBy(rexInputRefs.get(i), directions.get(i), pinotQuery));
+  public static List<Expression> convertOrderByList(SortNode node, PinotQuery pinotQuery) {
+    List<RexExpression> collationKeys = node.getCollationKeys();
+    List<Direction> collationDirections = node.getCollationDirections();
+    List<NullDirection> collationNullDirections = node.getCollationNullDirections();
+    int numKeys = collationKeys.size();
+    List<Expression> orderByExpressions = new ArrayList<>(numKeys);
+    for (int i = 0; i < numKeys; i++) {
+      orderByExpressions.add(
+          convertOrderBy(collationKeys.get(i), collationDirections.get(i), collationNullDirections.get(i), pinotQuery));
     }
-    return orderByExpr;
+    return orderByExpressions;
   }
 
-  private static Expression convertOrderBy(RexExpression rexNode, RelFieldCollation.Direction direction,
+  private static Expression convertOrderBy(RexExpression rexNode, Direction direction, NullDirection nullDirection,
       PinotQuery pinotQuery) {
-    Expression expression;
-    switch (direction) {
-      case DESCENDING:
-        expression = getFunctionExpression("DESC");
-        expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
-        break;
-      case ASCENDING:
-      default:
-        expression = getFunctionExpression("ASC");
-        expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
-        break;
+    if (direction == Direction.ASCENDING) {
+      Expression expression = getFunctionExpression("asc");
+      expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
+      // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
+      //       largest value)
+      if (nullDirection == NullDirection.FIRST) {
+        Expression nullFirstExpression = getFunctionExpression("nullsfirst");
+        nullFirstExpression.getFunctionCall().addToOperands(expression);
+        return nullFirstExpression;
+      } else {
+        return expression;
+      }
+    } else {
+      Expression expression = getFunctionExpression("desc");
+      expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
+      // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
+      //       largest value)
+      if (nullDirection == NullDirection.LAST) {
+        Expression nullLastExpression = getFunctionExpression("nullslast");
+        nullLastExpression.getFunctionCall().addToOperands(expression);
+        return nullLastExpression;
+      } else {
+        return expression;
+      }
     }
-    return expression;
   }
 
   private static Expression convertDistinctAndSelectListToFunctionExpression(RexExpression.FunctionCall rexCall,

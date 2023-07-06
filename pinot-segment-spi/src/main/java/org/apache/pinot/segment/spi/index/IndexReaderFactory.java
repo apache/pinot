@@ -30,8 +30,15 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 public interface IndexReaderFactory<R extends IndexReader> {
 
   /**
+   * Tries to create an index reader for the given column and segment.
+   *
+   * It may be the case that the configuration indicates that the index should be disabled but it is actually there.
+   * Also, it may be the case that the configuration says that the index should be there but it is not in the reader.
+   * In both cases the source of truth is the segment reader.
+   *
    * @throws IndexReaderConstraintException if the constraints of the index reader are not matched. For example, some
    * indexes may require the column to be dictionary based.
+   * @return the index reader or null if there is no index for that column
    */
   @Nullable
   R createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
@@ -50,20 +57,14 @@ public interface IndexReaderFactory<R extends IndexReader> {
         ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
       IndexType<C, R, ?> indexType = getIndexType();
-      C indexConf;
-      if (fieldIndexConfigs == null) {
-        indexConf = getIndexType().getDefaultConfig();
-      } else {
-        indexConf = fieldIndexConfigs.getConfig(indexType);
-      }
 
-      if (indexConf == null || !indexConf.isEnabled()) { //it is either not enabled or the default value is null
+      if (!segmentReader.hasIndexFor(metadata.getColumnName(), indexType)) { // there is no buffer for this index
         return null;
       }
 
       PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), indexType);
       try {
-        return createIndexReader(buffer, metadata, indexConf);
+        return createIndexReader(buffer, metadata, fieldIndexConfigs.getConfig(indexType));
       } catch (RuntimeException ex) {
         throw new RuntimeException(
             "Cannot read index " + indexType + " for column " + metadata.getColumnName(), ex);

@@ -22,11 +22,8 @@ import it.unimi.dsi.fastutil.floats.FloatHeapPriorityQueue;
 import it.unimi.dsi.fastutil.floats.FloatPriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -46,37 +43,7 @@ public class RawFloatSingleColumnDistinctOrderByExecutor extends BaseRawFloatSin
   }
 
   @Override
-  public boolean process(ValueBlock valueBlock) {
-    BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
-    int numDocs = valueBlock.getNumDocs();
-    if (blockValueSet.isSingleValue()) {
-      float[] values = blockValueSet.getFloatValuesSV();
-      if (_nullHandlingEnabled) {
-        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-        for (int i = 0; i < numDocs; i++) {
-          if (nullBitmap != null && nullBitmap.contains(i)) {
-            _hasNull = true;
-          } else {
-            add(values[i]);
-          }
-        }
-      } else {
-        for (int i = 0; i < numDocs; i++) {
-          add(values[i]);
-        }
-      }
-    } else {
-      float[][] values = blockValueSet.getFloatValuesMV();
-      for (int i = 0; i < numDocs; i++) {
-        for (float value : values[i]) {
-          add(value);
-        }
-      }
-    }
-    return false;
-  }
-
-  private void add(float value) {
+  protected boolean add(float value) {
     if (!_valueSet.contains(value)) {
       if (_valueSet.size() < _limit - (_hasNull ? 1 : 0)) {
         _valueSet.add(value);
@@ -91,5 +58,6 @@ public class RawFloatSingleColumnDistinctOrderByExecutor extends BaseRawFloatSin
         }
       }
     }
+    return false;
   }
 }

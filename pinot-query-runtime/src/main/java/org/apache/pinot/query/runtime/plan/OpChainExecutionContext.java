@@ -57,10 +57,10 @@ public class OpChainExecutionContext {
     _traceEnabled = traceEnabled;
   }
 
-  public OpChainExecutionContext(PlanRequestContext planRequestContext) {
-    this(planRequestContext.getMailboxService(), planRequestContext.getRequestId(), planRequestContext.getStageId(),
-        planRequestContext.getServer(), planRequestContext.getTimeoutMs(), planRequestContext.getDeadlineMs(),
-        planRequestContext.getStageMetadata(), planRequestContext.isTraceEnabled());
+  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext) {
+    this(physicalPlanContext.getMailboxService(), physicalPlanContext.getRequestId(), physicalPlanContext.getStageId(),
+        physicalPlanContext.getServer(), physicalPlanContext.getTimeoutMs(), physicalPlanContext.getDeadlineMs(),
+        physicalPlanContext.getStageMetadata(), physicalPlanContext.isTraceEnabled());
   }
 
   public MailboxService getMailboxService() {

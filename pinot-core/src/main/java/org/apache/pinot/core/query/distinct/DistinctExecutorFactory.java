@@ -130,7 +130,8 @@ public class DistinctExecutorFactory {
             limit);
       } else {
         // Raw value based
-        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, null, limit);
+        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, null, nullHandlingEnabled,
+            limit);
       }
     }
   }
@@ -202,13 +203,14 @@ public class DistinctExecutorFactory {
           }
         }
       }
-      if (dictionaryBased) {
+      if (dictionaryBased && !nullHandlingEnabled) {
         // Dictionary based
         return new DictionaryBasedMultiColumnDistinctOrderByExecutor(expressions, hasMVExpression, dictionaries,
             dataTypes, orderByExpressions, limit);
       } else {
         // Raw value based
-        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, orderByExpressions, limit);
+        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, orderByExpressions,
+            nullHandlingEnabled, limit);
       }
     }
   }

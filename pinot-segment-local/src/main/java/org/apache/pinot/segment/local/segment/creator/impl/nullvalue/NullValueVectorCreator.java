@@ -27,8 +27,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapWriter;
 
 
 /**
@@ -42,7 +42,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * null, which is true for all index creators types unless this one.
  */
 public class NullValueVectorCreator implements IndexCreator {
-  private final MutableRoaringBitmap _nullBitmap = new MutableRoaringBitmap();
+  private final RoaringBitmapWriter<RoaringBitmap> _bitmapWriter;
   private final File _nullValueVectorFile;
 
   @Override
@@ -58,26 +58,28 @@ public class NullValueVectorCreator implements IndexCreator {
   }
 
   public NullValueVectorCreator(File indexDir, String columnName) {
+    _bitmapWriter = RoaringBitmapWriter.writer().get();
     _nullValueVectorFile = new File(indexDir, columnName + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
   }
 
   public void setNull(int docId) {
-    _nullBitmap.add(docId);
+    _bitmapWriter.add(docId);
   }
 
   public void seal()
       throws IOException {
     // Create null value vector file only if the bitmap is not empty
-    if (!_nullBitmap.isEmpty()) {
+    RoaringBitmap nullBitmap = _bitmapWriter.get();
+    if (!nullBitmap.isEmpty()) {
       try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
-        _nullBitmap.serialize(outputStream);
+        nullBitmap.serialize(outputStream);
       }
     }
   }
 
   @VisibleForTesting
-  ImmutableRoaringBitmap getNullBitmap() {
-    return _nullBitmap;
+  RoaringBitmap getNullBitmap() {
+    return _bitmapWriter.get();
   }
 
   @Override

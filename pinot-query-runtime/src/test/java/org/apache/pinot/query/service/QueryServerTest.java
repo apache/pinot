@@ -65,11 +65,7 @@ public class QueryServerTest extends QueryTestSet {
       Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("QueryDispatcherTest_LeafWorker"));
   private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-          new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
-  private static final ExecutorService RUNNER_EXECUTOR_SERVICE =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
-          new NamedThreadFactory("QueryServerTest_Runner"));
+      Executors.newCachedThreadPool(new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -85,7 +81,6 @@ public class QueryServerTest extends QueryTestSet {
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
       Mockito.when(queryRunner.getQueryWorkerLeafExecutorService()).thenReturn(LEAF_WORKER_EXECUTOR_SERVICE);
       Mockito.when(queryRunner.getQueryWorkerIntermExecutorService()).thenReturn(INTERM_WORKER_EXECUTOR_SERVICE);
-      Mockito.when(queryRunner.getQueryRunnerExecutorService()).thenReturn(RUNNER_EXECUTOR_SERVICE);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);

@@ -130,7 +130,7 @@ public class MetadataBlock extends BaseDataBlock {
   public MetadataBlock(ByteBuffer byteBuffer)
       throws IOException {
     super(byteBuffer);
-    if (_variableSizeDataBytes != null) {
+    if (_variableSizeDataBytes != null && _variableSizeDataBytes.length > 0) {
       _contents = JSON.readValue(_variableSizeDataBytes, Contents.class);
     } else {
       _contents = new Contents();

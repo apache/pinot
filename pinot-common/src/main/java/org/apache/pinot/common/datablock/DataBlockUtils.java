@@ -49,7 +49,7 @@ public final class DataBlockUtils {
   }
 
   private static String extractErrorMsg(Throwable t) {
-    while (t.getMessage() == null) {
+    while (t.getCause() != null && t.getMessage() == null) {
       t = t.getCause();
     }
     return t.getMessage() + "\n" + QueryException.getTruncatedStackTrace(t);

@@ -68,9 +68,9 @@ PASS=0
 for i in $(seq 1 2)
 do
   if [ "$JAVA_VER" -gt 11 ] ; then
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
+    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
   else
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
+    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
   fi
   if [ $? -eq 0 ]; then
     PASS=1
@@ -87,6 +87,7 @@ cd "${DIST_BIN_DIR}"
 
 # Test standalone pinot. Configure JAVA_OPTS for smaller memory, and don't use System.exit
 export JAVA_OPTS="-Xms1G -Dlog4j2.configurationFile=conf/log4j2.xml"
+
 bin/pinot-admin.sh StartZookeeper &
 ZK_PID=$!
 sleep 10

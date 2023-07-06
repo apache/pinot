@@ -299,4 +299,31 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asText(), "null");
   }
+
+  @Test
+  public void testOrderByNullsFirst()
+      throws Exception {
+    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary NULLS FIRST";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+
+    testQuery(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testOrderByNullsLast()
+      throws Exception {
+    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+
+    testQuery(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testDistinctOrderByNullsLast()
+      throws Exception {
+    String h2Query = "SELECT distinct salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+
+    testQuery(pinotQuery, h2Query);
+  }
 }

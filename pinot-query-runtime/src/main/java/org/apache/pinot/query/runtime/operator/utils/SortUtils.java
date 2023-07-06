@@ -20,13 +20,13 @@ package org.apache.pinot.query.runtime.operator.utils;
 
 import java.util.Comparator;
 import java.util.List;
-import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
 public class SortUtils {
-
   private SortUtils() {
   }
 
@@ -34,44 +34,32 @@ public class SortUtils {
     private final int _size;
     private final int[] _valueIndices;
     private final int[] _multipliers;
+    private final int[] _nullsMultipliers;
     private final boolean[] _useDoubleComparison;
 
     /**
-     * Sort comparator for use with priority queues
+     * Sort comparator for use with priority queues.
+     *
      * @param collationKeys collation keys to sort on
      * @param collationDirections collation direction for each collation key to sort on
+     * @param collationNullDirections collation direction for NULL values in each collation key to sort on
      * @param dataSchema data schema to use
-     * @param isNullHandlingEnabled 'true' if null handling is enabled. Not supported yet
      * @param switchDirections 'true' if the opposite sort direction should be used as what is specified
      */
-    public SortComparator(List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
-        DataSchema dataSchema, boolean isNullHandlingEnabled, boolean switchDirections) {
+    public SortComparator(List<RexExpression> collationKeys, List<Direction> collationDirections,
+        List<NullDirection> collationNullDirections, DataSchema dataSchema, boolean switchDirections) {
       DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
       _size = collationKeys.size();
       _valueIndices = new int[_size];
       _multipliers = new int[_size];
+      _nullsMultipliers = new int[_size];
       _useDoubleComparison = new boolean[_size];
       for (int i = 0; i < _size; i++) {
         _valueIndices[i] = ((RexExpression.InputRef) collationKeys.get(i)).getIndex();
-        _multipliers[i] = switchDirections ? (collationDirections.get(i).isDescending() ? 1 : -1)
-            : (collationDirections.get(i).isDescending() ? -1 : 1);
-        _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
-      }
-    }
-
-    /**
-     * Sort comparator for use with priority queues
-     * @param dataSchema data schema to use
-     */
-    public SortComparator(DataSchema dataSchema) {
-      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-      _size = columnDataTypes.length;
-      _valueIndices = new int[_size];
-      _multipliers = new int[_size];
-      _useDoubleComparison = new boolean[_size];
-      for (int i = 0; i < _size; i++) {
-        _valueIndices[i] = i;
-        _multipliers[i] = 1;
+        int multiplier = collationDirections.get(i) == Direction.ASCENDING ? 1 : -1;
+        _multipliers[i] = switchDirections ? -multiplier : multiplier;
+        int nullsMultiplier = collationNullDirections.get(i) == NullDirection.LAST ? 1 : -1;
+        _nullsMultipliers[i] = switchDirections ? -nullsMultiplier : nullsMultiplier;
         _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
       }
     }
@@ -82,6 +70,15 @@ public class SortUtils {
         int index = _valueIndices[i];
         Object v1 = o1[index];
         Object v2 = o2[index];
+        if (v1 == null) {
+          if (v2 == null) {
+            continue;
+          }
+          return _nullsMultipliers[i];
+        }
+        if (v2 == null) {
+          return -_nullsMultipliers[i];
+        }
         int result;
         if (_useDoubleComparison[i]) {
           result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());

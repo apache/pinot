@@ -19,15 +19,14 @@
 package org.apache.pinot.segment.spi.creator.name;
 
 import com.google.common.base.Preconditions;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFormatPatternSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.joda.time.DateTime;
 
 
 /**
@@ -46,11 +45,11 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   private final boolean _appendUUIDToSegmentName;
 
   // For APPEND tables
-  private final SimpleDateFormat _outputSDF;
+  private final DateTimeFormatPatternSpec _outputSDF;
   // For EPOCH time format
   private final TimeUnit _inputTimeUnit;
   // For SIMPLE_DATE_FORMAT time format
-  private final SimpleDateFormat _inputSDF;
+  private final DateTimeFormatPatternSpec _inputSDF;
 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
@@ -78,12 +77,13 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     // Include time info for APPEND push type
     if (_appendPushType) {
       // For HOURLY push frequency, include hours into output format
+      String sdfPattern;
       if (PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(pushFrequency)) {
-        _outputSDF = new SimpleDateFormat("yyyy-MM-dd-HH");
+        sdfPattern = "yyyy-MM-dd-HH";
       } else {
-        _outputSDF = new SimpleDateFormat("yyyy-MM-dd");
+        sdfPattern = "yyyy-MM-dd";
       }
-      _outputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
+      _outputSDF = new DateTimeFormatPatternSpec(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, sdfPattern, "UTC");
 
       // Parse input time format: 'EPOCH'/'TIMESTAMP' or 'SIMPLE_DATE_FORMAT' using pattern
       Preconditions.checkArgument(dateTimeFormatSpec != null,
@@ -99,8 +99,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
             "Must provide pattern for SIMPLE_DATE_FORMAT for NormalizedDateSegmentNameGenerator. Common problem: "
                 + "the format spec in timeColumnName schema is SIMPLE_DATE_FORMAT but pattern is missing");
         _inputTimeUnit = null;
-        _inputSDF = new SimpleDateFormat(dateTimeFormatSpec.getSDFPattern());
-        _inputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
+        _inputSDF = dateTimeFormatSpec.getDateTimeFormatPattenSpec();
       }
     } else {
       _outputSDF = null;
@@ -133,14 +132,15 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
    */
   public String getNormalizedDate(Object timeValue) {
     if (_inputTimeUnit != null) {
-      return _outputSDF.format(new Date(_inputTimeUnit.toMillis(Long.parseLong(timeValue.toString()))));
+      return new DateTime(_inputTimeUnit.toMillis(Long.parseLong(timeValue.toString()))).toString(
+          _outputSDF.getDateTimeFormatter());
     } else {
       try {
-        return _outputSDF.format(_inputSDF.parse(timeValue.toString()));
-      } catch (ParseException e) {
-        throw new RuntimeException(String
-            .format("Caught exception while parsing simple date format: %s with value: %s", _inputSDF.toPattern(),
-                timeValue), e);
+        return _inputSDF.getDateTimeFormatter().parseDateTime(timeValue.toString())
+            .toString(_outputSDF.getDateTimeFormatter());
+      } catch (Exception e) {
+        throw new RuntimeException(String.format("Caught exception while parsing simple date format: %s with value: %s",
+            _inputSDF.getSdfPattern(), timeValue), e);
       }
     }
   }
@@ -157,13 +157,13 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       stringBuilder.append(", excludeSequenceId=true");
     }
     if (_outputSDF != null) {
-      stringBuilder.append(", outputSDF=").append(_outputSDF.toPattern());
+      stringBuilder.append(", outputSDF=").append(_outputSDF.getSdfPattern());
     }
     if (_inputTimeUnit != null) {
       stringBuilder.append(", inputTimeUnit=").append(_inputTimeUnit);
     }
     if (_inputSDF != null) {
-      stringBuilder.append(", inputSDF=").append(_inputSDF.toPattern());
+      stringBuilder.append(", inputSDF=").append(_inputSDF.getSdfPattern());
     }
     return stringBuilder.toString();
   }

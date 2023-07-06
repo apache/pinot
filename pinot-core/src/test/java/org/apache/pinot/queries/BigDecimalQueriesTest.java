@@ -179,7 +179,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 4000", BIG_DECIMAL_COLUMN);
+      String query =
+          String.format("SELECT * FROM testTable ORDER BY %s DESC NULLS LAST LIMIT 4000", BIG_DECIMAL_COLUMN);
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
@@ -189,9 +190,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 4000);
-      // Note 1: we inserted 250 nulls in _records, and since we query 4 identical index segments, the number of null
-      //  values is: 250 * 4 = 1000.
-      // Note 2: The default null ordering is 'NULLS LAST', regardless of the ordering direction.
+      // We inserted 250 nulls in _records, and since we query 4 identical index segments, the number of null values is:
+      // 250 * 4 = 1000.
       int k = 0;
       for (int i = 0; i < 4000; i += 4) {
         // Null values are inserted at indices where: index % 4 equals 3. Skip null values.

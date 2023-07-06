@@ -26,10 +26,13 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -63,4 +66,31 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
     }
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
+
+  @Override
+  public boolean process(ValueBlock valueBlock) {
+    BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
+    BigDecimal[] values = blockValueSet.getBigDecimalValuesSV();
+    int numDocs = valueBlock.getNumDocs();
+    if (_nullHandlingEnabled) {
+      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+      for (int i = 0; i < numDocs; i++) {
+        if (nullBitmap != null && nullBitmap.contains(i)) {
+          values[i] = null;
+        }
+        if (add(values[i])) {
+          return true;
+        }
+      }
+    } else {
+      for (int i = 0; i < numDocs; i++) {
+        if (add(values[i])) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  protected abstract boolean add(BigDecimal value);
 }

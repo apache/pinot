@@ -23,8 +23,9 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.spi.config.table.TableType;
 
 
@@ -32,7 +33,7 @@ import org.apache.pinot.spi.config.table.TableType;
  * Context class for converting a {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} into
  * {@link PinotQuery} to execute on server.
  */
-public class ServerPlanRequestContext extends PlanRequestContext {
+public class ServerPlanRequestContext extends PhysicalPlanContext {
   protected TableType _tableType;
   protected TimeBoundaryInfo _timeBoundaryInfo;
 
@@ -40,9 +41,11 @@ public class ServerPlanRequestContext extends PlanRequestContext {
   protected InstanceRequest _instanceRequest;
 
   public ServerPlanRequestContext(MailboxService mailboxService, long requestId, int stageId, long timeoutMs,
-      long deadlineMs, VirtualServerAddress server, StageMetadata stageMetadata, PinotQuery pinotQuery,
+      long deadlineMs, VirtualServerAddress server, StageMetadata stageMetadata,
+      PipelineBreakerResult pipelineBreakerResult, PinotQuery pinotQuery,
       TableType tableType, TimeBoundaryInfo timeBoundaryInfo, boolean traceEnabled) {
-    super(mailboxService, requestId, stageId, timeoutMs, deadlineMs, server, stageMetadata, traceEnabled);
+    super(mailboxService, requestId, stageId, timeoutMs, deadlineMs, server, stageMetadata, pipelineBreakerResult,
+        traceEnabled);
     _pinotQuery = pinotQuery;
     _tableType = tableType;
     _timeBoundaryInfo = timeBoundaryInfo;

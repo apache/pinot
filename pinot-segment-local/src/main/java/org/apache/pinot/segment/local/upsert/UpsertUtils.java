@@ -180,6 +180,7 @@ public class UpsertUtils {
 
     public MultiComparisonColumnReader(IndexSegment segment, List<String> comparisonColumns) {
       _comparisonColumnReaders = new PinotSegmentColumnReader[comparisonColumns.size()];
+
       for (int i = 0; i < comparisonColumns.size(); i++) {
         _comparisonColumnReaders[i] = new PinotSegmentColumnReader(segment, comparisonColumns.get(i));
       }
@@ -190,13 +191,14 @@ public class UpsertUtils {
 
       for (int i = 0; i < _comparisonColumnReaders.length; i++) {
         PinotSegmentColumnReader columnReader = _comparisonColumnReaders[i];
-        Comparable comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
+        Comparable comparisonValue = null;
+        if (!columnReader.isNull(docId)) {
+          comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
+        }
         comparisonColumns[i] = comparisonValue;
       }
 
-      // Note that the comparable index is negative here to indicate that this instance could be the argument to
-      // ComparisonColumns#compareTo, but should never call compareTo itself.
-      return new ComparisonColumns(comparisonColumns, -1);
+      return new ComparisonColumns(comparisonColumns, ComparisonColumns.SEALED_SEGMENT_COMPARISON_INDEX);
     }
 
     @Override

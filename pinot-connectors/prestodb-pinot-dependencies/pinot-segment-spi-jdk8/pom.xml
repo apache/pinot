@@ -60,6 +60,14 @@
       <groupId>org.xerial.larray</groupId>
       <artifactId>larray-mmap</artifactId>
     </dependency>
+    <dependency>
+      <groupId>net.openhft</groupId>
+      <artifactId>posix</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.openhft</groupId>
+      <artifactId>chronicle-core</artifactId>
+    </dependency>
 
     <!-- test -->
     <dependency>

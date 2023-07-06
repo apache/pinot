@@ -309,6 +309,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES
         = "pinot.broker.result.rewriter.class.names";
 
+    public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
+        "pinot.broker.enable.partition.metadata.manager";
+    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
