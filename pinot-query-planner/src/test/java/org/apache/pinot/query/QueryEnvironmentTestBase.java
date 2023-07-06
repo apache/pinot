@@ -139,24 +139,24 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), "
             + "aggOptions(is_partitioned_by_group_by_keys='true') */ a.col3, a.col1, SUM(b.col3) FROM a JOIN b "
             + "ON a.col3 = b.col3 GROUP BY a.col3, a.col1"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) "
-            + "FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND "
-            + "MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0"
-            + " AND a.col2 = 'a' GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 "
-            + "AND a.col2 = 'a' GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a"
-            + ".col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 "
-            + "= b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1 as v1, a.col1 as v2, AVG(a.col3) FROM"
-            + " a GROUP BY v1, v2"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) "
-            + "FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 "
-            + "AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col3 FROM a JOIN b ON a.col1 = b"
-            + ".col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
+            + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
+            + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a "
+            + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, COUNT(*) FROM a "
+            + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a "
+            + "WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, AVG(b.col3) FROM a JOIN b "
+            + "ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 as v1, a.col1 as v2, "
+            + "AVG(a.col3) FROM a GROUP BY v1, v2"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
+            + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
+            + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col3 FROM a JOIN b "
+            + "ON a.col1 = b.col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
     };
   }
 

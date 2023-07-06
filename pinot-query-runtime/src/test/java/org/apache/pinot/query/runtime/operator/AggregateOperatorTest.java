@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -78,7 +79,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            false, true, false, false);
+            AggType.INTERMEDIATE);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build
@@ -100,7 +101,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            false, true, false, false);
+            AggType.INTERMEDIATE);
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -124,7 +125,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            false, true, false, false);
+            AggType.INTERMEDIATE);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
@@ -149,7 +150,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            false, true, false, false);
+            AggType.INTERMEDIATE);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -176,7 +177,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            false, true, false, false);
+            AggType.INTERMEDIATE);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -199,7 +200,7 @@ public class AggregateOperatorTest {
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     AggregateOperator sum0GroupBy1 = new AggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator,
         OperatorTestUtil.getDataSchema(OperatorTestUtil.OP_1), inSchema, Collections.singletonList(agg),
-        Collections.singletonList(new RexExpression.InputRef(1)), true, false, false, false);
+        Collections.singletonList(new RexExpression.InputRef(1)), AggType.LEAF);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     while (result.isNoOpBlock()) {
       result = sum0GroupBy1.getNextBlock();
@@ -223,7 +224,7 @@ public class AggregateOperatorTest {
     // When:
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            false, true, false, false);
+            AggType.INTERMEDIATE);
   }
 
   @Test
@@ -242,7 +243,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            false, true, false, false);
+            AggType.INTERMEDIATE);
 
     // When:
     TransferableBlock block = operator.nextBlock();

@@ -30,6 +30,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -38,7 +39,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * Class that executes all aggregation functions (without group-bys) for the multistage AggregateOperator.
  */
 public class MultistageAggregationExecutor {
-  private final AggregateOperator.Mode _mode;
+  private final AggType _aggType;
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // from column name to their index.
   private final Map<String, Integer> _colNameToIndexMap;
@@ -50,10 +51,10 @@ public class MultistageAggregationExecutor {
   private final Object[] _mergeResultHolder;
   private final Object[] _finalResultHolder;
 
-  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, AggregateOperator.Mode mode,
-      Map<String, Integer> colNameToIndexMap) {
+  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions,
+      AggType aggType, Map<String, Integer> colNameToIndexMap) {
     _aggFunctions = aggFunctions;
-    _mode = mode;
+    _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
 
     _aggregateResultHolder = new AggregationResultHolder[aggFunctions.length];
@@ -69,11 +70,11 @@ public class MultistageAggregationExecutor {
    * Performs aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
+    if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block, inputDataSchema);
-    } else if (_mode.equals(AggregateOperator.Mode.MERGE)) {
+    } else if (_aggType.isOutputIntermediateFormat()) {
       processMerge(block);
-    } else if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
+    } else {
       collectResult(block);
     }
   }
@@ -99,14 +100,13 @@ public class MultistageAggregationExecutor {
 
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
-      if (_mode.equals(AggregateOperator.Mode.MERGE)) {
+      if (_aggType.equals(AggType.INTERMEDIATE)) {
         Object value = _mergeResultHolder[i];
         row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-      } else if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
+      } else if (!_aggType.isInputIntermediateFormat()) {
         Object value = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
         row[i] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
       } else {
-        assert _mode.equals(AggregateOperator.Mode.EXTRACT_RESULT);
         Comparable result = aggFunction.extractFinalResult(_finalResultHolder[i]);
         row[i] = result == null ? null : aggFunction.getFinalResultColumnType().convert(result);
       }

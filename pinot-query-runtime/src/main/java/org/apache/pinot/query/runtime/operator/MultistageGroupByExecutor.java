@@ -33,6 +33,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -41,7 +42,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * Class that executes the group by aggregations for the multistage AggregateOperator.
  */
 public class MultistageGroupByExecutor {
-  private final AggregateOperator.Mode _mode;
+  private final AggType _aggType;
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // between column name to their index which is used in v2 engine.
   private final Map<String, Integer> _colNameToIndexMap;
@@ -64,8 +65,8 @@ public class MultistageGroupByExecutor {
   private final Map<Key, Object[]> _groupByKeyHolder;
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      AggregateOperator.Mode mode, Map<String, Integer> colNameToIndexMap) {
-    _mode = mode;
+      AggType aggType, Map<String, Integer> colNameToIndexMap) {
+    _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
     _aggFunctions = aggFunctions;
@@ -88,11 +89,11 @@ public class MultistageGroupByExecutor {
    * Performs group-by aggregation for the data in the block.
    */
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
+    if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block, inputDataSchema);
-    } else if (_mode.equals(AggregateOperator.Mode.MERGE)) {
+    } else if (_aggType.isOutputIntermediateFormat()) {
       processMerge(block);
-    } else if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
+    } else {
       collectResult(block);
     }
   }
@@ -103,7 +104,7 @@ public class MultistageGroupByExecutor {
   public List<Object[]> getResult() {
     List<Object[]> rows = new ArrayList<>();
 
-    if (_mode.equals(AggregateOperator.Mode.EXTRACT_RESULT)) {
+    if (_aggType.equals(AggType.FINAL)) {
       return extractFinalGroupByResult();
     }
 
@@ -118,10 +119,10 @@ public class MultistageGroupByExecutor {
       for (int i = 0; i < _aggFunctions.length; i++) {
         int index = i + _groupSet.size();
         int groupId = _groupKeyToIdMap.get(e.getKey());
-        if (_mode.equals(AggregateOperator.Mode.MERGE)) {
+        if (_aggType.equals(AggType.INTERMEDIATE)) {
           Object value = _mergeResultHolder.get(groupId)[i];
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
-        } else if (_mode.equals(AggregateOperator.Mode.AGGREGATE)) {
+        } else {
           Object value = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
           row[index] = convertObjectToReturnType(_aggFunctions[i].getType(), value);
         }
@@ -151,11 +152,11 @@ public class MultistageGroupByExecutor {
     return rows;
   }
 
-  private Object convertObjectToReturnType(AggregationFunctionType aggType, Object value) {
+  private Object convertObjectToReturnType(AggregationFunctionType aggFuncType, Object value) {
     // For bool_and and bool_or aggregation functions, the return type for aggregate and merge modes are set as
     // boolean. However, the v1 bool_and and bool_or function uses Integer as the intermediate type.
     boolean boolAndOrAgg =
-        aggType.equals(AggregationFunctionType.BOOLAND) || aggType.equals(AggregationFunctionType.BOOLOR);
+        aggFuncType.equals(AggregationFunctionType.BOOLAND) || aggFuncType.equals(AggregationFunctionType.BOOLOR);
     if (boolAndOrAgg && value instanceof Integer) {
       Boolean boolVal = ((Number) value).intValue() > 0 ? true : false;
       return boolVal;

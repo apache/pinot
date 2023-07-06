@@ -33,6 +33,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -80,22 +81,6 @@ public class AggregateOperator extends MultiStageOperator {
   private MultistageAggregationExecutor _aggregationExecutor;
   private MultistageGroupByExecutor _groupByExecutor;
 
-  // This aggregation operator uses the v1 Aggregation functions to process the rows. It operates in one of the 3 modes:
-  // 1. Aggregate Mode:
-  //    - Calls aggregate(), aggregateGroupBySV(), aggregateGroupByMV()
-  //    - This mode is used when isLeafStage hint is set or if treatIntermediateAsLeaf is true.
-  // 2. Merge Mode:
-  //    - Calls merge()
-  //    - This mode is used when isIntermediateStage hint is set and if treatIntermediateAsLeaf is false.
-  // 3. ExtractResult Mode:
-  //    - Calls extractFinalResult()
-  //    - This mode is used when isFinalStage() hint is set.
-  enum Mode {
-    AGGREGATE,
-    MERGE,
-    EXTRACT_RESULT
-  }
-
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
@@ -104,7 +89,7 @@ public class AggregateOperator extends MultiStageOperator {
   @VisibleForTesting
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
-      boolean isLeafStage, boolean isIntermediateStage, boolean extractFinalResult, boolean treatIntermediateAsLeaf) {
+      AggType aggType) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
@@ -114,16 +99,6 @@ public class AggregateOperator extends MultiStageOperator {
     _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
     _colNameToIndexMap = new HashMap<>();
-
-    Mode mode;
-    if (extractFinalResult) {
-      mode = Mode.EXTRACT_RESULT;
-    } else if (isIntermediateStage && !treatIntermediateAsLeaf) {
-      mode = Mode.MERGE;
-    } else {
-      assert isLeafStage || (isIntermediateStage && treatIntermediateAsLeaf);
-      mode = Mode.AGGREGATE;
-    }
 
     // Convert groupSet to ExpressionContext that our aggregation functions understand.
     List<ExpressionContext> groupByExpr = getGroupSet(groupSet);
@@ -137,10 +112,10 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     if (!groupSet.isEmpty()) {
       _isGroupByAggregation = true;
-      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, mode, _colNameToIndexMap);
+      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, aggType, _colNameToIndexMap);
     } else {
       _isGroupByAggregation = false;
-      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, mode, _colNameToIndexMap);
+      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, aggType, _colNameToIndexMap);
     }
   }
 
