@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -1083,7 +1082,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
-  public void testDeleteTmpSegmentFiles() throws Exception{
+  public void testDeleteTmpSegmentFiles() throws Exception {
     // turn on knobs for async deletion of tmp files
     ControllerConf config = new ControllerConf();
     config.setDataDir(TEMP_DIR.toString());
@@ -1106,15 +1105,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
         .thenReturn(new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build());
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(
-        helixResourceManager,config);
+        helixResourceManager, config);
 
-    // case 1: the segmentMetadata download uri is identical to the uri of the tmp segment
+    // case 1: the segmentMetadata download uri is identical to the uri of the tmp segment. Should not delete
     when(segZKMeta.getStatus()).thenReturn(Status.DONE);
     when(segZKMeta.getDownloadUrl()).thenReturn(SCHEME + tableDir + "/" + segmentFileName);
     segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
     assertTrue(segmentFile.exists());
 
-    // case 2: download url is empty, indicates the
+    // case 2: download url is empty, indicating the tmp segment is absolutely orphan. Delete the file
     when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
     segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
     assertFalse(segmentFile.exists());
