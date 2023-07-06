@@ -35,6 +35,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+
 
 
 /**
@@ -45,6 +48,7 @@ public class MultistageGroupByExecutor {
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // between column name to their index which is used in v2 engine.
   private final Map<String, Integer> _colNameToIndexMap;
+  private final DataSchema _resultSchema;
 
   private final List<ExpressionContext> _groupSet;
   private final AggregationFunction[] _aggFunctions;
@@ -52,22 +56,21 @@ public class MultistageGroupByExecutor {
   // Group By Result holders for each mode
   private final GroupByResultHolder[] _aggregateResultHolders;
   private final Map<Integer, Object[]> _mergeResultHolder;
-  private final List<Object[]> _finalResultHolder;
 
   // Mapping from the row-key to a zero based integer index. This is used when we invoke the v1 aggregation functions
   // because they use the zero based integer indexes to store results.
   private final Map<Key, Integer> _groupKeyToIdMap;
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      AggType aggType, Map<String, Integer> colNameToIndexMap) {
+      AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
     _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
     _aggFunctions = aggFunctions;
+    _resultSchema = resultSchema;
 
     _aggregateResultHolders = new GroupByResultHolder[_aggFunctions.length];
     _mergeResultHolder = new HashMap<>();
-    _finalResultHolder = new ArrayList<>();
 
     _groupKeyToIdMap = new HashMap<>();
 
@@ -84,10 +87,8 @@ public class MultistageGroupByExecutor {
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
     if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block, inputDataSchema);
-    } else if (_aggType.isOutputIntermediateFormat()) {
-      processMerge(block);
     } else {
-      collectResult(block);
+      processMerge(block);
     }
   }
 
@@ -95,10 +96,6 @@ public class MultistageGroupByExecutor {
    * Fetches the result.
    */
   public List<Object[]> getResult() {
-    if (_aggType == AggType.FINAL) {
-      return extractFinalGroupByResult();
-    }
-
     List<Object[]> rows = new ArrayList<>(_groupKeyToIdMap.size());
     int numKeys = _groupSet.size();
     int numFunctions = _aggFunctions.length;
@@ -111,39 +108,27 @@ public class MultistageGroupByExecutor {
       for (int i = 0; i < numFunctions; i++) {
         AggregationFunction func = _aggFunctions[i];
         int index = numKeys + i;
-        if (!_aggType.isInputIntermediateFormat()) {
-          Object intermediateResult = func.extractGroupByResult(_aggregateResultHolders[i], groupId);
-          if (_aggType.isOutputIntermediateFormat()) {
-            row[index] = intermediateResult;
-          } else {
-            Object finalResult = func.extractFinalResult(intermediateResult);
-            row[index] = finalResult == null ? null : func.getFinalResultColumnType().convert(finalResult);
-          }
-        } else {
-          assert _aggType == AggType.INTERMEDIATE;
-          row[index] = _mergeResultHolder.get(groupId)[i];
+        Object value;
+        switch (_aggType) {
+          case LEAF:
+            value = func.extractGroupByResult(_aggregateResultHolders[i], groupId);
+            break;
+          case INTERMEDIATE:
+            value = _mergeResultHolder.get(groupId)[i];
+            break;
+          case FINAL:
+            value = func.extractFinalResult(_mergeResultHolder.get(groupId)[i]);
+            break;
+          case DIRECT:
+            Object intermediate = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
+            value = func.extractFinalResult(intermediate);
+            break;
+          default:
+            throw new UnsupportedOperationException("Unsupported aggTyp: " + _aggType);
         }
+        row[index] = value;
       }
-      rows.add(row);
-    }
-    return rows;
-  }
-
-  private List<Object[]> extractFinalGroupByResult() {
-    List<Object[]> rows = new ArrayList<>(_finalResultHolder.size());
-    int numKeys = _groupSet.size();
-    int numFunctions = _aggFunctions.length;
-    int numColumns = numKeys + numFunctions;
-    for (Object[] resultRow : _finalResultHolder) {
-      Object[] row = new Object[numColumns];
-      System.arraycopy(resultRow, 0, row, 0, numKeys);
-      for (int i = 0; i < numFunctions; i++) {
-        AggregationFunction func = _aggFunctions[i];
-        int index = numKeys + i;
-        Object finalResult = func.extractFinalResult(resultRow[index]);
-        row[index] = finalResult == null ? null : func.getFinalResultColumnType().convert(finalResult);
-      }
-      rows.add(row);
+      rows.add(TypeUtils.canonicalizeRow(row, _resultSchema));
     }
     return rows;
   }
@@ -186,22 +171,6 @@ public class MultistageGroupByExecutor {
 
         _mergeResultHolder.get(rowKey)[i] = _aggFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
       }
-    }
-  }
-
-  private void collectResult(TransferableBlock block) {
-    List<Object[]> container = block.getContainer();
-    for (Object[] row : container) {
-      assert row.length == _groupSet.size() + _aggFunctions.length;
-      Object[] resultRow = new Object[row.length];
-      System.arraycopy(row, 0, resultRow, 0, _groupSet.size());
-
-      for (int i = 0; i < _aggFunctions.length; i++) {
-        int index = _groupSet.size() + i;
-        resultRow[index] = extractValueFromRow(_aggFunctions[i], row);
-      }
-
-      _finalResultHolder.add(resultRow);
     }
   }
 
@@ -250,17 +219,29 @@ public class MultistageGroupByExecutor {
   }
 
   private Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row) {
-    // TODO: Add support to handle aggregation functions where:
-    //       1. The identifier need not be the first argument
-    //       2. There are more than one identifiers.
     List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
     Preconditions.checkState(expressions.size() == 1, "Only support single expression, got: %s", expressions.size());
     ExpressionContext expr = expressions.get(0);
     ExpressionContext.Type exprType = expr.getType();
     if (exprType == ExpressionContext.Type.IDENTIFIER) {
-      return row[_colNameToIndexMap.get(expr.getIdentifier())];
+      String colName = expr.getIdentifier();
+      Object value = row[_colNameToIndexMap.get(colName)];
+      return toIntermediateType(value, aggregationFunction);
     }
     Preconditions.checkState(exprType == ExpressionContext.Type.LITERAL, "Unsupported expression type: %s", exprType);
     return expr.getLiteral().getValue();
+  }
+
+  // TODO: remove this once planner correctly expects intermediate result type.
+  private Object toIntermediateType(Object value, AggregationFunction aggregationFunction) {
+    if (aggregationFunction.getType().equals(AggregationFunctionType.BOOLAND)
+        || aggregationFunction.getType().equals(AggregationFunctionType.BOOLOR)
+        || aggregationFunction.getType().equals(AggregationFunctionType.COUNT)) {
+      return (value instanceof Boolean) ? (((Boolean) value) ? 1 : 0)
+          : ((value instanceof Number) ? ((Number) value).intValue() : value);
+    } else {
+      return (value instanceof Boolean) ? (((Boolean) value) ? 1.0 : 0.0)
+          : ((value instanceof Number) ? ((Number) value).doubleValue() : value);
+    }
   }
 }

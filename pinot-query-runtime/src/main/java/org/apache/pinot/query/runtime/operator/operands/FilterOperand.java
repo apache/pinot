@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.function.IntPredicate;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 
 
@@ -160,8 +160,8 @@ public abstract class FilterOperand extends TransformOperand {
         return false;
       }
       if (_requireCasting) {
-        v1 = (Comparable) FunctionInvokeUtils.convert(v1, _commonCastType);
-        v2 = (Comparable) FunctionInvokeUtils.convert(v2, _commonCastType);
+        v1 = (Comparable) TypeUtils.convert(v1, _commonCastType);
+        v2 = (Comparable) TypeUtils.convert(v2, _commonCastType);
         assert v1 != null && v2 != null;
       }
       return _comparisonResultPredicate.test(v1.compareTo(v2));
