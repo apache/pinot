@@ -18,10 +18,26 @@
  */
 package org.apache.pinot.common.function;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperatorBinding;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlOperandTypeInference;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeFamily;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeTransforms;
+import org.apache.commons.lang.StringUtils;
 
 
 public enum TransformFunctionType {
@@ -76,7 +92,13 @@ public enum TransformFunctionType {
   CAST("cast"),
 
   // string functions
-  JSONEXTRACTSCALAR("jsonExtractScalar"),
+  JSONEXTRACTSCALAR("jsonExtractScalar", SqlKind.OTHER_FUNCTION,
+      ReturnTypes.cascade(opBinding -> inferJsonExtractScalarExplicitTypeSpec(opBinding).orElse(
+              opBinding.getTypeFactory().createSqlType(SqlTypeName.VARCHAR, 2000)),
+          SqlTypeTransforms.FORCE_NULLABLE), null,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+          ordinal -> ordinal > 1),
+      SqlFunctionCategory.USER_DEFINED_FUNCTION),
   JSONEXTRACTKEY("jsonExtractKey"),
 
   // date time functions
@@ -163,14 +185,33 @@ public enum TransformFunctionType {
 
   private final String _name;
   private final List<String> _aliases;
+  private final SqlKind _sqlKind;
+  private final SqlReturnTypeInference _sqlReturnTypeInference;
+  private final SqlOperandTypeInference _sqlOperandTypeInference;
+  private final SqlOperandTypeChecker _sqlOperandTypeChecker;
+  private final SqlFunctionCategory _sqlFunctionCategory;
 
   TransformFunctionType(String name, String... aliases) {
+    this(name, null, null, null, null, null, aliases);
+  }
+
+  /**
+   * Constructor to use for transform functions which are supported in both v1 and multistage engines
+   */
+  TransformFunctionType(String name, SqlKind sqlKind, SqlReturnTypeInference sqlReturnTypeInference,
+      SqlOperandTypeInference sqlOperandTypeInference, SqlOperandTypeChecker sqlOperandTypeChecker,
+      SqlFunctionCategory sqlFunctionCategory, String... aliases) {
     _name = name;
     List<String> all = new ArrayList<>(aliases.length + 2);
     all.add(name);
     all.add(name());
     all.addAll(Arrays.asList(aliases));
     _aliases = Collections.unmodifiableList(all);
+    _sqlKind = sqlKind;
+    _sqlReturnTypeInference = sqlReturnTypeInference;
+    _sqlOperandTypeInference = sqlOperandTypeInference;
+    _sqlOperandTypeChecker = sqlOperandTypeChecker;
+    _sqlFunctionCategory = sqlFunctionCategory;
   }
 
   public String getName() {
@@ -179,5 +220,59 @@ public enum TransformFunctionType {
 
   public List<String> getAliases() {
     return _aliases;
+  }
+
+  public SqlKind getSqlKind() {
+    return _sqlKind;
+  }
+
+  public SqlReturnTypeInference getSqlReturnTypeInference() {
+    return _sqlReturnTypeInference;
+  }
+
+  public SqlOperandTypeInference getSqlOperandTypeInference() {
+    return _sqlOperandTypeInference;
+  }
+
+  public SqlOperandTypeChecker getSqlOperandTypeChecker() {
+    return _sqlOperandTypeChecker;
+  }
+
+  public SqlFunctionCategory getSqlFunctionCategory() {
+    return _sqlFunctionCategory;
+  }
+
+  /** Returns the optional explicit returning type specification. */
+  private static Optional<RelDataType> inferJsonExtractScalarExplicitTypeSpec(SqlOperatorBinding opBinding) {
+    if (opBinding.getOperandCount() > 2
+        && opBinding.isOperandLiteral(2, false)) {
+      String operandType = opBinding.getOperandLiteralValue(2, String.class).toUpperCase();
+      return Optional.of(inferExplicitTypeSpec(operandType, opBinding.getTypeFactory()));
+    }
+    return Optional.empty();
+  }
+
+  private static RelDataType inferExplicitTypeSpec(String operandType, RelDataTypeFactory typeFactory) {
+    switch (operandType) {
+      case "INT":
+      case "INTEGER":
+        return typeFactory.createSqlType(SqlTypeName.INTEGER);
+      case "LONG":
+        return typeFactory.createSqlType(SqlTypeName.BIGINT);
+      case "STRING":
+        return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case "BYTES":
+        return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      default:
+        SqlTypeName sqlTypeName = SqlTypeName.get(operandType);
+        if (sqlTypeName == null) {
+          throw new IllegalArgumentException("Invalid type: " + operandType);
+        }
+        return typeFactory.createSqlType(sqlTypeName);
+    }
+  }
+
+  public static String getNormalizedTransformFunctionName(String functionName) {
+    return StringUtils.remove(functionName, '_').toUpperCase();
   }
 }
