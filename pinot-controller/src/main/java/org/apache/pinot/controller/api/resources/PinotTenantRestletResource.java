@@ -203,21 +203,37 @@ public class PinotTenantRestletResource {
   @GET
   @Path("/tenants/{tenantName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "List instance for a tenant, or enable/disable/drop a tenant")
+  @ApiOperation(value = "List instance for a tenant")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Error reading tenants list")
   })
-  public String listInstanceOrToggleTenantState(
+  public String listInstance(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
-      @ApiParam(value = "Table type (offline|realtime)") @QueryParam("tableType") String tableType,
-      @ApiParam(value = "state") @QueryParam("state") String stateStr)
-      throws Exception {
-    if (stateStr == null) {
-      return listInstancesForTenant(tenantName, tenantType, tableType);
-    } else {
+      @ApiParam(value = "Table type (offline|realtime)") @QueryParam("tableType") String tableType) {
+    return listInstancesForTenant(tenantName, tenantType, tableType);
+  }
+
+  @POST
+  @Path("/tenants/{tenantName}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "enable/disable a tenant")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error applying state to tenant")
+  })
+  public SuccessResponse enableOrDisableTenant(
+      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
+      @ApiParam(value = "state (enable|disable)") @QueryParam("state") String stateStr) {
+    if (stateStr.equalsIgnoreCase(String.valueOf(StateType.ENABLE))
+        || stateStr.equalsIgnoreCase(String.valueOf(StateType.DISABLE))) {
       return toggleTenantState(tenantName, stateStr, tenantType);
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Error: State mentioned " + stateStr + " is wrong. Valid States: Enable, Disable",
+          Response.Status.BAD_REQUEST);
     }
   }
 
@@ -260,7 +276,7 @@ public class PinotTenantRestletResource {
     return resourceGetRet.toString();
   }
 
-  private String toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) {
+  private SuccessResponse toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) {
     Set<String> serverInstances = new HashSet<>();
     Set<String> brokerInstances = new HashSet<>();
     ObjectNode instanceResult = JsonUtils.newObjectNode();
@@ -276,27 +292,17 @@ public class PinotTenantRestletResource {
     Set<String> allInstances = new HashSet<String>(serverInstances);
     allInstances.addAll(brokerInstances);
 
-    if (StateType.DROP.name().equalsIgnoreCase(stateStr)) {
-      if (!allInstances.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER,
-            "Error: Tenant " + tenantName + " has live instances, cannot be dropped.", Response.Status.BAD_REQUEST);
-      }
-      _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
-      _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
-      _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
-      return new SuccessResponse("Dropped tenant " + tenantName + " successfully.").toString();
-    }
-
-    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr) ? true : false;
-    for (String instance : allInstances) {
-      if (enable) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
-      } else {
+    if (StateType.DISABLE.name().equalsIgnoreCase(stateStr)) {
+      for (String instance : allInstances) {
         instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
     }
-
-    return null;
+    if (StateType.ENABLE.name().equalsIgnoreCase(stateStr)) {
+      for (String instance : allInstances) {
+        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
+      }
+    }
+    return new SuccessResponse("Changed state of tenant " + tenantName + " to " + stateStr + " successfully.");
   }
 
   private String listInstancesForTenant(String tenantName, String tenantType, String tableTypeString) {
@@ -401,6 +407,7 @@ public class PinotTenantRestletResource {
   // CHANGE-ALERT: This is not backward compatible. We've changed this API from GET to POST because:
   //   1. That is correct
   //   2. with GET, we need to write our own routing logic to avoid conflict since this is same as the API above
+  @Deprecated
   @POST
   @Path("/tenants/{tenantName}/metadata")
   @Authenticate(AccessType.UPDATE)
