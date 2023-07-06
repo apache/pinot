@@ -226,7 +226,12 @@ public class TableRebalancer {
 
     // Calculate instance partitions map
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
+    Map<InstancePartitionsType, InstancePartitions> existingInstancePartitionsMap = null;
     try {
+      if (reassignInstances) {
+        existingInstancePartitionsMap =
+                getExstingInstancePartitionsMap(tableConfig);
+      }
       instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
     } catch (Exception e) {
       LOGGER.warn("For rebalanceId: {}, caught exception while fetching/calculating instance partitions for table: {}, "
@@ -237,6 +242,11 @@ public class TableRebalancer {
 
     // Calculate instance partitions for tiers if configured
     List<Tier> sortedTiers = getSortedTiers(tableConfig);
+
+    // Get existing tier instance partitions if reassigning instances
+    Map<String, InstancePartitions> existingTierToInstancePartitionsMap = !reassignInstances ? null
+            : getExistingTierInstancePartitionMap(tableConfig, sortedTiers);
+
     Map<String, InstancePartitions> tierToInstancePartitionsMap =
         getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
 
@@ -256,22 +266,24 @@ public class TableRebalancer {
           tierToInstancePartitionsMap, null);
     }
 
-    if (currentAssignment.equals(targetAssignment)) {
+    boolean tierInstanceAssignmentUnchanged = !reassignInstances || sortedTiers == null
+            || existingTierToInstancePartitionsMap.equals(tierToInstancePartitionsMap);
+    LOGGER.info("For rebalanceId: {}, tierInstanceAssignmentUnchanged: {}",
+            rebalanceJobId, tierInstanceAssignmentUnchanged);
+
+    boolean instanceAssignmentUnchanged = !reassignInstances
+            || existingInstancePartitionsMap.equals(instancePartitionsMap);
+    LOGGER.info("For rebalanceId: {}, instanceAssignmentUnchanged: {}",
+            rebalanceJobId, instanceAssignmentUnchanged);
+
+    boolean segmentAssignmentUnchanged = currentAssignment.equals(targetAssignment);
+    LOGGER.info("For rebalanceId: {}, segmentAssignmentUnchanged: {}",
+            rebalanceJobId, segmentAssignmentUnchanged);
+
+    if (segmentAssignmentUnchanged && tierInstanceAssignmentUnchanged && instanceAssignmentUnchanged) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
-      if (reassignInstances) {
-        if (dryRun) {
-          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
-              "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
-              tierToInstancePartitionsMap, targetAssignment);
-        } else {
-          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
-              "Instance reassigned, table is already balanced", instancePartitionsMap, tierToInstancePartitionsMap,
-              targetAssignment);
-        }
-      } else {
-        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
+    return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
-      }
     }
 
     if (dryRun) {
@@ -479,6 +491,55 @@ public class TableRebalancer {
       }
     }
   }
+
+  private Map<InstancePartitionsType, InstancePartitions> getExstingInstancePartitionsMap(TableConfig tableConfig) {
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+
+    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    TableType tableType = tableConfig.getTableType();
+    if (tableType != TableType.REALTIME) {
+        InstancePartitions offlineInstancePartitions =
+                InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+                        InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
+        if (offlineInstancePartitions != null) {
+          instancePartitionsMap.put(InstancePartitionsType.OFFLINE, offlineInstancePartitions);
+      }
+    }
+    if (tableType != TableType.OFFLINE) {
+        InstancePartitions consumingInstancePartitions =
+                InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+                        InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
+        if (consumingInstancePartitions != null) {
+          instancePartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
+        }
+        InstancePartitions completedInstancePartitions =
+                InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+                        InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
+        if (completedInstancePartitions != null) {
+          instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
+        }
+      }
+    return instancePartitionsMap;
+    }
+
+private Map<String, InstancePartitions> getExistingTierInstancePartitionMap(
+        TableConfig tableConfig, List<Tier> sortedTiers) {
+    if (sortedTiers == null) {
+      return null;
+    }
+
+    Map<String, InstancePartitions> tierToInstancePartitionsMap = new HashMap<>();
+    for (Tier tier : sortedTiers) {
+      InstancePartitions instancePartitions =
+              InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+                      InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(),
+                              tier.getName()));
+      if (instancePartitions != null) {
+        tierToInstancePartitionsMap.put(tier.getName(), instancePartitions);
+      }
+    }
+    return tierToInstancePartitionsMap;
+    }
 
   private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
       boolean reassignInstances, boolean bootstrap, boolean dryRun) {
