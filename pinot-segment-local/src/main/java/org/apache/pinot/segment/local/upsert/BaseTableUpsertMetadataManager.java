@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
@@ -110,24 +109,30 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
     _segmentPreloadExecutor = segmentPreloadExecutor;
-    try {
-      if (_enableSnapshot && upsertConfig.isEnablePreload()) {
-        // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
-        // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
-        // The thread doing the segment preloading here must complete before the other helix threads start to handle
-        // segment state transitions. This is ensured implicitly because segment preloading happens here when
-        // initializing this TableUpsertMetadataManager, which happens when initializing the TableDataManager, which
-        // happens as the lambda of ConcurrentHashMap.computeIfAbsent() method, which ensures the waiting logic.
+    if (_enableSnapshot && upsertConfig.isEnablePreload()) {
+      // Preloading the segments with snapshots for fast upsert metadata recovery.
+      // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
+      // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
+      // The thread doing the segment preloading here must complete before the other helix threads start to handle
+      // segment state transitions. This is ensured implicitly because segment preloading happens here when
+      // initializing this TableUpsertMetadataManager, which happens when initializing the TableDataManager, which
+      // happens as the lambda of ConcurrentHashMap.computeIfAbsent() method, which ensures the waiting logic.
+      try {
         _isPreloading = true;
         preloadSegments();
+      } catch (Exception e) {
+        // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
+        // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
+        // loading logic would be used. The segments not being preloaded successfully here would be loaded via the
+        // normal segment loading logic, the one doing more costly checks on the upsert metadata.
+        LOGGER.warn("Failed to preload segments for table: {}", _tableNameWithType, e);
+        if (e instanceof InterruptedException) {
+          // Restore the interrupted status in case the upper callers want to check.
+          Thread.currentThread().interrupt();
+        }
+      } finally {
+        _isPreloading = false;
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException("Got interrupted to preload segments for table: " + _tableNameWithType, e);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to preload segments for table: " + _tableNameWithType, e);
-    } finally {
-      _isPreloading = false;
     }
   }
 
@@ -137,8 +142,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
    * transitions, which will proceed after the preloading phase fully completes.
    */
   private void preloadSegments()
-      throws ExecutionException, InterruptedException {
-    LOGGER.info("Preload segments for table: {} fast upsert metadata recovery", _tableNameWithType);
+      throws Exception {
+    LOGGER.info("Preload segments in table: {} for fast upsert metadata recovery", _tableNameWithType);
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, _tableNameWithType);
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
     String instanceId = getInstanceId();
@@ -159,10 +164,18 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         preloadSegment(segmentName, indexLoadingConfig, propertyStore);
       }));
     }
-    for (Future<?> f : futures) {
-      f.get();
+    try {
+      for (Future<?> f : futures) {
+        f.get();
+      }
+    } finally {
+      for (Future<?> f : futures) {
+        if (!f.isDone()) {
+          f.cancel(true);
+        }
+      }
     }
-    LOGGER.info("Preloaded segments for table: {} fast upsert metadata recovery", _tableNameWithType);
+    LOGGER.info("Preloaded segments in table: {} for fast upsert metadata recovery", _tableNameWithType);
   }
 
   private String getInstanceId() {

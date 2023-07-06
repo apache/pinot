@@ -60,7 +60,6 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class ConcurrentMapTableUpsertMetadataManagerTest {
@@ -107,14 +106,11 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     upsertConfig.setEnablePreload(true);
     mgr = new ConcurrentMapTableUpsertMetadataManager();
     assertFalse(mgr.isPreloading());
-    try {
-      // The preloading logic will hit on error as the HelixManager mock is not fully setup.
-      mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
-          null);
-      fail();
-    } catch (Exception ignore) {
-      assertFalse(mgr.isPreloading());
-    }
+    // The preloading logic will hit on error as the HelixManager mock is not fully setup. But failure of preloading
+    // should not fail the init() method.
+    mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
+        null);
+    assertFalse(mgr.isPreloading());
   }
 
   @Test
@@ -194,6 +190,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
         eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, "online_seg02")), any(),
         anyInt())).thenReturn(realtimeSegmentZKMetadata.toZNRecord());
 
+    // No snapshot file for online_seg01, so it's skipped.
     File seg01IdxDir = new File(TEMP_DIR, "online_seg01");
     FileUtils.forceMkdir(seg01IdxDir);
     when(tableDataManager.getSegmentDataDir("online_seg01", null, tableConfig)).thenReturn(seg01IdxDir);
