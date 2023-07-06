@@ -85,7 +85,7 @@
       },
       {
         "description": "Skip leaf stage aggregation with GROUP BY hint",
-        "sql": "SELECT /*+ skipLeafStageGroupByAggregation */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
       }
     ]
   }

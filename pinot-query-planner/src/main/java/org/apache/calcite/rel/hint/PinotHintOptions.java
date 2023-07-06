@@ -44,8 +44,7 @@ public class PinotHintOptions {
       DIRECT,
       LEAF,
       INTERMEDIATE,
-      FINAL,
-      REDUCE // NOT SUPPORTED
+      FINAL;
     }
   }
 

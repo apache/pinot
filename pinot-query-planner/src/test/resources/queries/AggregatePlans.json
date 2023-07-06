@@ -204,7 +204,7 @@
       },
       {
         "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
           "\nLogicalProject(avg=[CAST(AVG_REDUCE($0, $1)):DOUBLE], count=[$1])",
@@ -220,7 +220,7 @@
       },
       {
         "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'queen'",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'queen'",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
@@ -235,7 +235,7 @@
       },
       {
         "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ KURTOSIS(a.col3) as kurtosis, SKEWNESS(a.col6) as skewness, COUNT(DISTINCT a.col6), COUNT(DISTINCT a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'metallica'",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ KURTOSIS(a.col3) as kurtosis, SKEWNESS(a.col6) as skewness, COUNT(DISTINCT a.col6), COUNT(DISTINCT a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'metallica'",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{}], agg#0=[KURTOSIS($0)], agg#1=[SKEWNESS($1)], agg#2=[DISTINCTCOUNT(DISTINCT $2)], agg#3=[DISTINCTCOUNT(DISTINCT $3)])",

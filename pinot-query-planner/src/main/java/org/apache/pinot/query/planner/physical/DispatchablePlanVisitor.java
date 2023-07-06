@@ -52,7 +52,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
     dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0
-        && node.getAggType().equals(PinotHintOptions.InternalAggregateOptions.AggType.INTERMEDIATE));
+        && node.getAggType().equals(PinotHintOptions.InternalAggregateOptions.AggType.FINAL));
     return null;
   }
 

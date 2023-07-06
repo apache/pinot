@@ -381,7 +381,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // 3. Create an intermediate stage aggregation.
     RelNode newAggNode =
-        makeNewIntermediateAgg(call, oldAggRel, exchange, AggType.DIRECT, newAggArgColumns, newAggGroupByColumns);
+        makeNewIntermediateAgg(call, oldAggRel, exchange, AggType.LEAF, newAggArgColumns, newAggGroupByColumns);
 
     // 4. Create the final agg stage node on top of the intermediate agg if aggregations are present.
     RelNode transformToAgg = newAggNode;
