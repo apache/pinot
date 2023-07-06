@@ -63,12 +63,24 @@ public abstract class FST implements Iterable<ByteBuffer> {
     return buf;
   }
 
+  //HACK: atri
+  public static FST read(InputStream stream)
+          throws IOException {
+    return read(stream, false, new DirectMemoryManager(FST.class.getName()), 0);
+  }
+
   /**
    * Wrapper for the main read function
    */
-  public static FST read(InputStream stream)
+  public static FST read(InputStream stream, final int fstDataSize)
       throws IOException {
-    return read(stream, false, new DirectMemoryManager(FST.class.getName()));
+    return read(stream, false, new DirectMemoryManager(FST.class.getName()), fstDataSize);
+  }
+
+  //Hack: Atri
+  public static FST read(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager)
+          throws IOException {
+    return read(stream, hasOutputSymbols, memoryManager, 0);
   }
 
   /**
@@ -82,17 +94,22 @@ public abstract class FST implements Iterable<ByteBuffer> {
    *           If the input stream does not represent an automaton or is
    *           otherwise invalid.
    */
-  public static FST read(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager)
+  public static FST read(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager, final int fstDataSize)
       throws IOException {
     FSTHeader header = FSTHeader.read(stream);
 
     switch (header._version) {
       case ImmutableFST.VERSION:
-        return new ImmutableFST(stream, hasOutputSymbols, memoryManager);
+        return new ImmutableFST(stream, hasOutputSymbols, memoryManager, fstDataSize);
       default:
         throw new IOException(
             String.format(Locale.ROOT, "Unsupported automaton version: 0x%02x", header._version & 0xFF));
     }
+  }
+
+  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz, boolean hasOutputSymbolse)
+          throws IOException {
+    return read(stream, clazz, hasOutputSymbolse, 0);
   }
 
   /**
@@ -109,9 +126,9 @@ public abstract class FST implements Iterable<ByteBuffer> {
    *           invalid or the class of the automaton read from the input stream
    *           is not assignable to <code>clazz</code>.
    */
-  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz, boolean hasOutputSymbols)
+  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz, boolean hasOutputSymbols, final int fstDataSize)
       throws IOException {
-    FST fst = read(stream, hasOutputSymbols, new DirectMemoryManager(FST.class.getName()));
+    FST fst = read(stream, hasOutputSymbols, new DirectMemoryManager(FST.class.getName()), fstDataSize);
     if (!clazz.isInstance(fst)) {
       throw new IOException(
           String.format(Locale.ROOT, "Expected FST type %s, but read an incompatible type %s.", clazz.getName(),

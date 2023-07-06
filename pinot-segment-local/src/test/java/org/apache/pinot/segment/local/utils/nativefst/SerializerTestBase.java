@@ -135,8 +135,9 @@ public abstract class SerializerTestBase {
   private void checkSerialization0(FSTSerializer serializer, final byte[][] in, FST root, boolean hasOutputSymbols)
       throws IOException {
     byte[] fstData = serializer.serialize(root, new ByteArrayOutputStream()).toByteArray();
+    //TODO: Atri
     FST fst = FST.read(new ByteArrayInputStream(fstData), hasOutputSymbols,
-        new DirectMemoryManager(SerializerTestBase.class.getName()));
+        new DirectMemoryManager(SerializerTestBase.class.getName()), 0);
     checkCorrect(in, fst);
   }
 
@@ -176,8 +177,9 @@ public abstract class SerializerTestBase {
 
     FST fst = FSTBuilder.build(input, new int[]{10, 11, 12, 13});
     byte[] fstData = createSerializer().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
+    //TODO: Atri
     fst =
-        FST.read(new ByteArrayInputStream(fstData), true, new DirectMemoryManager(SerializerTestBase.class.getName()));
+        FST.read(new ByteArrayInputStream(fstData), true, new DirectMemoryManager(SerializerTestBase.class.getName()), 0);
 
     // Ensure we have the NUMBERS flag set.
     assertTrue(fst.getFlags().contains(NUMBERS));

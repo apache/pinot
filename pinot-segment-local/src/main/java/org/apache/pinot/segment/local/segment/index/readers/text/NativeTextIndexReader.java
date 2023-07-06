@@ -89,7 +89,7 @@ public class NativeTextIndexReader implements TextIndexReader {
     long fstDataEndOffset = fstDataStartOffset + fstDataLength;
     ByteBuffer byteBuffer = _buffer.toDirectByteBuffer(fstDataStartOffset, fstDataLength);
     try {
-      _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true);
+      _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true, fstDataLength);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

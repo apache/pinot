@@ -21,7 +21,10 @@ package org.apache.pinot.segment.local.utils.nativefst;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+
+import com.google.common.base.Preconditions;
 import org.apache.avro.util.ByteBufferInputStream;
+import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -48,8 +51,19 @@ public class NativeFSTIndexReader implements TextIndexReader {
   public NativeFSTIndexReader(PinotDataBuffer dataBuffer)
       throws IOException {
     // TODO: Implement an InputStream directly on PinotDataBuffer
-    ByteBuffer byteBuffer = dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size());
-    _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true);
+    /*ByteBuffer byteBuffer = dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size());
+    _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true);*/
+    int fstMagic = dataBuffer.getInt(0);
+    Preconditions.checkState(fstMagic == FSTHeader.FST_MAGIC, "Invalid native text index magic header: %s", fstMagic);
+    int fstDataLength = dataBuffer.getInt(4);
+
+    long fstDataStartOffset = NativeFSTIndexCreator.HEADER_LENGTH;
+    ByteBuffer byteBuffer = dataBuffer.toDirectByteBuffer(fstDataStartOffset, fstDataLength);
+    try {
+      _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true, fstDataLength);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

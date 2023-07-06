@@ -60,7 +60,8 @@ public class FSTSanityTest {
     FST fst = FSTBuilder.buildFST(input);
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
 
-    _nativeFST = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    //TODO: Atri
+    _nativeFST = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true, 0);
     _fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(input);
   }
 

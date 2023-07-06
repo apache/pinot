@@ -161,7 +161,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   private void generateIndexFile()
-      throws IOException {
+          throws IOException {
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
     headerBuffer.putInt(FSTHeader.FST_MAGIC);
     headerBuffer.putInt(VERSION);
@@ -172,8 +172,8 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     headerBuffer.position(0);
 
     try (FileChannel indexFileChannel = new RandomAccessFile(_indexFile, "rw").getChannel();
-        FileChannel invertedIndexFileChannel = new RandomAccessFile(_invertedIndexFile, "r").getChannel();
-        FileChannel fstFileChannel = new RandomAccessFile(_fstIndexFile, "rw").getChannel()) {
+         FileChannel invertedIndexFileChannel = new RandomAccessFile(_invertedIndexFile, "r").getChannel();
+         FileChannel fstFileChannel = new RandomAccessFile(_fstIndexFile, "rw").getChannel()) {
       indexFileChannel.write(headerBuffer);
       fstFileChannel.transferTo(0, _fstDataSize, indexFileChannel);
       invertedIndexFileChannel.transferTo(0, invertedIndexFileLength, indexFileChannel);
