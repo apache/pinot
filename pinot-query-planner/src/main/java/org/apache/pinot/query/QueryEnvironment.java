@@ -170,7 +170,6 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.

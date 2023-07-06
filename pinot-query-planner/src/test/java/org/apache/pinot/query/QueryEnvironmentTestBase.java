@@ -227,7 +227,7 @@ public class QueryEnvironmentTestBase {
   }
 
   // temporary function to strip the Physical plan from the explain query plan.
-  // physical plan is present for the explain queries having 'with implementation' option.
+  // physical plan is present for the explain queries by default.
   protected String stripPhysicalPlan(String explainedPlan) {
     return explainedPlan.substring(0, explainedPlan.indexOf("Physical Plan") - 1);
   }
