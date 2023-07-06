@@ -770,6 +770,7 @@ public class ClusterIntegrationTestUtils {
             return;
           }
 
+          h2Value = convertBooleanToLowerCase(h2Value);
           String brokerValue = brokerResponseRows.get(0).get(c).asText();
           String connectionValue = resultTableResultSet.getString(0, c);
 
@@ -795,7 +796,7 @@ public class ClusterIntegrationTestUtils {
           if (h2ResultSet.first()) {
             for (int i = 0; i < numRows; i++) {
               for (int c = 0; c < numColumns; c++) {
-                String h2Value = h2ResultSet.getString(c + 1);
+                String h2Value = convertBooleanToLowerCase(h2ResultSet.getString(c + 1));
                 String brokerValue = brokerResponseRows.get(i).get(c).asText();
                 String connectionValue = resultTableResultSet.getString(i, c);
                 boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);

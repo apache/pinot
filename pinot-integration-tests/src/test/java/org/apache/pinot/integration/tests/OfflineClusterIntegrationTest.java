@@ -2750,4 +2750,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rows.size(), 1);
     assertFalse(rows.get(0).get(0).asBoolean());
   }
+
+  @Test
+  public void testBooleanAggregation()
+      throws Exception {
+    testQuery("SELECT BOOL_AND(CAST(Cancelled AS BOOLEAN)) FROM mytable");
+    testQuery("SELECT BOOL_OR(CAST(Diverted AS BOOLEAN)) FROM mytable");
+  }
 }

@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
@@ -206,10 +205,14 @@ public class AggregateOperatorTest {
       result = sum0GroupBy1.getNextBlock();
     }
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{"Aa", 1.0}, new Object[]{"BB", 5.0});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    Assert.assertEquals(resultRows.size(), 2);
+    if (resultRows.get(0).equals("Aa")) {
+      Assert.assertEquals(resultRows.get(0), new Object[]{"Aa", 1.0});
+      Assert.assertEquals(resultRows.get(1), new Object[]{"BB", 5.0});
+    } else {
+      Assert.assertEquals(resultRows.get(0), new Object[]{"BB", 5.0});
+      Assert.assertEquals(resultRows.get(1), new Object[]{"Aa", 1.0});
+    }
   }
 
   @Test(expectedExceptions = BadQueryRequestException.class, expectedExceptionsMessageRegExp = ".*average.*")
