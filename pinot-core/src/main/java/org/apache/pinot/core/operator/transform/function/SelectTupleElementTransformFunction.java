@@ -30,7 +30,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class SelectTupleElementTransformFunction extends ComputeValueAndNullTogetherTransformFunction {
+public abstract class SelectTupleElementTransformFunction
+    extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
 
   private static final EnumSet<FieldSpec.DataType> SUPPORTED_DATATYPES = EnumSet.of(FieldSpec.DataType.INT,
       FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.BIG_DECIMAL,

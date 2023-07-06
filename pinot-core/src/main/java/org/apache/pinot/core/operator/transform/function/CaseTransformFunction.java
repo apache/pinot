@@ -54,7 +54,7 @@ import org.roaringbitmap.RoaringBitmap;
  * ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
  * expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
  */
-public class CaseTransformFunction extends ComputeValueAndNullTogetherTransformFunction {
+public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
   public static final String FUNCTION_NAME = "case";
 
   private List<TransformFunction> _whenStatements = new ArrayList<>();

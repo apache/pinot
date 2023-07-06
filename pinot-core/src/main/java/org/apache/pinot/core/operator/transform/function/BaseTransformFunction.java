@@ -100,6 +100,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected byte[][][] _bytesValuesMV;
 
   protected List<TransformFunction> _arguments;
+  protected boolean _nullHandlingEnabled;
 
   protected void fillResultUnknown(int length) {
     for (int i = 0; i < length; i++) {
@@ -111,6 +112,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     _arguments = arguments;
+  }
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    init(arguments, columnContextMap);
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override

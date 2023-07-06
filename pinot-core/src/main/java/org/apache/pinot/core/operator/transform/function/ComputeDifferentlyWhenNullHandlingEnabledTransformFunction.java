@@ -19,27 +19,17 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Base class for transform functions that compute value and NULL together when NULL handling is enabled.
+ * Base class for transform functions that compute differently (using value and NULL together) when NULL handling is
+ * enabled.
  */
-public abstract class ComputeValueAndNullTogetherTransformFunction extends BaseTransformFunction {
-  private boolean _nullHandlingEnabled;
-
-  @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
-      boolean nullHandlingEnabled) {
-    super.init(arguments, columnContextMap);
-    _nullHandlingEnabled = nullHandlingEnabled;
-  }
+public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
