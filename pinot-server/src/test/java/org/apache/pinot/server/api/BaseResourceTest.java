@@ -110,6 +110,7 @@ public abstract class BaseResourceTest {
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(serverInstance.getInstanceDataManager().getSegmentFileDirectory())
         .thenReturn(FileUtils.getTempDirectoryPath());
+    when(serverInstance.getHelixManager()).thenReturn(mock(HelixManager.class));
 
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
