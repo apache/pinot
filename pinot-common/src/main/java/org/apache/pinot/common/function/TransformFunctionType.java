@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlFunctionCategory;
@@ -92,14 +91,13 @@ public enum TransformFunctionType {
   CAST("cast"),
 
   // string functions
-  JSONEXTRACTSCALAR("jsonExtractScalar", SqlKind.OTHER_FUNCTION,
-      ReturnTypes.cascade(opBinding -> inferJsonExtractScalarExplicitTypeSpec(opBinding).orElse(
-              opBinding.getTypeFactory().createSqlType(SqlTypeName.VARCHAR, 2000)),
-          SqlTypeTransforms.FORCE_NULLABLE), null,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
-          ordinal -> ordinal > 1),
-      SqlFunctionCategory.USER_DEFINED_FUNCTION),
-  JSONEXTRACTKEY("jsonExtractKey"),
+  JSONEXTRACTSCALAR("jsonExtractScalar",
+      ReturnTypes.cascade(opBinding -> inferJsonExtractScalarExplicitTypeSpec(opBinding),
+          SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+      ordinal -> ordinal > 2)),
+  JSONEXTRACTKEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER))),
 
   // date time functions
   TIMECONVERT("timeConvert"),
@@ -195,6 +193,12 @@ public enum TransformFunctionType {
     this(name, null, null, null, null, null, aliases);
   }
 
+  TransformFunctionType(String name, SqlReturnTypeInference sqlReturnTypeInference,
+      SqlOperandTypeChecker sqlOperandTypeChecker, String... aliases) {
+    this(name, SqlKind.OTHER_FUNCTION, sqlReturnTypeInference, null, sqlOperandTypeChecker,
+        SqlFunctionCategory.USER_DEFINED_FUNCTION, aliases);
+  }
+
   /**
    * Constructor to use for transform functions which are supported in both v1 and multistage engines
    */
@@ -243,19 +247,18 @@ public enum TransformFunctionType {
   }
 
   /** Returns the optional explicit returning type specification. */
-  private static Optional<RelDataType> inferJsonExtractScalarExplicitTypeSpec(SqlOperatorBinding opBinding) {
+  private static RelDataType inferJsonExtractScalarExplicitTypeSpec(SqlOperatorBinding opBinding) {
     if (opBinding.getOperandCount() > 2
         && opBinding.isOperandLiteral(2, false)) {
       String operandType = opBinding.getOperandLiteralValue(2, String.class).toUpperCase();
-      return Optional.of(inferExplicitTypeSpec(operandType, opBinding.getTypeFactory()));
+      return inferExplicitTypeSpec(operandType, opBinding.getTypeFactory());
     }
-    return Optional.empty();
+    return null;
   }
 
   private static RelDataType inferExplicitTypeSpec(String operandType, RelDataTypeFactory typeFactory) {
     switch (operandType) {
       case "INT":
-      case "INTEGER":
         return typeFactory.createSqlType(SqlTypeName.INTEGER);
       case "LONG":
         return typeFactory.createSqlType(SqlTypeName.BIGINT);
@@ -274,5 +277,13 @@ public enum TransformFunctionType {
 
   public static String getNormalizedTransformFunctionName(String functionName) {
     return StringUtils.remove(functionName, '_').toUpperCase();
+  }
+
+  public static boolean isTransformFunctionType(String functionName) {
+    try {
+      return valueOf(functionName.toUpperCase()) != null;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 }

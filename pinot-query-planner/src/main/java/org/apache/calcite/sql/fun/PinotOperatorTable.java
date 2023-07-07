@@ -253,14 +253,9 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   }
 
   private boolean isPinotTransformFunction(String name) {
-    TransformFunctionType transformFunctionType = null;
     if (isTransformFunctionRegisteredWithOperatorTable(name)) {
-      try {
-        transformFunctionType = TransformFunctionType.valueOf(name);
-      } catch (IllegalArgumentException e) {
-        // Ignore
-      }
+      return TransformFunctionType.isTransformFunctionType(name);
     }
-    return transformFunctionType != null;
+    return false;
   }
 }

@@ -20,10 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.google.common.collect.ImmutableMap;
-import java.util.Properties;
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,33 +27,12 @@ import org.testng.annotations.Test;
 public class MultiStageEngineJsonPathClusterIntegrationTest extends JsonPathClusterIntegrationTest {
 
   @Override
-  protected Connection getPinotConnection() {
-    Properties properties = new Properties();
-    properties.put("queryOptions", "useMultistageEngine=true");
-    if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
-    }
-    return _pinotConnection;
-  }
-
-  @Override
-  protected void testQuery(String pinotQuery, String h2Query)
-      throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
-        getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/query/sql)
-   */
-  @Override
-  protected JsonNode postQuery(String query)
-      throws Exception {
-    return postQuery(query, _brokerBaseApiUrl, null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+  protected boolean useMultiStageQueryEngine() {
+    return true;
   }
 
   @Test
-  public void testComplexQueries2()
+  public void testComplexGroupByQuery()
       throws Exception {
     //Group By Query
     String query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"

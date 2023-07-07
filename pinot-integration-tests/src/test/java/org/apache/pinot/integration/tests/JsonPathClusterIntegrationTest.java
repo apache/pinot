@@ -263,7 +263,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testComplexQueries2()
+  public void testComplexGroupByQuery()
       throws Exception {
     //Group By Query
     String query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
@@ -279,6 +279,40 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
       Assert.assertEquals(row.get(0).asText(), "value-k1-" + seqId);
       Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId));
     }
+  }
+
+  @Test
+  public void testQueryWithIntegerDefault()
+      throws Exception {
+    //Group By Query
+    String query = "Select" + " jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey'),"
+        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','INT','1'))" + " from " + DEFAULT_TABLE_NAME
+        + " group by jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey')"
+        + " order by sum(jsonExtractScalar(complexMapStr,'$.inExistMet','INT','1')) DESC";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
+    ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    final JsonNode row = rows.get(0);
+    Assert.assertEquals(row.get(0).asText(), "defaultKey");
+    Assert.assertEquals(row.get(1).asDouble(), 1000.0);
+  }
+
+  @Test
+  public void testQueryWithDoubleDefault()
+      throws Exception {
+    //Group By Query
+    String query = "Select" + " jsonExtractScalar(complexMapStr,'$.inExistKey','STRING', 'defaultKey'),"
+        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','DOUBLE','0.1'))" + " from " + DEFAULT_TABLE_NAME
+        + " group by jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey')"
+        + " order by sum(jsonExtractScalar(complexMapStr,'$.inExistMet','DOUBLE','0.1')) DESC";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
+    ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    final JsonNode row = rows.get(0);
+    Assert.assertEquals(row.get(0).asText(), "defaultKey");
+    Assert.assertTrue(Math.abs(row.get(1).asDouble() - 100.0) < 1e-10);
   }
 
   @Test
