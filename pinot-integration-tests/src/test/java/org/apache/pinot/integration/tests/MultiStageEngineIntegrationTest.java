@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
-import java.util.Properties;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
@@ -48,9 +45,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Start the Pinot cluster
     startZk();
-    startController();
+    startController(getDefaultControllerConfiguration());
     startBroker();
     startServer();
+    setupTenants();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -75,6 +73,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     waitForAllDocsLoaded(600_000L);
   }
 
+  protected void setupTenants()
+      throws IOException {
+  }
+
+  @Override
+  protected boolean useMultiStageQueryEngine() {
+    return true;
+  }
+
   @Test
   @Override
   public void testHardcodedQueriesMultiStage()
@@ -95,8 +102,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
     String h2Query = "SELECT * FROM mytable limit 1";
-    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
-        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+    testQueryWithMatchingRowCount(pinotQuery, h2Query);
   }
 
   @Test
@@ -107,25 +113,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
     String h2Query =
         "SELECT DivAirportIDs[1], DivAirports[1] FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
-    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
-        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
-  }
-
-  @Override
-  protected Connection getPinotConnection() {
-    Properties properties = new Properties();
-    properties.put("queryOptions", "useMultistageEngine=true");
-    if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
-    }
-    return _pinotConnection;
-  }
-
-  @Override
-  protected void testQuery(String pinotQuery, String h2Query)
-      throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
-        getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+    testQueryWithMatchingRowCount(pinotQuery, h2Query);
   }
 
   @AfterClass

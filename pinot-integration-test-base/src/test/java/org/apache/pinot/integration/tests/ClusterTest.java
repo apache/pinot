@@ -95,10 +95,13 @@ public abstract class ClusterTest extends ControllerTest {
   protected BaseMinionStarter _minionStarter;
 
   private String _brokerBaseApiUrl;
-  private boolean _useMultiStageQueryEngine;
 
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
+  }
+
+  protected boolean useMultiStageQueryEngine() {
+    return false;
   }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
@@ -429,11 +432,14 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, getBrokerBaseApiUrl(), null, getMultiStageQueryProperties(_useMultiStageQueryEngine));
+    return postQuery(query, getBrokerBaseApiUrl(), null, getExtraQueryProperties());
   }
 
-  private static Map<String, String> getMultiStageQueryProperties(boolean useMultiStageQueryEngine) {
-    return ImmutableMap.of("queryOptions", "useMultistageEngine=" + useMultiStageQueryEngine);
+  protected Map<String, String> getExtraQueryProperties() {
+    if (!useMultiStageQueryEngine()) {
+      return Collections.emptyMap();
+    }
+    return ImmutableMap.of("queryOptions", "useMultistageEngine=true");
   }
 
   /**
@@ -465,8 +471,7 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public JsonNode postQueryToController(String query)
       throws Exception {
-    return postQueryToController(query, getInstance().getControllerBaseApiUrl(), null,
-        getMultiStageQueryProperties(_useMultiStageQueryEngine));
+    return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryProperties());
   }
 
   /**

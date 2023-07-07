@@ -507,9 +507,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName());
+      _pinotConnection =
+          ConnectionFactory.fromZookeeper(getPinotConnectionProperties(), getZkUrl() + "/" + getHelixClusterName());
     }
     return _pinotConnection;
+  }
+
+  protected Properties getPinotConnectionProperties() {
+    Properties properties = new Properties();
+    properties.putAll(getExtraQueryProperties());
+    return properties;
   }
 
   /**
@@ -580,6 +587,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     Assert.assertNotNull(inputStream);
     return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
+
   /**
    * Pushes the data in the given Avro files into a Kafka stream.
    *
@@ -602,8 +610,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     StreamDataProducer producer = null;
     try {
       producer =
-        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-            getDefaultKafkaProducerProperties(kafkaBroker));
+          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+              getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -629,6 +637,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       }
     }
   }
+
   private Properties getDefaultKafkaProducerProperties(String kafkaBroker) {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
@@ -744,6 +753,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
-        getH2Connection());
+        getH2Connection(), null, getExtraQueryProperties());
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   */
+  protected void testQueryWithMatchingRowCount(String pinotQuery, String h2Query)
+      throws Exception {
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
+        h2Query, getH2Connection(), null, getExtraQueryProperties());
   }
 }
