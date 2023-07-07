@@ -500,8 +500,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
       if (tableConfig != null) {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
-        if (!StreamConfig.ConsumerType.LOWLEVEL.name()
-            .equalsIgnoreCase(streamConfigMap.get(StreamConfigProperties.STREAM_CONSUMER_TYPES))) {
+        String consumerType = streamConfigMap.get(StreamConfigProperties.STREAM_CONSUMER_TYPES);
+        if (StreamConfig.ConsumerType.LOWLEVEL.name().equalsIgnoreCase(consumerType)
+            || "simple".equalsIgnoreCase(consumerType)) {
+          return;
+        } else {
           existingHlcTables.add(rt);
         }
       }

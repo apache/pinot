@@ -143,10 +143,11 @@ public final class TableConfigUtils {
       Map<String, String> streamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
       String streamType = streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE);
       Preconditions.checkNotNull(streamType, "stream.type cannot be null for REALTIME table");
-
+      String streamConsumerType = streamConfigsMap.getOrDefault(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.LOWLEVEL.name());
       Preconditions.checkState(StreamConfig.ConsumerType.LOWLEVEL.name()
-              .equalsIgnoreCase(streamConfigsMap.getOrDefault(StreamConfigProperties.constructStreamProperty(streamType,
-                  StreamConfigProperties.STREAM_CONSUMER_TYPES), StreamConfig.ConsumerType.LOWLEVEL.name())),
+              .equalsIgnoreCase(streamConsumerType) || "simple".equalsIgnoreCase(streamConsumerType),
           "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
     }
 
