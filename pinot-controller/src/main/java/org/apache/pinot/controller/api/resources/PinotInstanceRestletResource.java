@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Sets;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -29,8 +30,13 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.ClientErrorException;
@@ -49,12 +55,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -415,5 +423,76 @@ public class PinotInstanceRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to check the safety for instance drop operation.",
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @POST
+  @Path("/instances/updateTags/validate")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Check if it's safe to update the tags of the given instances. If not list all the reasons.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public List<OperationValidationResponse> instanceTagUpdateSafetyCheck(List<InstanceTagUpdateRequest> instances) {
+    LOGGER.info("Performing safety check on tag update request received for instances: {}",
+        instances.stream().map(InstanceTagUpdateRequest::getInstanceName).collect(Collectors.toList()));
+    Map<String, Integer> tenantTracker = new HashMap<>();
+    Map<String, List<String>> untaggedInstances = new HashMap<>();
+    for (InstanceTagUpdateRequest instance : instances) {
+      String name = instance.getInstanceName();
+      Set<String> oldTags = new HashSet<>(_pinotHelixResourceManager.getTagsForInstance(name));
+      Set<String> newTags = new HashSet<>(instance.getNewTags());
+      for (String tenant : Sets.difference(oldTags, newTags)) {
+        tenantTracker.put(tenant, Objects.requireNonNullElse(tenantTracker.get(tenant), 0) - 1);
+        List<String> instanceList = Objects.requireNonNullElse(untaggedInstances.get(tenant), new ArrayList<>());
+        instanceList.add(name);
+        untaggedInstances.put(tenant, instanceList);
+      }
+      for (String tenant : Sets.difference(newTags, oldTags)) {
+        tenantTracker.put(tenant, Objects.requireNonNullElse(tenantTracker.get(tenant), 0) + 1);
+      }
+    }
+    Map<String, Integer> tenantMinServerMap = minimumServersRequiredForTenants();
+    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap = new HashMap<>();
+    for (Map.Entry<String, Integer> entry : tenantTracker.entrySet()) {
+      if (entry.getValue() < 0) {
+        if (TagNameUtils.isServerTag(entry.getKey())) {
+          String tenant = TagNameUtils.getTenantFromTag(entry.getKey());
+          int updatedServerCount = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenant).size()
+              + entry.getValue();
+          int minServerRequirement = tenantMinServerMap.get(tenant);
+          if (updatedServerCount < minServerRequirement) {
+            untaggedInstances.get(entry.getKey()).forEach(instance -> {
+              List<OperationValidationResponse.ErrorWrapper> issueList =
+                  Objects.requireNonNullElse(responseMap.get(instance), new ArrayList<>());
+              issueList.add(new OperationValidationResponse.ErrorWrapper(
+                  OperationValidationResponse.ErrorCode.MINIMUM_SERVERS_UNSATISFIED, tenant, instance));
+              responseMap.put(instance, issueList);
+            });
+          }
+        }
+      }
+    }
+    List<OperationValidationResponse> response = new ArrayList<>(responseMap.size());
+    responseMap.forEach((instance, issueList) -> {
+      response.add(new OperationValidationResponse().putAllIssues(issueList).setInstanceName(instance).setSafe(false));
+    });
+    return response;
+  }
+
+  private Map<String, Integer> minimumServersRequiredForTenants() {
+    Map<String, Integer> tenantMinServerMap = new HashMap<>();
+    for (String table : _pinotHelixResourceManager.getAllTables()) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
+      if (tableConfig == null) {
+        LOGGER.error("Unable to retrieve table config for table: {}", table);
+        continue;
+      }
+      String tenant = tableConfig.getTenantConfig().getServer();
+      int maxReplication = Math.max(Objects.requireNonNullElse(tenantMinServerMap.get(tenant), 0),
+          tableConfig.getReplication());
+      tenantMinServerMap.put(tenant, maxReplication);
+    }
+    return tenantMinServerMap;
   }
 }

@@ -58,6 +58,11 @@ public class OperationValidationResponse {
     return this;
   }
 
+  public OperationValidationResponse putAllIssues(List<ErrorWrapper> issues) {
+    _issues.addAll(issues);
+    return this;
+  }
+
   public String getIssueMessage(int index) {
     return _issues.get(index).getMessage();
   }
@@ -82,7 +87,8 @@ public class OperationValidationResponse {
 
   public enum ErrorCode {
     IS_ALIVE("Instance %s is still live"),
-    CONTAINS_RESOURCE("Instance %s exists in ideal state for %s");
+    CONTAINS_RESOURCE("Instance %s exists in ideal state for %s"),
+    MINIMUM_SERVERS_UNSATISFIED("Tenant %s will not satisfy minimum servers requirement if removed from server %s.");
 
     public final String _description;
 

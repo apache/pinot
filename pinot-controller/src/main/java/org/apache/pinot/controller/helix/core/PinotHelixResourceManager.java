@@ -1225,7 +1225,7 @@ public class PinotHelixResourceManager {
     return tenantSet;
   }
 
-  private List<String> getTagsForInstance(String instanceName) {
+  public List<String> getTagsForInstance(String instanceName) {
     InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
     return config.getTags();
   }
